@@ -34,8 +34,9 @@ class BorrowedSocket;
 class SocketPool {
  public:
   friend class BorrowedSocket;
+  SocketPool(std::vector<base::ScopedFile> sockets);
+
   BorrowedSocket Borrow();
-  void Init(std::vector<base::ScopedFile> sockets);
   void Shutdown();
 
  private:
@@ -88,12 +89,11 @@ class FreePage {
   // Add address to buffer. Flush if necessary using a socket borrowed from
   // pool.
   // Can be called from any thread. Must not hold mutex_.`
-  bool Add(const uint64_t addr, uint64_t sequence_number, SocketPool* pool);
-  void Init();
+  void Add(const uint64_t addr, uint64_t sequence_number, SocketPool* pool);
 
  private:
   // Needs to be called holding mutex_.
-  bool FlushLocked(SocketPool* pool);
+  void FlushLocked(SocketPool* pool);
 
   FreeMetadata free_page_;
   std::mutex mutex_;
@@ -129,16 +129,13 @@ class PThreadKey {
 // This is created and owned by the malloc hooks.
 class Client {
  public:
-  Client();
-
-  void Init(std::vector<base::ScopedFile> sockets);
-  void Init(const std::string& sock_name, size_t conns);
-
-  bool RecordMalloc(uint64_t alloc_size,
+  Client(std::vector<base::ScopedFile> sockets);
+  Client(const std::string& sock_name, size_t conns);
+  void RecordMalloc(uint64_t alloc_size,
                     uint64_t total_size,
                     uint64_t alloc_address);
-  bool RecordFree(uint64_t alloc_address);
-  bool MaybeSampleAlloc(uint64_t alloc_size,
+  void RecordFree(uint64_t alloc_address);
+  void MaybeSampleAlloc(uint64_t alloc_size,
                         uint64_t alloc_address,
                         void* (*unhooked_malloc)(size_t),
                         void (*unhooked_free)(void*));
@@ -148,9 +145,9 @@ class Client {
   bool inited() { return inited_; }
 
  private:
-  ssize_t ShouldSampleAlloc(uint64_t alloc_size,
-                            void* (*unhooked_malloc)(size_t),
-                            void (*unhooked_free)(void*));
+  size_t ShouldSampleAlloc(uint64_t alloc_size,
+                           void* (*unhooked_malloc)(size_t),
+                           void (*unhooked_free)(void*));
   const char* GetStackBase();
 
   std::atomic<bool> inited_{false};
