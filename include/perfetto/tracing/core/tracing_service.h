@@ -77,12 +77,12 @@ class PERFETTO_EXPORT TracingService {
     // copy uncommitted chunks written by the trace writer into its associated
     // buffer, e.g. when a producer process crashes or when a flush is
     // necessary.
-    virtual void OnTraceWriterCreated(uint32_t writer_id,
-                                      uint32_t target_buffer) = 0;
+    virtual void RegisterTraceWriter(uint32_t writer_id,
+                                     uint32_t target_buffer) = 0;
 
     // Remove the association of the trace writer previously created via
-    // OnTraceWriterCreated.
-    virtual void OnTraceWriterDestroyed(uint32_t writer_id) = 0;
+    // RegisterTraceWriter.
+    virtual void UnregisterTraceWriter(uint32_t writer_id) = 0;
 
     // Called by the Producer to signal that some pages in the shared memory
     // buffer (shared between Service and Producer) have changed.

@@ -207,32 +207,32 @@ void ProducerIPCClientImpl::UnregisterDataSource(const std::string& name) {
       req, ipc::Deferred<protos::UnregisterDataSourceResponse>());
 }
 
-void ProducerIPCClientImpl::OnTraceWriterCreated(uint32_t writer_id,
-                                                 uint32_t target_buffer) {
+void ProducerIPCClientImpl::RegisterTraceWriter(uint32_t writer_id,
+                                                uint32_t target_buffer) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   if (!connected_) {
     PERFETTO_DLOG(
-        "Cannot OnTraceWriterCreated(), not connected to tracing service");
+        "Cannot RegisterTraceWriter(), not connected to tracing service");
     return;
   }
-  protos::OnTraceWriterCreatedRequest req;
+  protos::RegisterTraceWriterRequest req;
   req.set_trace_writer_id(writer_id);
   req.set_target_buffer(target_buffer);
-  producer_port_.OnTraceWriterCreated(
-      req, ipc::Deferred<protos::OnTraceWriterCreatedResponse>());
+  producer_port_.RegisterTraceWriter(
+      req, ipc::Deferred<protos::RegisterTraceWriterResponse>());
 }
 
-void ProducerIPCClientImpl::OnTraceWriterDestroyed(uint32_t writer_id) {
+void ProducerIPCClientImpl::UnregisterTraceWriter(uint32_t writer_id) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   if (!connected_) {
     PERFETTO_DLOG(
-        "Cannot OnTraceWriterDestroyed(), not connected to tracing service");
+        "Cannot UnregisterTraceWriter(), not connected to tracing service");
     return;
   }
-  protos::OnTraceWriterDestroyedRequest req;
+  protos::UnregisterTraceWriterRequest req;
   req.set_trace_writer_id(writer_id);
-  producer_port_.OnTraceWriterDestroyed(
-      req, ipc::Deferred<protos::OnTraceWriterDestroyedResponse>());
+  producer_port_.UnregisterTraceWriter(
+      req, ipc::Deferred<protos::UnregisterTraceWriterResponse>());
 }
 
 void ProducerIPCClientImpl::CommitData(const CommitDataRequest& req,

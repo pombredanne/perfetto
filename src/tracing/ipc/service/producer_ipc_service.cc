@@ -131,39 +131,39 @@ void ProducerIPCService::UnregisterDataSource(
       ipc::AsyncResult<protos::UnregisterDataSourceResponse>::Create());
 }
 
-void ProducerIPCService::OnTraceWriterCreated(
-    const protos::OnTraceWriterCreatedRequest& req,
-    DeferredOnTraceWriterCreatedResponse response) {
+void ProducerIPCService::RegisterTraceWriter(
+    const protos::RegisterTraceWriterRequest& req,
+    DeferredRegisterTraceWriterResponse response) {
   RemoteProducer* producer = GetProducerForCurrentRequest();
   if (!producer) {
     PERFETTO_DLOG(
-        "Producer invoked OnTraceWriterCreated() before "
+        "Producer invoked RegisterTraceWriter() before "
         "InitializeConnection()");
     return response.Reject();
   }
-  producer->service_endpoint->OnTraceWriterCreated(req.trace_writer_id(),
-                                                   req.target_buffer());
+  producer->service_endpoint->RegisterTraceWriter(req.trace_writer_id(),
+                                                  req.target_buffer());
 
-  // OnTraceWriterCreated doesn't expect any meaningful response.
+  // RegisterTraceWriter doesn't expect any meaningful response.
   response.Resolve(
-      ipc::AsyncResult<protos::OnTraceWriterCreatedResponse>::Create());
+      ipc::AsyncResult<protos::RegisterTraceWriterResponse>::Create());
 }
 
-void ProducerIPCService::OnTraceWriterDestroyed(
-    const protos::OnTraceWriterDestroyedRequest& req,
-    DeferredOnTraceWriterDestroyedResponse response) {
+void ProducerIPCService::UnregisterTraceWriter(
+    const protos::UnregisterTraceWriterRequest& req,
+    DeferredUnregisterTraceWriterResponse response) {
   RemoteProducer* producer = GetProducerForCurrentRequest();
   if (!producer) {
     PERFETTO_DLOG(
-        "Producer invoked OnTraceWriterDestroyed() before "
+        "Producer invoked UnregisterTraceWriter() before "
         "InitializeConnection()");
     return response.Reject();
   }
-  producer->service_endpoint->OnTraceWriterDestroyed(req.trace_writer_id());
+  producer->service_endpoint->UnregisterTraceWriter(req.trace_writer_id());
 
-  // OnTraceWriterDestroyed doesn't expect any meaningful response.
+  // UnregisterTraceWriter doesn't expect any meaningful response.
   response.Resolve(
-      ipc::AsyncResult<protos::OnTraceWriterDestroyedResponse>::Create());
+      ipc::AsyncResult<protos::UnregisterTraceWriterResponse>::Create());
 }
 
 void ProducerIPCService::CommitData(const protos::CommitDataRequest& proto_req,

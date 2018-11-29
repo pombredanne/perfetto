@@ -39,13 +39,13 @@ service ProducerPort {
       returns (UnregisterDataSourceResponse) {}
 
   // Associates a trace writer with its target buffer.
-  rpc OnTraceWriterCreated(OnTraceWriterCreatedRequest)
-      returns (OnTraceWriterCreatedResponse) {}
+  rpc RegisterTraceWriter(RegisterTraceWriterRequest)
+      returns (RegisterTraceWriterResponse) {}
 
   // Removes a trace writer association previously added by
-  // OnTraceWriterCreated.
-  rpc OnTraceWriterDestroyed(OnTraceWriterDestroyedRequest)
-      returns (OnTraceWriterDestroyedResponse) {}
+  // RegisterTraceWriter.
+  rpc UnregisterTraceWriter(UnregisterTraceWriterRequest)
+      returns (UnregisterTraceWriterResponse) {}
 
   // Sent by the client to request the service to:
   // 1) Move some chunks from the shmem buffer into the logging buffer.
@@ -106,9 +106,9 @@ message UnregisterDataSourceRequest {
 
 message UnregisterDataSourceResponse {}
 
-// Arguments for rpc OnTraceWriterCreated().
+// Arguments for rpc RegisterTraceWriter().
 
-message OnTraceWriterCreatedRequest {
+message RegisterTraceWriterRequest {
   // The ID of a producer's trace writer.
   optional uint32 trace_writer_id = 1;
 
@@ -116,16 +116,16 @@ message OnTraceWriterCreatedRequest {
   optional uint32 target_buffer = 2;
 }
 
-message OnTraceWriterCreatedResponse {}
+message RegisterTraceWriterResponse {}
 
-// Arguments for rpc OnTraceWriterDestroyed().
+// Arguments for rpc UnregisterTraceWriter().
 
-message OnTraceWriterDestroyedRequest {
+message UnregisterTraceWriterRequest {
   // The ID of a producer's trace writer.
   optional uint32 trace_writer_id = 1;
 }
 
-message OnTraceWriterDestroyedResponse {}
+message UnregisterTraceWriterResponse {}
 
 // Arguments for rpc CommitData().
 // See commit_data_request.proto for CommitDataRequest. That has its own file
