@@ -86,6 +86,7 @@ class TracingServiceImpl : public TracingService {
     void StartDataSource(DataSourceInstanceID, const DataSourceConfig&);
     void StopDataSource(DataSourceInstanceID);
     void Flush(FlushRequestID, const std::vector<DataSourceInstanceID>&);
+    void OnFreeBuffers(const std::vector<BufferID>& target_buffers);
 
    private:
     friend class TracingServiceImpl;
@@ -104,6 +105,10 @@ class TracingServiceImpl : public TracingService {
     SharedMemoryABI shmem_abi_;
     size_t shmem_size_hint_bytes_ = 0;
     const std::string name_;
+
+    // Set of the global target_buffer IDs that the producer is configured to
+    // write into in any active tracing session.
+    std::set<BufferID> allowed_target_buffers_;
 
     // This is used only in in-process configurations (mostly tests).
     std::unique_ptr<SharedMemoryArbiterImpl> inproc_shmem_arbiter_;
@@ -254,6 +259,9 @@ class TracingServiceImpl : public TracingService {
     // The original trace config provided by the Consumer when calling
     // EnableTracing().
     const TraceConfig config;
+
+    // Set of producers that are or were participating in this session.
+    std::set<ProducerID> producers;
 
     // List of data source instances that have been enabled on the various
     // producers for this tracing session.

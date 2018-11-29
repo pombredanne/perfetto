@@ -173,6 +173,9 @@ void TracingServiceImpl::DisconnectProducer(ProducerID id) {
     it = next;
   }
 
+  for (auto& session_entry : tracing_sessions_)
+    session_entry.second.producers.erase(id);
+
   producers_.erase(id);
   UpdateMemoryGuardrail();
 }
@@ -916,6 +919,12 @@ void TracingServiceImpl::FreeBuffers(TracingSessionID tsid) {
   }
   DisableTracing(tsid, /*disable_immediately=*/true);
 
+  for (ProducerID producer_id : tracing_session->producers) {
+    ProducerEndpointImpl* producer = GetProducer(producer_id);
+    PERFETTO_DCHECK(producer);
+    producer->OnFreeBuffers(tracing_session->buffers_index);
+  }
+
   for (BufferID buffer_id : tracing_session->buffers_index) {
     buffer_ids_.Free(buffer_id);
     PERFETTO_DCHECK(buffers_.count(buffer_id) == 1);
@@ -1098,6 +1107,7 @@ TracingServiceImpl::DataSourceInstance* TracingServiceImpl::SetupDataSource(
     producer->OnTracingSetup();
     UpdateMemoryGuardrail();
   }
+  tracing_session->producers.insert(producer->id_);
   producer->SetupDataSource(inst_id, ds_config);
   return ds_instance;
 }
@@ -1624,6 +1634,7 @@ void TracingServiceImpl::ProducerEndpointImpl::SetupDataSource(
     DataSourceInstanceID ds_id,
     const DataSourceConfig& config) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
+  allowed_target_buffers_.insert(static_cast<BufferID>(config.target_buffer()));
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
   task_runner_->PostTask([weak_this, ds_id, config] {
     if (weak_this)
@@ -1652,6 +1663,12 @@ void TracingServiceImpl::ProducerEndpointImpl::NotifyDataSourceStopped(
     DataSourceInstanceID data_source_id) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   service_->NotifyDataSourceStopped(id_, data_source_id);
+}
+
+void TracingServiceImpl::ProducerEndpointImpl::OnFreeBuffers(
+    const std::vector<BufferID>& target_buffers) {
+  for (BufferID buffer : target_buffers)
+    allowed_target_buffers_.erase(buffer);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
