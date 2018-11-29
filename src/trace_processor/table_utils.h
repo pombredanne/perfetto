@@ -57,14 +57,13 @@ inline RangeRowIterator CreateRangeIterator(
       bitvector_cs.emplace_back(i);
   }
 
-  //
+  // Create an filter index and allow each of the columns filter on it.
   FilteredRowIndex index(min_idx, max_idx);
   for (const auto& c_idx : bitvector_cs) {
     const auto& c = cs[c_idx];
     auto* value = argv[c_idx];
 
-    auto col = static_cast<size_t>(c.iColumn);
-    const auto& schema_col = schema.GetColumn(col);
+    const auto& schema_col = schema.GetColumn(static_cast<size_t>(c.iColumn));
     schema_col.Filter(c.op, value, &index);
   }
 

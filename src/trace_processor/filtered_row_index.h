@@ -61,7 +61,7 @@ class FilteredRowIndex {
   void FilterAllRows(Predicate fn) {
     row_filter_.resize(end_row_ - start_row_, true);
     for (uint32_t i = start_row_; i < end_row_; i++) {
-      row_filter_[start_row_ - i] = fn(i);
+      row_filter_[i - start_row_] = fn(i);
     }
     // Update the mode to use the bitvector.
     mode_ = Mode::kBitVector;
