@@ -4,7 +4,6 @@ _These are temporary instructions while heapprofd is under development. They are
 subject to frequent change and will be obsoleted once heapprofd is integrated
 into Perfetto._
 
-Currently heapprofd only works with SELinux disabled.
 
 ## Using convenience script
 
@@ -20,6 +19,8 @@ This will create a heap dump every second for a default of 1 minute.
 Head to http://pprof/ and upload the gzipped protos to get a visualization.
 
 ## Manual
+Currently heapprofd only works with SELinux disabled.
+
 To start profiling the process `${PID}`, run the following sequence of commands.
 Adjust the `INTERVAL` to trade-off runtime impact for higher accuracy of the
 results. If `INTERVAL=1`, every allocation is sampled for maximum accuracy.
