@@ -26,6 +26,7 @@
 namespace perfetto {
 namespace trace_processor {
 
+// Storage for information about the rows to be returned by a filter operation.
 class FilteredRowIndex {
  public:
   enum Mode {
@@ -35,6 +36,8 @@ class FilteredRowIndex {
 
   FilteredRowIndex(uint32_t start_row, uint32_t end_row);
 
+  // Cals |fn| on each row index which is currently to be returned and retains
+  // row index if |fn| returns true or discards the row otherwise.
   template <typename Predicate>
   void FilterRows(Predicate fn) {
     switch (mode_) {
@@ -47,6 +50,8 @@ class FilteredRowIndex {
     }
   }
 
+  // Returns the bitvector backing this row index. Only valid if |mode()| ==
+  // Mode::kBitVector.
   std::vector<bool> ReleaseBitVector() {
     auto vector = std::move(row_filter_);
     row_filter_.clear();
