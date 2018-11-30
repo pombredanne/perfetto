@@ -938,7 +938,7 @@ TEST_F(TracingServiceImplTest, AllowedBuffers) {
   ds_config22->set_target_buffer(2);
   auto* ds_config23 = trace_config.add_data_sources()->mutable_config();
   ds_config23->set_name("data_source2.3");
-  ds_config23->set_target_buffer(2);
+  ds_config23->set_target_buffer(2);  // same buffer as data_source2.2.
   consumer->EnableTracing(trace_config);
 
   ASSERT_EQ(3, tracing_session()->num_buffers());
@@ -965,7 +965,8 @@ TEST_F(TracingServiceImplTest, AllowedBuffers) {
   producer2->UnregisterDataSource("data_source2.3");
   producer2->WaitForDataSourceStop("data_source2.3");
 
-  // Should still be allowed to write to buffers 1 and 2.
+  // Should still be allowed to write to buffers 1 (data_source2.1) and 2
+  // (data_source2.2).
   EXPECT_EQ(expected_buffers_producer2, GetAllowedTargetBuffers(producer2_id));
 
   // Calling StartTracing() should be a noop (% a DLOG statement) because the
