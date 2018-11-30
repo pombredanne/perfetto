@@ -171,7 +171,7 @@ bool DoUnwind(WireMessage* msg, UnwindingMetadata* metadata, AllocRecord* out) {
     out->frames.emplace_back(frame_data);
     PERFETTO_DLOG("unwinding failed %" PRIu8, error_code);
   }
-  return error_code == 0;
+  return true;
 }
 
 bool HandleUnwindingRecord(UnwindingRecord* rec, BookkeepingRecord* out) {
@@ -188,10 +188,7 @@ bool HandleUnwindingRecord(UnwindingRecord* rec, BookkeepingRecord* out) {
 
     out->pid = rec->pid;
     out->record_type = BookkeepingRecord::Type::Malloc;
-    if (!DoUnwind(&msg, metadata.get(), &out->alloc_record)) {
-      return false;
-    }
-    return true;
+    return DoUnwind(&msg, metadata.get(), &out->alloc_record);
   } else if (msg.record_type == RecordType::Free) {
     out->record_type = BookkeepingRecord::Type::Free;
     out->pid = rec->pid;
