@@ -1676,6 +1676,8 @@ void TracingServiceImpl::ProducerEndpointImpl::NotifyDataSourceStopped(
 
 void TracingServiceImpl::ProducerEndpointImpl::OnFreeBuffers(
     const std::vector<BufferID>& target_buffers) {
+  if (allowed_target_buffers_.empty())
+  return;
   for (BufferID buffer : target_buffers)
     allowed_target_buffers_.erase(buffer);
 }
