@@ -491,15 +491,13 @@ void PerfettoCmd::SetupCtrlCSignalHandler() {
 #if defined(__clang__)
 #pragma GCC diagnostic ignored "-Wdisabled-macro-expansion"
 #endif
-  sa.sa_handler = [](int) {
-    PERFETTO_LOG("SIGINT received: disabling tracing");
-    g_consumer_cmd->SignalCtrlC();
-  };
+  sa.sa_handler = [](int) { g_consumer_cmd->SignalCtrlC(); };
   sa.sa_flags = static_cast<decltype(sa.sa_flags)>(SA_RESETHAND | SA_RESTART);
 #pragma GCC diagnostic pop
   sigaction(SIGINT, &sa, nullptr);
 
   task_runner_.AddFileDescriptorWatch(ctrl_c_evt_.fd(), [this] {
+    PERFETTO_LOG("SIGINT received: disabling tracing");
     ctrl_c_evt_.Clear();
     consumer_endpoint_->Flush(kFlushTimeoutMs, [this](bool) {
       consumer_endpoint_->DisableTracing();
