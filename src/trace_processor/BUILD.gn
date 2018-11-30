@@ -161,6 +161,7 @@ source_set("unittests") {
   sources = [
     "counters_table_unittest.cc",
     "event_tracker_unittest.cc",
+    "filtered_row_index_unittest.cc",
     "process_table_unittest.cc",
     "process_tracker_unittest.cc",
     "proto_trace_parser_unittest.cc",

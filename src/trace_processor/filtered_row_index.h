@@ -60,6 +60,8 @@ class FilteredRowIndex {
   }
 
   Mode mode() const { return mode_; }
+  uint32_t start_row() const { return start_row_; }
+  uint32_t end_row() const { return end_row_; }
 
  private:
   template <typename Predicate>
