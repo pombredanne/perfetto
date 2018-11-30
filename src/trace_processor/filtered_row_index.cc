@@ -39,6 +39,10 @@ void FilteredRowIndex::SetOnlyRows(std::vector<uint32_t> rows) {
   // Initialise start to the beginning of the vector.
   auto start = row_filter_.begin();
   for (size_t row : rows) {
+    // If a row is out of bounds of of the index, simply ignore it.
+    if (row < start_row_ || row >= end_row_)
+      continue;
+
     // Unset all bits between the start iterator and the iterator pointing
     // to the current row. That is, this loop sets all elements not pointed
     // to by rows to false. It does not touch the rows themselves which
