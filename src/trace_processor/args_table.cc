@@ -91,7 +91,7 @@ void ArgsTable::IdColumn::Filter(int op,
   auto id = sqlite_utils::ExtractSqliteValue<RowId>(value);
   const auto& args_for_id = storage_->args().args_for_id();
   auto it_pair = args_for_id.equal_range(id);
-  std::vector<size_t> rows;
+  std::vector<uint32_t> rows;
   for (auto it = it_pair.first; it != it_pair.second; it++) {
     rows.push_back(it->second);
   }

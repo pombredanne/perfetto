@@ -22,7 +22,17 @@ namespace trace_processor {
 FilteredRowIndex::FilteredRowIndex(uint32_t start_row, uint32_t end_row)
     : mode_(Mode::kAllRows), start_row_(start_row), end_row_(end_row) {}
 
-void FilteredRowIndex::SetOnlyRows(std::vector<size_t> rows) {
+void FilteredRowIndex::SetOnlyRows(std::vector<uint32_t> rows) {
+  if (mode_ == kAllRows) {
+    mode_ = Mode::kBitVector;
+    row_filter_.resize(end_row_ - start_row_, false);
+
+    for (size_t row : rows) {
+      row_filter_[row - start_row_] = true;
+    }
+    return;
+  }
+
   // Sort the rows so that the algorithm below makes sense.
   std::sort(rows.begin(), rows.end());
 
@@ -35,7 +45,7 @@ void FilteredRowIndex::SetOnlyRows(std::vector<size_t> rows) {
     // means if they were already false (i.e. not returned) then they won't
     // be returned now and if they were true (i.e. returned) they will still
     // be returned.
-    auto end = row_filter_.begin() + static_cast<ptrdiff_t>(row);
+    auto end = row_filter_.begin() + static_cast<ptrdiff_t>(row - start_row_);
     std::fill(start, end, false);
     start = end + 1;
   }
