@@ -292,6 +292,16 @@ UI_DEPS = [
     CATAPULT_SHA1,
    'all'
   ),
+  ('buildtools/pax.tgz',
+   'https://github.com/chromy/pax/releases/download/pax-v0.4.2/chromy-pax-pax-v0.4.2-x86_64-apple-darwin.tar.gz',
+   '5e70fc0921e3356a0b7a62369f6d8833288fa793',
+   'darwin'
+  ),
+  ('buildtools/pax.tgz',
+   'https://github.com/chromy/pax/releases/download/pax-v0.4.2/chromy-pax-pax-v0.4.2-x86_64-unknown-linux-gnu.tar.gz',
+   '721b492e5a34acdd8cbdfa81a8db6d6a1f2c7364', 
+   'linux2'
+  ),
 ]
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

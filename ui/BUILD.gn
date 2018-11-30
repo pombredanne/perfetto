@@ -20,6 +20,7 @@ ui_dir = "$root_build_dir/ui"
 ui_gen_dir = "$target_out_dir/gen"
 nodejs_root = "../buildtools/nodejs"
 nodejs_bin = rebase_path("$nodejs_root/bin", root_build_dir)
+px_bin = "../buildtools/pax/px"
 
 # +----------------------------------------------------------------------------+
 # | The outer "ui" target to just ninja -C out/xxx ui                          |
@@ -101,29 +102,30 @@ template("sorcery") {
 # | Template for bundling js                                                   |
 # +----------------------------------------------------------------------------+
 template("bundle") {
-  node_bin(target_name) {
+  action(target_name) {
     assert(defined(invoker.input))
     assert(defined(invoker.output))
     forward_variables_from(invoker, [ "deps" ])
+    script = "../gn/standalone/build_tool_wrapper.py"
     inputs = [
+      px_bin,
       invoker.input,
-      "rollup.config.js",
     ]
     outputs = [
       invoker.output,
       invoker.output + ".map",
     ]
-    node_cmd = "rollup"
     args = [
-      "-c",
-      rebase_path("rollup.config.js", root_build_dir),
-      rebase_path(invoker.input, root_build_dir),
-      "-o",
-      rebase_path(invoker.output, root_build_dir),
-      "-f",
-      "iife",
-      "-m",
-      "--silent",
+     rebase_path(px_bin, root_build_dir),
+     "-x",
+     "crypto",
+     "--external-core",
+     "-i",
+     rebase_path(invoker.input, root_build_dir),
+     "-o",
+     rebase_path(invoker.output, root_build_dir),
+    "-m",
+     rebase_path(invoker.output + ".map", root_build_dir),
     ]
   }
 }
@@ -140,7 +142,7 @@ bundle("frontend_bundle") {
     ":transpile_all_ts",
   ]
   input = "$target_out_dir/frontend/index.js"
-  output = "$target_out_dir/frontend_bundle.js"
+  output = "$target_out_dir/frontend/frontend_bundle.js"
 }
 
 bundle("controller_bundle") {
@@ -148,7 +150,7 @@ bundle("controller_bundle") {
     ":transpile_all_ts",
   ]
   input = "$target_out_dir/controller/index.js"
-  output = "$target_out_dir/controller_bundle.js"
+  output = "$target_out_dir/controller/controller_bundle.js"
 }
 
 bundle("engine_bundle") {
@@ -156,7 +158,7 @@ bundle("engine_bundle") {
     ":transpile_all_ts",
   ]
   input = "$target_out_dir/engine/index.js"
-  output = "$target_out_dir/engine_bundle.js"
+  output = "$target_out_dir/engine/engine_bundle.js"
 }
 
 # +----------------------------------------------------------------------------+
@@ -303,7 +305,7 @@ sorcery("frontend_bundle_dist") {
   deps = [
     ":frontend_bundle",
   ]
-  input = "$target_out_dir/frontend_bundle.js"
+  input = "$target_out_dir/frontend/frontend_bundle.js"
   output = "$ui_dir/frontend_bundle.js"
 }
 
@@ -311,7 +313,7 @@ sorcery("controller_bundle_dist") {
   deps = [
     ":controller_bundle",
   ]
-  input = "$target_out_dir/controller_bundle.js"
+  input = "$target_out_dir/controller/controller_bundle.js"
   output = "$ui_dir/controller_bundle.js"
 }
 
@@ -319,7 +321,7 @@ sorcery("engine_bundle_dist") {
   deps = [
     ":engine_bundle",
   ]
-  input = "$target_out_dir/engine_bundle.js"
+  input = "$target_out_dir/engine/engine_bundle.js"
   output = "$ui_dir/engine_bundle.js"
 }
 
