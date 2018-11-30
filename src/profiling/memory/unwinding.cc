@@ -162,10 +162,15 @@ bool DoUnwind(WireMessage* msg, UnwindingMetadata* metadata, AllocRecord* out) {
     if (error_code != unwindstack::ERROR_INVALID_MAP)
       break;
   }
-  if (error_code == 0)
-    out->frames = unwinder.frames();
-  else
+  out->frames = unwinder.frames();
+  if (error_code != 0) {
+    unwindstack::FrameData frame_data{};
+    frame_data.function_name = "ERROR " + std::to_string(error_code);
+    frame_data.map_name = "ERROR";
+
+    out->frames.emplace_back(frame_data);
     PERFETTO_DLOG("unwinding failed %" PRIu8, error_code);
+  }
   return error_code == 0;
 }
 
