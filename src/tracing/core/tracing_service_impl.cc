@@ -173,9 +173,6 @@ void TracingServiceImpl::DisconnectProducer(ProducerID id) {
     it = next;
   }
 
-  for (auto& session_entry : tracing_sessions_)
-    session_entry.second.producers.erase(id);
-
   producers_.erase(id);
   UpdateMemoryGuardrail();
 }
@@ -919,9 +916,8 @@ void TracingServiceImpl::FreeBuffers(TracingSessionID tsid) {
   }
   DisableTracing(tsid, /*disable_immediately=*/true);
 
-  for (ProducerID producer_id : tracing_session->producers) {
-    ProducerEndpointImpl* producer = GetProducer(producer_id);
-    PERFETTO_DCHECK(producer);
+  for (auto& producer_entry : producers_) {
+    ProducerEndpointImpl* producer = producer_entry.second;
     producer->OnFreeBuffers(tracing_session->buffers_index);
   }
 
@@ -1107,7 +1103,6 @@ TracingServiceImpl::DataSourceInstance* TracingServiceImpl::SetupDataSource(
     producer->OnTracingSetup();
     UpdateMemoryGuardrail();
   }
-  tracing_session->producers.insert(producer->id_);
   producer->SetupDataSource(inst_id, ds_config);
   return ds_instance;
 }
@@ -1500,6 +1495,20 @@ void TracingServiceImpl::ProducerEndpointImpl::UnregisterDataSource(
     const std::string& name) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   service_->UnregisterDataSource(id_, name);
+}
+
+void TracingServiceImpl::ProducerEndpointImpl::RegisterTraceWriter(
+    uint32_t /*writer_id*/,
+    uint32_t /*target_buffer*/) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  // TODO(eseckler): Store association into a map. Make sure to verify that the
+  // target buffer is "allowed" when using this association later.
+}
+
+void TracingServiceImpl::ProducerEndpointImpl::UnregisterTraceWriter(
+    uint32_t /*writer_id*/) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  // TODO(eseckler): Remove association from the map.
 }
 
 void TracingServiceImpl::ProducerEndpointImpl::CommitData(

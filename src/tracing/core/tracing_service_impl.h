@@ -73,6 +73,9 @@ class TracingServiceImpl : public TracingService {
     // TracingService::ProducerEndpoint implementation.
     void RegisterDataSource(const DataSourceDescriptor&) override;
     void UnregisterDataSource(const std::string& name) override;
+    void RegisterTraceWriter(uint32_t writer_id,
+                             uint32_t target_buffer) override;
+    void UnregisterTraceWriter(uint32_t writer_id) override;
     void CommitData(const CommitDataRequest&, CommitDataCallback) override;
     void SetSharedMemory(std::unique_ptr<SharedMemory>);
     std::unique_ptr<TraceWriter> CreateTraceWriter(BufferID) override;
@@ -259,9 +262,6 @@ class TracingServiceImpl : public TracingService {
     // The original trace config provided by the Consumer when calling
     // EnableTracing().
     const TraceConfig config;
-
-    // Set of producers that are or were participating in this session.
-    std::set<ProducerID> producers;
 
     // List of data source instances that have been enabled on the various
     // producers for this tracing session.
