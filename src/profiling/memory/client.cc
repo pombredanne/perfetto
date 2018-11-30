@@ -107,34 +107,47 @@ char* FindMainThreadStack() {
 
 }  // namespace
 
-void FreePage::Add(const uint64_t addr,
+bool FreePage::Add(const uint64_t addr,
                    const uint64_t sequence_number,
                    SocketPool* pool) {
   std::lock_guard<std::mutex> l(mutex_);
   if (offset_ == kFreePageSize) {
-    FlushLocked(pool);
+    if (!FlushLocked(pool))
+      return false;
     // Now that we have flushed, reset to after the header.
     offset_ = 0;
   }
   FreePageEntry& current_entry = free_page_.entries[offset_++];
   current_entry.sequence_number = sequence_number;
   current_entry.addr = addr;
+  return true;
 }
 
-void FreePage::FlushLocked(SocketPool* pool) {
+bool FreePage::FlushLocked(SocketPool* pool) {
   WireMessage msg = {};
   msg.record_type = RecordType::Free;
   free_page_.num_entries = offset_;
   msg.free_header = &free_page_;
   BorrowedSocket fd(pool->Borrow());
   if (!fd || !SendWireMessage(*fd, msg)) {
-    PERFETTO_DFATAL("Failed to send wire message");
     fd.Close();
+    return false;
   }
+  return true;
 }
 
-SocketPool::SocketPool(std::vector<base::ScopedFile> sockets)
-    : sockets_(std::move(sockets)), available_sockets_(sockets_.size()) {}
+void FreePage::Init() {
+  std::lock_guard<std::mutex> l(mutex_);
+  offset_ = 0;
+}
+
+void SocketPool::Init(std::vector<base::ScopedFile> sockets) {
+  std::unique_lock<std::mutex> lck_(mutex_);
+  sockets_ = std::move(sockets);
+  available_sockets_ = sockets_.size();
+  dead_sockets_ = 0;
+  shutdown_ = false;
+}
 
 BorrowedSocket SocketPool::Borrow() {
   std::unique_lock<std::mutex> lck_(mutex_);
@@ -195,11 +208,24 @@ const char* GetThreadStackBase() {
   return stackaddr + stacksize;
 }
 
-Client::Client(std::vector<base::ScopedFile> socks)
+Client::Client()
     : pthread_key_(ThreadLocalSamplingData::KeyDestructor),
-      socket_pool_(std::move(socks)),
-      main_thread_stack_base_(FindMainThreadStack()) {
+      main_thread_stack_base_(FindMainThreadStack()) {}
+
+void Client::Init(std::vector<base::ScopedFile> socks) {
   PERFETTO_DCHECK(pthread_key_.valid());
+  PERFETTO_DCHECK(!inited());
+
+  // It is essential that this happens BEFORE re-initializing the SocketPool.
+  // Let's assume this is called while another thread is inside of
+  // RecordMalloc. If we stored the updated sequence number, the following
+  // could happen: the thread gets a socket before the sequence number is
+  // updated but after the socket pool has been reinitialized. It then sends
+  // a record with the old sequence number, confusing the central service.
+  sequence_number_.store(0, std::memory_order_release);
+
+  socket_pool_.Init(std::move(socks));
+  free_page_.Init();
 
   uint64_t size = 0;
   base::ScopedFile maps(base::OpenFile("/proc/self/maps", O_RDONLY));
@@ -230,8 +256,9 @@ Client::Client(std::vector<base::ScopedFile> socks)
   inited_.store(true, std::memory_order_release);
 }
 
-Client::Client(const std::string& sock_name, size_t conns)
-    : Client(ConnectPool(sock_name, conns)) {}
+void Client::Init(const std::string& sock_name, size_t conns) {
+  Init(ConnectPool(sock_name, conns));
+}
 
 const char* Client::GetStackBase() {
   if (IsMainThread()) {
@@ -256,11 +283,12 @@ const char* Client::GetStackBase() {
 //               +------------+    |
 //               |  main      |    v
 // stackbase +-> +------------+ 0xffff
-void Client::RecordMalloc(uint64_t alloc_size,
+bool Client::RecordMalloc(uint64_t alloc_size,
                           uint64_t total_size,
                           uint64_t alloc_address) {
-  if (!inited_.load(std::memory_order_acquire))
-    return;
+  if (!inited_.load(std::memory_order_acquire)) {
+    return false;
+  }
   AllocMetadata metadata;
   const char* stackbase = GetStackBase();
   const char* stacktop = reinterpret_cast<char*>(__builtin_frame_address(0));
@@ -268,7 +296,8 @@ void Client::RecordMalloc(uint64_t alloc_size,
 
   if (stackbase < stacktop) {
     PERFETTO_DFATAL("Stackbase >= stacktop.");
-    return;
+    Shutdown();
+    return false;
   }
 
   uint64_t stack_size = static_cast<uint64_t>(stackbase - stacktop);
@@ -287,38 +316,52 @@ void Client::RecordMalloc(uint64_t alloc_size,
   msg.payload = const_cast<char*>(stacktop);
   msg.payload_size = static_cast<size_t>(stack_size);
 
-  BorrowedSocket fd = socket_pool_.Borrow();
-  if (!fd || !SendWireMessage(*fd, msg)) {
-    PERFETTO_DFATAL("Failed to send wire message.");
-    fd.Close();
+  bool shut_down = false;
+  {
+    BorrowedSocket fd = socket_pool_.Borrow();
+    if (!fd || !SendWireMessage(*fd, msg)) {
+      fd.Close();
+      shut_down = true;
+    }
   }
+  // Return the socket before shutting down to prevent a deadlock.
+  if (shut_down)
+    Shutdown();
+  return !shut_down;
 }
 
-void Client::RecordFree(uint64_t alloc_address) {
-  if (!inited_.load(std::memory_order_acquire))
-    return;
-  free_page_.Add(alloc_address,
-                 1 + sequence_number_.fetch_add(1, std::memory_order_acq_rel),
-                 &socket_pool_);
-}
-
-size_t Client::ShouldSampleAlloc(uint64_t alloc_size,
-                                 void* (*unhooked_malloc)(size_t),
-                                 void (*unhooked_free)(void*)) {
+bool Client::RecordFree(uint64_t alloc_address) {
   if (!inited_.load(std::memory_order_acquire))
     return false;
-  return SampleSize(pthread_key_.get(), alloc_size, client_config_.interval,
-                    unhooked_malloc, unhooked_free);
+  bool success = free_page_.Add(
+      alloc_address,
+      1 + sequence_number_.fetch_add(1, std::memory_order_acq_rel),
+      &socket_pool_);
+  if (!success)
+    Shutdown();
+  return success;
 }
 
-void Client::MaybeSampleAlloc(uint64_t alloc_size,
+ssize_t Client::ShouldSampleAlloc(uint64_t alloc_size,
+                                  void* (*unhooked_malloc)(size_t),
+                                  void (*unhooked_free)(void*)) {
+  if (!inited_.load(std::memory_order_acquire))
+    return -1;
+  return static_cast<ssize_t>(SampleSize(pthread_key_.get(), alloc_size,
+                                         client_config_.interval,
+                                         unhooked_malloc, unhooked_free));
+}
+
+bool Client::MaybeSampleAlloc(uint64_t alloc_size,
                               uint64_t alloc_address,
                               void* (*unhooked_malloc)(size_t),
                               void (*unhooked_free)(void*)) {
-  size_t total_size =
+  ssize_t total_size =
       ShouldSampleAlloc(alloc_size, unhooked_malloc, unhooked_free);
   if (total_size > 0)
-    RecordMalloc(alloc_size, total_size, alloc_address);
+    return RecordMalloc(alloc_size, static_cast<size_t>(total_size),
+                        alloc_address);
+  return total_size != -1;
 }
 
 void Client::Shutdown() {

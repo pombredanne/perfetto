@@ -85,7 +85,8 @@ TEST_F(HeapprofdIntegrationTest, MAYBE_EndToEnd) {
     PERFETTO_CHECK(false);
   }
   std::thread th([kSamplingInterval] {
-    Client client(kSocketName, 1);
+    Client client;
+    client.Init(kSocketName, 1);
     SomeFunction(&client);
     EXPECT_EQ(client.client_config_for_testing().interval, kSamplingInterval);
   });
@@ -116,7 +117,8 @@ TEST_F(HeapprofdIntegrationTest, MAYBE_MultiSession) {
     PERFETTO_CHECK(false);
   }
   std::thread th([kSamplingInterval] {
-    Client client(kSocketName, 1);
+    Client client;
+    client.Init(kSocketName, 1);
     SomeFunction(&client);
     EXPECT_EQ(client.client_config_for_testing().interval, kSamplingInterval);
   });
