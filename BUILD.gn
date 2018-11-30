@@ -238,6 +238,12 @@ if (perfetto_build_standalone || perfetto_build_with_android) {
         "protos/perfetto/trace:lite",
       ]
     }
+
+    executable("power_trace") {
+      deps = [
+        "src/traced/probes:power_trace",
+      ]
+    }
   }
 }  # if (perfetto_build_standalone || perfetto_build_with_android)
 

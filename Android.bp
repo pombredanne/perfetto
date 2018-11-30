@@ -2472,6 +2472,29 @@ cc_test {
   },
 }
 
+// GN target: //:power_trace
+cc_binary {
+  name: "power_trace",
+  srcs: [
+    "src/traced/probes/power/power_data_source.cc",
+  ],
+  shared_libs: [
+    "android.hardware.health@2.0",
+    "libbase",
+    "libutils",
+    "libhidlbase",
+    "libhidltransport",
+    "libhwbinder",
+    "liblog",
+  ],
+  defaults: [
+    "perfetto_defaults",
+  ],
+  static_libs: [
+    "libhealthhalutils",
+  ],
+}
+
 // GN target: //:trace_to_text
 cc_binary_host {
   name: "trace_to_text",

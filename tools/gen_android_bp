@@ -46,6 +46,7 @@ default_targets = [
     '//:trace_to_text',
     '//:heapprofd_client',
     '//:heapprofd',
+    '//:power_trace',
 ]
 
 # Defines a custom init_rc argument to be applied to the corresponding output
@@ -76,6 +77,10 @@ library_whitelist = [
     'log',
     'services',
     'utils',
+    'android.hardware.health@2.0',
+    'libhwbinder',
+    'libhidlbase',
+    'libhidltransport'
 ]
 
 # Name of the module which settings such as compiler flags for all other
@@ -101,6 +106,10 @@ library_not_in_pdk = {
 additional_args = {
     "heapprofd_client": [
         ("include_dirs", ["bionic/libc"]),
+    ],
+    "power_trace": [
+      # ("shared_libs", ["android.hardware.health@2.0", "libhwbinder", "libhidlbase", "libhidltransport"]),
+      ("static_libs", ["libhealthhalutils"]),
     ],
 }
 

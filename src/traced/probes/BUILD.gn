@@ -73,3 +73,16 @@ source_set("unittests") {
     "sys_stats:unittests",
   ]
 }
+
+source_set("power_trace") {
+  deps = [
+    "../../../gn:default_deps",
+    # "../../base",
+  ]
+  sources = [
+    "power/power_data_source.cc",
+  ]
+  libs = [
+"android.hardware.health@2.0", "libhwbinder", "libhidlbase", "libhidltransport"
+  ]
+}
