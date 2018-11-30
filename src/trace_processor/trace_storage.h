@@ -379,7 +379,7 @@ class TraceStorage {
   }
 
   static RowId CreateRowId(TableId table, uint32_t row) {
-    static constexpr uint64_t kRowIdTableShift = 32ul;
+    static constexpr uint8_t kRowIdTableShift = 32;
     return (static_cast<uint64_t>(table) << kRowIdTableShift) | row;
   }
 
