@@ -317,8 +317,12 @@ cc_library_shared {
   ],
   shared_libs: [
     "android.hardware.health@2.0",
+    "libbase",
     "libhidlbase",
+    "libhidltransport",
+    "libhwbinder",
     "liblog",
+    "libutils",
   ],
   defaults: [
     "perfetto_defaults",

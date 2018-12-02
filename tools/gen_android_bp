@@ -74,9 +74,10 @@ module_prefix = 'perfetto_'
 library_whitelist = [
     'android.hardware.health@2.0',
     'android',
+    'base',
     'binder',
     'hidlbase',
-    'hidltransport'
+    'hidltransport',
     'hwbinder',
     'log',
     'services',

@@ -20,10 +20,9 @@ source_set("power") {
     "..:data_source",
     "../../../../gn:default_deps",
     "../../../../include/perfetto/traced",
+    "../../../../protos/perfetto/trace/power:zero",
     "../../../android_hal:headers",
     "../../../base",
-
-    # "../../../../protos/perfetto/trace/filesystem:zero",
   ]
   sources = [
     "android_power_data_source.cc",

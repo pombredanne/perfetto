@@ -23,6 +23,8 @@ source_set("headers") {
   ]
 }
 
+# This target proxies calls to Android internal libraries that are not part of
+# the NDK. This is replaced in standalone builds with empty stubs (_noop.cc).
 source_set("android_hal") {
   deps = [
     ":headers",
@@ -39,6 +41,7 @@ source_set("android_hal") {
       "hwbinder",
       "hidlbase",
       "hidltransport",
+      "utils",
     ]
   } else {
     sources = [

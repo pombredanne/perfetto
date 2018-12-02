@@ -48,7 +48,7 @@ decltype(&android_hal::GetBatteryCounter) GetBatteryCounterFunction() {
 }
 
 base::Optional<int64_t> GetCounter(android_hal::BatteryCounter counter) {
-  auto get_counter_fn = GetBatteryCounterFunction();
+  static auto get_counter_fn = GetBatteryCounterFunction();
   if (!get_counter_fn)
     return base::nullopt;
   int64_t value = 0;
@@ -69,7 +69,7 @@ AndroidPowerDataSource::AndroidPowerDataSource(
       poll_rate_ms_(cfg.android_power_config().battery_poll_ms()),
       writer_(std::move(writer)),
       weak_factory_(this) {
-  poll_rate_ms_ = std::min(poll_rate_ms_, 100u);
+  poll_rate_ms_ = std::max(poll_rate_ms_, 100u);
   for (auto id : cfg.android_power_config().battery_counters()) {
     PERFETTO_CHECK(id < counters_enabled_.size());
     counters_enabled_.set(id);
@@ -102,8 +102,9 @@ void AndroidPowerDataSource::Tick() {
       continue;
     auto counter = static_cast<android_hal::BatteryCounter>(i);
     auto value = GetCounter(counter);
-    if (value.has_value())
+    if (!value.has_value())
       continue;
+
     switch (counter) {
       case android_hal::BatteryCounter::kCharge:
         counters_proto->set_charge_counter_uah(*value);
@@ -116,6 +117,7 @@ void AndroidPowerDataSource::Tick() {
       case android_hal::BatteryCounter::kCurrent:
         counters_proto->set_current_ua(*value);
         break;
+
       case android_hal::BatteryCounter::kCurrentAvg:
         counters_proto->set_current_avg_ua(*value);
         break;
