@@ -6,14 +6,20 @@ on Android internals.
 Block diagram:
 
 ```
-                                                       [   Non-NDK libraries   ]
-                                                   +-> libbase.so
-+---------------+       +-----------------------+  +-> libutils.so
-| traced_probes |- - -> | libperfetto_binder.so |->+-> libhidltransport.so
-+---------------+  ^    +-----------------------+  +-> libhwbinder.so
-                   |                               +-> android.hardware.xxx@2.0
+                                                   
+                                                   
++---------------+       +---------------------------------+  
+| traced_probes |- - -> | libperfetto_android_internal.so |
++---------------+  ^    +---------------+-----------------+ 
+                   |                    |        
+                   |                    | [  Non-NDK libraries ]
+                   |                    +-> libbase.so
+                   |                    +-> libutils.so
+                   |                    +-> libhidltransport.so
+                   |                    +-> libhwbinder.so
+                   |                    +-> android.hardware.xxx@2.0
                    |
-                   dynamically loaded on first use via dlopen()
+                   + dynamically loaded on first use via dlopen()
 ```
 
 The major reason for using a separate .so() and introducing the shared library

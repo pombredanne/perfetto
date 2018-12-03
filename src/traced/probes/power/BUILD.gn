@@ -22,7 +22,7 @@ source_set("power") {
     "../../../../gn:default_deps",
     "../../../../include/perfetto/traced",
     "../../../../protos/perfetto/trace/power:zero",
-    "../../../android_binder:headers",
+    "../../../android_internal:headers",
     "../../../base",
   ]
   sources = [

@@ -26,7 +26,7 @@
 #include "perfetto/tracing/core/data_source_config.h"
 #include "perfetto/tracing/core/trace_packet.h"
 #include "perfetto/tracing/core/trace_writer.h"
-#include "src/android_binder/health_hal.h"
+#include "src/android_internal/health_hal.h"
 
 #include "perfetto/trace/power/battery_counters.pbzero.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
@@ -37,13 +37,13 @@ namespace {
 constexpr uint32_t kMinPollRateMs = 250;
 }
 
-// Dynamically loads / unloads the libperfetto_binder.so library which allows
-// to proxy calls to android hwbinder in in-tree builds.
+// Dynamically loads / unloads the libperfetto_android_internal.so library which
+// allows to proxy calls to android hwbinder in in-tree builds.
 struct AndroidPowerDataSource::DynamicLibLoader {
   using ScopedDlHandle = base::ScopedResource<void*, dlclose, nullptr>;
 
   DynamicLibLoader() {
-    static const char kLibName[] = "libperfetto_binder.so";
+    static const char kLibName[] = "libperfetto_android_internal.so";
     handle_.reset(dlopen(kLibName, RTLD_NOW));
     if (!handle_) {
       PERFETTO_PLOG("dlopen(%s) failed", kLibName);
@@ -55,7 +55,7 @@ struct AndroidPowerDataSource::DynamicLibLoader {
     get_battery_counter_ = reinterpret_cast<decltype(get_battery_counter_)>(fn);
   }
 
-  base::Optional<int64_t> GetCounter(android_binder::BatteryCounter counter) {
+  base::Optional<int64_t> GetCounter(android_internal::BatteryCounter counter) {
     if (!get_battery_counter_)
       return base::nullopt;
     int64_t value = 0;
@@ -67,7 +67,7 @@ struct AndroidPowerDataSource::DynamicLibLoader {
   bool is_loaded() const { return !!handle_; }
 
  private:
-  decltype(&android_binder::GetBatteryCounter) get_battery_counter_ = nullptr;
+  decltype(&android_internal::GetBatteryCounter) get_battery_counter_ = nullptr;
   ScopedDlHandle handle_;
 };
 
@@ -88,21 +88,21 @@ AndroidPowerDataSource::AndroidPowerDataSource(
     poll_rate_ms_ = kMinPollRateMs;
   }
   for (auto counter : cfg.android_power_config().battery_counters()) {
-    auto hal_id = android_binder::BatteryCounter::kUnspecified;
+    auto hal_id = android_internal::BatteryCounter::kUnspecified;
     switch (counter) {
       case AndroidPowerConfig::BATTERY_COUNTER_UNSPECIFIED:
         break;
       case AndroidPowerConfig::BATTERY_COUNTER_CHARGE:
-        hal_id = android_binder::BatteryCounter::kCharge;
+        hal_id = android_internal::BatteryCounter::kCharge;
         break;
       case AndroidPowerConfig::BATTERY_COUNTER_CAPACITY_PERCENT:
-        hal_id = android_binder::BatteryCounter::kCapacityPercent;
+        hal_id = android_internal::BatteryCounter::kCapacityPercent;
         break;
       case AndroidPowerConfig::BATTERY_COUNTER_CURRENT:
-        hal_id = android_binder::BatteryCounter::kCurrent;
+        hal_id = android_internal::BatteryCounter::kCurrent;
         break;
       case AndroidPowerConfig::BATTERY_COUNTER_CURRENT_AVG:
-        hal_id = android_binder::BatteryCounter::kCurrentAvg;
+        hal_id = android_internal::BatteryCounter::kCurrentAvg;
         break;
     }
     PERFETTO_CHECK(static_cast<size_t>(hal_id) < counters_enabled_.size());
@@ -137,29 +137,29 @@ void AndroidPowerDataSource::Tick() {
   for (size_t i = 0; i < counters_enabled_.size(); i++) {
     if (!counters_enabled_.test(i))
       continue;
-    auto counter = static_cast<android_binder::BatteryCounter>(i);
+    auto counter = static_cast<android_internal::BatteryCounter>(i);
     auto value = lib_->GetCounter(counter);
     if (!value.has_value())
       continue;
 
     switch (counter) {
-      case android_binder::BatteryCounter::kUnspecified:
+      case android_internal::BatteryCounter::kUnspecified:
         PERFETTO_DCHECK(false);
         break;
 
-      case android_binder::BatteryCounter::kCharge:
+      case android_internal::BatteryCounter::kCharge:
         counters_proto->set_charge_counter_uah(*value);
         break;
 
-      case android_binder::BatteryCounter::kCapacityPercent:
+      case android_internal::BatteryCounter::kCapacityPercent:
         counters_proto->set_capacity_percent(static_cast<int>(*value));
         break;
 
-      case android_binder::BatteryCounter::kCurrent:
+      case android_internal::BatteryCounter::kCurrent:
         counters_proto->set_current_ua(*value);
         break;
 
-      case android_binder::BatteryCounter::kCurrentAvg:
+      case android_internal::BatteryCounter::kCurrentAvg:
         counters_proto->set_current_avg_ua(*value);
         break;
     }
