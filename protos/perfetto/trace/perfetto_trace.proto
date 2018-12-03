@@ -2198,7 +2198,7 @@ message BatteryCounters {
   optional int64 charge_counter_uah = 1;
 
   // Remaining battery capacity percentage of total capacity
-  optional int32 capacity_percent = 2;
+  optional float capacity_percent = 2;
 
   // Instantaneous battery current in microamperes(µA).
   // Positive values indicate net current entering the battery from a charge
