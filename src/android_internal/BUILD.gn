@@ -45,4 +45,12 @@ source_set("android_internal") {
       "utils",
     ]
   }
+
+  # This target should never depend on any other perfetto target to avoid ODR
+  # violation by doubly linking code in two .so(s) loaded in the same exe.
+  assert_no_deps = [
+    "//src/base/*",
+    "//src/tracing/*",
+    "//include/*",
+  ]
 }
