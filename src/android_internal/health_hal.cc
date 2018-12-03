@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-#include "src/android_binder/health_hal.h"
+#include "src/android_internal/health_hal.h"
 
 #include <android/hardware/health/2.0/IHealth.h>
 #include <healthhalutils/HealthHalUtils.h>
 
 namespace perfetto {
-namespace android_binder {
+namespace android_internal {
 
 using ::android::hardware::health::V2_0::IHealth;
 using ::android::hardware::health::V2_0::Result;
@@ -90,5 +90,5 @@ bool GetBatteryCounter(BatteryCounter counter, int64_t* value) {
   return res == Result::SUCCESS;
 }
 
-}  // namespace android_binder
+}  // namespace android_internal
 }  // namespace perfetto

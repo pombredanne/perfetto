@@ -239,10 +239,10 @@ if (perfetto_build_standalone || perfetto_build_with_android) {
       ]
     }
 
-    shared_library("libperfetto_binder") {
+    shared_library("libperfetto_android_internal") {
       deps = [
         "gn:default_deps",
-        "src/android_binder",
+        "src/android_internal",
       ]
     }
   }  # if (perfetto_build_with_android)

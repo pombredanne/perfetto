@@ -37,7 +37,7 @@ import sys
 # Default targets to translate to the blueprint file.
 default_targets = [
     '//:libperfetto',
-    '//:libperfetto_binder',
+    '//:libperfetto_android_internal',
     '//:perfetto_integrationtests',
     '//:perfetto_trace_protos',
     '//:perfetto_unittests',
@@ -109,9 +109,9 @@ additional_args = {
         ('include_dirs', ['bionic/libc']),
     ],
     'traced_probes': [
-      ('required', ['libperfetto_binder']),
+      ('required', ['libperfetto_android_internal']),
     ],
-    'libperfetto_binder': [
+    'libperfetto_android_internal': [
       ('static_libs', ['libhealthhalutils']),
     ],
 }

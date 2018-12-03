@@ -14,19 +14,20 @@
  * limitations under the License.
  */
 
-#ifndef SRC_ANDROID_BINDER_HEALTH_HAL_H_
-#define SRC_ANDROID_BINDER_HEALTH_HAL_H_
+#ifndef SRC_ANDROID_INTERNAL_HEALTH_HAL_H_
+#define SRC_ANDROID_INTERNAL_HEALTH_HAL_H_
 
 #include <stddef.h>
 #include <stdint.h>
 
-// This header declares proxy functions defined in libperfetto_binder.so that
-// allow traced_probes to access internal android functions via hwbinder.
+// This header declares proxy functions defined in
+// libperfetto_android_internal.so that allow traced_probes to access internal
+// android functions (e.g., hwbinder).
 // Do not add any include to either perfetto headers or android headers. See
 // README.md for more.
 
 namespace perfetto {
-namespace android_binder {
+namespace android_internal {
 
 enum class BatteryCounter {
   kUnspecified = 0,
@@ -38,12 +39,14 @@ enum class BatteryCounter {
 
 extern "C" {
 
+// Thse functions are not thread safe unless specified otherwise.
+
 bool __attribute__((visibility("default")))
 GetBatteryCounter(BatteryCounter, int64_t*);
 
 }  // extern "C"
 
-}  // namespace android_binder
+}  // namespace android_internal
 }  // namespace perfetto
 
-#endif  // SRC_ANDROID_BINDER_HEALTH_HAL_H_
+#endif  // SRC_ANDROID_INTERNAL_HEALTH_HAL_H_
