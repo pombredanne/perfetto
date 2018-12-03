@@ -822,7 +822,8 @@ void ProtoTraceParser::ParseBatteryCounters(uint64_t ts,
         break;
       case protos::BatteryCounters::kCapacityPercentFieldNumber:
         context_->event_tracker->PushCounter(
-            ts, fld.as_int64(), batt_capacity_id_, 0, RefType::kRefNoRef);
+            ts, static_cast<double>(fld.as_float()), batt_capacity_id_, 0,
+            RefType::kRefNoRef);
         break;
       case protos::BatteryCounters::kCurrentUaFieldNumber:
         context_->event_tracker->PushCounter(

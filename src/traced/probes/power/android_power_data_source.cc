@@ -50,8 +50,10 @@ struct AndroidPowerDataSource::DynamicLibLoader {
       return;
     }
     void* fn = dlsym(*handle_, "GetBatteryCounter");
-    if (!fn)
+    if (!fn) {
       PERFETTO_PLOG("dlsym(GetBatteryCounter) failed");
+      return;
+    }
     get_battery_counter_ = reinterpret_cast<decltype(get_battery_counter_)>(fn);
   }
 
@@ -152,7 +154,7 @@ void AndroidPowerDataSource::Tick() {
         break;
 
       case android_internal::BatteryCounter::kCapacityPercent:
-        counters_proto->set_capacity_percent(static_cast<int>(*value));
+        counters_proto->set_capacity_percent(static_cast<float>(*value));
         break;
 
       case android_internal::BatteryCounter::kCurrent:
