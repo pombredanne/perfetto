@@ -573,7 +573,6 @@ void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
         ParseSignalDeliver(timestamp, pid, ftrace.slice(fld_off, fld.size()));
         break;
       }
-
       default:
         break;
     }

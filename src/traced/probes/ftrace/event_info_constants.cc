@@ -18,6 +18,12 @@
 
 namespace perfetto {
 
+using protozero::proto_utils::kProtoInt32;
+using protozero::proto_utils::kProtoInt64;
+using protozero::proto_utils::kProtoString;
+using protozero::proto_utils::kProtoUint64;
+using protozero::proto_utils::kProtoUint32;
+
 Field MakeField(const char* name, uint32_t id, ProtoFieldType type) {
   Field field{};
   field.ftrace_name = name;
