@@ -34,7 +34,7 @@ class TaskRunner;
 
 class FtraceController;
 
-// This struct is acessed both by the FtraceController on the main thread and
+// This struct is accessed both by the FtraceController on the main thread and
 // by the CpuReader(s) on their worker threads. It is used to synchronize
 // handshakes between FtraceController and CpuReader(s). There is only *ONE*
 // instance of this state, owned by the FtraceController and shared with all

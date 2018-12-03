@@ -186,7 +186,7 @@ CpuReader::CpuReader(const ProtoTranslationTable* table,
 }
 
 CpuReader::~CpuReader() {
-// FtraceController (who owns this) is supposed to issue a kStop notifitcation
+// FtraceController (who owns this) is supposed to issue a kStop notification
 // to the thread sync object before destroying the CpuReader.
 #if PERFETTO_DCHECK_IS_ON()
   {
@@ -230,7 +230,7 @@ void CpuReader::RunWorkerThread(size_t cpu,
   pthread_setname_np(pthread_self(), thread_name);
 
   // When using splice() the target fd needs to be an actual pipe. This pipe is
-  // used only within this thread and is mainly for synchronizatio purposes.
+  // used only within this thread and is mainly for synchronization purposes.
   // A blocking splice() is the only way to block and wait for a new page of
   // ftrace data.
   base::Pipe sync_pipe = base::Pipe::Create(base::Pipe::kBothNonBlock);
@@ -240,7 +240,7 @@ void CpuReader::RunWorkerThread(size_t cpu,
   constexpr auto kPageSize = base::kPageSize;
 
   // This lambda function reads the ftrace raw pipe using either read() or
-  // splice(), either in bloking or non-blocking mode.
+  // splice(), either in blocking or non-blocking mode.
   // Returns the number of ftrace bytes read, or -1 in case of failure.
   auto read_ftrace_pipe = [&sync_pipe, trace_fd, pool, cpu, header_size_len](
                               ReadMode mode, Block block) -> int {
@@ -249,15 +249,16 @@ void CpuReader::RunWorkerThread(size_t cpu,
     const char* mode_str = kModesStr[(mode == kSplice) * 2 + (block == kBlock)];
     PERFETTO_METATRACE(mode_str, cpu);
     uint8_t* pool_page = pool->BeginWrite();
-    if (!pool_page)
-      return -1;
+    PERFETTO_DCHECK(pool_page);
 
     ssize_t res;
+    int err = 0;
     if (mode == kSplice) {
-      uint32_t flags = SPLICE_F_MOVE | (block == kNonBlock) * SPLICE_F_NONBLOCK;
-      res = splice(trace_fd, nullptr, *sync_pipe.wr, nullptr, kPageSize, flags);
+      uint32_t flg = SPLICE_F_MOVE | ((block == kNonBlock) * SPLICE_F_NONBLOCK);
+      res = splice(trace_fd, nullptr, *sync_pipe.wr, nullptr, kPageSize, flg);
+      err = errno;
       if (res > 0) {
-        // If the splice() succeeded read back from the other end of our own
+        // If the splice() succeeded, read back from the other end of our own
         // pipe and copy the data into the pool.
         ssize_t rdres = read(*sync_pipe.rd, pool_page, kPageSize);
         PERFETTO_DCHECK(rdres = res);
@@ -266,6 +267,7 @@ void CpuReader::RunWorkerThread(size_t cpu,
       if (block == kNonBlock)
         SetBlocking(trace_fd, false);
       res = read(trace_fd, pool_page, kPageSize);
+      err = errno;
       if (res > 0) {
         // Need to copy the ptr, ParsePageHeader() advances the passed ptr arg.
         const uint8_t* ptr = pool_page;
@@ -296,8 +298,8 @@ void CpuReader::RunWorkerThread(size_t cpu,
 
     // It is fine to leave the BeginWrite() unpaired in the error case.
 
-    if (res && errno != EAGAIN && errno != ENOMEM && errno != EBUSY &&
-        errno != EINTR && errno != EBADF) {
+    if (res && err != EAGAIN && err != ENOMEM && err != EBUSY && err != EINTR &&
+        err != EBADF) {
       // EAGAIN: no data when in non-blocking mode.
       // ENONMEM, EBUSY: temporary ftrace failures (they happen).
       // EINTR: signal interruption, likely from main thread to issue a new cmd.
@@ -316,7 +318,7 @@ void CpuReader::RunWorkerThread(size_t cpu,
     // is not necessary for the condition variable itself, but it's necessary to
     // unblock us if we are in a blocking read() or splice().
     // Commands are tagged with an ID, every new command has a new |cmd_id|, so
-    // we can distinguish spurious wakeups from actual cmd requestss.
+    // we can distinguish spurious wakeups from actual cmd requests.
     {
       PERFETTO_METATRACE("wait cmd", cpu);
       std::unique_lock<std::mutex> lock(thread_sync->mutex);
@@ -365,7 +367,8 @@ void CpuReader::RunWorkerThread(size_t cpu,
         }
         pool->CommitWrittenPages();
         FtraceController::OnCpuReaderRead(cpu, generation, thread_sync);
-      } break;
+        break;
+      }
 
       case FtraceThreadSync::kFlush: {
         PERFETTO_METATRACE("flush", cpu);
@@ -374,7 +377,8 @@ void CpuReader::RunWorkerThread(size_t cpu,
         }
         pool->CommitWrittenPages();
         FtraceController::OnCpuReaderFlush(cpu, generation, thread_sync);
-      } break;
+        break;
+      }
     }  // switch(cmd)
   }    // for(run_loop)
   PERFETTO_DPLOG("Terminating CPUReader thread for CPU %zd.", cpu);
