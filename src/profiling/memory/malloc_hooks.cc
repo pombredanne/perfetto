@@ -108,30 +108,25 @@ void* HEAPPROFD_ADD_PREFIX(_valloc)(size_t size);
 bool HEAPPROFD_ADD_PREFIX(_initialize)(const MallocDispatch* malloc_dispatch,
                                        int*,
                                        const char*) {
-  perfetto::profiling::Client* client = GetClient();
-  if (!client) {
-    g_dispatch.store(malloc_dispatch, write_order);
-    // This can store a nullptr, so we have to check in the hooks below to avoid
-    // segfaulting in that case.
-    std::unique_ptr<perfetto::profiling::Client> new_client(
-        new (std::nothrow) perfetto::profiling::Client());
-    if (!new_client)
-      return false;
-    new_client->Init(perfetto::profiling::kHeapprofdSocketFile,
-                     kNumConnections);
-    if (!new_client->inited())
-      return false;
+  perfetto::profiling::Client* old_client = GetClient();
+  if (old_client)
+    old_client->Shutdown();
 
-    g_client.store(new_client.release());
-  } else {
-    if (!client->inited())
-      client->Init(perfetto::profiling::kHeapprofdSocketFile, kNumConnections);
-    return client->inited();
-  }
+  g_dispatch.store(malloc_dispatch, write_order);
+  // This can store a nullptr, so we have to check in the hooks below to avoid
+  // segfaulting in that case.
+  std::unique_ptr<perfetto::profiling::Client> client(
+      new (std::nothrow) perfetto::profiling::Client(
+          perfetto::profiling::kHeapprofdSocketFile, kNumConnections));
+  if (!client || !client->inited())
+    return false;
+
+  g_client.store(client.release());
   return true;
 }
 
 void HEAPPROFD_ADD_PREFIX(_finalize)() {
+  // TODO(fmayer): This should not leak.
   perfetto::profiling::Client* client = GetClient();
   if (client)
     client->Shutdown();

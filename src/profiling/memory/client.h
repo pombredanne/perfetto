@@ -34,8 +34,9 @@ class BorrowedSocket;
 class SocketPool {
  public:
   friend class BorrowedSocket;
+  SocketPool(std::vector<base::ScopedFile> sockets);
+
   BorrowedSocket Borrow();
-  void Init(std::vector<base::ScopedFile> sockets);
   void Shutdown();
 
  private:
@@ -89,7 +90,6 @@ class FreePage {
   // pool.
   // Can be called from any thread. Must not hold mutex_.`
   bool Add(const uint64_t addr, uint64_t sequence_number, SocketPool* pool);
-  void Init();
 
  private:
   // Needs to be called holding mutex_.
@@ -129,11 +129,8 @@ class PThreadKey {
 // This is created and owned by the malloc hooks.
 class Client {
  public:
-  Client();
-
-  void Init(std::vector<base::ScopedFile> sockets);
-  void Init(const std::string& sock_name, size_t conns);
-
+  Client(std::vector<base::ScopedFile> sockets);
+  Client(const std::string& sock_name, size_t conns);
   bool RecordMalloc(uint64_t alloc_size,
                     uint64_t total_size,
                     uint64_t alloc_address);

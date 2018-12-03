@@ -136,18 +136,8 @@ bool FreePage::FlushLocked(SocketPool* pool) {
   return true;
 }
 
-void FreePage::Init() {
-  std::lock_guard<std::mutex> l(mutex_);
-  offset_ = 0;
-}
-
-void SocketPool::Init(std::vector<base::ScopedFile> sockets) {
-  std::unique_lock<std::mutex> lck_(mutex_);
-  sockets_ = std::move(sockets);
-  available_sockets_ = sockets_.size();
-  dead_sockets_ = 0;
-  shutdown_ = false;
-}
+SocketPool::SocketPool(std::vector<base::ScopedFile> sockets)
+    : sockets_(std::move(sockets)), available_sockets_(sockets_.size()) {}
 
 BorrowedSocket SocketPool::Borrow() {
   std::unique_lock<std::mutex> lck_(mutex_);
@@ -208,24 +198,11 @@ const char* GetThreadStackBase() {
   return stackaddr + stacksize;
 }
 
-Client::Client()
+Client::Client(std::vector<base::ScopedFile> socks)
     : pthread_key_(ThreadLocalSamplingData::KeyDestructor),
-      main_thread_stack_base_(FindMainThreadStack()) {}
-
-void Client::Init(std::vector<base::ScopedFile> socks) {
+      socket_pool_(std::move(socks)),
+      main_thread_stack_base_(FindMainThreadStack()) {
   PERFETTO_DCHECK(pthread_key_.valid());
-  PERFETTO_DCHECK(!inited());
-
-  // It is essential that this happens BEFORE re-initializing the SocketPool.
-  // Let's assume this is called while another thread is inside of
-  // RecordMalloc. If we stored the updated sequence number, the following
-  // could happen: the thread gets a socket before the sequence number is
-  // updated but after the socket pool has been reinitialized. It then sends
-  // a record with the old sequence number, confusing the central service.
-  sequence_number_.store(0, std::memory_order_release);
-
-  socket_pool_.Init(std::move(socks));
-  free_page_.Init();
 
   uint64_t size = 0;
   base::ScopedFile maps(base::OpenFile("/proc/self/maps", O_RDONLY));
@@ -256,9 +233,8 @@ void Client::Init(std::vector<base::ScopedFile> socks) {
   inited_.store(true, std::memory_order_release);
 }
 
-void Client::Init(const std::string& sock_name, size_t conns) {
-  Init(ConnectPool(sock_name, conns));
-}
+Client::Client(const std::string& sock_name, size_t conns)
+    : Client(ConnectPool(sock_name, conns)) {}
 
 const char* Client::GetStackBase() {
   if (IsMainThread()) {
