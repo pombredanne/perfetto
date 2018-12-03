@@ -33,6 +33,10 @@
 
 namespace perfetto {
 
+namespace {
+constexpr uint32_t kMinPollRateMs = 250;
+}
+
 // Dynamically loads / unloads the libperfetto_binder.so library which allows
 // to proxy calls to android hwbinder in in-tree builds.
 struct AndroidPowerDataSource::DynamicLibLoader {
@@ -77,10 +81,32 @@ AndroidPowerDataSource::AndroidPowerDataSource(
       poll_rate_ms_(cfg.android_power_config().battery_poll_ms()),
       writer_(std::move(writer)),
       weak_factory_(this) {
-  poll_rate_ms_ = std::max(poll_rate_ms_, 100u);
-  for (auto id : cfg.android_power_config().battery_counters()) {
-    PERFETTO_CHECK(id < counters_enabled_.size());
-    counters_enabled_.set(id);
+  if (poll_rate_ms_ < kMinPollRateMs) {
+    PERFETTO_ELOG("Battery poll interval of %" PRIu32
+                  " ms is too low. Capping to %" PRIu32 " ms",
+                  poll_rate_ms_, kMinPollRateMs);
+    poll_rate_ms_ = kMinPollRateMs;
+  }
+  for (auto counter : cfg.android_power_config().battery_counters()) {
+    auto hal_id = android_binder::BatteryCounter::kUnspecified;
+    switch (counter) {
+      case AndroidPowerConfig::BATTERY_COUNTER_UNSPECIFIED:
+        break;
+      case AndroidPowerConfig::BATTERY_COUNTER_CHARGE:
+        hal_id = android_binder::BatteryCounter::kCharge;
+        break;
+      case AndroidPowerConfig::BATTERY_COUNTER_CAPACITY_PERCENT:
+        hal_id = android_binder::BatteryCounter::kCapacityPercent;
+        break;
+      case AndroidPowerConfig::BATTERY_COUNTER_CURRENT:
+        hal_id = android_binder::BatteryCounter::kCurrent;
+        break;
+      case AndroidPowerConfig::BATTERY_COUNTER_CURRENT_AVG:
+        hal_id = android_binder::BatteryCounter::kCurrentAvg;
+        break;
+    }
+    PERFETTO_CHECK(static_cast<size_t>(hal_id) < counters_enabled_.size());
+    counters_enabled_.set(static_cast<size_t>(hal_id));
   }
 }
 
@@ -117,6 +143,10 @@ void AndroidPowerDataSource::Tick() {
       continue;
 
     switch (counter) {
+      case android_binder::BatteryCounter::kUnspecified:
+        PERFETTO_DCHECK(false);
+        break;
+
       case android_binder::BatteryCounter::kCharge:
         counters_proto->set_charge_counter_uah(*value);
         break;

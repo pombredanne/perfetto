@@ -24,7 +24,7 @@ source_set("headers") {
 }
 
 # This target proxies calls to Android internal libraries that are not part of
-# the NDK. This is replaced in standalone builds with empty stubs (_noop.cc).
+# the NDK. See README.md.
 source_set("android_binder") {
   visibility = [ "//:libperfetto_binder" ]
   deps = [

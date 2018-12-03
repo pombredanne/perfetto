@@ -1,17 +1,24 @@
-This directory contains Android code that accesses (hw)binder interfaces
+This directory contains code that accesses Android (hw)binder interfaces
 and is dynamically loaded and used by traced_probes.
+The code in this directory is built as a separate .so library and can depend on
+on Android internals.
 
-Code in this directory:
-- Can depend on Android internals, as it is built by in-tree builds
-  (via Android.bp).
-- Has no-op implementations for out-of-tree (standalone) builds, which 
-  allow dependencies to build cleanly without bubbling up #ifdefs.
-- Is dynamically loaded via dlopen()/dlsym() by the rest of perfetto.
+Block diagram:
 
-The latter is to avoid paying the cost of linker relocations
-(~150 MB private dirty) requires by loading libhidlbase.so,
-libhidltransport.so, libhwbinder.so and their recursive dependencies,
-until the first time a data source that requires binder is used.
+```
+                                                       [   Non-NDK libraries   ]
+                                                   +-> libbase.so
++---------------+       +-----------------------+  +-> libutils.so
+| traced_probes |- - -> | libperfetto_binder.so |->+-> libhidltransport.so
++---------------+  ^    +-----------------------+  +-> libhwbinder.so
+                   |                               +-> android.hardware.xxx@2.0
+                   |
+                   dynamically loaded on first use via dlopen()
+```
+
+The major reason for using a separate .so() and introducing the shared library
+layer is avoiding the cost of linker relocations (~150 KB private dirty)
+required for loading the graph of binder-related libraries.
 
 The general structure and rules for code in this directory is as-follows:
 - Targets herein defined must be leaf targets. Dependencies to perfetto targets
@@ -22,4 +29,3 @@ The general structure and rules for code in this directory is as-follows:
   directory.
 - Dependencies to Android internal headers are allowed only in .cc files, not
   in headers.
-- Each API should have a default _noop.cc implementation for standalone builds.

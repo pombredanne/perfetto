@@ -52,6 +52,7 @@ class AndroidPowerDataSource : public ProbesDataSource {
 
  private:
   struct DynamicLibLoader;
+
   void Tick();
 
   base::TaskRunner* const task_runner_;

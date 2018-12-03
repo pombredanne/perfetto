@@ -43,6 +43,11 @@ bool GetBatteryCounter(BatteryCounter counter, int64_t* value) {
   if (!g_svc)
     return false;
 
+  // The Android VNDK documentation states that for blocking services, the
+  // caller blocks until the reply is received and the callback is called inline
+  // in the same thread.
+  // See https://source.android.com/devices/architecture/hidl/threading .
+
   Result res;
   switch (counter) {
     case BatteryCounter::kCharge:
@@ -76,7 +81,8 @@ bool GetBatteryCounter(BatteryCounter counter, int64_t* value) {
   }  // switch(counter)
 
   if (res == Result::CALLBACK_DIED)
-    ResetService();
+    g_svc.clear();
+
   return res == Result::SUCCESS;
 }
 

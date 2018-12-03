@@ -20,11 +20,17 @@
 #include <stddef.h>
 #include <stdint.h>
 
+// This header declares proxy functions defined in libperfetto_binder.so that
+// allow traced_probes to access internal android functions via hwbinder.
+// Do not add any include to either perfetto headers or android headers. See
+// README.md for more.
+
 namespace perfetto {
 namespace android_binder {
 
 enum class BatteryCounter {
-  kCharge = 0,
+  kUnspecified = 0,
+  kCharge,
   kCapacityPercent,
   kCurrent,
   kCurrentAvg,
