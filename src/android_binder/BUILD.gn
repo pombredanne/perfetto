@@ -25,7 +25,8 @@ source_set("headers") {
 
 # This target proxies calls to Android internal libraries that are not part of
 # the NDK. This is replaced in standalone builds with empty stubs (_noop.cc).
-source_set("android_hal") {
+source_set("android_binder") {
+  visibility = [ "//:libperfetto_binder" ]
   deps = [
     ":headers",
     "../../gn:default_deps",
@@ -42,10 +43,6 @@ source_set("android_hal") {
       "hidlbase",
       "hidltransport",
       "utils",
-    ]
-  } else {
-    sources = [
-      "health_hal_noop.cc",
     ]
   }
 }

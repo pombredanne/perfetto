@@ -309,11 +309,11 @@ cc_library_shared {
   ],
 }
 
-// GN target: //:libperfetto_hal
+// GN target: //:libperfetto_binder
 cc_library_shared {
-  name: "libperfetto_hal",
+  name: "libperfetto_binder",
   srcs: [
-    "src/android_hal/health_hal.cc",
+    "src/android_binder/health_hal.cc",
   ],
   shared_libs: [
     "android.hardware.health@2.0",
@@ -2699,6 +2699,9 @@ cc_binary {
   ],
   defaults: [
     "perfetto_defaults",
+  ],
+  required: [
+    "libperfetto_binder",
   ],
 }
 

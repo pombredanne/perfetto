@@ -14,18 +14,30 @@
  * limitations under the License.
  */
 
-#include "src/android_hal/health_hal.h"
+#ifndef SRC_ANDROID_BINDER_HEALTH_HAL_H_
+#define SRC_ANDROID_BINDER_HEALTH_HAL_H_
 
-// Fallback implementation used in standalone builds, where we cannot depend
-// on Android tree internals and hence the IHealth service.
+#include <stddef.h>
+#include <stdint.h>
 
 namespace perfetto {
-namespace android_hal {
+namespace android_binder {
 
-bool GetBatteryCounter(BatteryCounter, int64_t* value) {
-  *value = 0;
-  return false;
-}
+enum class BatteryCounter {
+  kCharge = 0,
+  kCapacityPercent,
+  kCurrent,
+  kCurrentAvg,
+};
 
-}  // namespace android_hal
+extern "C" {
+
+bool __attribute__((visibility("default")))
+GetBatteryCounter(BatteryCounter, int64_t*);
+
+}  // extern "C"
+
+}  // namespace android_binder
 }  // namespace perfetto
+
+#endif  // SRC_ANDROID_BINDER_HEALTH_HAL_H_

@@ -16,12 +16,13 @@ source_set("power") {
   public_deps = [
     "../../../tracing",
   ]
+  libs = [ "dl" ]  # for dlopen()
   deps = [
     "..:data_source",
     "../../../../gn:default_deps",
     "../../../../include/perfetto/traced",
     "../../../../protos/perfetto/trace/power:zero",
-    "../../../android_hal:headers",
+    "../../../android_binder:headers",
     "../../../base",
   ]
   sources = [

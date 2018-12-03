@@ -37,7 +37,7 @@ import sys
 # Default targets to translate to the blueprint file.
 default_targets = [
     '//:libperfetto',
-    '//:libperfetto_hal',
+    '//:libperfetto_binder',
     '//:perfetto_integrationtests',
     '//:perfetto_trace_protos',
     '//:perfetto_unittests',
@@ -105,11 +105,14 @@ library_not_in_pdk = {
 
 # Additional arguments to apply to Android.bp rules.
 additional_args = {
-    "heapprofd_client": [
-        ("include_dirs", ["bionic/libc"]),
+    'heapprofd_client': [
+        ('include_dirs', ['bionic/libc']),
     ],
-    "libperfetto_hal": [
-      ("static_libs", ["libhealthhalutils"]),
+    'traced_probes': [
+      ('required', ['libperfetto_binder']),
+    ],
+    'libperfetto_binder': [
+      ('static_libs', ['libhealthhalutils']),
     ],
 }
 

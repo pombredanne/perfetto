@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-#include "src/android_hal/health_hal.h"
+#include "src/android_binder/health_hal.h"
 
 #include <android/hardware/health/2.0/IHealth.h>
 #include <healthhalutils/HealthHalUtils.h>
 
 namespace perfetto {
-namespace android_hal {
+namespace android_binder {
 
 using ::android::hardware::health::V2_0::IHealth;
 using ::android::hardware::health::V2_0::Result;
@@ -43,38 +43,42 @@ bool GetBatteryCounter(BatteryCounter counter, int64_t* value) {
   if (!g_svc)
     return false;
 
-  bool res = false;
+  Result res;
   switch (counter) {
     case BatteryCounter::kCharge:
-      g_svc->getChargeCounter([&res, value](auto hal_res, int32_t hal_value) {
-        res = hal_res == Result::SUCCESS;
+      g_svc->getChargeCounter([&res, value](Result hal_res, int32_t hal_value) {
+        res = hal_res;
         *value = hal_value;
       });
       break;
 
     case BatteryCounter::kCapacityPercent:
-      g_svc->getCapacity([&res, value](auto hal_res, int64_t hal_value) {
-        res = hal_res == Result::SUCCESS;
+      g_svc->getCapacity([&res, value](Result hal_res, int64_t hal_value) {
+        res = hal_res;
         *value = hal_value;
       });
       break;
 
     case BatteryCounter::kCurrent:
-      g_svc->getCurrentNow([&res, value](auto hal_res, int32_t hal_value) {
-        res = hal_res == Result::SUCCESS;
+      g_svc->getCurrentNow([&res, value](Result hal_res, int32_t hal_value) {
+        res = hal_res;
         *value = hal_value;
       });
       break;
 
     case BatteryCounter::kCurrentAvg:
-      g_svc->getCurrentAverage([&res, value](auto hal_res, int32_t hal_value) {
-        res = hal_res == Result::SUCCESS;
-        *value = hal_value;
-      });
+      g_svc->getCurrentAverage(
+          [&res, value](Result hal_res, int32_t hal_value) {
+            res = hal_res;
+            *value = hal_value;
+          });
       break;
-  }
-  return res;
+  }  // switch(counter)
+
+  if (res == Result::CALLBACK_DIED)
+    ResetService();
+  return res == Result::SUCCESS;
 }
 
-}  // namespace android_hal
+}  // namespace android_binder
 }  // namespace perfetto

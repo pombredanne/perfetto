@@ -49,7 +49,6 @@ group("all") {
   ]
   if (perfetto_build_standalone || perfetto_build_with_android) {
     deps += [
-      ":libperfetto_hal",
       ":perfetto",
       ":perfetto_integrationtests",
       ":traced",
@@ -172,13 +171,6 @@ if (perfetto_build_standalone || perfetto_build_with_android) {
     ]
   }
 
-  target(libperfetto_target_type, "libperfetto_hal") {
-    deps = [
-      "gn:default_deps",
-      "src/android_hal",
-    ]
-  }
-
   # The unprivileged trace daemon that listens for Producer and Consumer
   # connections, handles the coordination of the tracing sessions and owns the
   # log buffers.
@@ -201,14 +193,6 @@ if (perfetto_build_standalone || perfetto_build_with_android) {
       "gn:default_deps",
       "include/perfetto/traced",
     ]
-    if (monolithic_binaries) {
-      # In a monolithic binary, just link the HAL source set as part of
-      # traced_probes. In a standard build, though, don't depend on it directly.
-      # Conversely to libperfetto.so, we don't want to have a load-time
-      # dependency on the HAL bridge and instead dlopen() it dynamically. This
-      # is to save memory when the HAL data source is not used.
-      deps += [ ":libperfetto_hal" ]
-    }
     sources = [
       "src/traced/probes/main.cc",
     ]
@@ -254,7 +238,14 @@ if (perfetto_build_standalone || perfetto_build_with_android) {
         "protos/perfetto/trace:lite",
       ]
     }
-  }
+
+    shared_library("libperfetto_binder") {
+      deps = [
+        "gn:default_deps",
+        "src/android_binder",
+      ]
+    }
+  }  # if (perfetto_build_with_android)
 }  # if (perfetto_build_standalone || perfetto_build_with_android)
 
 if (perfetto_build_with_embedder) {

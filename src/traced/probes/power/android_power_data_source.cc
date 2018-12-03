@@ -26,38 +26,46 @@
 #include "perfetto/tracing/core/data_source_config.h"
 #include "perfetto/tracing/core/trace_packet.h"
 #include "perfetto/tracing/core/trace_writer.h"
-#include "src/android_hal/health_hal.h"
+#include "src/android_binder/health_hal.h"
 
 #include "perfetto/trace/power/battery_counters.pbzero.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 
 namespace perfetto {
 
-namespace {
+// Dynamically loads / unloads the libperfetto_binder.so library which allows
+// to proxy calls to android hwbinder in in-tree builds.
+struct AndroidPowerDataSource::DynamicLibLoader {
+  using ScopedDlHandle = base::ScopedResource<void*, dlclose, nullptr>;
 
-decltype(&android_hal::GetBatteryCounter) GetBatteryCounterFunction() {
-  void* handle = dlopen("libperfetto_hal.so", RTLD_NOW);
-  if (!handle) {
-    PERFETTO_PLOG("dlopen() failed");
-    return nullptr;
+  DynamicLibLoader() {
+    static const char kLibName[] = "libperfetto_binder.so";
+    handle_.reset(dlopen(kLibName, RTLD_NOW));
+    if (!handle_) {
+      PERFETTO_PLOG("dlopen(%s) failed", kLibName);
+      return;
+    }
+    void* fn = dlsym(*handle_, "GetBatteryCounter");
+    if (!fn)
+      PERFETTO_PLOG("dlsym(GetBatteryCounter) failed");
+    get_battery_counter_ = reinterpret_cast<decltype(get_battery_counter_)>(fn);
   }
-  void* fn = dlsym(handle, "GetBatteryCounter");
-  if (!fn)
-    PERFETTO_PLOG("dlsym() failed");
-  return reinterpret_cast<decltype(&android_hal::GetBatteryCounter)>(fn);
-}
 
-base::Optional<int64_t> GetCounter(android_hal::BatteryCounter counter) {
-  static auto get_counter_fn = GetBatteryCounterFunction();
-  if (!get_counter_fn)
+  base::Optional<int64_t> GetCounter(android_binder::BatteryCounter counter) {
+    if (!get_battery_counter_)
+      return base::nullopt;
+    int64_t value = 0;
+    if (get_battery_counter_(counter, &value))
+      return base::make_optional(value);
     return base::nullopt;
-  int64_t value = 0;
-  if (get_counter_fn(counter, &value))
-    return base::make_optional(value);
-  return base::nullopt;
-}
+  }
 
-}  // namespace
+  bool is_loaded() const { return !!handle_; }
+
+ private:
+  decltype(&android_binder::GetBatteryCounter) get_battery_counter_ = nullptr;
+  ScopedDlHandle handle_;
+};
 
 AndroidPowerDataSource::AndroidPowerDataSource(
     DataSourceConfig cfg,
@@ -79,6 +87,9 @@ AndroidPowerDataSource::AndroidPowerDataSource(
 AndroidPowerDataSource::~AndroidPowerDataSource() = default;
 
 void AndroidPowerDataSource::Start() {
+  lib_.reset(new DynamicLibLoader());
+  if (!lib_->is_loaded())
+    return;
   Tick();
 }
 
@@ -100,25 +111,25 @@ void AndroidPowerDataSource::Tick() {
   for (size_t i = 0; i < counters_enabled_.size(); i++) {
     if (!counters_enabled_.test(i))
       continue;
-    auto counter = static_cast<android_hal::BatteryCounter>(i);
-    auto value = GetCounter(counter);
+    auto counter = static_cast<android_binder::BatteryCounter>(i);
+    auto value = lib_->GetCounter(counter);
     if (!value.has_value())
       continue;
 
     switch (counter) {
-      case android_hal::BatteryCounter::kCharge:
+      case android_binder::BatteryCounter::kCharge:
         counters_proto->set_charge_counter_uah(*value);
         break;
 
-      case android_hal::BatteryCounter::kCapacityPercent:
+      case android_binder::BatteryCounter::kCapacityPercent:
         counters_proto->set_capacity_percent(static_cast<int>(*value));
         break;
 
-      case android_hal::BatteryCounter::kCurrent:
+      case android_binder::BatteryCounter::kCurrent:
         counters_proto->set_current_ua(*value);
         break;
 
-      case android_hal::BatteryCounter::kCurrentAvg:
+      case android_binder::BatteryCounter::kCurrentAvg:
         counters_proto->set_current_avg_ua(*value);
         break;
     }
