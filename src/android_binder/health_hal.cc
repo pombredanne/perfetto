@@ -50,6 +50,10 @@ bool GetBatteryCounter(BatteryCounter counter, int64_t* value) {
 
   Result res;
   switch (counter) {
+    case BatteryCounter::kUnspecified:
+      res = Result::NOT_FOUND;
+      break;
+
     case BatteryCounter::kCharge:
       g_svc->getChargeCounter([&res, value](Result hal_res, int32_t hal_value) {
         res = hal_res;
