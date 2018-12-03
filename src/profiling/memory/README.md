@@ -6,7 +6,6 @@ into Perfetto._
 
 Googlers, for design doc see: http://go/heapprofd-design
 
-
 ## Using convenience script
 
 Use the `tools/heap_profile` script to heap profile a process. See all the
