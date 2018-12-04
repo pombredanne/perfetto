@@ -24,7 +24,9 @@ using protozero::proto_utils::kProtoString;
 using protozero::proto_utils::kProtoUint64;
 using protozero::proto_utils::kProtoUint32;
 
-Field MakeField(const char* name, uint32_t id, ProtoFieldType type) {
+Field MakeField(const char* name,
+                uint32_t id,
+                protozero::proto_utils::ProtoFieldType type) {
   Field field{};
   field.ftrace_name = name;
   field.proto_field_id = id;
@@ -41,7 +43,7 @@ std::vector<Field> GetStaticCommonFieldsInfo() {
 }
 
 bool SetTranslationStrategy(FtraceFieldType ftrace,
-                            ProtoFieldType proto,
+                            protozero::proto_utils::ProtoFieldType proto,
                             TranslationStrategy* out) {
   if (ftrace == kFtraceCommonPid32 && proto == kProtoInt32) {
     *out = kCommonPid32ToInt32;
@@ -101,7 +103,7 @@ bool SetTranslationStrategy(FtraceFieldType ftrace,
     *out = kDataLocToString;
   } else {
     PERFETTO_DLOG("No translation strategy for '%s' -> '%s'", ToString(ftrace),
-                  ToString(proto));
+                  protozero::proto_utils::ProtoFieldToString(proto));
     return false;
   }
   return true;

@@ -22,12 +22,10 @@
 #include <string>
 #include <vector>
 
-#include "include/perfetto/protozero/proto_utils.h"
 #include "perfetto/base/logging.h"
+#include "perfetto/protozero/proto_utils.h"
 
 namespace perfetto {
-
-using protozero::proto_utils::ProtoFieldType;
 
 enum FtraceFieldType {
   kFtraceUint8 = 1,
@@ -142,7 +140,7 @@ struct Field {
   const char* ftrace_name;
 
   uint32_t proto_field_id;
-  ProtoFieldType proto_field_type;
+  protozero::proto_utils::ProtoFieldType proto_field_type;
 
   TranslationStrategy strategy;
 };
@@ -172,10 +170,12 @@ struct Event {
 std::vector<Field> GetStaticCommonFieldsInfo();
 
 bool SetTranslationStrategy(FtraceFieldType ftrace,
-                            ProtoFieldType proto,
+                            protozero::proto_utils::ProtoFieldType proto,
                             TranslationStrategy* out);
 
-Field MakeField(const char* name, uint32_t id, ProtoFieldType type);
+Field MakeField(const char* name,
+                uint32_t id,
+                protozero::proto_utils::ProtoFieldType type);
 
 }  // namespace perfetto
 

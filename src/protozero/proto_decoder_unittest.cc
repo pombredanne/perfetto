@@ -48,7 +48,8 @@ TEST(ProtoDecoder, ReadString) {
   ProtoDecoder::Field field = decoder.ReadField();
 
   ASSERT_EQ(field.id, 1u);
-  ASSERT_EQ(field.type, proto_utils::FieldType::kFieldTypeLengthDelimited);
+  ASSERT_EQ(field.type,
+            proto_utils::DecoderFieldType::kFieldTypeLengthDelimited);
   ASSERT_EQ(field.length_limited.length, sizeof(kTestString) - 1);
   for (size_t i = 0; i < sizeof(kTestString) - 1; i++) {
     ASSERT_EQ(field.length_limited.data[i], kTestString[i]);
@@ -60,7 +61,7 @@ TEST(ProtoDecoder, FixedData) {
     const char* encoded;
     size_t encoded_size;
     uint32_t id;
-    FieldType type;
+    DecoderFieldType type;
     uint64_t int_value;
   };
 

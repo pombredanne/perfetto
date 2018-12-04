@@ -27,6 +27,7 @@
 #include "perfetto/base/logging.h"
 #include "perfetto/base/pipe.h"
 #include "perfetto/base/string_splitter.h"
+#include "perfetto/base/string_utils.h"
 
 namespace perfetto {
 
@@ -89,6 +90,10 @@ std::string RunClangFmt(const std::string& input) {
 }
 
 }  // namespace
+
+using base::EndsWith;
+using base::StartsWith;
+using base::Contains;
 
 VerifyStream::VerifyStream(std::string filename)
     : filename_(std::move(filename)) {

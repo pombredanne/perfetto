@@ -19,6 +19,7 @@
 
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/descriptor.pb.h>
+
 #include "perfetto/base/logging.h"
 #include "tools/ftrace_proto_gen/ftrace_proto_gen.h"
 
@@ -41,46 +42,61 @@ static void GenerateFtraceDescriptors(
   #define SRC_TRACE_PROCESSOR_FTRACE_DESCRIPTORS_H_
 
   #include <array>
-  #include "include/perfetto/protozero/proto_utils.h"
+  #include "perfetto/protozero/proto_utils.h"
 
   namespace perfetto {
 
-  using protozero::proto_utils::FieldType;
-  using protozero::proto_utils::MessageDescriptor;
   using protozero::proto_utils::ProtoFieldType;
 
-  static std::array<MessageDescriptor, 
+  struct FieldDescriptor {
+    const char* name;
+    ProtoFieldType type;
+  };
+
+  struct MessageDescriptor {
+    const char* name;
+    FieldDescriptor fields[32];
+  };
+
+  static std::array<MessageDescriptor,
   )";
   *fout << std::to_string(max_id + 1) + "> descriptors{{";
 
-  int proto_field_id = 0;
+  int proto_id = 0;
   for (int i = 0; i < one_of_event->field_count(); i++) {
     const google::protobuf::FieldDescriptor* event = one_of_event->field(i);
     const google::protobuf::Descriptor* event_descriptor =
         event->message_type();
-    // For proto field ids that do not have an event output an empty descriptor.
-    while (proto_field_id != event->number()) {
+    // For proto ids that do not have an event output an empty descriptor.
+    while (proto_id != event->number()) {
       *fout << "{},";
-      ++proto_field_id;
+      ++proto_id;
     }
     // Output empty descriptor for generic since it contains a nested message.
     // We know how to parse generic events so the descriptor is unecessary
     // anyway.
     if (event->name() == "generic") {
       *fout << "{},";
-      ++proto_field_id;
+      ++proto_id;
       continue;
     }
     *fout << "{\"" + event->name() + "\", {";
+    int field_id = 0;
     for (int j = 0; j < event_descriptor->field_count(); j++) {
       const google::protobuf::FieldDescriptor* field =
           event_descriptor->field(j);
+      // For field ids with no field outpit an empty field.
+      while (field_id != field->number()) {
+        *fout << "{},";
+        ++field_id;
+      }
       ProtoType type = ProtoType::FromDescriptor(field->type());
       *fout << "{\"" + field->name() + "\", ProtoFieldType::kProto" +
                    ToCamelCase(type.ToString()) + "},";
+      ++field_id;
     }
     *fout << "},\n},";
-    ++proto_field_id;
+    ++proto_id;
   }
   *fout << "}};\n";
 

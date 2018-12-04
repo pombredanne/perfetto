@@ -64,7 +64,7 @@ ProtoDecoder::Field ProtoDecoder::ReadField() {
     return field;
   }
 
-  field.type = static_cast<FieldType>(raw_field_id & kFieldTypeMask);
+  field.type = static_cast<DecoderFieldType>(raw_field_id & kFieldTypeMask);
 
   const uint8_t* new_pos = nullptr;
   uint64_t field_intvalue = 0;

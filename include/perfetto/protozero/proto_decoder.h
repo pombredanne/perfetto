@@ -42,40 +42,40 @@ class ProtoDecoder {
     };
 
     uint32_t id = 0;
-    protozero::proto_utils::FieldType type;
+    protozero::proto_utils::DecoderFieldType type;
     union {
       uint64_t int_value;
       LengthDelimited length_limited;
     };
 
     inline uint32_t as_uint32() const {
-      PERFETTO_DCHECK(type == proto_utils::FieldType::kFieldTypeVarInt ||
-                      type == proto_utils::FieldType::kFieldTypeFixed32);
+      PERFETTO_DCHECK(type == proto_utils::DecoderFieldType::kFieldTypeVarInt ||
+                      type == proto_utils::DecoderFieldType::kFieldTypeFixed32);
       return static_cast<uint32_t>(int_value);
     }
 
     inline uint64_t as_uint64() const {
-      PERFETTO_DCHECK(type == proto_utils::FieldType::kFieldTypeVarInt ||
-                      type == proto_utils::FieldType::kFieldTypeFixed64);
+      PERFETTO_DCHECK(type == proto_utils::DecoderFieldType::kFieldTypeVarInt ||
+                      type == proto_utils::DecoderFieldType::kFieldTypeFixed64);
       return int_value;
     }
 
     inline StringView as_string() const {
       PERFETTO_DCHECK(type ==
-                      proto_utils::FieldType::kFieldTypeLengthDelimited);
+                      proto_utils::DecoderFieldType::kFieldTypeLengthDelimited);
       return StringView(reinterpret_cast<const char*>(length_limited.data),
                         length_limited.length);
     }
 
     inline const uint8_t* data() const {
       PERFETTO_DCHECK(type ==
-                      proto_utils::FieldType::kFieldTypeLengthDelimited);
+                      proto_utils::DecoderFieldType::kFieldTypeLengthDelimited);
       return length_limited.data;
     }
 
     inline size_t size() const {
       PERFETTO_DCHECK(type ==
-                      proto_utils::FieldType::kFieldTypeLengthDelimited);
+                      proto_utils::DecoderFieldType::kFieldTypeLengthDelimited);
       return static_cast<size_t>(length_limited.length);
     }
   };

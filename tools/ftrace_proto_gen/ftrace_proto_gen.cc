@@ -27,8 +27,12 @@
 #include "perfetto/base/logging.h"
 #include "perfetto/base/pipe.h"
 #include "perfetto/base/string_splitter.h"
+#include "perfetto/base/string_utils.h"
 
 namespace perfetto {
+
+using base::StartsWith;
+using base::Contains;
 
 std::vector<FtraceEventName> ReadWhitelist(const std::string& filename) {
   std::string line;

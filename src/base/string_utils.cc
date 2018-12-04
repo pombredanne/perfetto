@@ -23,5 +23,13 @@ bool StartsWith(const std::string& str, const std::string& prefix) {
   return str.compare(0, prefix.length(), prefix) == 0;
 }
 
+bool EndsWith(const std::string& str, const std::string& suffix) {
+  return str.rfind(suffix) == str.size() - suffix.size();
+}
+
+bool Contains(const std::string& haystack, const std::string& needle) {
+  return haystack.find(needle) != std::string::npos;
+}
+
 }  // namespace base
 }  // namespace perfetto

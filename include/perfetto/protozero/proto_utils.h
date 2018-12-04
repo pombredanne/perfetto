@@ -30,7 +30,7 @@ namespace proto_utils {
 
 // See https://developers.google.com/protocol-buffers/docs/encoding wire types.
 
-enum FieldType : uint32_t {
+enum DecoderFieldType : uint32_t {
   kFieldTypeVarInt = 0,
   kFieldTypeFixed64 = 1,
   kFieldTypeLengthDelimited = 2,
@@ -55,7 +55,7 @@ enum ProtoFieldType {
   kProtoBytes,
 };
 
-inline const char* ToString(ProtoFieldType v) {
+inline const char* ProtoFieldToString(ProtoFieldType v) {
   switch (v) {
     case kProtoDouble:
       return "double";
@@ -89,19 +89,8 @@ inline const char* ToString(ProtoFieldType v) {
       return "bytes";
   }
   // For gcc:
-  PERFETTO_CHECK(false);
-  return "";
+  PERFETTO_FATAL("Never reached");
 }
-
-struct FieldDescriptor {
-  const char* name;
-  ProtoFieldType type;
-};
-
-struct MessageDescriptor {
-  const char* name;
-  FieldDescriptor fields[32];
-};
 
 // Maximum message size supported: 256 MiB (4 x 7-bit due to varint encoding).
 constexpr size_t kMessageLengthFieldSize = 4;

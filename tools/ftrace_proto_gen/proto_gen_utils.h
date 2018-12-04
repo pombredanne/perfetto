@@ -17,12 +17,13 @@
 #ifndef TOOLS_FTRACE_PROTO_GEN_PROTO_GEN_UTILS_H_
 #define TOOLS_FTRACE_PROTO_GEN_PROTO_GEN_UTILS_H_
 
-#include <google/protobuf/descriptor.h>
 #include <map>
 #include <set>
 #include <sstream>
 #include <string>
 #include <vector>
+
+#include <google/protobuf/descriptor.h>
 
 #include "src/traced/probes/ftrace/format_parser.h"
 
@@ -85,21 +86,6 @@ struct Proto {
   std::vector<const Field*> SortedFields();
   uint32_t max_id = 0;
 };
-
-static inline bool StartsWith(const std::string& str,
-                              const std::string& prefix) {
-  return str.compare(0, prefix.length(), prefix) == 0;
-}
-
-static inline bool EndsWith(const std::string& str,
-                            const std::string& pattern) {
-  return str.rfind(pattern) == str.size() - pattern.size();
-}
-
-static inline bool Contains(const std::string& haystack,
-                            const std::string& needle) {
-  return haystack.find(needle) != std::string::npos;
-}
 
 std::string ToCamelCase(const std::string& s);
 ProtoType GetCommon(ProtoType one, ProtoType other);
