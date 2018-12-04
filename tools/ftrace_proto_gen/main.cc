@@ -216,7 +216,7 @@ int main(int argc, char** argv) {
 
   {
     std::unique_ptr<std::ostream> out =
-        ostream_factory("src/trace_processor/ftrace_descriptors.h");
+        ostream_factory("src/trace_processor/ftrace_descriptors.cc");
     perfetto::GenerateFtraceDescriptors(descriptor_pool, out.get());
     PERFETTO_CHECK(!out->fail());
   }

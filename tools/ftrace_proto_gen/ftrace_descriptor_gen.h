@@ -38,25 +38,9 @@ static void GenerateFtraceDescriptors(
   *fout << std::string("// ") + __FILE__ + "\n";
   *fout << "// Do not edit.\n";
   *fout << R"(
-  #ifndef SRC_TRACE_PROCESSOR_FTRACE_DESCRIPTORS_H_
-  #define SRC_TRACE_PROCESSOR_FTRACE_DESCRIPTORS_H_
-
-  #include <array>
-  #include "perfetto/protozero/proto_utils.h"
+  #include "src/trace_processor/ftrace_descriptors.h"
 
   namespace perfetto {
-
-  using protozero::proto_utils::ProtoFieldType;
-
-  struct FieldDescriptor {
-    const char* name;
-    ProtoFieldType type;
-  };
-
-  struct MessageDescriptor {
-    const char* name;
-    FieldDescriptor fields[32];
-  };
 
   static std::array<MessageDescriptor,
   )";
@@ -99,9 +83,17 @@ static void GenerateFtraceDescriptors(
     ++proto_id;
   }
   *fout << "}};\n";
+  *fout << R"(
+  MessageDescriptor* GetMessageDescriptorForId(size_t id) {
+    PERFETTO_DCHECK(id < descriptors.size());
+    return &descriptors[id];
+  }
 
+  size_t DescriptorsSize() {
+    return descriptors.size();
+  }
+  )";
   *fout << "} // namespace perfetto\n";
-  *fout << "#endif  // SRC_TRACE_PROCESSOR_FTRACE_DESCRIPTORS_H_\n";
 }
 }  // namespace perfetto
 #endif  // TOOLS_FTRACE_PROTO_GEN_FTRACE_DESCRIPTOR_GEN_H_

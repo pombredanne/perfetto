@@ -18,6 +18,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "perfetto/protozero/proto_utils.h"
 #include "perfetto/trace/ftrace/ftrace_event.pbzero.h"
 #include "perfetto/trace/ftrace/generic.pbzero.h"
 #include "src/traced/probes/ftrace/event_info.h"
@@ -33,6 +34,7 @@ using testing::IsNull;
 using testing::Contains;
 using testing::Eq;
 using testing::Pointee;
+using protozero::proto_utils::ProtoFieldType;
 
 namespace perfetto {
 namespace {
@@ -95,7 +97,8 @@ TEST_P(AllTranslationTableTest, Create) {
     EXPECT_TRUE(event);
     EXPECT_EQ(std::string(event->name), "print");
     EXPECT_EQ(std::string(event->group), "ftrace");
-    EXPECT_EQ(event->fields.at(1).proto_field_type, kProtoString);
+    EXPECT_EQ(event->fields.at(1).proto_field_type,
+              ProtoFieldType::kProtoString);
     EXPECT_EQ(event->fields.at(1).ftrace_type, kFtraceCString);
     EXPECT_EQ(event->fields.at(1).strategy, kCStringToString);
   }
@@ -186,7 +189,7 @@ print fmt: "some format")"));
       event->fields.emplace_back(Field{});
       Field* field = &event->fields.back();
       field->proto_field_id = 501;
-      field->proto_field_type = kProtoString;
+      field->proto_field_type = ProtoFieldType::kProtoString;
       field->ftrace_name = "field_a";
     }
 
@@ -195,7 +198,7 @@ print fmt: "some format")"));
       event->fields.emplace_back(Field{});
       Field* field = &event->fields.back();
       field->proto_field_id = 502;
-      field->proto_field_type = kProtoString;
+      field->proto_field_type = ProtoFieldType::kProtoString;
       field->ftrace_name = "field_b";
     }
 
@@ -204,7 +207,7 @@ print fmt: "some format")"));
       event->fields.emplace_back(Field{});
       Field* field = &event->fields.back();
       field->proto_field_id = 503;
-      field->proto_field_type = kProtoString;
+      field->proto_field_type = ProtoFieldType::kProtoString;
       field->ftrace_name = "field_c";
     }
 
@@ -213,7 +216,7 @@ print fmt: "some format")"));
       event->fields.emplace_back(Field{});
       Field* field = &event->fields.back();
       field->proto_field_id = 504;
-      field->proto_field_type = kProtoUint64;
+      field->proto_field_type = ProtoFieldType::kProtoUint64;
       field->ftrace_name = "field_e";
     }
   }
@@ -411,7 +414,7 @@ print fmt: "some format")"));
   EXPECT_STREQ(str_field.ftrace_name, "field_a");
   EXPECT_EQ(str_field.proto_field_id,
             protos::pbzero::GenericFtraceEvent::Field::kStrValueFieldNumber);
-  EXPECT_EQ(str_field.proto_field_type, kProtoString);
+  EXPECT_EQ(str_field.proto_field_type, ProtoFieldType::kProtoString);
   EXPECT_EQ(str_field.ftrace_type, kFtraceFixedCString);
   EXPECT_EQ(str_field.ftrace_size, 16);
   EXPECT_EQ(str_field.ftrace_offset, 8);
@@ -421,7 +424,7 @@ print fmt: "some format")"));
   EXPECT_STREQ(bool_field.ftrace_name, "field_b");
   EXPECT_EQ(bool_field.proto_field_id,
             protos::pbzero::GenericFtraceEvent::Field::kUintValueFieldNumber);
-  EXPECT_EQ(bool_field.proto_field_type, kProtoUint64);
+  EXPECT_EQ(bool_field.proto_field_type, ProtoFieldType::kProtoUint64);
   EXPECT_EQ(bool_field.ftrace_type, kFtraceBool);
   EXPECT_EQ(bool_field.ftrace_size, 1);
   EXPECT_EQ(bool_field.ftrace_offset, 24);
@@ -431,7 +434,7 @@ print fmt: "some format")"));
   EXPECT_STREQ(int_field.ftrace_name, "field_c");
   EXPECT_EQ(int_field.proto_field_id,
             protos::pbzero::GenericFtraceEvent::Field::kIntValueFieldNumber);
-  EXPECT_EQ(int_field.proto_field_type, kProtoInt64);
+  EXPECT_EQ(int_field.proto_field_type, ProtoFieldType::kProtoInt64);
   EXPECT_EQ(int_field.ftrace_type, kFtraceInt32);
   EXPECT_EQ(int_field.ftrace_size, 4);
   EXPECT_EQ(int_field.ftrace_offset, 25);
@@ -441,7 +444,7 @@ print fmt: "some format")"));
   EXPECT_STREQ(uint_field.ftrace_name, "field_d");
   EXPECT_EQ(uint_field.proto_field_id,
             protos::pbzero::GenericFtraceEvent::Field::kUintValueFieldNumber);
-  EXPECT_EQ(uint_field.proto_field_type, kProtoUint64);
+  EXPECT_EQ(uint_field.proto_field_type, ProtoFieldType::kProtoUint64);
   EXPECT_EQ(uint_field.ftrace_type, kFtraceUint32);
   EXPECT_EQ(uint_field.ftrace_size, 4);
   EXPECT_EQ(uint_field.ftrace_offset, 33);

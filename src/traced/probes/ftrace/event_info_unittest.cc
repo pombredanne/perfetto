@@ -15,11 +15,16 @@
  */
 
 #include "src/traced/probes/ftrace/event_info.h"
+#include "perfetto/protozero/proto_utils.h"
 
 #include "gtest/gtest.h"
 
 namespace perfetto {
 namespace {
+
+using protozero::proto_utils::kProtoUint64;
+using protozero::proto_utils::kProtoString;
+using protozero::proto_utils::kProtoInt32;
 
 TEST(EventInfoTest, GetStaticEventInfoSanityCheck) {
   std::vector<Event> events = GetStaticEventInfo();
