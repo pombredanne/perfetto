@@ -292,18 +292,13 @@ bool Client::RecordMalloc(uint64_t alloc_size,
   msg.payload = const_cast<char*>(stacktop);
   msg.payload_size = static_cast<size_t>(stack_size);
 
-  bool shut_down = false;
-  {
-    BorrowedSocket fd = socket_pool_.Borrow();
-    if (!fd || !SendWireMessage(*fd, msg)) {
-      fd.Close();
-      shut_down = true;
-    }
-  }
-  // Return the socket before shutting down to prevent a deadlock.
-  if (shut_down)
+  BorrowedSocket fd = socket_pool_.Borrow();
+  if (!fd || !SendWireMessage(*fd, msg)) {
+    fd.Close();
     Shutdown();
-  return !shut_down;
+    return false;
+  }
+  return true;
 }
 
 bool Client::RecordFree(uint64_t alloc_address) {
