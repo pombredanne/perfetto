@@ -49,6 +49,8 @@ source_set("lib") {
     "counters_table.h",
     "event_tracker.cc",
     "event_tracker.h",
+    "filtered_row_index.cc",
+    "filtered_row_index.h",
     "ftrace_descriptors.cc",
     "ftrace_descriptors.h",
     "instants_table.cc",
@@ -161,6 +163,7 @@ source_set("unittests") {
   sources = [
     "counters_table_unittest.cc",
     "event_tracker_unittest.cc",
+    "filtered_row_index_unittest.cc",
     "process_table_unittest.cc",
     "process_tracker_unittest.cc",
     "proto_trace_parser_unittest.cc",
