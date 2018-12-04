@@ -61,6 +61,13 @@ operator=(ProcessSetSpecHandle&& other) {
   return *this;
 }
 
+std::set<pid_t> ProcessMatcher::ProcessSetSpecHandle::GetPIDs() const {
+  std::set<pid_t> result;
+  for (const ProcessItem* process_item : iterator_->process_items)
+    result.emplace(process_item->process.pid);
+  return result;
+}
+
 ProcessMatcher::ProcessSetSpecHandle::~ProcessSetSpecHandle() {
   if (matcher_)
     matcher_->UnwaitProcessSetSpec(iterator_);
@@ -122,8 +129,15 @@ void ProcessMatcher::RemoveProcess(pid_t pid) {
     return;
   }
   ProcessItem& process_item = it->second;
-  size_t erased = cmdline_to_process_.erase(process_item.process.cmdline);
-  PERFETTO_DCHECK(erased);
+  auto range = cmdline_to_process_.equal_range(process_item.process.cmdline);
+  for (auto process_it = range.first; process_it != range.second;
+       ++process_it) {
+    if (process_it->second == &process_item) {
+      size_t erased = cmdline_to_process_.erase(process_item.process.cmdline);
+      PERFETTO_DCHECK(erased);
+      break;
+    }
+  }
   pid_to_process_.erase(it);
 }
 
@@ -152,8 +166,9 @@ ProcessMatcher::ProcessSetSpecHandle ProcessMatcher::AwaitProcessSetSpec(
     }
     for (std::string cmdline : new_process_set.process_cmdline) {
       cmdline_to_process_set_.emplace(cmdline, new_process_set_item);
-      auto process_it = cmdline_to_process_.find(cmdline);
-      if (process_it != cmdline_to_process_.end())
+      auto range = cmdline_to_process_.equal_range(cmdline);
+      for (auto process_it = range.first; process_it != range.second;
+           ++process_it)
         matching_process_items.emplace(process_it->second);
     }
   }

@@ -161,6 +161,28 @@ TEST(MatcherTest, MatchCmdlineProcessSetSpecFirstMultiple) {
   EXPECT_TRUE(shutdown);
 }
 
+TEST(MatcherTest, GetPIDs) {
+  bool match = false;
+  auto match_fn = [&match](const Process&,
+                           const std::vector<const ProcessSetSpec*>&) {
+    match = true;
+  };
+  bool shutdown = false;
+  auto shutdown_fn = [&shutdown](pid_t) { shutdown = true; };
+
+  ProcessMatcher m(std::move(shutdown_fn), std::move(match_fn));
+  ProcessSetSpec ps;
+  ps.process_cmdline.emplace("init");
+
+  auto init_handle = m.ProcessConnected({1, "init"});
+  auto second_init_handle = m.ProcessConnected({2, "init"});
+  auto ps_handle = m.AwaitProcessSetSpec(std::move(ps));
+  std::set<pid_t> expected_pids{1, 2};
+  EXPECT_EQ(ps_handle.GetPIDs(), expected_pids);
+  EXPECT_TRUE(match);
+  EXPECT_FALSE(shutdown);
+}
+
 }  // namespace
 }  // namespace profiling
 }  // namespace perfetto

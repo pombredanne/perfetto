@@ -160,7 +160,7 @@ class ProcessMatcher {
       match_fn_;
 
   std::map<pid_t, ProcessItem> pid_to_process_;
-  std::map<std::string, ProcessItem*> cmdline_to_process_;
+  std::multimap<std::string, ProcessItem*> cmdline_to_process_;
 
   std::multiset<ProcessSetSpecItem> process_sets_;
   std::multimap<pid_t, ProcessSetSpecItem*> pid_to_process_set_;
