@@ -36,10 +36,6 @@ class FilteredRowIndex {
 
   FilteredRowIndex(uint32_t start_row, uint32_t end_row);
 
-  // Interesects the rows specified by |rows| with the already filtered rows
-  // and updates the index to the intersection.
-  void SetOnlyRows(std::vector<uint32_t> rows);
-
   // Cals |fn| on each row index which is currently to be returned and retains
   // row index if |fn| returns true or discards the row otherwise.
   template <typename Predicate>
@@ -70,12 +66,12 @@ class FilteredRowIndex {
  private:
   template <typename Predicate>
   void FilterAllRows(Predicate fn) {
-    mode_ = Mode::kBitVector;
     row_filter_.resize(end_row_ - start_row_, true);
-
     for (uint32_t i = start_row_; i < end_row_; i++) {
       row_filter_[i - start_row_] = fn(i);
     }
+    // Update the mode to use the bitvector.
+    mode_ = Mode::kBitVector;
   }
 
   template <typename Predicate>
