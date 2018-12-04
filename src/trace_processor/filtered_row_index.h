@@ -29,12 +29,11 @@ namespace trace_processor {
 // Storage for information about the rows to be returned by a filter operation.
 class FilteredRowIndex {
  public:
-  enum Mode {
-    kAllRows = 1,
-    kBitVector = 2,
-  };
-
   FilteredRowIndex(uint32_t start_row, uint32_t end_row);
+
+  // Interesects the rows specified by |rows| with the already filtered rows
+  // and updates the index to the intersection.
+  void IntersectRows(std::vector<uint32_t> rows);
 
   // Cals |fn| on each row index which is currently to be returned and retains
   // row index if |fn| returns true or discards the row otherwise.
@@ -47,31 +46,40 @@ class FilteredRowIndex {
       case Mode::kBitVector:
         FilterBitVector(fn);
         break;
+      case Mode::kRowVector:
+        FilterRowVector(fn);
+        break;
     }
   }
 
-  // Returns the bitvector backing this row index. Only valid if |mode()| ==
-  // Mode::kBitVector.
-  std::vector<bool> ReleaseBitVector() {
-    auto vector = std::move(row_filter_);
-    row_filter_.clear();
-    mode_ = Mode::kAllRows;
-    return vector;
-  }
+  // Returns the bitvector backing this row index. Resets the internal bitvector
+  // storage as well if used.
+  std::vector<bool> TakeBitvector();
 
-  Mode mode() const { return mode_; }
+  // Returns the row vector backing this row index. Resets the internal row
+  // vector storage as well if used.
+  std::vector<uint32_t> TakeRowVector();
+
+  bool all_set() { return mode_ == Mode::kAllRows; }
+  bool backing_rowvector() { return mode_ == Mode::kRowVector; }
   uint32_t start_row() const { return start_row_; }
   uint32_t end_row() const { return end_row_; }
 
  private:
+  enum Mode {
+    kAllRows = 1,
+    kBitVector = 2,
+    kRowVector = 3,
+  };
+
   template <typename Predicate>
   void FilterAllRows(Predicate fn) {
+    mode_ = Mode::kBitVector;
     row_filter_.resize(end_row_ - start_row_, true);
+
     for (uint32_t i = start_row_; i < end_row_; i++) {
       row_filter_[i - start_row_] = fn(i);
     }
-    // Update the mode to use the bitvector.
-    mode_ = Mode::kBitVector;
   }
 
   template <typename Predicate>
@@ -85,10 +93,32 @@ class FilteredRowIndex {
     }
   }
 
+  template <typename Predicate>
+  void FilterRowVector(Predicate fn) {
+    size_t rows_size = rows_.size();
+    for (size_t i = 0; i < rows_size;) {
+      if (fn(rows_[i])) {
+        i++;
+      } else {
+        std::swap(rows_[i], rows_[rows_size - 1]);
+        rows_size--;
+      }
+    }
+    rows_.resize(rows_size);
+  }
+
+  void ConvertBitVectorToRowVector();
+
   Mode mode_;
   uint32_t start_row_;
   uint32_t end_row_;
+
+  // Only non-empty when |mode_| == Mode::kBitVector.
   std::vector<bool> row_filter_;
+
+  // Only non-empty when |mode_| == Mode::kRowVector.
+  // This vector is sorted.
+  std::vector<uint32_t> rows_;
 };
 
 }  // namespace trace_processor

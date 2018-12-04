@@ -38,9 +38,6 @@ class ArgsTable : public StorageTable {
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
 
  private:
-<<<<<<< HEAD
-  class ValueColumn final : public StorageSchema::Column {
-=======
   class IdColumn final : public StorageTable::NumericColumn<RowId> {
    public:
     IdColumn(std::string col_name,
@@ -54,7 +51,6 @@ class ArgsTable : public StorageTable {
   };
 
   class ValueColumn final : public StorageTable::Column {
->>>>>>> 88ffab9b... test
    public:
     ValueColumn(std::string col_name,
                 VarardicType type,
