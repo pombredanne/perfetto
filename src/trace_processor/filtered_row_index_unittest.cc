@@ -23,6 +23,8 @@ namespace perfetto {
 namespace trace_processor {
 namespace {
 
+using ::testing::ElementsAre;
+
 TEST(FilteredRowIndexUnittest, Noop) {
   FilteredRowIndex index(1, 13);
   ASSERT_TRUE(index.all_set());
@@ -67,21 +69,7 @@ TEST(FilteredRowIndexUnittest, FilterBitvectorTwice) {
   ASSERT_FALSE(f[3]);
 }
 
-TEST(FilteredRowUnittest, SetAllRows) {
-  FilteredRowIndex index(1, 5);
-  index.IntersectRows({2, 3});
-
-  ASSERT_FALSE(index.all_set());
-
-  auto f = index.TakeBitvector();
-  ASSERT_EQ(f.size(), 4);
-  ASSERT_FALSE(f[0]);
-  ASSERT_TRUE(f[1]);
-  ASSERT_TRUE(f[2]);
-  ASSERT_FALSE(f[3]);
-}
-
-TEST(FilteredRowUnittest, SetBitvectorRows) {
+TEST(FilteredRowUnittest, FilterBitvectorRowVector) {
   FilteredRowIndex index(1, 5);
   index.FilterRows([](uint32_t row) { return row == 2 || row == 3; });
   index.IntersectRows({0, 2, 4, 5, 10});
@@ -94,6 +82,70 @@ TEST(FilteredRowUnittest, SetBitvectorRows) {
   ASSERT_TRUE(f[1]);
   ASSERT_FALSE(f[2]);
   ASSERT_FALSE(f[3]);
+}
+
+TEST(FilteredRowUnittest, FilterRowVectorBitvector) {
+  FilteredRowIndex index(1, 5);
+  index.IntersectRows({0, 2, 4, 5, 10});
+  index.FilterRows([](uint32_t row) { return row == 2 || row == 3; });
+
+  ASSERT_FALSE(index.all_set());
+
+  auto f = index.TakeBitvector();
+  ASSERT_EQ(f.size(), 4);
+  ASSERT_FALSE(f[0]);
+  ASSERT_TRUE(f[1]);
+  ASSERT_FALSE(f[2]);
+  ASSERT_FALSE(f[3]);
+}
+
+TEST(FilteredRowUnittest, FilterRowvector) {
+  FilteredRowIndex index(1, 5);
+  index.IntersectRows({0, 2, 4, 5, 10});
+
+  ASSERT_FALSE(index.all_set());
+  ASSERT_TRUE(index.backing_rowvector());
+
+  auto f = index.TakeRowVector();
+  ASSERT_THAT(f, ElementsAre(2, 4));
+}
+
+TEST(FilteredRowUnittest, FilterRowvectorTwice) {
+  FilteredRowIndex index(1, 5);
+  index.IntersectRows({0, 2, 4, 5, 10});
+  index.IntersectRows({4});
+
+  ASSERT_FALSE(index.all_set());
+  ASSERT_TRUE(index.backing_rowvector());
+
+  auto f = index.TakeRowVector();
+  ASSERT_THAT(f, ElementsAre(4));
+}
+
+TEST(FilteredRowUnittest, ConvertAllToBitVector) {
+  FilteredRowIndex index(1, 5);
+
+  ASSERT_THAT(index.TakeBitvector(), ElementsAre(true, true, true, true));
+}
+
+TEST(FilteredRowUnittest, ConvertAllToRowVector) {
+  FilteredRowIndex index(1, 5);
+
+  ASSERT_THAT(index.TakeRowVector(), ElementsAre(1, 2, 3, 4));
+}
+
+TEST(FilteredRowUnittest, ConvertBitVectorToRowVector) {
+  FilteredRowIndex index(1, 5);
+  index.FilterRows([](uint32_t row) { return row == 2 || row == 3; });
+
+  ASSERT_THAT(index.TakeRowVector(), ElementsAre(2, 3));
+}
+
+TEST(FilteredRowUnittest, ConvertRowVectorToBitVector) {
+  FilteredRowIndex index(1, 5);
+  index.IntersectRows({2, 3});
+
+  ASSERT_THAT(index.TakeBitvector(), ElementsAre(false, true, true, false));
 }
 
 }  // namespace

@@ -17,7 +17,6 @@
 #ifndef SRC_TRACE_PROCESSOR_ARGS_TABLE_H_
 #define SRC_TRACE_PROCESSOR_ARGS_TABLE_H_
 
-#include "src/trace_processor/storage_columns.h"
 #include "src/trace_processor/storage_schema.h"
 #include "src/trace_processor/table.h"
 #include "src/trace_processor/trace_storage.h"
@@ -40,7 +39,7 @@ class ArgsTable : public Table {
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
 
  private:
-  class IdColumn final : public NumericColumn<RowId> {
+  class IdColumn final : public StorageSchema::NumericColumn<RowId> {
    public:
     IdColumn(std::string col_name,
              const TraceStorage* storage,
@@ -52,7 +51,7 @@ class ArgsTable : public Table {
     const TraceStorage* storage_ = nullptr;
   };
 
-  class ValueColumn final : public StorageColumn {
+  class ValueColumn final : public StorageSchema::Column {
    public:
     ValueColumn(std::string col_name,
                 VarardicType type,
