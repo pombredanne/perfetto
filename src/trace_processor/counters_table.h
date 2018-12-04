@@ -17,13 +17,14 @@
 #ifndef SRC_TRACE_PROCESSOR_COUNTERS_TABLE_H_
 #define SRC_TRACE_PROCESSOR_COUNTERS_TABLE_H_
 
-#include "src/trace_processor/storage_table.h"
+#include "src/trace_processor/storage_schema.h"
+#include "src/trace_processor/table.h"
 #include "src/trace_processor/trace_storage.h"
 
 namespace perfetto {
 namespace trace_processor {
 
-class CountersTable : public StorageTable {
+class CountersTable : public Table {
  public:
   static void RegisterTable(sqlite3* db, const TraceStorage* storage);
 
@@ -36,7 +37,7 @@ class CountersTable : public StorageTable {
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
 
  private:
-  class RefColumn final : public StorageTable::Column {
+  class RefColumn final : public StorageSchema::Column {
    public:
     RefColumn(std::string col_name, const TraceStorage* storage);
 
@@ -61,6 +62,7 @@ class CountersTable : public StorageTable {
   };
 
   std::deque<std::string> ref_types_;
+  StorageSchema schema_;
   const TraceStorage* const storage_;
 };
 }  // namespace trace_processor

@@ -16,48 +16,35 @@
 
 #include "src/trace_processor/args_table.h"
 
-#include "src/trace_processor/storage_cursor.h"
-#include "src/trace_processor/table_utils.h"
-
 namespace perfetto {
 namespace trace_processor {
 
 ArgsTable::ArgsTable(sqlite3*, const TraceStorage* storage)
-    : storage_(storage) {}
+    : StorageTable(storage, CreateColumns(storage), {"id", "key"}) {}
 
 void ArgsTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
   Table::Register<ArgsTable>(db, storage, "args");
 }
 
-Table::Schema ArgsTable::CreateSchema(int, const char* const*) {
-  const auto& args = storage_->args();
+std::vector<std::unique_ptr<StorageSchema::Column>> ArgsTable::CreateColumns(
+    const TraceStorage* storage) {
+  const auto& args = storage->args();
   std::unique_ptr<StorageSchema::Column> cols[] = {
-      std::unique_ptr<IdColumn>(new IdColumn("id", storage_, &args.ids())),
+      std::unique_ptr<IdColumn>(new IdColumn("id", storage, &args.ids())),
       StorageSchema::StringColumnPtr("flat_key", &args.flat_keys(),
-                                     &storage_->string_pool()),
+                                     &storage->string_pool()),
       StorageSchema::StringColumnPtr("key", &args.keys(),
-                                     &storage_->string_pool()),
+                                     &storage->string_pool()),
       std::unique_ptr<ValueColumn>(
-          new ValueColumn("int_value", VarardicType::kInt, storage_)),
+          new ValueColumn("int_value", VarardicType::kInt, storage)),
       std::unique_ptr<ValueColumn>(
-          new ValueColumn("string_value", VarardicType::kString, storage_)),
+          new ValueColumn("string_value", VarardicType::kString, storage)),
       std::unique_ptr<ValueColumn>(
-          new ValueColumn("real_value", VarardicType::kReal, storage_))};
-  schema_ = StorageSchema({
+          new ValueColumn("real_value", VarardicType::kReal, storage))};
+  return {
       std::make_move_iterator(std::begin(cols)),
       std::make_move_iterator(std::end(cols)),
-  });
-  return schema_.ToTableSchema({"id", "key"});
-}
-
-std::unique_ptr<Table::Cursor> ArgsTable::CreateCursor(
-    const QueryConstraints& qc,
-    sqlite3_value** argv) {
-  uint32_t count = static_cast<uint32_t>(storage_->args().args_count());
-  auto it = table_utils::CreateBestRowIteratorForGenericSchema(schema_, count,
-                                                               qc, argv);
-  return std::unique_ptr<Table::Cursor>(
-      new StorageCursor(std::move(it), schema_.ToColumnReporters()));
+  };
 }
 
 int ArgsTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
