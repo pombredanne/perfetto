@@ -25,7 +25,7 @@ namespace {
 
 TEST(FilteredRowIndexUnittest, Noop) {
   FilteredRowIndex index(1, 13);
-  ASSERT_EQ(index.mode(), FilteredRowIndex::Mode::kAllRows);
+  ASSERT_TRUE(index.all_set());
   ASSERT_EQ(index.start_row(), 1);
   ASSERT_EQ(index.end_row(), 13);
 }
@@ -38,9 +38,9 @@ TEST(FilteredRowIndexUnittest, FilterAllRows) {
     return row == 2 || row == 3;
   });
   ASSERT_TRUE(in_bound_indices);
-  ASSERT_EQ(index.mode(), FilteredRowIndex::Mode::kBitVector);
+  ASSERT_FALSE(index.all_set());
 
-  auto f = index.ReleaseBitVector();
+  auto f = index.TakeBitvector();
   ASSERT_EQ(f.size(), 4);
   ASSERT_FALSE(f[0]);
   ASSERT_TRUE(f[1]);
@@ -57,9 +57,9 @@ TEST(FilteredRowIndexUnittest, FilterBitvectorTwice) {
     return row == 2;
   });
   ASSERT_TRUE(in_bound_indices);
-  ASSERT_EQ(index.mode(), FilteredRowIndex::Mode::kBitVector);
+  ASSERT_FALSE(index.all_set());
 
-  auto f = index.ReleaseBitVector();
+  auto f = index.TakeBitvector();
   ASSERT_EQ(f.size(), 4);
   ASSERT_FALSE(f[0]);
   ASSERT_TRUE(f[1]);
@@ -69,11 +69,11 @@ TEST(FilteredRowIndexUnittest, FilterBitvectorTwice) {
 
 TEST(FilteredRowUnittest, SetAllRows) {
   FilteredRowIndex index(1, 5);
-  index.SetOnlyRows({2, 3});
+  index.IntersectRows({2, 3});
 
-  ASSERT_EQ(index.mode(), FilteredRowIndex::Mode::kBitVector);
+  ASSERT_FALSE(index.all_set());
 
-  auto f = index.ReleaseBitVector();
+  auto f = index.TakeBitvector();
   ASSERT_EQ(f.size(), 4);
   ASSERT_FALSE(f[0]);
   ASSERT_TRUE(f[1]);
@@ -84,11 +84,11 @@ TEST(FilteredRowUnittest, SetAllRows) {
 TEST(FilteredRowUnittest, SetBitvectorRows) {
   FilteredRowIndex index(1, 5);
   index.FilterRows([](uint32_t row) { return row == 2 || row == 3; });
-  index.SetOnlyRows({0, 2, 4, 5, 10});
+  index.IntersectRows({0, 2, 4, 5, 10});
 
-  ASSERT_EQ(index.mode(), FilteredRowIndex::Mode::kBitVector);
+  ASSERT_FALSE(index.all_set());
 
-  auto f = index.ReleaseBitVector();
+  auto f = index.TakeBitvector();
   ASSERT_EQ(f.size(), 4);
   ASSERT_FALSE(f[0]);
   ASSERT_TRUE(f[1]);

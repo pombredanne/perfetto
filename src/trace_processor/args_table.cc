@@ -91,11 +91,14 @@ void ArgsTable::IdColumn::Filter(int op,
   auto id = sqlite_utils::ExtractSqliteValue<RowId>(value);
   const auto& args_for_id = storage_->args().args_for_id();
   auto it_pair = args_for_id.equal_range(id);
-  std::vector<uint32_t> rows;
+
+  auto size = static_cast<size_t>(std::distance(it_pair.first, it_pair.second));
+  std::vector<uint32_t> rows(size);
+  size_t i = 0;
   for (auto it = it_pair.first; it != it_pair.second; it++) {
-    rows.push_back(it->second);
+    rows[i++] = it->second;
   }
-  index->SetOnlyRows(std::move(rows));
+  index->IntersectRows(std::move(rows));
 }
 
 ArgsTable::ValueColumn::ValueColumn(std::string col_name,
@@ -167,7 +170,6 @@ void ArgsTable::ValueColumn::Filter(int op,
       break;
     }
   }
-  PERFETTO_CHECK(false);
 }
 
 ArgsTable::ValueColumn::Comparator ArgsTable::ValueColumn::Sort(

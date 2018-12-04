@@ -67,13 +67,11 @@ inline RangeRowIterator CreateRangeIterator(
     schema_col.Filter(c.op, value, &index);
   }
 
-  switch (index.mode()) {
-    case FilteredRowIndex::Mode::kAllRows:
-      return RangeRowIterator(min_idx, max_idx, desc);
-    case FilteredRowIndex::Mode::kBitVector:
-      return RangeRowIterator(min_idx, desc, index.ReleaseBitVector());
+  if (index.all_set()) {
+    return RangeRowIterator(min_idx, max_idx, desc);
+  } else {
+    return RangeRowIterator(min_idx, desc, index.TakeBitvector());
   }
-  PERFETTO_CHECK(false);
 }
 
 inline std::pair<bool, bool> IsOrdered(

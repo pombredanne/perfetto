@@ -21,6 +21,7 @@
 #include <sqlite3.h>
 
 #include <functional>
+#include <limits>
 #include <string>
 
 #include "perfetto/base/logging.h"
@@ -302,7 +303,8 @@ inline std::vector<Table::Column> GetColumnsForTable(
     if (err == SQLITE_DONE)
       break;
     if (err != SQLITE_ROW) {
-      PERFETTO_ELOG("Querying schema of table failed");
+      PERFETTO_ELOG("Querying schema of table %s failed",
+                    raw_table_name.c_str());
       return {};
     }
 
@@ -310,9 +312,9 @@ inline std::vector<Table::Column> GetColumnsForTable(
         reinterpret_cast<const char*>(sqlite3_column_text(*stmt, 0));
     const char* raw_type =
         reinterpret_cast<const char*>(sqlite3_column_text(*stmt, 1));
-    if (!name || !raw_type || !*name || !*raw_type) {
-      PERFETTO_ELOG("Schema has invalid column values");
-      return {};
+    if (!name || !raw_type || !*name) {
+      PERFETTO_FATAL("Schema for %s has invalid column values",
+                     raw_table_name.c_str());
     }
 
     Table::ColumnType type;
@@ -328,6 +330,10 @@ inline std::vector<Table::Column> GetColumnsForTable(
       type = Table::ColumnType::kString;
     } else if (strcmp(raw_type, "DOUBLE") == 0) {
       type = Table::ColumnType::kDouble;
+    } else if (!*raw_type) {
+      PERFETTO_DLOG("Unknown column type for %s %s", raw_table_name.c_str(),
+                    name);
+      type = Table::ColumnType::kUnknown;
     } else {
       PERFETTO_FATAL("Unknown column type '%s' on table %s", raw_type,
                      raw_table_name.c_str());
