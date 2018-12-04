@@ -174,12 +174,48 @@ void TraceBuffer::CopyChunkUntrusted(ProducerID producer_id_trusted,
       index_.emplace(key, ChunkMeta(GetChunkRecordAt(wptr_), num_fragments,
                                     chunk_flags, producer_uid_trusted));
   if (PERFETTO_UNLIKELY(!it_and_inserted.second)) {
+    uint16_t last_frag_read = 0;
+    uint16_t last_frag_off = 0;
+    if (chunk_id !=
+        last_chunk_id_[std::make_pair(producer_id_trusted, writer_id)]) {
+      stats_.abi_violations++;
+      PERFETTO_DCHECK(suppress_sanity_dchecks_for_testing_);
+    } else {
+      // ChunkRecord* prev = it_and_inserted.first->second.chunk_record;
+      last_frag_read = it_and_inserted.first->second.num_fragments_read;
+      last_frag_off = it_and_inserted.first->second.cur_fragment_offset;
+    }
+
+    // if (prev->producer_id != producer_id_trusted || prev->writer_id !=
+    // writer_id || prev->chunk_id != chunk_id )
+
     // More likely a producer bug, but could also be a malicious producer.
-    stats_.abi_violations++;
-    PERFETTO_DCHECK(suppress_sanity_dchecks_for_testing_);
+    // TODO invalidate here.
+    // TODO do some sanity checks.
+    // TODO check that this is the +1th.
+    // TODO that wptr still is consistent with previous offsets.
+
+    // TODO: there is a conceptual problem here. Say that the producer writes
+    // two chunks from the same writer (say chunk 1 and 2, where 1 is complete
+    // and 2 is write in progress). Say that the commit IPC for writer 1 is
+    // on flight (but the service hasn't seen it yet). Say also that the sevice
+    // decides to do a flush right now and starts scraping the SMB (will it do
+    // immediately or only after a timeout?). Essentially what if the service
+    // scrapes on its own chunk 1 and chunk 2 (so last_chunk_id[writer] = 2)
+    // but then the commit IPC for chunk 1 is received (and eventually after
+    // some time event the one for chunk 2). What should the service do in this
+    // case? Just ignore? record that as an ABI violation?
+
     index_.erase(it_and_inserted.first);
-    index_.emplace(key, ChunkMeta(GetChunkRecordAt(wptr_), num_fragments,
-                                  chunk_flags, producer_uid_trusted));
+    it_and_inserted =
+        index_.emplace(key, ChunkMeta(GetChunkRecordAt(wptr_), num_fragments,
+                                      chunk_flags, producer_uid_trusted));
+
+    // TODO this needs to be stronger.
+    PERFETTO_DCHECK(last_frag_read <= num_fragments);
+    ChunkMeta& new_meta = it_and_inserted.first->second;
+    new_meta.num_fragments_read = last_frag_read;
+    new_meta.cur_fragment_offset = last_frag_off;
   }
   TRACE_BUFFER_DLOG("  copying @ [%lu - %lu] %zu", wptr_ - begin(),
                     wptr_ - begin() + record_size, record_size);

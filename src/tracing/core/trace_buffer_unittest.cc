@@ -1018,6 +1018,41 @@ TEST_F(TraceBufferTest, Malicious_PatchOutOfBounds) {
   }
 }
 
+TEST_F(TraceBufferTest, Malicious_OverwriteShorter) {
+  ResetBuffer(4096);
+  SuppressSanityDchecksForTesting();
+
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
+      .AddPacket(30, 'a')
+      .AddPacket(40, 'b')
+      .CopyIntoTraceBuffer();
+  trace_buffer()->BeginRead();
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(30, 'a')));
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(40, 'b')));
+
+  // The attacker in this case speculates on the fact that the read pointer is
+  // @ 70 which is >> the size of the new chunk we overwrite.
+  // The service should detect that and invalidate completely the read.
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
+      .AddPacket(10, 'a')
+      .AddPacket(10, 'b')
+      .AddPacket(10, 'c')
+      .CopyIntoTraceBuffer();
+  trace_buffer()->BeginRead();
+  ASSERT_THAT(ReadPacket(), IsEmpty());
+
+  // Test that the service didn't get stuck in some indeterminate state.
+  // Writing a valid chunk with a larger ID should make things work again.
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(1))
+      .AddPacket(10, 'd')
+      .AddPacket(10, 'e')
+      .CopyIntoTraceBuffer();
+  trace_buffer()->BeginRead();
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(10, 'd')));
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(10, 'e')));
+  ASSERT_THAT(ReadPacket(), IsEmpty());
+}
+
 // -------------------
 // SequenceIterator tests
 // -------------------
@@ -1089,6 +1124,166 @@ TEST_F(TraceBufferTest, Iterator_ManyStreamsWrapping) {
   ASSERT_TRUE(IteratorSeqEq(ProducerID(1), WriterID(2), {Neg(-2), 0, 1}));
   ASSERT_TRUE(IteratorSeqEq(ProducerID(3), WriterID(1), {Neg(-1), 2, 4}));
 }
+
+// -------------------
+// Re-writing same chunk id
+// -------------------
+
+TEST_F(TraceBufferTest, Overwrite_ReCommitBeforeRead) {
+  ResetBuffer(4096);
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
+      .AddPacket(100, 'a')
+      .AddPacket(100, 'b')
+      .CopyIntoTraceBuffer();
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
+      .AddPacket(100, 'a')
+      .AddPacket(100, 'b')
+      .AddPacket(100, 'c')
+      .AddPacket(100, 'd')
+      .CopyIntoTraceBuffer();
+  trace_buffer()->BeginRead();
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(100, 'a')));
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(100, 'b')));
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(100, 'c')));
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(100, 'd')));
+  ASSERT_THAT(ReadPacket(), IsEmpty());
+}
+
+TEST_F(TraceBufferTest, Overwrite_ReCommitAfterPartialRead) {
+  ResetBuffer(4096);
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
+      .AddPacket(20, 'a')
+      .AddPacket(30, 'b')
+      .CopyIntoTraceBuffer();
+  trace_buffer()->BeginRead();
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(20, 'a')));
+
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
+      .AddPacket(20, 'a')
+      .AddPacket(30, 'b')
+      .AddPacket(40, 'c')
+      .AddPacket(50, 'd')
+      .CopyIntoTraceBuffer();
+  trace_buffer()->BeginRead();
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(30, 'b')));
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(40, 'c')));
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(50, 'd')));
+  ASSERT_THAT(ReadPacket(), IsEmpty());
+}
+
+TEST_F(TraceBufferTest, Overwrite_ReCommitAfterFullRead) {
+  ResetBuffer(4096);
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
+      .AddPacket(20, 'a')
+      .AddPacket(30, 'b')
+      .CopyIntoTraceBuffer();
+  trace_buffer()->BeginRead();
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(20, 'a')));
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(30, 'b')));
+
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
+      .AddPacket(20, 'a')
+      .AddPacket(30, 'b')
+      .AddPacket(40, 'c')
+      .AddPacket(50, 'd')
+      .CopyIntoTraceBuffer();
+  trace_buffer()->BeginRead();
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(40, 'c')));
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(50, 'd')));
+  ASSERT_THAT(ReadPacket(), IsEmpty());
+}
+
+TEST_F(TraceBufferTest, Overwrite_ReCommitInvalid) {
+  ResetBuffer(4096);
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
+      .AddPacket(20, 'a')
+      .AddPacket(30, 'b')
+      .CopyIntoTraceBuffer();
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(1))
+      .AddPacket(40, 'c')
+      .AddPacket(50, 'd')
+      .CopyIntoTraceBuffer();
+  trace_buffer()->BeginRead();
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(20, 'a')));
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(30, 'b')));
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(40, 'c')));
+
+  // This should fail. We are trying to re-commit chunk 0, but chunk 1 for the
+  // same (producer,writer) has been seen already. On production builds this
+  // will ... TODO here I am not sure what's the right behavior. think.  // DNS
+  SuppressSanityDchecksForTesting();
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
+      .AddPacket(20, 'e')
+      .AddPacket(60, 'f')
+      .AddPacket(70, 'g')
+      .CopyIntoTraceBuffer();
+  trace_buffer()->BeginRead();
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(50, 'd')));
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(20, 'e')));
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(60, 'f')));
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(70, 'g')));
+  ASSERT_THAT(ReadPacket(), IsEmpty());
+}
+
+TEST_F(TraceBufferTest, Overwrite_ReCommitSameBeforeRead) {
+  ResetBuffer(4096);
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
+      .AddPacket(20, 'a')
+      .AddPacket(30, 'b')
+      .CopyIntoTraceBuffer();
+
+  // Commit again the same chunk.
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
+      .AddPacket(20, 'a')
+      .AddPacket(30, 'b')
+      .CopyIntoTraceBuffer();
+
+  // Then write some new content in a new chunk.
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(1))
+      .AddPacket(40, 'c')
+      .AddPacket(50, 'd')
+      .CopyIntoTraceBuffer();
+
+  // The reader should keep reading from the new chunk.
+  trace_buffer()->BeginRead();
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(20, 'a')));
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(30, 'b')));
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(40, 'c')));
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(50, 'd')));
+  ASSERT_THAT(ReadPacket(), IsEmpty());
+}
+
+TEST_F(TraceBufferTest, Overwrite_ReCommitSameAfterRead) {
+  ResetBuffer(4096);
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
+      .AddPacket(20, 'a')
+      .AddPacket(30, 'b')
+      .CopyIntoTraceBuffer();
+  trace_buffer()->BeginRead();
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(20, 'a')));
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(30, 'b')));
+
+  // This re-commit should be ignored. We just re-committed an identical chunk.
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
+      .AddPacket(20, 'a')
+      .AddPacket(30, 'b')
+      .CopyIntoTraceBuffer();
+
+  // Then write some new content in a new chunk.
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(1))
+      .AddPacket(40, 'c')
+      .AddPacket(50, 'd')
+      .CopyIntoTraceBuffer();
+
+  // The reader should keep reading from the new chunk.
+  trace_buffer()->BeginRead();
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(40, 'c')));
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(50, 'd')));
+  ASSERT_THAT(ReadPacket(), IsEmpty());
+}
+
+// TODO malicious recommit with different chunk size.
+// TODO malicious recommit with different offsets.
 
 // TODO(primiano): test stats().
 // TODO(primiano): test multiple streams interleaved.
