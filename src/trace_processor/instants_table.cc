@@ -17,7 +17,6 @@
 #include "src/trace_processor/instants_table.h"
 
 #include "src/trace_processor/storage_cursor.h"
-#include "src/trace_processor/table_utils.h"
 
 namespace perfetto {
 namespace trace_processor {
