@@ -30,7 +30,9 @@ void FilteredRowIndex::IntersectRows(std::vector<uint32_t> rows) {
 
   if (mode_ == kAllRows) {
     mode_ = Mode::kRowVector;
-    rows_ = std::move(rows);
+    auto begin = std::lower_bound(rows.begin(), rows.end(), start_row_);
+    auto end = std::lower_bound(rows.begin(), rows.end(), end_row_);
+    rows_.insert(rows_.end(), begin, end);
     return;
   } else if (mode_ == kRowVector) {
     std::vector<uint32_t> intersected;
@@ -91,7 +93,7 @@ std::vector<uint32_t> FilteredRowIndex::TakeRowVector() {
   switch (mode_) {
     case Mode::kAllRows:
       rows_.resize(end_row_ - start_row_);
-      std::iota(rows_.begin(), rows_.end(), 0);
+      std::iota(rows_.begin(), rows_.end(), start_row_);
       break;
     case Mode::kBitVector:
       ConvertBitVectorToRowVector();
