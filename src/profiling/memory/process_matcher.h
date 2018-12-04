@@ -99,7 +99,16 @@ class ProcessMatcher {
       std::function<void(pid_t)> shutdown_fn,
       std::function<void(const Process&,
                          const std::vector<const ProcessSetSpec*>&)> match_fn);
+
+  // Notify that a process has connected. This will determine which
+  // ProcessSetSpecs it matches, and call match_fn with that set.
+  // This is called by the SocketListener.
   ProcessHandle ProcessConnected(Process process);
+  // Wait for connection of a set of processes as specified in ProcessSetSpec.
+  // When a process matching that specificaton connects, match_fn will be called
+  // with this and other ProcessSetSpecs that have called this function
+  // previously.
+  // This is called by HeapprofdProducer.
   ProcessSetSpecHandle AwaitProcessSetSpec(ProcessSetSpec process_set);
 
  private:
