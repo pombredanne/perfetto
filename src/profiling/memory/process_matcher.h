@@ -104,6 +104,7 @@ class ProcessMatcher {
   // ProcessSetSpecs it matches, and call match_fn with that set.
   // This is called by the SocketListener.
   ProcessHandle ProcessConnected(Process process);
+
   // Wait for connection of a set of processes as specified in ProcessSetSpec.
   // When a process matching that specificaton connects, match_fn will be called
   // with this and other ProcessSetSpecs that have called this function
