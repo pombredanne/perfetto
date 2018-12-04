@@ -29,11 +29,6 @@ namespace trace_processor {
 // Storage for information about the rows to be returned by a filter operation.
 class FilteredRowIndex {
  public:
-  enum Mode {
-    kAllRows = 1,
-    kBitVector = 2,
-  };
-
   FilteredRowIndex(uint32_t start_row, uint32_t end_row);
 
   // Cals |fn| on each row index which is currently to be returned and retains
@@ -50,20 +45,28 @@ class FilteredRowIndex {
     }
   }
 
-  // Returns the bitvector backing this row index. Only valid if |mode()| ==
-  // Mode::kBitVector.
-  std::vector<bool> ReleaseBitVector() {
+  // Returns the bitvector backing this row index. Rests the internal bitvector
+  // storage as well.
+  std::vector<bool> TakeBitvector() {
+    if (mode_ == Mode::kAllRows)
+      return std::vector<bool>(end_row_ - start_row_, true);
+
     auto vector = std::move(row_filter_);
     row_filter_.clear();
     mode_ = Mode::kAllRows;
     return vector;
   }
 
-  Mode mode() const { return mode_; }
+  bool all_set() { return mode_ == Mode::kAllRows; }
   uint32_t start_row() const { return start_row_; }
   uint32_t end_row() const { return end_row_; }
 
  private:
+  enum Mode {
+    kAllRows = 1,
+    kBitVector = 2,
+  };
+
   template <typename Predicate>
   void FilterAllRows(Predicate fn) {
     row_filter_.resize(end_row_ - start_row_, true);

@@ -134,7 +134,6 @@ void ArgsTable::ValueColumn::Filter(int op,
       break;
     }
   }
-  PERFETTO_CHECK(false);
 }
 
 ArgsTable::ValueColumn::Comparator ArgsTable::ValueColumn::Sort(
