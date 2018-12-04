@@ -85,9 +85,9 @@
 // this state yet, so the CallstackAllocations will be kept around until the
 // next dump, written to the trace, and then destroyed.
 //
-// On the right hand side is the GlobalCallstackTrie, with notes representing
+// On the right hand side is the GlobalCallstackTrie, with nodes representing
 // distinct callstacks. They have no information about the currently allocated
-// or freed bytes, they only contain a reference count to deallocate them as
+// or freed bytes, they only contain a reference count to destroy them as
 // soon as they are no longer referenced by a HeapTracker.
 
 namespace perfetto {
