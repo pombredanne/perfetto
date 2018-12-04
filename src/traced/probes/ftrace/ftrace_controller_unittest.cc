@@ -397,53 +397,6 @@ TEST(FtraceControllerTest, ControllerMayDieFirst) {
   data_source.reset();
 }
 
-TEST(FtraceControllerTest, TaskScheduling) {
-  auto controller = CreateTestController(
-      false /* nice runner */, false /* nice procfs */, 2 /* num cpus */);
-
-  // For this test we don't care about calls to WriteToFile/ClearFile.
-  EXPECT_CALL(*controller->procfs(), WriteToFile(_, _)).Times(AnyNumber());
-  EXPECT_CALL(*controller->procfs(), ClearFile(_)).Times(AnyNumber());
-
-  FtraceConfig config = CreateFtraceConfig({"group/foo"});
-  auto data_source = controller->AddFakeDataSource(config);
-  ASSERT_TRUE(controller->StartDataSource(data_source.get()));
-
-  // Only one call to drain should be scheduled for the next drain period.
-  // FtraceController issues 1 PostTask + 1 PostDelayedTask for each cycle.
-  ::testing::InSequence seq;
-  EXPECT_CALL(*controller->runner(), PostTask(_));
-  EXPECT_CALL(*controller->runner(), PostDelayedTask(_, 100));
-
-  // However both CPUs should be drained.
-  EXPECT_CALL(*controller, OnDrainCpuForTesting(_)).Times(2);
-
-  // Finally, another task should be posted to unblock the workers.
-  EXPECT_CALL(*controller->runner(), PostTask(_));
-
-  // Simulate two worker threads reporting available data.
-  auto on_data_available0 = controller->GetDataAvailableCallback(0u);
-  std::thread worker0([on_data_available0] { on_data_available0(); });
-
-  auto on_data_available1 = controller->GetDataAvailableCallback(1u);
-  std::thread worker1([on_data_available1] { on_data_available1(); });
-
-  // Poll until both worker threads have reported available data.
-  controller->WaitForData(0u);
-  controller->WaitForData(1u);
-
-  // Run the task to drain all CPUs.
-  controller->runner()->RunLastTask();
-
-  // Run the task to unblock all workers.
-  controller->runner()->RunLastTask();
-
-  worker0.join();
-  worker1.join();
-
-  data_source.reset();
-}
-
 TEST(FtraceControllerTest, BackToBackEnableDisable) {
   auto controller =
       CreateTestController(false /* nice runner */, false /* nice procfs */);
