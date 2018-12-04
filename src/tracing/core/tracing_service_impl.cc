@@ -419,6 +419,10 @@ bool TracingServiceImpl::StartTracing(TracingSessionID tsid) {
         tracing_session->delay_to_next_write_period_ms());
   }
 
+  // Start the periodic flush tasks if the config specified a flush period.
+  if (tracing_session->config.flush_period_ms())
+    PeriodicFlushTask(tsid, /*post_next_only=*/true);
+
   for (const auto& kv : tracing_session->data_source_instances) {
     ProducerID producer_id = kv.first;
     const DataSourceInstance& data_source = kv.second;
@@ -665,6 +669,31 @@ void TracingServiceImpl::FlushAndDisableTracing(TracingSessionID tsid) {
   });
 }
 
+void TracingServiceImpl::PeriodicFlushTask(TracingSessionID tsid,
+                                           bool post_next_only) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  TracingSession* tracing_session = GetTracingSession(tsid);
+  if (!tracing_session || tracing_session->state != TracingSession::STARTED)
+    return;
+
+  uint32_t flush_period_ms = tracing_session->config.flush_period_ms();
+  auto weak_this = weak_ptr_factory_.GetWeakPtr();
+  task_runner_->PostDelayedTask(
+      [weak_this, tsid] {
+        if (weak_this)
+          weak_this->PeriodicFlushTask(tsid, /*post_next_only=*/false);
+      },
+      flush_period_ms - (base::GetWallTimeMs().count() % flush_period_ms));
+
+  if (post_next_only)
+    return;
+
+  Flush(tsid, kFlushTimeoutMs, [](bool success) {
+    if (!success)
+      PERFETTO_ELOG("Periodic flush timed out");
+  });
+}
+
 // Note: when this is called to write into a file passed when starting tracing
 // |consumer| will be == nullptr (as opposite to the case of a consumer asking
 // to send the trace data back over IPC).
@@ -887,6 +916,11 @@ void TracingServiceImpl::FreeBuffers(TracingSessionID tsid) {
   }
   DisableTracing(tsid, /*disable_immediately=*/true);
 
+  for (auto& producer_entry : producers_) {
+    ProducerEndpointImpl* producer = producer_entry.second;
+    producer->OnFreeBuffers(tracing_session->buffers_index);
+  }
+
   for (BufferID buffer_id : tracing_session->buffers_index) {
     buffer_ids_.Free(buffer_id);
     PERFETTO_DCHECK(buffers_.count(buffer_id) == 1);
@@ -1025,11 +1059,12 @@ TracingServiceImpl::DataSourceInstance* TracingServiceImpl::SetupDataSource(
 
   DataSourceInstanceID inst_id = ++last_data_source_instance_id_;
   auto insert_iter = tracing_session->data_source_instances.emplace(
-      producer->id_,
-      DataSourceInstance{inst_id,
-                         cfg_data_source.config(),  //  Deliberate copy.
-                         data_source.descriptor.name(),
-                         data_source.descriptor.will_notify_on_stop()});
+      std::piecewise_construct,  //
+      std::forward_as_tuple(producer->id_),
+      std::forward_as_tuple(inst_id,
+                            cfg_data_source.config(),  //  Deliberate copy.
+                            data_source.descriptor.name(),
+                            data_source.descriptor.will_notify_on_stop()));
   DataSourceInstance* ds_instance = &insert_iter->second;
   DataSourceConfig& ds_config = ds_instance->config;
   ds_config.set_trace_duration_ms(tracing_session->config.duration_ms());
@@ -1462,6 +1497,20 @@ void TracingServiceImpl::ProducerEndpointImpl::UnregisterDataSource(
   service_->UnregisterDataSource(id_, name);
 }
 
+void TracingServiceImpl::ProducerEndpointImpl::RegisterTraceWriter(
+    uint32_t /*writer_id*/,
+    uint32_t /*target_buffer*/) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  // TODO(eseckler): Store association into a map. Make sure to verify that the
+  // target buffer is "allowed" when using this association later.
+}
+
+void TracingServiceImpl::ProducerEndpointImpl::UnregisterTraceWriter(
+    uint32_t /*writer_id*/) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  // TODO(eseckler): Remove association from the map.
+}
+
 void TracingServiceImpl::ProducerEndpointImpl::CommitData(
     const CommitDataRequest& req_untrusted,
     CommitDataCallback callback) {
@@ -1594,6 +1643,7 @@ void TracingServiceImpl::ProducerEndpointImpl::SetupDataSource(
     DataSourceInstanceID ds_id,
     const DataSourceConfig& config) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
+  allowed_target_buffers_.insert(static_cast<BufferID>(config.target_buffer()));
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
   task_runner_->PostTask([weak_this, ds_id, config] {
     if (weak_this)
@@ -1622,6 +1672,14 @@ void TracingServiceImpl::ProducerEndpointImpl::NotifyDataSourceStopped(
     DataSourceInstanceID data_source_id) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   service_->NotifyDataSourceStopped(id_, data_source_id);
+}
+
+void TracingServiceImpl::ProducerEndpointImpl::OnFreeBuffers(
+    const std::vector<BufferID>& target_buffers) {
+  if (allowed_target_buffers_.empty())
+    return;
+  for (BufferID buffer : target_buffers)
+    allowed_target_buffers_.erase(buffer);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

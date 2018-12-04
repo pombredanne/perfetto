@@ -14,22 +14,22 @@
  * limitations under the License.
  */
 
-#include "src/profiling/memory/matcher.h"
+#include "src/profiling/memory/process_matcher.h"
 
 #include "perfetto/base/logging.h"
 
 namespace perfetto {
 namespace profiling {
 
-Matcher::ProcessHandle::ProcessHandle(Matcher* matcher, pid_t pid)
+ProcessMatcher::ProcessHandle::ProcessHandle(ProcessMatcher* matcher, pid_t pid)
     : matcher_(matcher), pid_(pid) {}
 
-Matcher::ProcessHandle::ProcessHandle(ProcessHandle&& other)
+ProcessMatcher::ProcessHandle::ProcessHandle(ProcessHandle&& other)
     : matcher_(other.matcher_), pid_(other.pid_) {
   other.matcher_ = nullptr;
 }
 
-Matcher::ProcessHandle& Matcher::ProcessHandle::operator=(
+ProcessMatcher::ProcessHandle& ProcessMatcher::ProcessHandle::operator=(
     ProcessHandle&& other) {
   matcher_ = other.matcher_;
   pid_ = other.pid_;
@@ -37,43 +37,43 @@ Matcher::ProcessHandle& Matcher::ProcessHandle::operator=(
   return *this;
 }
 
-Matcher::ProcessHandle::~ProcessHandle() {
+ProcessMatcher::ProcessHandle::~ProcessHandle() {
   if (matcher_)
     matcher_->RemoveProcess(pid_);
 }
 
-Matcher::ProcessSetHandle::ProcessSetHandle(
-    Matcher* matcher,
-    HeapprofdProducer::DataSource* data_source)
-    : matcher_(matcher), data_source_(data_source) {}
+ProcessMatcher::ProcessSetSpecHandle::ProcessSetSpecHandle(
+    ProcessMatcher* matcher,
+    std::multiset<ProcessSetSpecItem>::iterator iterator)
+    : matcher_(matcher), iterator_(iterator) {}
 
-Matcher::ProcessSetHandle::ProcessSetHandle(ProcessSetHandle&& other)
-    : matcher_(other.matcher_), data_source_(other.data_source_) {
+ProcessMatcher::ProcessSetSpecHandle::ProcessSetSpecHandle(
+    ProcessSetSpecHandle&& other)
+    : matcher_(other.matcher_), iterator_(other.iterator_) {
   other.matcher_ = nullptr;
 }
 
-Matcher::ProcessSetHandle& Matcher::ProcessSetHandle::operator=(
-    ProcessSetHandle&& other) {
+ProcessMatcher::ProcessSetSpecHandle& ProcessMatcher::ProcessSetSpecHandle::
+operator=(ProcessSetSpecHandle&& other) {
   matcher_ = other.matcher_;
-  data_source_ = other.data_source_;
+  iterator_ = other.iterator_;
   other.matcher_ = nullptr;
   return *this;
 }
 
-Matcher::ProcessSetHandle::~ProcessSetHandle() {
+ProcessMatcher::ProcessSetSpecHandle::~ProcessSetSpecHandle() {
   if (matcher_)
-    matcher_->UnwaitProcessSet(data_source_);
+    matcher_->UnwaitProcessSetSpec(iterator_);
 }
 
-Matcher::Matcher(std::function<void(pid_t)> shutdown_fn,
-                 std::function<void(const Process&,
-                                    const std::vector<ProcessSet*>&)> match_fn)
-    : shutdown_fn_(shutdown_fn),
-      match_fn_(match_fn),
-      current_orphan_generation_(new ProcessSetItem(this, ProcessSet{})),
-      old_orphan_generation_(new ProcessSetItem(this, ProcessSet{})) {}
+ProcessMatcher::ProcessMatcher(
+    std::function<void(pid_t)> shutdown_fn,
+    std::function<void(const Process&,
+                       const std::vector<const ProcessSetSpec*>&)> match_fn)
+    : shutdown_fn_(shutdown_fn), match_fn_(match_fn) {}
 
-Matcher::ProcessHandle Matcher::NotifyProcess(Process process) {
+ProcessMatcher::ProcessHandle ProcessMatcher::ProcessConnected(
+    Process process) {
   pid_t pid = process.pid;
   decltype(pid_to_process_)::iterator it;
   bool inserted;
@@ -87,41 +87,35 @@ Matcher::ProcessHandle Matcher::NotifyProcess(Process process) {
   const std::string& cmdline = new_process_item->process.cmdline;
   cmdline_to_process_.emplace(cmdline, new_process_item);
 
-  // Go through existing ProcessSets to find ones containing the newly
+  // Go through existing ProcessSetSpecs to find ones containing the newly
   // connected process.
-  std::set<ProcessSetItem*> matching_process_set_items = process_set_for_all_;
+  std::set<ProcessSetSpecItem*> matching_process_set_items =
+      process_set_for_all_;
   auto pid_range = pid_to_process_set_.equal_range(pid);
   for (auto i = pid_range.first; i != pid_range.second; ++i) {
-    ProcessSet& ps = i->second->process_set;
+    ProcessSetSpec& ps = const_cast<ProcessSetSpec&>(i->second->process_set);
     if (ps.pids.find(pid) != ps.pids.end())
       matching_process_set_items.emplace(i->second);
   }
   auto cmdline_range = cmdline_to_process_set_.equal_range(cmdline);
   for (auto i = cmdline_range.first; i != cmdline_range.second; ++i) {
-    ProcessSet& ps = i->second->process_set;
+    ProcessSetSpec& ps = const_cast<ProcessSetSpec&>(i->second->process_set);
     if (ps.process_cmdline.find(cmdline) != ps.process_cmdline.end())
       matching_process_set_items.emplace(i->second);
   }
 
-  bool found_process_set_item = !matching_process_set_items.empty();
-  // If we did not find any ProcessSet, we use the placeholder orphan process
-  // set. This allows processes to connect before the DataSource was
-  // initialized. This happens on user builds for the fork model.
-  if (!found_process_set_item)
-    matching_process_set_items.emplace(current_orphan_generation_.get());
-
-  for (ProcessSetItem* process_set_item : matching_process_set_items) {
+  for (ProcessSetSpecItem* process_set_item : matching_process_set_items) {
     process_set_item->process_items.emplace(new_process_item);
     new_process_item->references.emplace(process_set_item);
   }
 
-  if (found_process_set_item)
+  if (!matching_process_set_items.empty())
     RunMatchFn(new_process_item);
 
   return ProcessHandle(this, pid);
 }
 
-void Matcher::RemoveProcess(pid_t pid) {
+void ProcessMatcher::RemoveProcess(pid_t pid) {
   auto it = pid_to_process_.find(pid);
   if (it == pid_to_process_.end()) {
     PERFETTO_DFATAL("Could not find process.");
@@ -133,22 +127,15 @@ void Matcher::RemoveProcess(pid_t pid) {
   pid_to_process_.erase(it);
 }
 
-Matcher::ProcessSetHandle Matcher::AwaitProcessSet(ProcessSet process_set) {
-  HeapprofdProducer::DataSource* ds = process_set.data_source;
-  decltype(process_sets_)::iterator it;
-  bool inserted;
-  std::tie(it, inserted) = process_sets_.emplace(
-      std::piecewise_construct, std::forward_as_tuple(ds),
-      std::forward_as_tuple(this, std::move(process_set)));
-  if (!inserted) {
-    PERFETTO_DFATAL("Duplicate DataSource");
-    return ProcessSetHandle(nullptr, nullptr);
-  }
-  ProcessSetItem* new_process_set_item = &(it->second);
-  const ProcessSet& new_process_set = new_process_set_item->process_set;
+ProcessMatcher::ProcessSetSpecHandle ProcessMatcher::AwaitProcessSetSpec(
+    ProcessSetSpec process_set) {
+  auto it = process_sets_.emplace(this, std::move(process_set));
+  ProcessSetSpecItem* new_process_set_item =
+      const_cast<ProcessSetSpecItem*>(&*it);
+  const ProcessSetSpec& new_process_set = new_process_set_item->process_set;
 
   // Go through currently active processes to find ones matching the new
-  // ProcessSet.
+  // ProcessSetSpec.
   std::set<ProcessItem*> matching_process_items;
   if (new_process_set.all) {
     process_set_for_all_.emplace(new_process_set_item);
@@ -177,18 +164,14 @@ Matcher::ProcessSetHandle Matcher::AwaitProcessSet(ProcessSet process_set) {
     RunMatchFn(process_item);
   }
 
-  return ProcessSetHandle(this, ds);
+  return ProcessSetSpecHandle(this, it);
 }
 
-void Matcher::UnwaitProcessSet(HeapprofdProducer::DataSource* ds) {
-  auto it = process_sets_.find(ds);
-  if (it == process_sets_.end()) {
-    PERFETTO_DFATAL("Removing invalid ProcessSet");
-    return;
-  }
-
-  ProcessSetItem& process_set_item = it->second;
-  const ProcessSet& process_set = process_set_item.process_set;
+void ProcessMatcher::UnwaitProcessSetSpec(
+    std::multiset<ProcessSetSpecItem>::iterator iterator) {
+  ProcessSetSpecItem& process_set_item =
+      const_cast<ProcessSetSpecItem&>(*iterator);
+  const ProcessSetSpec& process_set = process_set_item.process_set;
 
   for (pid_t pid : process_set.pids) {
     auto pid_range = pid_to_process_set_.equal_range(pid);
@@ -211,22 +194,25 @@ void Matcher::UnwaitProcessSet(HeapprofdProducer::DataSource* ds) {
 
   if (process_set.all)
     process_set_for_all_.erase(&process_set_item);
-  process_sets_.erase(it);
+  process_sets_.erase(iterator);
 }
 
-void Matcher::GarbageCollectOrphans() {
-  old_orphan_generation_ = std::move(current_orphan_generation_);
-  current_orphan_generation_.reset(new ProcessSetItem(this, ProcessSet{}));
-}
-
-Matcher::ProcessItem::~ProcessItem() {
-  for (ProcessSetItem* process_set_item : references) {
+ProcessMatcher::ProcessItem::~ProcessItem() {
+  for (ProcessSetSpecItem* process_set_item : references) {
     size_t erased = process_set_item->process_items.erase(this);
     PERFETTO_DCHECK(erased);
   }
 }
 
-Matcher::ProcessSetItem::~ProcessSetItem() {
+bool ProcessMatcher::ProcessSetSpecItem::operator<(
+    const ProcessSetSpecItem& other) const {
+  return std::tie(process_set.pids, process_set.process_cmdline,
+                  process_set.all) < std::tie(other.process_set.pids,
+                                              other.process_set.process_cmdline,
+                                              other.process_set.all);
+}
+
+ProcessMatcher::ProcessSetSpecItem::~ProcessSetSpecItem() {
   for (ProcessItem* process_item : process_items) {
     size_t erased = process_item->references.erase(this);
     PERFETTO_DCHECK(erased);
@@ -235,17 +221,14 @@ Matcher::ProcessSetItem::~ProcessSetItem() {
   }
 }
 
-void Matcher::ShutdownProcess(pid_t pid) {
+void ProcessMatcher::ShutdownProcess(pid_t pid) {
   shutdown_fn_(pid);
 }
 
-void Matcher::RunMatchFn(ProcessItem* process_item) {
-  std::vector<ProcessSet*> process_sets;
-  for (ProcessSetItem* process_set_item : process_item->references) {
-    if (process_set_item != current_orphan_generation_.get() &&
-        process_set_item != old_orphan_generation_.get())
-      process_sets.emplace_back(&(process_set_item->process_set));
-  }
+void ProcessMatcher::RunMatchFn(ProcessItem* process_item) {
+  std::vector<const ProcessSetSpec*> process_sets;
+  for (ProcessSetSpecItem* process_set_item : process_item->references)
+    process_sets.emplace_back(&(process_set_item->process_set));
   match_fn_(process_item->process, process_sets);
 }
 

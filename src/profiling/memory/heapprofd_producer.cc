@@ -98,9 +98,14 @@ void FindPidsForCmdlines(const std::vector<std::string>& cmdlines,
 
     // Strip everything after @ for Java processes.
     // Otherwise, strip newline at EOF.
-    size_t endpos = process_cmdline.find('@');
-    if (endpos == std::string::npos)
-      endpos = process_cmdline.size();
+    size_t endpos = process_cmdline.find('\0');
+    if (endpos == std::string::npos) {
+      PERFETTO_DFATAL("No nullbyte in cmdline.");
+      return;
+    }
+    size_t atpos = process_cmdline.find('@');
+    if (atpos != std::string::npos && atpos < endpos)
+      endpos = atpos;
     if (endpos < 1)
       return;
     process_cmdline.resize(endpos);
@@ -201,22 +206,31 @@ void HeapprofdProducer::SetupDataSource(DataSourceInstanceID id,
     return;
   }
 
+  const HeapprofdConfig& heapprofd_config = cfg.heapprofd_config();
+
   DataSource data_source;
+
+  if (heapprofd_config.all()) {
+    data_source.properties.emplace_back(properties_.SetAll());
+  } else {
+    for (std::string cmdline : heapprofd_config.process_cmdline())
+      data_source.properties.emplace_back(
+          properties_.SetProperty(std::move(cmdline)));
+  }
 
   ClientConfiguration client_config = MakeClientConfiguration(cfg);
 
-  if (cfg.heapprofd_config().all()) {
+  if (heapprofd_config.all()) {
     FindAllProfilablePids(&data_source.pids);
-    if (!cfg.heapprofd_config().pid().empty())
+    if (!heapprofd_config.pid().empty())
       PERFETTO_ELOG("Got all and pid. Ignoring pid.");
-    if (!cfg.heapprofd_config().process_cmdline().empty())
+    if (!heapprofd_config.process_cmdline().empty())
       PERFETTO_ELOG("Got all and process_cmdline. Ignoring process_cmdline.");
   } else {
-    for (uint64_t pid : cfg.heapprofd_config().pid())
+    for (uint64_t pid : heapprofd_config.pid())
       data_source.pids.emplace_back(static_cast<pid_t>(pid));
 
-    FindPidsForCmdlines(cfg.heapprofd_config().process_cmdline(),
-                        &data_source.pids);
+    FindPidsForCmdlines(heapprofd_config.process_cmdline(), &data_source.pids);
   }
 
   auto pid_it = data_source.pids.begin();
@@ -429,6 +443,13 @@ void HeapprofdProducer::ConnectWithRetries(const char* socket_name) {
   ResetConnectionBackoff();
   socket_name_ = socket_name;
   Connect();
+}
+
+void HeapprofdProducer::DumpAll() {
+  for (const auto& id_and_data_source : data_sources_) {
+    if (!Dump(id_and_data_source.first, 0 /* flush_id */, false /* is_flush */))
+      PERFETTO_DLOG("Failed to dump %" PRIu64, id_and_data_source.first);
+  }
 }
 
 void HeapprofdProducer::Connect() {
