@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import("../../gn/fuzzer.gni")
 import("../../gn/perfetto.gni")
 import("//build_overrides/build.gni")
 
@@ -229,4 +230,14 @@ if (perfetto_build_standalone || perfetto_build_with_android) {
       "api_impl/consumer_api.cc",
     ]
   }
+}
+
+perfetto_fuzzer_test("trace_buffer_fuzzer") {
+  sources = [
+    "core/trace_buffer_fuzzer.cc",
+  ]
+  deps = [
+    ":tracing",
+    "../../gn:default_deps",
+  ]
 }
