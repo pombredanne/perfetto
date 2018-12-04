@@ -148,7 +148,6 @@ TEST(MatcherTest, MatchCmdlineProcessSetSpecFirstMultiple) {
   ProcessSetSpec ps;
   ps.process_cmdline.emplace("init");
   ProcessSetSpec ps2;
-  HeapprofdProducer::DataSource ds;
   ps2.process_cmdline.emplace("init");
 
   auto ps_handle = m.AwaitProcessSetSpec(std::move(ps));
