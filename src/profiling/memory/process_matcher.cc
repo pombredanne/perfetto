@@ -24,13 +24,13 @@ namespace profiling {
 ProcessMatcher::ProcessHandle::ProcessHandle(ProcessMatcher* matcher, pid_t pid)
     : matcher_(matcher), pid_(pid) {}
 
-ProcessMatcher::ProcessHandle::ProcessHandle(ProcessHandle&& other)
+ProcessMatcher::ProcessHandle::ProcessHandle(ProcessHandle&& other) noexcept
     : matcher_(other.matcher_), pid_(other.pid_) {
   other.matcher_ = nullptr;
 }
 
 ProcessMatcher::ProcessHandle& ProcessMatcher::ProcessHandle::operator=(
-    ProcessHandle&& other) {
+    ProcessHandle&& other) noexcept {
   matcher_ = other.matcher_;
   pid_ = other.pid_;
   other.matcher_ = nullptr;
@@ -48,13 +48,13 @@ ProcessMatcher::ProcessSetSpecHandle::ProcessSetSpecHandle(
     : matcher_(matcher), iterator_(iterator) {}
 
 ProcessMatcher::ProcessSetSpecHandle::ProcessSetSpecHandle(
-    ProcessSetSpecHandle&& other)
+    ProcessSetSpecHandle&& other) noexcept
     : matcher_(other.matcher_), iterator_(other.iterator_) {
   other.matcher_ = nullptr;
 }
 
 ProcessMatcher::ProcessSetSpecHandle& ProcessMatcher::ProcessSetSpecHandle::
-operator=(ProcessSetSpecHandle&& other) {
+operator=(ProcessSetSpecHandle&& other) noexcept {
   matcher_ = other.matcher_;
   iterator_ = other.iterator_;
   other.matcher_ = nullptr;
