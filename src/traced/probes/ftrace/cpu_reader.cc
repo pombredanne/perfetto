@@ -281,6 +281,10 @@ void CpuReader::RunWorkerThread(size_t cpu,
         // causes read to always returns 4096. The only way to have a good
         // indication of how many bytes of ftrace data have been read is to
         // parse the ftrace header.
+        // Note: |header_size_len| is *not* an indication on how many bytes are
+        // available form |ptr|. It's just an independent piece of information
+        // that needs to be passed to ParsePageHeader() (a static function) in
+        // order to work.
         base::Optional<PageHeader> hdr = ParsePageHeader(&ptr, header_size_len);
         PERFETTO_DCHECK(hdr && hdr->size > 0 && hdr->size <= base::kPageSize);
         res = hdr.has_value() ? static_cast<int>(hdr->size) : -1;
