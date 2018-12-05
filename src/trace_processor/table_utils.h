@@ -108,7 +108,7 @@ inline std::vector<uint32_t> CreateSortedIndexVector(
   // Retrieve the index created above from the index.
   std::vector<uint32_t> sorted_rows = index.TakeRowVector();
 
-  std::vector<StorageSchema::Column::Comparator> comparators;
+  std::vector<StorageColumn::Comparator> comparators;
   for (const auto& ob : obs) {
     auto col = static_cast<size_t>(ob.iColumn);
     comparators.emplace_back(schema.GetColumn(col).Sort(ob));
