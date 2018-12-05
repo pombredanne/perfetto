@@ -29,9 +29,6 @@ namespace trace_processor {
 // storage.
 class StorageTable : public Table {
  public:
-  StorageTable();
-  virtual ~StorageTable();
-
   // A cursor which abstracts common patterns found in storage backed tables. It
   // takes a strategy to iterate through rows and a column reporter for each
   // column to implement the Cursor interface.
@@ -49,6 +46,9 @@ class StorageTable : public Table {
     std::unique_ptr<RowIterator> iterator_;
     std::vector<std::unique_ptr<StorageColumn>>* columns_;
   };
+
+  StorageTable();
+  virtual ~StorageTable();
 
  protected:
   // Creates a row iterator which is optimized for a generic storage schema
