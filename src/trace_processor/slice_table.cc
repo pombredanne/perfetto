@@ -30,21 +30,19 @@ void SliceTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
 
 base::Optional<Table::Schema> SliceTable::Init(int, const char* const*) {
   const auto& slices = storage_->nestable_slices();
-  std::unique_ptr<StorageColumn> cols[] = {
-      NumericColumnPtr("ts", &slices.start_ns(), false /* hidden */,
-                       true /* ordered */),
-      NumericColumnPtr("dur", &slices.durations()),
-      NumericColumnPtr("utid", &slices.utids()),
-      StringColumnPtr("cat", &slices.cats(), &storage_->string_pool()),
-      StringColumnPtr("name", &slices.names(), &storage_->string_pool()),
-      NumericColumnPtr("depth", &slices.depths()),
-      NumericColumnPtr("stack_id", &slices.stack_ids()),
-      NumericColumnPtr("parent_stack_id", &slices.parent_stack_ids())};
-  schema_ = StorageSchema({
-      std::make_move_iterator(std::begin(cols)),
-      std::make_move_iterator(std::end(cols)),
-  });
-  return schema_.ToTableSchema({"utid", "ts", "depth"});
+  schema_ =
+      StorageSchema::Builder()
+          .AddNumericColumn("ts", &slices.start_ns(), false /* hidden */,
+                            true /* ordered */)
+          .AddNumericColumn("dur", &slices.durations())
+          .AddNumericColumn("utid", &slices.utids())
+          .AddStringColumn("cat", &slices.cats(), &storage_->string_pool())
+          .AddStringColumn("name", &slices.names(), &storage_->string_pool())
+          .AddNumericColumn("depth", &slices.depths())
+          .AddNumericColumn("stack_id", &slices.stack_ids())
+          .AddNumericColumn("parent_stack_id", &slices.parent_stack_ids())
+          .Build({"utid", "ts", "depth"});
+  return schema_->ToTableSchema();
 }
 
 std::unique_ptr<Table::Cursor> SliceTable::CreateCursor(
@@ -54,7 +52,7 @@ std::unique_ptr<Table::Cursor> SliceTable::CreateCursor(
       static_cast<uint32_t>(storage_->nestable_slices().slice_count());
   auto it = CreateBestRowIteratorForGenericSchema(count, qc, argv);
   return std::unique_ptr<Table::Cursor>(
-      new Cursor(std::move(it), schema_.mutable_columns()));
+      new Cursor(std::move(it), schema_->mutable_columns()));
 }
 
 int SliceTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
@@ -63,8 +61,8 @@ int SliceTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
 
   // Only the string columns are handled by SQLite
   info->order_by_consumed = true;
-  size_t name_index = schema_.ColumnIndexFromName("name");
-  size_t cat_index = schema_.ColumnIndexFromName("cat");
+  size_t name_index = schema_->ColumnIndexFromName("name");
+  size_t cat_index = schema_->ColumnIndexFromName("cat");
   for (size_t i = 0; i < qc.constraints().size(); i++) {
     info->omit[i] =
         qc.constraints()[i].iColumn != static_cast<int>(name_index) &&
