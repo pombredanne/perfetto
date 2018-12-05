@@ -22,6 +22,12 @@ namespace trace_processor {
 StorageTable::StorageTable() = default;
 StorageTable::~StorageTable() = default;
 
+base::Optional<Table::Schema> StorageTable::Init(int, const char* const*) {
+  PERFETTO_CHECK(!schema_.has_value());
+  schema_ = CreateStorageSchema();
+  return schema_->ToTableSchema();
+}
+
 std::unique_ptr<RowIterator>
 StorageTable::CreateBestRowIteratorForGenericSchema(uint32_t size,
                                                     const QueryConstraints& qc,
