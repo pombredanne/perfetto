@@ -62,10 +62,12 @@ class SocketListener : public base::UnixSocket::EventListener,
   struct ProcessInfo {
     ProcessInfo(pid_t pid);
 
-    void Connected(ProcessMatcher* process_matcher);
+    void Connected(ProcessMatcher* process_matcher,
+                   BookkeepingThread* bookkeeping_thread);
 
     Process process;
-    ProcessMatcher::ProcessHandle process_handle;
+    ProcessMatcher::ProcessHandle matcher_handle;
+    BookkeepingThread::ProcessHandle bookkeeping_handle;
     bool connected = false;
     bool set_up = false;
 

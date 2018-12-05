@@ -89,16 +89,19 @@ SocketListener::ProcessInfo::ProcessInfo(pid_t pid) {
     PERFETTO_ELOG("Failed to get cmdline for %d", pid);
 }
 
-void SocketListener::ProcessInfo::Connected(ProcessMatcher* process_matcher) {
-  if (!connected)
-    process_handle = process_matcher->ProcessConnected(process);
+void SocketListener::ProcessInfo::Connected(
+    ProcessMatcher* process_matcher,
+    BookkeepingThread* bookkeeping_thread) {
+  if (!connected) {
+    matcher_handle = process_matcher->ProcessConnected(process);
+    bookkeeping_handle =
+        bookkeeping_thread->NotifyProcessConnected(process.pid);
+  }
   connected = false;
 }
 
 void SocketListener::OnDisconnect(base::UnixSocket* self) {
   pid_t peer_pid = self->peer_pid();
-
-  bookkeeping_thread_->NotifyClientDisconnected(peer_pid);
   Disconnect(peer_pid);
 }
 
@@ -142,16 +145,13 @@ void SocketListener::OnNewIncomingConnection(
   decltype(process_info_)::iterator it;
   std::tie(it, std::ignore) = process_info_.emplace(peer_pid, peer_pid);
   ProcessInfo& process_info = it->second;
-  process_info.Connected(&process_matcher_);
+  process_info.Connected(&process_matcher_, bookkeeping_thread_);
   process_info.sockets.emplace(new_connection_raw, std::move(new_connection));
-  if (process_info.set_up)
+  if (process_info.set_up) {
     new_connection_raw->Send(&process_info.client_config,
                              sizeof(process_info.client_config), -1,
                              base::UnixSocket::BlockingMode::kBlocking);
-
-  // TODO(fmayer): Move destruction of bookkeeping data to
-  // HeapprofdProducer.
-  bookkeeping_thread_->NotifyClientConnected(peer_pid);
+  }
 }
 
 void SocketListener::OnDataAvailable(base::UnixSocket* self) {

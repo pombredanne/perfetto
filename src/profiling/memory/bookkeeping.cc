@@ -314,16 +314,18 @@ void BookkeepingThread::HandleBookkeepingRecord(BookkeepingRecord* rec) {
   }
 }
 
-void BookkeepingThread::NotifyClientConnected(pid_t pid) {
+BookkeepingThread::ProcessHandle BookkeepingThread::NotifyProcessConnected(
+    pid_t pid) {
   std::lock_guard<std::mutex> l(bookkeeping_mutex_);
   // emplace gives the existing BookkeepingData for pid if it already exists
   // or creates a new one.
   auto it_and_inserted = bookkeeping_data_.emplace(pid, &callsites_);
   BookkeepingData& bk = it_and_inserted.first->second;
   bk.ref_count++;
+  return {this, pid};
 }
 
-void BookkeepingThread::NotifyClientDisconnected(pid_t pid) {
+void BookkeepingThread::NotifyProcessDisconnected(pid_t pid) {
   std::lock_guard<std::mutex> l(bookkeeping_mutex_);
   auto it = bookkeeping_data_.find(pid);
   if (it == bookkeeping_data_.end()) {
@@ -340,6 +342,29 @@ void BookkeepingThread::Run(BoundedQueue<BookkeepingRecord>* input_queue) {
       return;
     HandleBookkeepingRecord(&rec);
   }
+}
+
+BookkeepingThread::ProcessHandle::ProcessHandle(
+    BookkeepingThread* bookkeeping_thread,
+    pid_t pid)
+    : bookkeeping_thread_(bookkeeping_thread), pid_(pid) {}
+
+BookkeepingThread::ProcessHandle::~ProcessHandle() {
+  if (bookkeeping_thread_)
+    bookkeeping_thread_->NotifyProcessDisconnected(pid_);
+}
+
+BookkeepingThread::ProcessHandle::ProcessHandle(ProcessHandle&& other) noexcept
+    : bookkeeping_thread_(other.bookkeeping_thread_), pid_(other.pid_) {
+  other.bookkeeping_thread_ = nullptr;
+}
+
+BookkeepingThread::ProcessHandle& BookkeepingThread::ProcessHandle::operator=(
+    ProcessHandle&& other) noexcept {
+  bookkeeping_thread_ = other.bookkeeping_thread_;
+  pid_ = other.pid_;
+  other.bookkeeping_thread_ = nullptr;
+  return *this;
 }
 
 }  // namespace profiling
