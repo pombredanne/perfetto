@@ -120,6 +120,7 @@ void SocketListener::Match(
     // TODO(fmayer): Allow to change sampling rate.
     return;
   }
+
   ClientConfiguration cfg = MergeProcessSetSpecs(process_sets);
   for (auto& raw_sock_and_sockinfo : process_info.sockets) {
     SocketInfo& sock_info = raw_sock_and_sockinfo.second;
@@ -127,6 +128,7 @@ void SocketListener::Match(
     sock_info.sock->Send(&cfg, sizeof(cfg), -1,
                          base::UnixSocket::BlockingMode::kBlocking);
   }
+  process_info.client_config = std::move(cfg);
   process_info.set_up = true;
 }
 
@@ -141,6 +143,10 @@ void SocketListener::OnNewIncomingConnection(
   ProcessInfo& process_info = it->second;
   process_info.Connected(&process_matcher_);
   process_info.sockets.emplace(new_connection_raw, std::move(new_connection));
+  if (process_info.set_up)
+    new_connection_raw->Send(&process_info.client_config,
+                             sizeof(process_info.client_config), -1,
+                             base::UnixSocket::BlockingMode::kBlocking);
 
   // TODO(fmayer): Move destruction of bookkeeping data to
   // HeapprofdProducer.
