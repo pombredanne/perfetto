@@ -24,6 +24,7 @@ namespace {
 // This is mostly the same as GetHeapprofdProgramProperty in
 // https://android.googlesource.com/platform/bionic/+/master/libc/bionic/malloc_common.cpp
 // This should give the same result as GetHeapprofdProgramProperty.
+// TODO(fmayer): Move all the /proc parsing functions to separate file.
 bool GetCmdlineForPID(pid_t pid, std::string* name) {
   std::string filename = "/proc/" + std::to_string(pid) + "/cmdline";
   base::ScopedFile fd(base::OpenFile(filename, O_RDONLY | O_CLOEXEC));
@@ -182,11 +183,6 @@ void SocketListener::OnDataAvailable(base::UnixSocket* self) {
       PERFETTO_DLOG("%d: Received FDs.", peer_pid);
       process_info.unwinding_metadata = std::make_shared<UnwindingMetadata>(
           peer_pid, std::move(fds[0]), std::move(fds[1]));
-      /*
-      self->Send(&process_info.client_config,
-                 sizeof(process_info.client_config), -1,
-                 base::UnixSocket::BlockingMode::kBlocking);
-                 */
     } else if (fds[0] || fds[1]) {
       PERFETTO_DLOG("%d: Received partial FDs.", peer_pid);
     } else {

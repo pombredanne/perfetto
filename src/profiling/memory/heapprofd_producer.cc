@@ -214,11 +214,11 @@ void HeapprofdProducer::SetupDataSource(DataSourceInstanceID id,
   process_set_spec.all = heapprofd_config.all();
   process_set_spec.client_configuration = MakeClientConfiguration(cfg);
   if (!process_set_spec.all) {
-    process_set_spec.pids.insert(heapprofd_config.pid().begin(),
-                                 heapprofd_config.pid().end());
+    process_set_spec.pids.insert(heapprofd_config.pid().cbegin(),
+                                 heapprofd_config.pid().cend());
     process_set_spec.process_cmdline.insert(
-        heapprofd_config.process_cmdline().begin(),
-        heapprofd_config.process_cmdline().end());
+        heapprofd_config.process_cmdline().cbegin(),
+        heapprofd_config.process_cmdline().cend());
   }
 
   data_source.processes =
