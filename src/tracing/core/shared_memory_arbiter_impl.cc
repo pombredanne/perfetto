@@ -56,9 +56,7 @@ SharedMemoryArbiterImpl::SharedMemoryArbiterImpl(
       producer_endpoint_(producer_endpoint),
       shmem_abi_(reinterpret_cast<uint8_t*>(start), size, page_size),
       active_writer_ids_(kMaxWriterID),
-      weak_ptr_factory_(this) {
-  weak_this_ = weak_ptr_factory_.GetWeakPtr();
-}
+      weak_ptr_factory_(this) {}
 
 Chunk SharedMemoryArbiterImpl::GetNewChunk(
     const SharedMemoryABI::ChunkHeader& header,
@@ -245,7 +243,7 @@ std::unique_ptr<TraceWriter> SharedMemoryArbiterImpl::CreateTraceWriter(
   }
   if (!id)
     return std::unique_ptr<TraceWriter>(new NullTraceWriter());
-  auto weak_this = weak_this_;
+  auto weak_this = weak_ptr_factory_.GetWeakPtr();
   task_runner_->PostTask([weak_this, id, target_buffer] {
     if (weak_this)
       weak_this->producer_endpoint_->RegisterTraceWriter(id, target_buffer);
@@ -280,7 +278,7 @@ void SharedMemoryArbiterImpl::NotifyFlushComplete(FlushRequestID req_id) {
 }
 
 void SharedMemoryArbiterImpl::ReleaseWriterID(WriterID id) {
-  auto weak_this = weak_this_;
+  auto weak_this = weak_ptr_factory_.GetWeakPtr();
   task_runner_->PostTask([weak_this, id] {
     if (weak_this)
       weak_this->producer_endpoint_->UnregisterTraceWriter(id);

@@ -59,7 +59,7 @@ class WeakPtr {
   WeakPtr& operator=(WeakPtr&&) = default;
 
   T* get() const {
-    PERFETTO_DCHECK_THREAD(thread_checker_);
+    PERFETTO_DCHECK_THREAD(thread_checker);
     return handle_ ? *handle_.get() : nullptr;
   }
   T* operator->() const { return get(); }
@@ -69,43 +69,36 @@ class WeakPtr {
 
  private:
   friend class WeakPtrFactory<T>;
-#if PERFETTO_THREAD_CHECKER_ENABLED()
-  explicit WeakPtr(const std::shared_ptr<T*>& handle,
-                   const base::ThreadChecker& thread_checker)
-      : handle_(handle), thread_checker_(thread_checker) {}
-#else
   explicit WeakPtr(const std::shared_ptr<T*>& handle) : handle_(handle) {}
-#endif
 
   std::shared_ptr<T*> handle_;
-  PERFETTO_THREAD_CHECKER(thread_checker_)
+  PERFETTO_THREAD_CHECKER(thread_checker)
 };
 
 template <typename T>
 class WeakPtrFactory {
  public:
-  explicit WeakPtrFactory(T* owner) : handle_(new T* {owner}) {
-    PERFETTO_DCHECK_THREAD(thread_checker_);
-  }
-  ~WeakPtrFactory() {
-    PERFETTO_DCHECK_THREAD(thread_checker_);
-    *(handle_.get()) = nullptr;
+  explicit WeakPtrFactory(T* owner)
+      : weak_ptr_(std::shared_ptr<T*>(new T* {owner})) {
+    PERFETTO_DCHECK_THREAD(thread_checker);
   }
 
-  WeakPtr<T> GetWeakPtr() const {
-#if PERFETTO_THREAD_CHECKER_ENABLED()
-    return WeakPtr<T>(handle_, thread_checker_);
-#else
-    return WeakPtr<T>(handle_);
-#endif
+  ~WeakPtrFactory() {
+    PERFETTO_DCHECK_THREAD(thread_checker);
+    *(weak_ptr_.handle_.get()) = nullptr;
   }
+
+  // Can be safely called on any thread, since it simply copies |weak_ptr_|.
+  // Note that any accesses to the returned pointer need to be made on the
+  // thread that created the factory.
+  WeakPtr<T> GetWeakPtr() const { return weak_ptr_; }
 
  private:
   WeakPtrFactory(const WeakPtrFactory&) = delete;
   WeakPtrFactory& operator=(const WeakPtrFactory&) = delete;
 
-  std::shared_ptr<T*> handle_;
-  PERFETTO_THREAD_CHECKER(thread_checker_)
+  WeakPtr<T> weak_ptr_;
+  PERFETTO_THREAD_CHECKER(thread_checker)
 };
 
 }  // namespace base
