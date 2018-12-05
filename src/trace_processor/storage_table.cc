@@ -33,14 +33,14 @@ StorageTable::CreateBestRowIteratorForGenericSchema(uint32_t size,
 
   // Figure out whether the data is already ordered and which order we should
   // traverse the data.
-  bool is_ordered, desc = false;
-  std::tie(is_ordered, desc) = IsOrdered(obs);
+  bool is_ordered, is_desc = false;
+  std::tie(is_ordered, is_desc) = IsOrdered(obs);
 
   // Create the range iterator and if we are sorted, just return it.
   auto index = CreateRangeIterator(size, cs, argv);
-  if (is_ordered) {
-    return index.ToRowIterator(desc);
-  }
+  if (is_ordered)
+    return index.ToRowIterator(is_desc);
+
   // Otherwise, create the sorted vector of indices and create the vector
   // iterator.
   return std::unique_ptr<VectorRowIterator>(
