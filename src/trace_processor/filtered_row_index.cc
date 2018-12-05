@@ -71,6 +71,7 @@ void FilteredRowIndex::IntersectRows(std::vector<uint32_t> rows) {
 std::vector<uint32_t> FilteredRowIndex::ToRowVector() {
   switch (mode_) {
     case Mode::kAllRows:
+      mode_ = Mode::kRowVector;
       rows_.resize(end_row_ - start_row_);
       std::iota(rows_.begin(), rows_.end(), start_row_);
       break;
@@ -110,7 +111,7 @@ std::unique_ptr<RowIterator> FilteredRowIndex::ToRowIterator(bool desc) {
       return std::unique_ptr<VectorRowIterator>(
           new VectorRowIterator(TakeRowVector()));
   }
-  PERFETTO_CHECK(false);  // for GCC.
+  PERFETTO_FATAL("For GCC");
 }
 
 std::vector<uint32_t> FilteredRowIndex::TakeRowVector() {
