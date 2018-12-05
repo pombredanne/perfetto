@@ -121,13 +121,17 @@ void HeapTracker::CommitFree(uint64_t sequence_number, uint64_t address) {
 void HeapTracker::Dump(
     ProfilePacket::ProcessHeapSamples* proto,
     std::set<GlobalCallstackTrie::Node*>* callstacks_to_dump) {
+  // There are two reasons we remove the unused callstack allocations on the
+  // next iteration of Dump:
+  // * We need to remove them after the callstacks were dumped, which currently
+  //   happens after the allocations are dumped.
+  // * This way, we do not destroy and recreate callstacks as frequently.
   for (auto it : dead_callstack_allocations_) {
     const CallstackAllocations& alloc = it->second;
     if (alloc.allocation_count == alloc.free_count)
-      it = callstack_allocations_.erase(it);
-    else
-      ++it;
+      callstack_allocations_.erase(it);
   }
+  dead_callstack_allocations_.clear();
 
   for (auto it = callstack_allocations_.begin();
        it != callstack_allocations_.end(); ++it) {
