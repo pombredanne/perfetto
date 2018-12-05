@@ -59,7 +59,7 @@ class WeakPtr {
   WeakPtr& operator=(WeakPtr&&) = default;
 
   T* get() const {
-    PERFETTO_DCHECK_THREAD(thread_checker);
+    PERFETTO_DCHECK_THREAD(thread_checker_);
     return handle_ ? *handle_.get() : nullptr;
   }
   T* operator->() const { return get(); }
@@ -69,26 +69,35 @@ class WeakPtr {
 
  private:
   friend class WeakPtrFactory<T>;
+#if PERFETTO_THREAD_CHECKER_ENABLED()
+  explicit WeakPtr(const std::shared_ptr<T*>& handle,
+                   const base::ThreadChecker& thread_checker)
+      : handle_(handle), thread_checker_(thread_checker) {}
+#else
   explicit WeakPtr(const std::shared_ptr<T*>& handle) : handle_(handle) {}
+#endif
 
   std::shared_ptr<T*> handle_;
-  PERFETTO_THREAD_CHECKER(thread_checker)
+  PERFETTO_THREAD_CHECKER(thread_checker_)
 };
 
 template <typename T>
 class WeakPtrFactory {
  public:
   explicit WeakPtrFactory(T* owner) : handle_(new T* {owner}) {
-    PERFETTO_DCHECK_THREAD(thread_checker);
+    PERFETTO_DCHECK_THREAD(thread_checker_);
   }
   ~WeakPtrFactory() {
-    PERFETTO_DCHECK_THREAD(thread_checker);
+    PERFETTO_DCHECK_THREAD(thread_checker_);
     *(handle_.get()) = nullptr;
   }
 
   WeakPtr<T> GetWeakPtr() const {
-    PERFETTO_DCHECK_THREAD(thread_checker);
+#if PERFETTO_THREAD_CHECKER_ENABLED()
+    return WeakPtr<T>(handle_, thread_checker_);
+#else
     return WeakPtr<T>(handle_);
+#endif
   }
 
  private:
@@ -96,7 +105,7 @@ class WeakPtrFactory {
   WeakPtrFactory& operator=(const WeakPtrFactory&) = delete;
 
   std::shared_ptr<T*> handle_;
-  PERFETTO_THREAD_CHECKER(thread_checker)
+  PERFETTO_THREAD_CHECKER(thread_checker_)
 };
 
 }  // namespace base

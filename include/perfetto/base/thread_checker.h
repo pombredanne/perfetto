@@ -55,11 +55,13 @@ class ThreadChecker {
 #define PERFETTO_DCHECK_THREAD(name) \
   PERFETTO_DCHECK((name).CalledOnValidThread())
 #define PERFETTO_DETACH_FROM_THREAD(name) (name).DetachFromThread()
-#else
+#define PERFETTO_THREAD_CHECKER_ENABLED() 1
+#else  // PERFETTO_DCHECK_IS_ON() && !defined(PERFETTO_BUILD_WITH_CHROMIUM)
 #define PERFETTO_THREAD_CHECKER(name)
 #define PERFETTO_DCHECK_THREAD(name)
 #define PERFETTO_DETACH_FROM_THREAD(name)
-#endif  // PERFETTO_DCHECK_IS_ON()
+#define PERFETTO_THREAD_CHECKER_ENABLED() 0
+#endif  // PERFETTO_DCHECK_IS_ON() && !defined(PERFETTO_BUILD_WITH_CHROMIUM)
 
 }  // namespace base
 }  // namespace perfetto
