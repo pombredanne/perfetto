@@ -19,9 +19,11 @@
 
 #include <stdint.h>
 #include <algorithm>
+#include <memory>
 #include <vector>
 
 #include "perfetto/base/logging.h"
+#include "src/trace_processor/row_iterators.h"
 
 namespace perfetto {
 namespace trace_processor {
@@ -52,18 +54,13 @@ class FilteredRowIndex {
     }
   }
 
-  // Returns the bitvector backing this row index. Resets the internal bitvector
-  // storage as well if used.
-  std::vector<bool> TakeBitvector();
+  // Converts this index into a vector of row indicies.
+  // Note: this function leaves the index in a freshly constructed state.
+  std::vector<uint32_t> ToRowVector();
 
-  // Returns the row vector backing this row index. Resets the internal row
-  // vector storage as well if used.
-  std::vector<uint32_t> TakeRowVector();
-
-  bool all_set() { return mode_ == Mode::kAllRows; }
-  bool backing_rowvector() { return mode_ == Mode::kRowVector; }
-  uint32_t start_row() const { return start_row_; }
-  uint32_t end_row() const { return end_row_; }
+  // Converts this index into a row iterator.
+  // Note: this function leaves the index in a freshly constructed state.
+  std::unique_ptr<RowIterator> ToRowIterator(bool desc);
 
  private:
   enum Mode {
@@ -108,6 +105,10 @@ class FilteredRowIndex {
   }
 
   void ConvertBitVectorToRowVector();
+
+  std::vector<uint32_t> TakeRowVector();
+
+  std::vector<bool> TakeBitVector();
 
   Mode mode_;
   uint32_t start_row_;

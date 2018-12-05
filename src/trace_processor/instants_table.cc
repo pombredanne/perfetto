@@ -16,9 +16,6 @@
 
 #include "src/trace_processor/instants_table.h"
 
-#include "src/trace_processor/storage_cursor.h"
-#include "src/trace_processor/table_utils.h"
-
 namespace perfetto {
 namespace trace_processor {
 
@@ -39,15 +36,13 @@ void InstantsTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
 
 Table::Schema InstantsTable::CreateSchema(int, const char* const*) {
   const auto& instants = storage_->instants();
-  std::unique_ptr<StorageSchema::Column> cols[] = {
-      StorageSchema::NumericColumnPtr("ts", &instants.timestamps(),
-                                      false /* hidden */, true /* ordered */),
-      StorageSchema::StringColumnPtr("name", &instants.name_ids(),
-                                     &storage_->string_pool()),
-      StorageSchema::NumericColumnPtr("value", &instants.values()),
-      StorageSchema::NumericColumnPtr("ref", &instants.refs()),
-      StorageSchema::StringColumnPtr("ref_type", &instants.types(),
-                                     &ref_types_)};
+  std::unique_ptr<StorageColumn> cols[] = {
+      NumericColumnPtr("ts", &instants.timestamps(), false /* hidden */,
+                       true /* ordered */),
+      StringColumnPtr("name", &instants.name_ids(), &storage_->string_pool()),
+      NumericColumnPtr("value", &instants.values()),
+      NumericColumnPtr("ref", &instants.refs()),
+      StringColumnPtr("ref_type", &instants.types(), &ref_types_)};
   schema_ = StorageSchema({
       std::make_move_iterator(std::begin(cols)),
       std::make_move_iterator(std::end(cols)),
@@ -59,10 +54,9 @@ std::unique_ptr<Table::Cursor> InstantsTable::CreateCursor(
     const QueryConstraints& qc,
     sqlite3_value** argv) {
   uint32_t count = static_cast<uint32_t>(storage_->instants().instant_count());
-  auto it = table_utils::CreateBestRowIteratorForGenericSchema(schema_, count,
-                                                               qc, argv);
+  auto it = CreateBestRowIteratorForGenericSchema(count, qc, argv);
   return std::unique_ptr<Table::Cursor>(
-      new StorageCursor(std::move(it), schema_.ToColumnReporters()));
+      new Cursor(std::move(it), schema_.mutable_columns()));
 }
 
 int InstantsTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {

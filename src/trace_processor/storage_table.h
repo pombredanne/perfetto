@@ -15,6 +15,10 @@
 #ifndef SRC_TRACE_PROCESSOR_STORAGE_TABLE_H_
 #define SRC_TRACE_PROCESSOR_STORAGE_TABLE_H_
 
+#include <set>
+
+#include "src/trace_processor/row_iterators.h"
+#include "src/trace_processor/storage_columns.h"
 #include "src/trace_processor/storage_schema.h"
 #include "src/trace_processor/table.h"
 
@@ -23,18 +27,53 @@ namespace trace_processor {
 
 class StorageTable : public Table {
  public:
-  StorageTable(const TraceStorage* storage,
-               std::vector<std::unique_ptr<StorageSchema::Column>> columns,
-               std::vector<std::string> primary_keys);
+  StorageTable();
+  virtual ~StorageTable();
 
-  Table::Schema CreateSchema(int, const char* const*) override final;
-  std::unique_ptr<Table::Cursor> CreateCursor(const QueryConstraints&,
-                                              sqlite3_value**) override;
+  // A cursor which abstracts common patterns found in storage backed tables. It
+  // takes a strategy to iterate through rows and a column reporter for each
+  // column to implement the Cursor interface.
+  class Cursor final : public Table::Cursor {
+   public:
+    Cursor(std::unique_ptr<RowIterator>,
+           std::vector<std::unique_ptr<StorageColumn>>*);
+
+    // Implementation of Table::Cursor.
+    int Next() override;
+    int Eof() override;
+    int Column(sqlite3_context*, int N) override;
+
+   private:
+    std::unique_ptr<RowIterator> iterator_;
+    std::vector<std::unique_ptr<StorageColumn>>* columns_;
+  };
 
  protected:
-  const TraceStorage* const storage_;
+  // Creates a row iterator which is optimized for a generic storage schema
+  // (i.e. it does not make assumptions about values of columns).
+  std::unique_ptr<RowIterator> CreateBestRowIteratorForGenericSchema(
+      uint32_t size,
+      const QueryConstraints& qc,
+      sqlite3_value** argv);
+
   StorageSchema schema_;
-  std::vector<std::string> primary_keys_;
+
+ private:
+  FilteredRowIndex CreateRangeIterator(
+      uint32_t size,
+      const std::vector<QueryConstraints::Constraint>& cs,
+      sqlite3_value** argv);
+
+  std::pair<bool, bool> IsOrdered(
+      const std::vector<QueryConstraints::OrderBy>& obs);
+
+  std::vector<QueryConstraints::OrderBy> RemoveRedundantOrderBy(
+      const std::vector<QueryConstraints::Constraint>& cs,
+      const std::vector<QueryConstraints::OrderBy>& obs);
+
+  std::vector<uint32_t> CreateSortedIndexVector(
+      FilteredRowIndex index,
+      const std::vector<QueryConstraints::OrderBy>& obs);
 };
 
 }  // namespace trace_processor

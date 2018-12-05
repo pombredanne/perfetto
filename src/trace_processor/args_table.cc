@@ -16,35 +16,44 @@
 
 #include "src/trace_processor/args_table.h"
 
+#include "src/trace_processor/sqlite_utils.h"
+
 namespace perfetto {
 namespace trace_processor {
 
 ArgsTable::ArgsTable(sqlite3*, const TraceStorage* storage)
-    : StorageTable(storage, CreateColumns(storage), {"id", "key"}) {}
+    : storage_(storage) {}
 
 void ArgsTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
   Table::Register<ArgsTable>(db, storage, "args");
 }
 
-std::vector<std::unique_ptr<StorageSchema::Column>> ArgsTable::CreateColumns(
-    const TraceStorage* storage) {
-  const auto& args = storage->args();
-  std::unique_ptr<StorageSchema::Column> cols[] = {
-      std::unique_ptr<IdColumn>(new IdColumn("id", storage, &args.ids())),
-      StorageSchema::StringColumnPtr("flat_key", &args.flat_keys(),
-                                     &storage->string_pool()),
-      StorageSchema::StringColumnPtr("key", &args.keys(),
-                                     &storage->string_pool()),
+Table::Schema ArgsTable::CreateSchema(int, const char* const*) {
+  const auto& args = storage_->args();
+  std::unique_ptr<StorageColumn> cols[] = {
+      std::unique_ptr<IdColumn>(new IdColumn("id", storage_, &args.ids())),
+      StringColumnPtr("flat_key", &args.flat_keys(), &storage_->string_pool()),
+      StringColumnPtr("key", &args.keys(), &storage_->string_pool()),
       std::unique_ptr<ValueColumn>(
-          new ValueColumn("int_value", VarardicType::kInt, storage)),
+          new ValueColumn("int_value", VarardicType::kInt, storage_)),
       std::unique_ptr<ValueColumn>(
-          new ValueColumn("string_value", VarardicType::kString, storage)),
+          new ValueColumn("string_value", VarardicType::kString, storage_)),
       std::unique_ptr<ValueColumn>(
-          new ValueColumn("real_value", VarardicType::kReal, storage))};
-  return {
+          new ValueColumn("real_value", VarardicType::kReal, storage_))};
+  schema_ = StorageSchema({
       std::make_move_iterator(std::begin(cols)),
       std::make_move_iterator(std::end(cols)),
-  };
+  });
+  return schema_.ToTableSchema({"id", "key"});
+}
+
+std::unique_ptr<Table::Cursor> ArgsTable::CreateCursor(
+    const QueryConstraints& qc,
+    sqlite3_value** argv) {
+  uint32_t count = static_cast<uint32_t>(storage_->args().args_count());
+  auto it = CreateBestRowIteratorForGenericSchema(count, qc, argv);
+  return std::unique_ptr<Cursor>(
+      new Cursor(std::move(it), schema_.mutable_columns()));
 }
 
 int ArgsTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
@@ -91,7 +100,9 @@ void ArgsTable::IdColumn::Filter(int op,
 ArgsTable::ValueColumn::ValueColumn(std::string col_name,
                                     VarardicType type,
                                     const TraceStorage* storage)
-    : Column(col_name, false), type_(type), storage_(storage) {}
+    : StorageColumn(col_name, false /* hidden */),
+      type_(type),
+      storage_(storage) {}
 
 void ArgsTable::ValueColumn::ReportResult(sqlite3_context* ctx,
                                           uint32_t row) const {
@@ -109,9 +120,8 @@ void ArgsTable::ValueColumn::ReportResult(sqlite3_context* ctx,
       sqlite_utils::ReportSqliteResult(ctx, value.real_value);
       break;
     case VarardicType::kString: {
-      const auto kSqliteStatic = reinterpret_cast<sqlite3_destructor_type>(0);
       const char* str = storage_->GetString(value.string_value).c_str();
-      sqlite3_result_text(ctx, str, -1, kSqliteStatic);
+      sqlite3_result_text(ctx, str, -1, sqlite_utils::kSqliteStatic);
       break;
     }
   }
@@ -128,31 +138,40 @@ void ArgsTable::ValueColumn::Filter(int op,
                                     FilteredRowIndex* index) const {
   switch (type_) {
     case VarardicType::kInt: {
-      auto binary_op = sqlite_utils::GetPredicateForOp<int64_t>(op);
+      auto binary_op = sqlite_utils::GetOptionalPredicateForOp<int64_t>(op);
       int64_t extracted = sqlite_utils::ExtractSqliteValue<int64_t>(value);
       index->FilterRows([this, &binary_op, extracted](uint32_t row) {
         const auto& arg = storage_->args().arg_values()[row];
-        return arg.type == type_ && binary_op(arg.int_value, extracted);
+        if (arg.type == type_) {
+          return binary_op(arg.int_value, extracted);
+        }
+        return binary_op(base::nullopt, extracted);
       });
       break;
     }
     case VarardicType::kReal: {
-      auto binary_op = sqlite_utils::GetPredicateForOp<double>(op);
+      auto binary_op = sqlite_utils::GetOptionalPredicateForOp<double>(op);
       double extracted = sqlite_utils::ExtractSqliteValue<double>(value);
       index->FilterRows([this, &binary_op, extracted](uint32_t row) {
         const auto& arg = storage_->args().arg_values()[row];
-        return arg.type == type_ && binary_op(arg.real_value, extracted);
+        if (arg.type == type_) {
+          return binary_op(arg.real_value, extracted);
+        }
+        return binary_op(base::nullopt, extracted);
       });
       break;
     }
     case VarardicType::kString: {
-      auto binary_op = sqlite_utils::GetPredicateForOp<std::string>(op);
+      auto binary_op = sqlite_utils::GetOptionalPredicateForOp<std::string>(op);
       const auto* extracted =
           reinterpret_cast<const char*>(sqlite3_value_text(value));
       index->FilterRows([this, &binary_op, extracted](uint32_t row) {
         const auto& arg = storage_->args().arg_values()[row];
         const auto& str = storage_->GetString(arg.string_value);
-        return arg.type == type_ && binary_op(str, extracted);
+        if (arg.type == type_) {
+          return binary_op(str, extracted);
+        }
+        return binary_op(base::nullopt, extracted);
       });
       break;
     }

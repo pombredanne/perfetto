@@ -30,8 +30,12 @@ void FilteredRowIndex::IntersectRows(std::vector<uint32_t> rows) {
 
   if (mode_ == kAllRows) {
     mode_ = Mode::kRowVector;
+    // Yes you're reading this code correctly. We use lower_bound in both cases.
+    // Yes this is very intentional and has to do with |end_row_| already being
+    // one greater than the value we are searching for so we need the first
+    // iterator which is *geq* the |end_row_|.
     auto begin = std::lower_bound(rows.begin(), rows.end(), start_row_);
-    auto end = std::lower_bound(rows.begin(), rows.end(), end_row_);
+    auto end = std::lower_bound(begin, rows.end(), end_row_);
     rows_.insert(rows_.end(), begin, end);
     return;
   } else if (mode_ == kRowVector) {
@@ -64,32 +68,7 @@ void FilteredRowIndex::IntersectRows(std::vector<uint32_t> rows) {
   std::fill(start, row_filter_.end(), false);
 }
 
-std::vector<bool> FilteredRowIndex::TakeBitvector() {
-  switch (mode_) {
-    case Mode::kAllRows:
-      row_filter_.resize(end_row_ - start_row_, true);
-      break;
-    case Mode::kRowVector: {
-      row_filter_.resize(end_row_ - start_row_, false);
-      size_t i = 0;
-      for (; i < rows_.size() && rows_[i] < start_row_; i++) {
-      }
-      for (; i < rows_.size() && rows_[i] < end_row_; i++) {
-        row_filter_[rows_[i] - start_row_] = true;
-      }
-      break;
-    }
-    case Mode::kBitVector:
-      // Nothing to do.
-      break;
-  }
-  auto vector = std::move(row_filter_);
-  row_filter_.clear();
-  mode_ = Mode::kAllRows;
-  return vector;
-}
-
-std::vector<uint32_t> FilteredRowIndex::TakeRowVector() {
+std::vector<uint32_t> FilteredRowIndex::ToRowVector() {
   switch (mode_) {
     case Mode::kAllRows:
       rows_.resize(end_row_ - start_row_);
@@ -102,10 +81,7 @@ std::vector<uint32_t> FilteredRowIndex::TakeRowVector() {
       // Nothing to do.
       break;
   }
-  auto vector = std::move(rows_);
-  rows_.clear();
-  mode_ = Mode::kAllRows;
-  return vector;
+  return TakeRowVector();
 }
 
 void FilteredRowIndex::ConvertBitVectorToRowVector() {
@@ -119,6 +95,38 @@ void FilteredRowIndex::ConvertBitVectorToRowVector() {
     rows_.emplace_back(filter_idx + start_row_);
   }
   row_filter_.clear();
+}
+
+std::unique_ptr<RowIterator> FilteredRowIndex::ToRowIterator(bool desc) {
+  switch (mode_) {
+    case Mode::kAllRows:
+      return std::unique_ptr<RangeRowIterator>(
+          new RangeRowIterator(start_row_, end_row_, desc));
+    case Mode::kBitVector: {
+      return std::unique_ptr<RangeRowIterator>(
+          new RangeRowIterator(start_row_, desc, TakeBitVector()));
+    }
+    case Mode::kRowVector:
+      return std::unique_ptr<VectorRowIterator>(
+          new VectorRowIterator(TakeRowVector()));
+  }
+  PERFETTO_CHECK(false);  // for GCC.
+}
+
+std::vector<uint32_t> FilteredRowIndex::TakeRowVector() {
+  PERFETTO_DCHECK(mode_ == Mode::kRowVector);
+  auto vector = std::move(rows_);
+  rows_.clear();
+  mode_ = Mode::kAllRows;
+  return vector;
+}
+
+std::vector<bool> FilteredRowIndex::TakeBitVector() {
+  PERFETTO_DCHECK(mode_ == Mode::kBitVector);
+  auto filter = std::move(row_filter_);
+  row_filter_.clear();
+  mode_ = Mode::kAllRows;
+  return filter;
 }
 
 }  // namespace trace_processor

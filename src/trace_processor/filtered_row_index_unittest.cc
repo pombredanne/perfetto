@@ -26,31 +26,21 @@ namespace {
 using ::testing::ElementsAre;
 
 TEST(FilteredRowIndexUnittest, Noop) {
-  FilteredRowIndex index(1, 13);
-  ASSERT_TRUE(index.all_set());
-  ASSERT_EQ(index.start_row(), 1);
-  ASSERT_EQ(index.end_row(), 13);
+  FilteredRowIndex index(1, 4);
+  ASSERT_THAT(index.ToRowVector(), ElementsAre(1, 2, 3));
 }
 
-TEST(FilteredRowIndexUnittest, FilterAllRows) {
+TEST(FilteredRowIndexUnittest, FilterRows) {
   FilteredRowIndex index(1, 5);
   bool in_bound_indices = true;
   index.FilterRows([&in_bound_indices](uint32_t row) {
     in_bound_indices = in_bound_indices && row >= 1 && row < 5;
     return row == 2 || row == 3;
   });
-  ASSERT_TRUE(in_bound_indices);
-  ASSERT_FALSE(index.all_set());
-
-  auto f = index.TakeBitvector();
-  ASSERT_EQ(f.size(), 4);
-  ASSERT_FALSE(f[0]);
-  ASSERT_TRUE(f[1]);
-  ASSERT_TRUE(f[2]);
-  ASSERT_FALSE(f[3]);
+  ASSERT_THAT(index.ToRowVector(), ElementsAre(2, 3));
 }
 
-TEST(FilteredRowIndexUnittest, FilterBitvectorTwice) {
+TEST(FilteredRowIndexUnittest, FilterRowsTwice) {
   FilteredRowIndex index(1, 5);
   index.FilterRows([](uint32_t row) { return row == 2 || row == 3; });
   bool in_bound_indices = true;
@@ -59,93 +49,46 @@ TEST(FilteredRowIndexUnittest, FilterBitvectorTwice) {
     return row == 2;
   });
   ASSERT_TRUE(in_bound_indices);
-  ASSERT_FALSE(index.all_set());
-
-  auto f = index.TakeBitvector();
-  ASSERT_EQ(f.size(), 4);
-  ASSERT_FALSE(f[0]);
-  ASSERT_TRUE(f[1]);
-  ASSERT_FALSE(f[2]);
-  ASSERT_FALSE(f[3]);
+  ASSERT_THAT(index.ToRowVector(), ElementsAre(2));
 }
 
-TEST(FilteredRowUnittest, FilterBitvectorRowVector) {
+TEST(FilteredRowIndexUnittest, FilterThenIntersect) {
   FilteredRowIndex index(1, 5);
   index.FilterRows([](uint32_t row) { return row == 2 || row == 3; });
   index.IntersectRows({0, 2, 4, 5, 10});
-
-  ASSERT_FALSE(index.all_set());
-
-  auto f = index.TakeBitvector();
-  ASSERT_EQ(f.size(), 4);
-  ASSERT_FALSE(f[0]);
-  ASSERT_TRUE(f[1]);
-  ASSERT_FALSE(f[2]);
-  ASSERT_FALSE(f[3]);
+  ASSERT_THAT(index.ToRowVector(), ElementsAre(2));
 }
 
-TEST(FilteredRowUnittest, FilterRowVectorBitvector) {
+TEST(FilteredRowIndexUnittest, IntersectThenFilter) {
   FilteredRowIndex index(1, 5);
   index.IntersectRows({0, 2, 4, 5, 10});
   index.FilterRows([](uint32_t row) { return row == 2 || row == 3; });
-
-  ASSERT_FALSE(index.all_set());
-
-  auto f = index.TakeBitvector();
-  ASSERT_EQ(f.size(), 4);
-  ASSERT_FALSE(f[0]);
-  ASSERT_TRUE(f[1]);
-  ASSERT_FALSE(f[2]);
-  ASSERT_FALSE(f[3]);
+  ASSERT_THAT(index.ToRowVector(), ElementsAre(2));
 }
 
-TEST(FilteredRowUnittest, FilterRowvector) {
+TEST(FilteredRowIndexUnittest, Intersect) {
   FilteredRowIndex index(1, 5);
   index.IntersectRows({0, 2, 4, 5, 10});
-
-  ASSERT_FALSE(index.all_set());
-  ASSERT_TRUE(index.backing_rowvector());
-
-  auto f = index.TakeRowVector();
-  ASSERT_THAT(f, ElementsAre(2, 4));
+  ASSERT_THAT(index.ToRowVector(), ElementsAre(2, 4));
 }
 
-TEST(FilteredRowUnittest, FilterRowvectorTwice) {
+TEST(FilteredRowIndexUnittest, IntersectTwice) {
   FilteredRowIndex index(1, 5);
   index.IntersectRows({0, 2, 4, 5, 10});
   index.IntersectRows({4});
-
-  ASSERT_FALSE(index.all_set());
-  ASSERT_TRUE(index.backing_rowvector());
-
-  auto f = index.TakeRowVector();
-  ASSERT_THAT(f, ElementsAre(4));
+  ASSERT_THAT(index.ToRowVector(), ElementsAre(4));
 }
 
-TEST(FilteredRowUnittest, ConvertAllToBitVector) {
+TEST(FilteredRowIndexUnittest, ToIterator) {
   FilteredRowIndex index(1, 5);
+  index.IntersectRows({0, 2, 4, 5, 10});
+  auto iterator = index.ToRowIterator(false);
 
-  ASSERT_THAT(index.TakeBitvector(), ElementsAre(true, true, true, true));
-}
-
-TEST(FilteredRowUnittest, ConvertAllToRowVector) {
-  FilteredRowIndex index(1, 5);
-
-  ASSERT_THAT(index.TakeRowVector(), ElementsAre(1, 2, 3, 4));
-}
-
-TEST(FilteredRowUnittest, ConvertBitVectorToRowVector) {
-  FilteredRowIndex index(1, 5);
-  index.FilterRows([](uint32_t row) { return row == 2 || row == 3; });
-
-  ASSERT_THAT(index.TakeRowVector(), ElementsAre(2, 3));
-}
-
-TEST(FilteredRowUnittest, ConvertRowVectorToBitVector) {
-  FilteredRowIndex index(1, 5);
-  index.IntersectRows({2, 3});
-
-  ASSERT_THAT(index.TakeBitvector(), ElementsAre(false, true, true, false));
+  ASSERT_THAT(iterator->Row(), 2);
+  iterator->NextRow();
+  ASSERT_THAT(iterator->Row(), 4);
+  iterator->NextRow();
+  ASSERT_TRUE(iterator->IsEnd());
 }
 
 }  // namespace

@@ -32,10 +32,13 @@ class ArgsTable : public StorageTable {
   ArgsTable(sqlite3*, const TraceStorage*);
 
   // Table implementation.
+  Table::Schema CreateSchema(int argc, const char* const* argv) override;
+  std::unique_ptr<Table::Cursor> CreateCursor(const QueryConstraints&,
+                                              sqlite3_value**) override;
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
 
  private:
-  class IdColumn final : public StorageSchema::NumericColumn<RowId> {
+  class IdColumn final : public NumericColumn<RowId> {
    public:
     IdColumn(std::string col_name,
              const TraceStorage* storage,
@@ -47,7 +50,7 @@ class ArgsTable : public StorageTable {
     const TraceStorage* storage_ = nullptr;
   };
 
-  class ValueColumn final : public StorageSchema::Column {
+  class ValueColumn final : public StorageColumn {
    public:
     ValueColumn(std::string col_name,
                 VarardicType type,
@@ -82,8 +85,7 @@ class ArgsTable : public StorageTable {
     const TraceStorage* storage_ = nullptr;
   };
 
-  static std::vector<std::unique_ptr<StorageSchema::Column>> CreateColumns(
-      const TraceStorage* storage);
+  const TraceStorage* const storage_;
 };
 
 }  // namespace trace_processor
