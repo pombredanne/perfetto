@@ -42,14 +42,23 @@ namespace perfetto {
 
 namespace {
 
-// TODO(primiano): refactor this, it's copy/pasted in three places now.
-std::string GetFtracePath() {
-  size_t i = 0;
-  while (!FtraceProcfs::Create(FtraceController::kTracingPaths[i])) {
-    i++;
+class PerfettoTest : public ::testing::Test {
+ public:
+  void SetUp() override {
+    // TODO(primiano): refactor this, it's copy/pasted in three places now.
+    size_t i = 0;
+    while (!(ftrace_procfs_ =
+                 FtraceProcfs::Create(FtraceController::kTracingPaths[i]))) {
+      i++;
+    }
+
+    ftrace_procfs_->SetTracingOn(false);
   }
-  return std::string(FtraceController::kTracingPaths[i]);
-}
+
+  void TearDown() override { ftrace_procfs_->SetTracingOn(false); }
+
+  std::unique_ptr<FtraceProcfs> ftrace_procfs_;
+};
 
 }  // namespace
 
@@ -69,7 +78,7 @@ std::string GetFtracePath() {
 #define TreeHuggerOnly(x) DISABLED_##x
 #endif
 
-TEST(PerfettoTest, TreeHuggerOnly(TestFtraceProducer)) {
+TEST_F(PerfettoTest, TreeHuggerOnly(TestFtraceProducer)) {
   base::TestTaskRunner task_runner;
 
   TestHelper helper(&task_runner);
@@ -112,7 +121,7 @@ TEST(PerfettoTest, TreeHuggerOnly(TestFtraceProducer)) {
   }
 }
 
-TEST(PerfettoTest, TreeHuggerOnly(TestFtraceFlush)) {
+TEST_F(PerfettoTest, TreeHuggerOnly(TestFtraceFlush)) {
   base::TestTaskRunner task_runner;
 
   TestHelper helper(&task_runner);
@@ -127,26 +136,34 @@ TEST(PerfettoTest, TreeHuggerOnly(TestFtraceFlush)) {
   helper.ConnectConsumer();
   helper.WaitForConsumerConnect();
 
+  const uint32_t kTestTimeoutMs = 30000;
   TraceConfig trace_config;
-  trace_config.add_buffers()->set_size_kb(1024);
-  trace_config.set_duration_ms(3000);
+  trace_config.add_buffers()->set_size_kb(16);
+  trace_config.set_duration_ms(kTestTimeoutMs);
 
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
   ds_config->set_name("linux.ftrace");
-  ds_config->set_target_buffer(0);
 
   auto* ftrace_config = ds_config->mutable_ftrace_config();
   *ftrace_config->add_ftrace_events() = "print";
 
   helper.StartTracing(trace_config);
 
-  auto ftrace_procfs = FtraceProcfs::Create(GetFtracePath());
-  while (!ftrace_procfs->IsTracingEnabled()) {
-    usleep(10000);
-  }
+  // Do a first flush just to synchronize with the producer. The problem here
+  // is that, on a Linux workstation, the producer can take several seconds just
+  // to get to the point where ftrace is ready. We use the flush ack as a
+  // synchronization point.
+  helper.FlushAndWait(kTestTimeoutMs);
+
+  EXPECT_TRUE(ftrace_procfs_->IsTracingEnabled());
   const char kMarker[] = "just_one_event";
-  EXPECT_TRUE(ftrace_procfs->WriteTraceMarker(kMarker));
-  helper.WaitForTracingDisabled();
+  EXPECT_TRUE(ftrace_procfs_->WriteTraceMarker(kMarker));
+
+  // This is the real flush we are testing.
+  helper.FlushAndWait(kTestTimeoutMs);
+
+  helper.DisableTracing();
+  helper.WaitForTracingDisabled(kTestTimeoutMs);
 
   helper.ReadData();
   helper.WaitForReadData();
@@ -162,7 +179,7 @@ TEST(PerfettoTest, TreeHuggerOnly(TestFtraceFlush)) {
   ASSERT_EQ(marker_found, 1);
 }
 
-TEST(PerfettoTest, TreeHuggerOnly(TestBatteryTracing)) {
+TEST_F(PerfettoTest, TreeHuggerOnly(TestBatteryTracing)) {
   base::TestTaskRunner task_runner;
 
   TestHelper helper(&task_runner);
@@ -213,7 +230,7 @@ TEST(PerfettoTest, TreeHuggerOnly(TestBatteryTracing)) {
   ASSERT_TRUE(has_battery_packet);
 }
 
-TEST(PerfettoTest, TestFakeProducer) {
+TEST_F(PerfettoTest, TestFakeProducer) {
   base::TestTaskRunner task_runner;
 
   TestHelper helper(&task_runner);
@@ -254,7 +271,7 @@ TEST(PerfettoTest, TestFakeProducer) {
   }
 }
 
-TEST(PerfettoTest, VeryLargePackets) {
+TEST_F(PerfettoTest, VeryLargePackets) {
   base::TestTaskRunner task_runner;
 
   TestHelper helper(&task_runner);
