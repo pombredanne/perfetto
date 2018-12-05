@@ -106,7 +106,7 @@ inline std::vector<uint32_t> CreateSortedIndexVector(
   PERFETTO_DCHECK(obs.size() > 0);
 
   // Retrieve the index created above from the index.
-  std::vector<uint32_t> sorted_rows = index.TakeRowVector();
+  std::vector<uint32_t> sorted_rows = index.ToRowVector();
 
   std::vector<StorageColumn::Comparator> comparators;
   for (const auto& ob : obs) {
@@ -131,11 +131,11 @@ inline std::vector<uint32_t> CreateSortedIndexVector(
 
 // Creates a row iterator which is optimized for a generic storage schema (i.e.
 // it does not make assumptions about values of columns).
-inline std::unique_ptr<StorageCursor::RowIterator>
-CreateBestRowIteratorForGenericSchema(const StorageSchema& schema,
-                                      uint32_t size,
-                                      const QueryConstraints& qc,
-                                      sqlite3_value** argv) {
+inline std::unique_ptr<RowIterator> CreateBestRowIteratorForGenericSchema(
+    const StorageSchema& schema,
+    uint32_t size,
+    const QueryConstraints& qc,
+    sqlite3_value** argv) {
   const auto& cs = qc.constraints();
   auto obs = internal::RemoveRedundantOrderBy(cs, qc.order_by());
 
@@ -147,18 +147,8 @@ CreateBestRowIteratorForGenericSchema(const StorageSchema& schema,
   // Create the range iterator and if we are sorted, just return it.
   auto index = internal::CreateRangeIterator(schema, size, cs, argv);
   if (is_ordered) {
-    if (index.all_set()) {
-      return std::unique_ptr<RangeRowIterator>(
-          new RangeRowIterator(index.start_row(), index.end_row(), desc));
-    } else if (index.backing_rowvector()) {
-      return std::unique_ptr<VectorRowIterator>(
-          new VectorRowIterator(index.TakeRowVector()));
-    } else {
-      return std::unique_ptr<RangeRowIterator>(
-          new RangeRowIterator(index.start_row(), desc, index.TakeBitvector()));
-    }
+    return index.ToRowIterator(desc);
   }
-
   // Otherwise, create the sorted vector of indices and create the vector
   // iterator.
   return std::unique_ptr<VectorRowIterator>(new VectorRowIterator(
