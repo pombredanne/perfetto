@@ -26,7 +26,9 @@ StorageColumn::~StorageColumn() = default;
 TsEndColumn::TsEndColumn(std::string col_name,
                          const std::deque<uint64_t>* ts_start,
                          const std::deque<uint64_t>* dur)
-    : StorageColumn(col_name, false), ts_start_(ts_start), dur_(dur) {}
+    : StorageColumn(col_name, false /* hidden */),
+      ts_start_(ts_start),
+      dur_(dur) {}
 TsEndColumn::~TsEndColumn() = default;
 
 void TsEndColumn::ReportResult(sqlite3_context* ctx, uint32_t row) const {

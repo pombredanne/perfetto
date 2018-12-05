@@ -102,7 +102,9 @@ void ArgsTable::IdColumn::Filter(int op,
 ArgsTable::ValueColumn::ValueColumn(std::string col_name,
                                     VarardicType type,
                                     const TraceStorage* storage)
-    : StorageColumn(col_name, false), type_(type), storage_(storage) {}
+    : StorageColumn(col_name, false /* hidden */),
+      type_(type),
+      storage_(storage) {}
 
 void ArgsTable::ValueColumn::ReportResult(sqlite3_context* ctx,
                                           uint32_t row) const {

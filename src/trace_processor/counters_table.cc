@@ -87,7 +87,7 @@ int CountersTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
 
 CountersTable::RefColumn::RefColumn(std::string col_name,
                                     const TraceStorage* storage)
-    : StorageColumn(col_name, false), storage_(storage) {}
+    : StorageColumn(col_name, false /* hidden */), storage_(storage) {}
 
 void CountersTable::RefColumn::ReportResult(sqlite3_context* ctx,
                                             uint32_t row) const {
