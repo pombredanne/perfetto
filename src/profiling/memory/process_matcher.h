@@ -22,7 +22,7 @@
 #include <string>
 #include <vector>
 
-#include "src/profiling/memory/heapprofd_producer.h"
+#include "src/profiling/memory/wire_protocol.h"
 
 namespace perfetto {
 namespace profiling {
@@ -36,6 +36,8 @@ struct ProcessSetSpec {
   std::set<pid_t> pids;
   std::set<std::string> process_cmdline;
   bool all = false;
+
+  ClientConfiguration client_configuration{};
 };
 
 // The Matcher allows DataSources to wait for ProcessSetSpecs, and the
@@ -60,9 +62,20 @@ class ProcessMatcher {
   struct ProcessSetSpecItem;
 
  public:
+  class Delegate {
+   public:
+    virtual void Match(
+        const Process& process,
+        const std::vector<const ProcessSetSpec*>& process_sets) = 0;
+    virtual void Disconnect(pid_t pid) = 0;
+    virtual ~Delegate();
+  };
+
   class ProcessHandle {
    public:
     friend class ProcessMatcher;
+    ProcessHandle() = default;
+
     ~ProcessHandle();
     ProcessHandle(const ProcessHandle&) = delete;
     ProcessHandle& operator=(const ProcessHandle&) = delete;
@@ -72,13 +85,15 @@ class ProcessMatcher {
    private:
     ProcessHandle(ProcessMatcher* matcher, pid_t pid);
 
-    ProcessMatcher* matcher_;
+    ProcessMatcher* matcher_ = nullptr;
     pid_t pid_;
   };
 
   class ProcessSetSpecHandle {
    public:
     friend class ProcessMatcher;
+    ProcessSetSpecHandle() = default;
+
     ~ProcessSetSpecHandle();
     ProcessSetSpecHandle(const ProcessSetSpecHandle&) = delete;
     ProcessSetSpecHandle& operator=(const ProcessSetSpecHandle&) = delete;
@@ -91,14 +106,11 @@ class ProcessMatcher {
     ProcessSetSpecHandle(ProcessMatcher* matcher,
                          std::multiset<ProcessSetSpecItem>::iterator iterator);
 
-    ProcessMatcher* matcher_;
+    ProcessMatcher* matcher_ = nullptr;
     std::multiset<ProcessSetSpecItem>::iterator iterator_;
   };
 
-  ProcessMatcher(
-      std::function<void(pid_t)> shutdown_fn,
-      std::function<void(const Process&,
-                         const std::vector<const ProcessSetSpec*>&)> match_fn);
+  ProcessMatcher(Delegate* delegate);
 
   // Notify that a process has connected. This will determine which
   // ProcessSetSpecs it matches, and call match_fn with that set.
@@ -156,9 +168,7 @@ class ProcessMatcher {
   void ShutdownProcess(pid_t pid);
   void RunMatchFn(ProcessItem* process_item);
 
-  std::function<void(pid_t)> shutdown_fn_;
-  std::function<void(const Process&, const std::vector<const ProcessSetSpec*>&)>
-      match_fn_;
+  Delegate* delegate_;
 
   std::map<pid_t, ProcessItem> pid_to_process_;
   std::multimap<std::string, ProcessItem*> cmdline_to_process_;
