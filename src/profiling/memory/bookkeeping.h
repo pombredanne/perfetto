@@ -29,12 +29,12 @@
 #include "src/profiling/memory/interner.h"
 #include "src/profiling/memory/queue_messages.h"
 
-// Below is an illustration of the bookmark ssytem state where
+// Below is an illustration of the bookmark system state where
 // PID 1 does the following allocations:
 // 0x123: 128 bytes at [bar main]
 // 0x234: 128 bytes at [bar main]
 // 0xf00: 512 bytes at [foo main]
-// PID 1 allocated but previously free 1024 bytes at [bar main]
+// PID 1 allocated but previously freed 1024 bytes at [bar main]
 //
 // PID 2 does the following allocations:
 // 0x345: 512 bytes at [foo main]
