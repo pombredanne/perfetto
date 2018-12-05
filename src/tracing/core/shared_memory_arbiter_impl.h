@@ -109,6 +109,7 @@ class SharedMemoryArbiterImpl : public SharedMemoryArbiter {
   // Called by the TraceWriter destructor.
   void ReleaseWriterID(WriterID);
 
+  base::WeakPtr<SharedMemoryArbiterImpl> weak_this_;
   base::TaskRunner* const task_runner_;
   TracingService::ProducerEndpoint* const producer_endpoint_;
   PERFETTO_THREAD_CHECKER(thread_checker_)

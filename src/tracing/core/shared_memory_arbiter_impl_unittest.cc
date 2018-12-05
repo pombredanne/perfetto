@@ -132,13 +132,20 @@ TEST_P(SharedMemoryArbiterImplTest, GetAndReturnChunks) {
 
 // Check that we can actually create up to kMaxWriterID TraceWriter(s).
 TEST_P(SharedMemoryArbiterImplTest, WriterIDsAllocation) {
+  auto checkpoint = task_runner_->CreateCheckpoint("last_unregistered");
+  int num_unregistered = 0;
   {
     std::map<WriterID, std::unique_ptr<TraceWriter>> writers;
     for (size_t i = 0; i < kMaxWriterID; i++) {
       EXPECT_CALL(mock_producer_endpoint_,
                   RegisterTraceWriter(static_cast<uint32_t>(i + 1), 0));
       EXPECT_CALL(mock_producer_endpoint_,
-                  UnregisterTraceWriter(static_cast<uint32_t>(i + 1)));
+                  UnregisterTraceWriter(static_cast<uint32_t>(i + 1)))
+          .WillOnce(Invoke([checkpoint, &num_unregistered](uint32_t) {
+            num_unregistered++;
+            if (num_unregistered == kMaxWriterID)
+              checkpoint();
+          }));
 
       std::unique_ptr<TraceWriter> writer = arbiter_->CreateTraceWriter(0);
       ASSERT_TRUE(writer);
@@ -152,7 +159,7 @@ TEST_P(SharedMemoryArbiterImplTest, WriterIDsAllocation) {
   }
 
   // This should run the Register/UnregisterTraceWriter calls expected above.
-  task_runner_->RunUntilIdle();
+  task_runner_->RunUntilCheckpoint("last_unregistered");
 }
 
 // TODO(primiano): add multi-threaded tests.
