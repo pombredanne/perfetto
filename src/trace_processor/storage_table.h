@@ -25,6 +25,8 @@
 namespace perfetto {
 namespace trace_processor {
 
+// Base class for all table implementations which are backed by some data
+// storage.
 class StorageTable : public Table {
  public:
   StorageTable();
