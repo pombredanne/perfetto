@@ -26,18 +26,16 @@ void SchedSliceTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
   Table::Register<SchedSliceTable>(db, storage, "sched");
 }
 
-base::Optional<Table::Schema> SchedSliceTable::Init(int, const char* const*) {
-  const auto& slices = storage_->slices();
-  schema_ = StorageSchema::Builder()
-                .AddNumericColumn("ts", &slices.start_ns(), false /* hidden */,
-                                  true /* ordered */)
-                .AddNumericColumn("cpu", &slices.cpus())
-                .AddNumericColumn("dur", &slices.durations())
-                .AddColumn<TsEndColumn>("ts_end", &slices.start_ns(),
-                                        &slices.durations())
-                .AddNumericColumn("utid", &slices.utids())
-                .Build({"cpu", "ts"});
-  return schema_->ToTableSchema();
+StorageSchema SchedSliceTable::CreateStorageSchema() {
+  const auto& s = storage_->slices();
+  return StorageSchema::Builder()
+      .AddNumericColumn("ts", &s.start_ns(), false /* hidden */,
+                        true /* ordered */)
+      .AddNumericColumn("cpu", &s.cpus())
+      .AddNumericColumn("dur", &s.durations())
+      .AddColumn<TsEndColumn>("ts_end", &s.start_ns(), &s.durations())
+      .AddNumericColumn("utid", &s.utids())
+      .Build({"cpu", "ts"});
 }
 
 std::unique_ptr<Table::Cursor> SchedSliceTable::CreateCursor(
