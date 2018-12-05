@@ -302,6 +302,9 @@ class HeapTracker {
   std::map<GlobalCallstackTrie::Node*, CallstackAllocations>
       callstack_allocations_;
 
+  std::vector<decltype(callstack_allocations_)::iterator>
+      dead_callstack_allocations_;
+
   // Address -> (size, sequence_number, code location)
   std::map<uint64_t, Allocation> allocations_;
 

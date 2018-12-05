@@ -121,8 +121,16 @@ void HeapTracker::CommitFree(uint64_t sequence_number, uint64_t address) {
 void HeapTracker::Dump(
     ProfilePacket::ProcessHeapSamples* proto,
     std::set<GlobalCallstackTrie::Node*>* callstacks_to_dump) {
+  for (auto it : dead_callstack_allocations_) {
+    const CallstackAllocations& alloc = it->second;
+    if (alloc.allocation_count == alloc.free_count)
+      it = callstack_allocations_.erase(it);
+    else
+      ++it;
+  }
+
   for (auto it = callstack_allocations_.begin();
-       it != callstack_allocations_.end();) {
+       it != callstack_allocations_.end(); ++it) {
     const CallstackAllocations& alloc = it->second;
     callstacks_to_dump->emplace(alloc.node);
     ProfilePacket::HeapSample* sample = proto->add_samples();
@@ -133,9 +141,7 @@ void HeapTracker::Dump(
     sample->set_free_count(alloc.free_count);
 
     if (alloc.allocation_count == alloc.free_count)
-      it = callstack_allocations_.erase(it);
-    else
-      ++it;
+      dead_callstack_allocations_.emplace_back(it);
   }
 }
 
