@@ -117,7 +117,6 @@ TEST_F(HeapprofdIntegrationTest, MAYBE_MultiSession) {
   // sampling rate.
   spec.client_configuration.interval = kSamplingInterval + 1;
   auto session2 = listener.process_matcher().AwaitProcessSetSpec(spec);
-  //  { auto destroy = std::move(session); }
   auto sock = base::UnixSocket::Listen(kSocketName, &listener, &task_runner);
   if (!sock->is_listening()) {
     PERFETTO_ELOG("Socket not listening.");
