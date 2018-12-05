@@ -28,10 +28,16 @@ base::Optional<Table::Schema> StorageTable::Init(int, const char* const*) {
   return schema_->ToTableSchema();
 }
 
-std::unique_ptr<RowIterator>
-StorageTable::CreateBestRowIteratorForGenericSchema(uint32_t size,
-                                                    const QueryConstraints& qc,
-                                                    sqlite3_value** argv) {
+std::unique_ptr<Table::Cursor> StorageTable::CreateCursor(
+    const QueryConstraints& qc,
+    sqlite3_value** argv) {
+  return std::unique_ptr<Cursor>(
+      new Cursor(CreateBestRowIterator(qc, argv), schema_->mutable_columns()));
+}
+
+std::unique_ptr<RowIterator> StorageTable::CreateBestRowIterator(
+    const QueryConstraints& qc,
+    sqlite3_value** argv) {
   PERFETTO_DCHECK(schema_.has_value());
 
   const auto& cs = qc.constraints();
@@ -43,7 +49,7 @@ StorageTable::CreateBestRowIteratorForGenericSchema(uint32_t size,
   std::tie(is_ordered, desc) = IsOrdered(obs);
 
   // Create the range iterator and if we are sorted, just return it.
-  auto index = CreateRangeIterator(size, cs, argv);
+  auto index = CreateRangeIterator(cs, argv);
   if (is_ordered) {
     return index.ToRowIterator(desc);
   }
@@ -54,13 +60,12 @@ StorageTable::CreateBestRowIteratorForGenericSchema(uint32_t size,
 }
 
 FilteredRowIndex StorageTable::CreateRangeIterator(
-    uint32_t size,
     const std::vector<QueryConstraints::Constraint>& cs,
     sqlite3_value** argv) {
   // Try and bound the search space to the smallest possible index region and
   // store any leftover constraints to filter using bitvector.
   uint32_t min_idx = 0;
-  uint32_t max_idx = size;
+  uint32_t max_idx = RowCount();
   std::vector<size_t> bitvector_cs;
   for (size_t i = 0; i < cs.size(); i++) {
     const auto& c = cs[i];
