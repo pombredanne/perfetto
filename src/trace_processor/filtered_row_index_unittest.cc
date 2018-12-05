@@ -30,7 +30,7 @@ TEST(FilteredRowIndexUnittest, Noop) {
   ASSERT_THAT(index.ToRowVector(), ElementsAre(1, 2, 3));
 }
 
-TEST(FilteredRowIndexUnittest, FilterAllRows) {
+TEST(FilteredRowIndexUnittest, FilterRows) {
   FilteredRowIndex index(1, 5);
   bool in_bound_indices = true;
   index.FilterRows([&in_bound_indices](uint32_t row) {
@@ -40,7 +40,7 @@ TEST(FilteredRowIndexUnittest, FilterAllRows) {
   ASSERT_THAT(index.ToRowVector(), ElementsAre(2, 3));
 }
 
-TEST(FilteredRowIndexUnittest, FilterBitvectorTwice) {
+TEST(FilteredRowIndexUnittest, FilterRowsTwice) {
   FilteredRowIndex index(1, 5);
   index.FilterRows([](uint32_t row) { return row == 2 || row == 3; });
   bool in_bound_indices = true;
@@ -52,31 +52,43 @@ TEST(FilteredRowIndexUnittest, FilterBitvectorTwice) {
   ASSERT_THAT(index.ToRowVector(), ElementsAre(2));
 }
 
-TEST(FilteredRowIndexUnittest, FilterBitvectorRowVector) {
+TEST(FilteredRowIndexUnittest, FilterThenIntersect) {
   FilteredRowIndex index(1, 5);
   index.FilterRows([](uint32_t row) { return row == 2 || row == 3; });
   index.IntersectRows({0, 2, 4, 5, 10});
   ASSERT_THAT(index.ToRowVector(), ElementsAre(2));
 }
 
-TEST(FilteredRowIndexUnittest, FilterRowVectorBitvector) {
+TEST(FilteredRowIndexUnittest, IntersectThenFilter) {
   FilteredRowIndex index(1, 5);
   index.IntersectRows({0, 2, 4, 5, 10});
   index.FilterRows([](uint32_t row) { return row == 2 || row == 3; });
   ASSERT_THAT(index.ToRowVector(), ElementsAre(2));
 }
 
-TEST(FilteredRowIndexUnittest, FilterRowvector) {
+TEST(FilteredRowIndexUnittest, Intersect) {
   FilteredRowIndex index(1, 5);
   index.IntersectRows({0, 2, 4, 5, 10});
   ASSERT_THAT(index.ToRowVector(), ElementsAre(2, 4));
 }
 
-TEST(FilteredRowIndexUnittest, FilterRowvectorTwice) {
+TEST(FilteredRowIndexUnittest, IntersectTwice) {
   FilteredRowIndex index(1, 5);
   index.IntersectRows({0, 2, 4, 5, 10});
   index.IntersectRows({4});
   ASSERT_THAT(index.ToRowVector(), ElementsAre(4));
+}
+
+TEST(FilteredRowIndexUnittest, ToIterator) {
+  FilteredRowIndex index(1, 5);
+  index.IntersectRows({0, 2, 4, 5, 10});
+  auto iterator = index.ToRowIterator(false);
+
+  ASSERT_THAT(iterator->Row(), 2);
+  iterator->NextRow();
+  ASSERT_THAT(iterator->Row(), 4);
+  iterator->NextRow();
+  ASSERT_TRUE(iterator->IsEnd());
 }
 
 }  // namespace

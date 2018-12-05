@@ -30,6 +30,10 @@ void FilteredRowIndex::IntersectRows(std::vector<uint32_t> rows) {
 
   if (mode_ == kAllRows) {
     mode_ = Mode::kRowVector;
+    // Yes you're reading this code correctly. We use lower_bound in both cases.
+    // Yes this is very intentional and has to do with |end_row_| already being
+    // one greater than the value we are searching for so we need the first
+    // iterator which is *geq* the |end_row_|.
     auto begin = std::lower_bound(rows.begin(), rows.end(), start_row_);
     auto end = std::lower_bound(begin, rows.end(), end_row_);
     rows_.insert(rows_.end(), begin, end);
@@ -106,7 +110,7 @@ std::unique_ptr<RowIterator> FilteredRowIndex::ToRowIterator(bool desc) {
       return std::unique_ptr<VectorRowIterator>(
           new VectorRowIterator(TakeRowVector()));
   }
-  PERFETTO_CHECK(false); // for GCC.
+  PERFETTO_CHECK(false);  // for GCC.
 }
 
 std::vector<uint32_t> FilteredRowIndex::TakeRowVector() {
