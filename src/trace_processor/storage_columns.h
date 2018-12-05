@@ -16,6 +16,8 @@
 #define SRC_TRACE_PROCESSOR_STORAGE_COLUMNS_H_
 
 #include <deque>
+#include <memory>
+#include <string>
 
 #include "src/trace_processor/sqlite_utils.h"
 #include "src/trace_processor/storage_schema.h"
