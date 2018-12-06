@@ -41,4 +41,12 @@ WORKDIR /home/perfetto
 
 RUN git clone https://android.googlesource.com/platform/external/perfetto/
 
-CMD cd perfetto/ && tools/continuous_fuzz
+WORKDIR /home/perfetto/perfetto
+
+RUN tools/install-build-deps --no-android
+
+RUN mkdir fuzz_out
+
+EXPOSE 8000
+
+CMD python -m SimpleHTTPServer 8000 & tools/continuous_fuzz
