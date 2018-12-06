@@ -26,7 +26,6 @@ namespace perfetto {
 namespace profiling {
 
 using InternID = uintptr_t;
-
 template <typename T>
 class Interner {
  private:
@@ -56,16 +55,9 @@ class Interner {
       other.entry_ = nullptr;
     }
 
-    Interned& operator=(Interned&& other) {
-      entry_ = other.entry_;
-      other.entry_ = nullptr;
-      return *this;
-    }
-
-    Interned& operator=(Interned& other) noexcept {
-      entry_ = other.entry_;
-      if (entry_ != nullptr)
-        entry_->ref_count++;
+    Interned& operator=(Interned other) {
+      using std::swap;
+      swap(*this, other);
       return *this;
     }
 
@@ -111,6 +103,11 @@ class Interner {
   static_assert(sizeof(Interned) == sizeof(void*),
                 "interned things should be small");
 };
+
+template <typename T>
+void swap(typename Interner<T>::Interned a, typename Interner<T>::Interned b) {
+  std::swap(a.entry_, b.entry_);
+}
 
 }  // namespace profiling
 }  // namespace perfetto
