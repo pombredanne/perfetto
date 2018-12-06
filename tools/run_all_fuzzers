@@ -1,0 +1,35 @@
+#!/bin/bash
+
+set -euo pipefail
+
+OUTDIR=out/linux_fuzzer_run
+
+gn gen "$OUTDIR"
+EDITOR=true gn args "$OUTDIR" \
+  --args="is_clang=true is_debug=false use_libfuzzer=true is_asan=true" \
+  --check
+
+ninja -C $OUTDIR
+
+FUZZERS=$(cd $OUTDIR && ls *fuzzer)
+
+for fuzzer in $FUZZERS; do
+  mkdir -p "fuzz_out/$fuzzer/corpus"
+  mkdir -p "fuzz_out/$fuzzer/artifacts"
+  for crash in $(ls fuzz_out/$fuzzer/artifacts/crash-* 2> /dev/null); do
+    if "$OUTDIR/$fuzzer" "$crash"; then
+      rm $crash;
+    else
+      echo "$crash still exists"
+    fi
+  done;
+
+  "$OUTDIR/$fuzzer" -artifact_prefix="fuzz_out/$fuzzer/artifacts/" \
+    "fuzz_out/$fuzzer/corpus" 2> "fuzz_out/$fuzzer/log.err" &
+done
+
+for job in `jobs -p`
+do
+echo $job
+    wait $job || cat
+done
