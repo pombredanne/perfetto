@@ -1132,10 +1132,11 @@ void TracingServiceImpl::CopyProducerPageIntoLogBuffer(
   // buffer specified in the request. This prevents a malicious producer from
   // injecting data into a log buffer that belongs to a tracing session the
   // producer is not part of.
-  if (!producer->IsAllowedTargetBufferId(buffer_id)) {
-    PERFETTO_DLOG("Producer %" PRIu16
+  if (!producer->is_allowed_target_buffer(buffer_id)) {
+    PERFETTO_ELOG("Producer %" PRIu16
                   " tried to write into forbidden target buffer %" PRIu16,
-                  producer->id_, buffer_id);
+                  producer_id_trusted, buffer_id);
+    PERFETTO_DCHECK(false);
     return;
   }
 
@@ -1145,11 +1146,11 @@ void TracingServiceImpl::CopyProducerPageIntoLogBuffer(
     // ProducerEndpointImpl::CommitData.
     PERFETTO_DFATAL("Could not find target buffer %" PRIu16
                     " for producer %" PRIu16,
-                    buffer_id, producer->id_);
+                    buffer_id, producer_id_trusted);
     return;
   }
 
-  buf->CopyChunkUntrusted(producer->id_, producer_uid_trusted, writer_id,
+  buf->CopyChunkUntrusted(producer_id_trusted, producer_uid_trusted, writer_id,
                           chunk_id, num_fragments, chunk_flags, src, size);
 }
 
@@ -1694,11 +1695,6 @@ void TracingServiceImpl::ProducerEndpointImpl::OnFreeBuffers(
     return;
   for (BufferID buffer : target_buffers)
     allowed_target_buffers_.erase(buffer);
-}
-
-bool TracingServiceImpl::ProducerEndpointImpl::IsAllowedTargetBufferId(
-    BufferID buffer_id) const {
-  return allowed_target_buffers_.count(buffer_id);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

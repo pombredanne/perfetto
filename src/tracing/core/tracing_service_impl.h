@@ -90,7 +90,10 @@ class TracingServiceImpl : public TracingService {
     void StopDataSource(DataSourceInstanceID);
     void Flush(FlushRequestID, const std::vector<DataSourceInstanceID>&);
     void OnFreeBuffers(const std::vector<BufferID>& target_buffers);
-    bool IsAllowedTargetBufferId(BufferID buffer_id) const;
+
+    bool is_allowed_target_buffer(BufferID buffer_id) const {
+      return allowed_target_buffers_.count(buffer_id);
+    }
 
    private:
     friend class TracingServiceImpl;
