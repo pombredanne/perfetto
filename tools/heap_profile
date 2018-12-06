@@ -98,13 +98,6 @@ def sigint_handler(sig, frame):
   IS_INTERRUPTED = True
 
 
-def on_exit(enforcing):
-  subprocess.check_output(['adb', 'shell', 'su root stop heapprofd'])
-  if enforcing:
-    subprocess.check_output(
-        ['adb', 'shell', 'su root setenforce %s' % enforcing])
-
-
 def main(argv):
   parser = argparse.ArgumentParser()
   parser.add_argument("-i", "--interval", help="Sampling interval. "
@@ -162,13 +155,14 @@ def main(argv):
   cfg = CFG.format(all=str(args.all == True).lower(), interval=args.interval,
                    duration=args.duration, target_cfg=target_cfg)
 
-  enforcing = ""
   if args.disable_selinux:
     enforcing = subprocess.check_output(['adb', 'shell', 'getenforce'])
-  atexit.register(on_exit, enforcing)
-
-  if args.disable_selinux:
+    atexit.register(subprocess.check_call,
+        ['adb', 'shell', 'su root setenforce %s' % enforcing])
     subprocess.check_call(['adb', 'shell', 'su root setenforce 0'])
+
+  atexit.register(subprocess.check_call,
+                  ['adb', 'shell', 'su root stop heapprofd'])
   subprocess.check_call(['adb', 'shell', 'su root start heapprofd'])
 
   perfetto_pid = subprocess.check_output(
