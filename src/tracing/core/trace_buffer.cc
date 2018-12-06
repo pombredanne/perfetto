@@ -125,6 +125,78 @@ void TraceBuffer::CopyChunkUntrusted(ProducerID producer_id_trusted,
   changed_since_last_read_ = true;
 #endif
 
+  ChunkRecord record(record_size);
+  record.producer_id = producer_id_trusted;
+  record.chunk_id = chunk_id;
+  record.writer_id = writer_id;
+  record.num_fragments = num_fragments;
+  record.flags = chunk_flags;
+  ChunkMeta::Key key(record);
+
+  // Check whether we have already copied the same chunk previously. This may
+  // happen if the service scrapes chunks in a potentially incomplete state
+  // before receiving a commit request for it from the producer.
+  const auto it = index_.find(key);
+  if (PERFETTO_UNLIKELY(it != index_.end())) {
+    ChunkRecord* prev = it->second.chunk_record;
+
+    // Verify that the old chunk's metadata corresponds to the new one.
+    if (PERFETTO_UNLIKELY(prev->producer_id != producer_id_trusted ||
+                          prev->writer_id != writer_id ||
+                          prev->chunk_id != chunk_id ||
+                          prev->size != record_size)) {
+      stats_.abi_violations++;
+      PERFETTO_DCHECK(suppress_sanity_dchecks_for_testing_);
+      return;
+    }
+
+    // Number of fragments shouldn't decrease.
+    if (PERFETTO_UNLIKELY(prev->num_fragments > num_fragments)) {
+      stats_.abi_violations++;
+      PERFETTO_DCHECK(suppress_sanity_dchecks_for_testing_);
+      return;
+    }
+
+    // If this chunk was previously copied with the same number of fragmens and
+    // the number didn't change, there's no need to copy it again.
+    if (prev->num_fragments == num_fragments) {
+      TRACE_BUFFER_DLOG("  skipping recommit of identical chunk");
+      return;
+    }
+
+    uint8_t* wptr = reinterpret_cast<uint8_t*>(prev);
+    TRACE_BUFFER_DLOG("  overriding chunk @ %lu, size=%zu", wptr - begin(),
+                      record_size);
+
+    uint16_t last_frag_read = it->second.num_fragments_read;
+    uint16_t last_frag_off = it->second.cur_fragment_offset;
+
+    // We should not have read past the last packet.
+    if (last_frag_read > prev->num_fragments) {
+      PERFETTO_ELOG(
+          "TraceBuffer read too many fragments from an incomplete chunk");
+      PERFETTO_DCHECK(suppress_sanity_dchecks_for_testing_);
+    }
+
+    // Number of fragments and flags may have changed, so replace index entry.
+    index_.erase(it);
+    auto it_and_inserted = index_.emplace(
+        key, ChunkMeta(prev, num_fragments, chunk_flags, producer_uid_trusted));
+    PERFETTO_DCHECK(it_and_inserted.second);
+
+    ChunkMeta& new_meta = it_and_inserted.first->second;
+    new_meta.num_fragments_read = last_frag_read;
+    new_meta.cur_fragment_offset = last_frag_off;
+
+    // Override the ChunkRecord contents at the original |wptr|.
+    TRACE_BUFFER_DLOG("  copying @ [%lu - %lu] %zu", wptr - begin(),
+                      wptr - begin() + record_size, record_size);
+    WriteChunkRecord(wptr, record, src, size);
+    TRACE_BUFFER_DLOG("Chunk raw: %s", HexDump(wptr, record_size).c_str());
+
+    return;
+  }
+
   // If there isn't enough room from the given write position. Write a padding
   // record to clear the end of the buffer and wrap back.
   const size_t cached_size_to_end = size_to_end();
@@ -136,13 +208,6 @@ void TraceBuffer::CopyChunkUntrusted(ProducerID producer_id_trusted,
     stats_.write_wrap_count++;
     PERFETTO_DCHECK(size_to_end() >= record_size);
   }
-
-  ChunkRecord record(record_size);
-  record.producer_id = producer_id_trusted;
-  record.chunk_id = chunk_id;
-  record.writer_id = writer_id;
-  record.num_fragments = num_fragments;
-  record.flags = chunk_flags;
 
   // At this point either |wptr_| points to an untouched part of the buffer
   // (i.e. *wptr_ == 0) or we are about to overwrite one or more ChunkRecord(s).
@@ -167,23 +232,15 @@ void TraceBuffer::CopyChunkUntrusted(ProducerID producer_id_trusted,
   size_t padding_size = DeleteNextChunksFor(record_size);
 
   // Now first insert the new chunk. At the end, if necessary, add the padding.
-  ChunkMeta::Key key(record);
   stats_.chunks_written++;
   stats_.bytes_written += size;
   auto it_and_inserted =
       index_.emplace(key, ChunkMeta(GetChunkRecordAt(wptr_), num_fragments,
                                     chunk_flags, producer_uid_trusted));
-  if (PERFETTO_UNLIKELY(!it_and_inserted.second)) {
-    // More likely a producer bug, but could also be a malicious producer.
-    stats_.abi_violations++;
-    PERFETTO_DCHECK(suppress_sanity_dchecks_for_testing_);
-    index_.erase(it_and_inserted.first);
-    index_.emplace(key, ChunkMeta(GetChunkRecordAt(wptr_), num_fragments,
-                                  chunk_flags, producer_uid_trusted));
-  }
+  PERFETTO_DCHECK(it_and_inserted.second);
   TRACE_BUFFER_DLOG("  copying @ [%lu - %lu] %zu", wptr_ - begin(),
                     wptr_ - begin() + record_size, record_size);
-  WriteChunkRecord(record, src, size);
+  WriteChunkRecord(wptr_, record, src, size);
   TRACE_BUFFER_DLOG("Chunk raw: %s", HexDump(wptr_, record_size).c_str());
   wptr_ += record_size;
   if (wptr_ >= end()) {
@@ -281,7 +338,7 @@ void TraceBuffer::AddPaddingRecord(size_t size) {
   record.is_padding = 1;
   TRACE_BUFFER_DLOG("AddPaddingRecord @ [%lu - %lu] %zu", wptr_ - begin(),
                     wptr_ - begin() + size, size);
-  WriteChunkRecord(record, nullptr, size - sizeof(ChunkRecord));
+  WriteChunkRecord(wptr_, record, nullptr, size - sizeof(ChunkRecord));
   // |wptr_| is deliberately not advanced when writing a padding record.
 }
 

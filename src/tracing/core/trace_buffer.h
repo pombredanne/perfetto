@@ -157,12 +157,19 @@ class TraceBuffer {
   ~TraceBuffer();
 
   // Copies a Chunk from a producer Shared Memory Buffer into the trace buffer.
-  // |src| points to the first packet in the SharedMemoryABI's chunk shared
-  // with an untrusted producer. "untrusted" here means: the producer might be
+  // |src| points to the first packet in the SharedMemoryABI's chunk shared with
+  // an untrusted producer. "untrusted" here means: the producer might be
   // malicious and might change |src| concurrently while we read it (internally
-  // this method memcpy()-s first the chunk before processing it).
-  // None of the arguments should be trusted, unless otherwise stated. We can
-  // trust that |src| points to a valid memory area, but not its contents.
+  // this method memcpy()-s first the chunk before processing it). None of the
+  // arguments should be trusted, unless otherwise stated. We can trust that
+  // |src| points to a valid memory area, but not its contents.
+  //
+  // This method may be called multiple times for the same chunk. In this case,
+  // the original chunk's payload will be overridden and its number of fragments
+  // and flags adjusted to match |num_fragments| and |chunk_flags|. The service
+  // may use this to insert partial chunks before producer has committed them.
+  // Note that the service should exclude any potentially incompletely written
+  // fragments from |num_fragments| for such partial chunks.
   void CopyChunkUntrusted(ProducerID producer_id_trusted,
                           uid_t producer_uid_trusted,
                           WriterID writer_id,
@@ -476,7 +483,8 @@ class TraceBuffer {
   // |src| can be nullptr (in which case |size| must be ==
   // record.size - sizeof(ChunkRecord)), for the case of writing a padding
   // record. |wptr_| is NOT advanced by this function, the caller must do that.
-  void WriteChunkRecord(const ChunkRecord& record,
+  void WriteChunkRecord(uint8_t* wptr,
+                        const ChunkRecord& record,
                         const uint8_t* src,
                         size_t size) {
     // Note: |record.size| will be slightly bigger than |size| because of the
@@ -488,21 +496,21 @@ class TraceBuffer {
     PERFETTO_DCHECK(record.size % sizeof(record) == 0);
     PERFETTO_DCHECK(record.size >= size + sizeof(record));
     PERFETTO_CHECK(record.size <= size_to_end());
-    DcheckIsAlignedAndWithinBounds(wptr_);
+    DcheckIsAlignedAndWithinBounds(wptr);
 
     // We may be writing to this area for the first time.
-    data_.EnsureCommitted(static_cast<size_t>(wptr_ + record.size - begin()));
+    data_.EnsureCommitted(static_cast<size_t>(wptr + record.size - begin()));
 
     // Deliberately not a *D*CHECK.
-    PERFETTO_CHECK(wptr_ + sizeof(record) + size <= end());
-    memcpy(wptr_, &record, sizeof(record));
+    PERFETTO_CHECK(wptr + sizeof(record) + size <= end());
+    memcpy(wptr, &record, sizeof(record));
     if (PERFETTO_LIKELY(src)) {
-      memcpy(wptr_ + sizeof(record), src, size);
+      memcpy(wptr + sizeof(record), src, size);
     } else {
       PERFETTO_DCHECK(size == record.size - sizeof(record));
     }
     const size_t rounding_size = record.size - sizeof(record) - size;
-    memset(wptr_ + sizeof(record) + size, 0, rounding_size);
+    memset(wptr + sizeof(record) + size, 0, rounding_size);
   }
 
   uint8_t* begin() const { return reinterpret_cast<uint8_t*>(data_.Get()); }
