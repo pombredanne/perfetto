@@ -32,11 +32,17 @@ group("ui") {
     ":engine_bundle_dist",
     ":frontend_bundle_dist",
     ":index_dist",
-    ":query_bundle_dist",
-    ":query_dist",
     ":scss",
     ":test_scripts",
     ":wasm_dist",
+  ]
+}
+
+group("query") {
+  deps = [
+    ":query_bundle_dist",
+    ":query_dist",
+    ":ui",
   ]
 }
 
@@ -305,7 +311,7 @@ copy("query_dist") {
     "query.html",
   ]
   outputs = [
-    "$ui_dir/query/index.html",
+    "$ui_dir/query.html",
   ]
 }
 

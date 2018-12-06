@@ -294,7 +294,7 @@ function render(root: Element, controller: QueryController) {
                 },
                 m('.query-text', q.query),
                 m('.query-time',
-                  isResult(q) ? `${q.executionTimeNs / 1000}ms` : ''),
+                  isResult(q) ? `${q.executionTimeNs / 1000000}ms` : ''),
                 isResult(q) ? m('.query-content', renderTable(q.result)) : null,
                 isError(q) ? m('.query-content', q.error) : null,
                 isPending(q) ? m('.query-content') : null, ))),
