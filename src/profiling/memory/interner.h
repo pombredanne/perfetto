@@ -56,7 +56,7 @@ class Interner {
       other.entry_ = nullptr;
     }
 
-    Interned& operator=(Interned other) {
+    Interned& operator=(Interned other) noexcept {
       using std::swap;
       swap(*this, other);
       return *this;
