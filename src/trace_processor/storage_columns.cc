@@ -45,11 +45,9 @@ TsEndColumn::Bounds TsEndColumn::BoundFilter(int, sqlite3_value*) const {
 void TsEndColumn::Filter(int op,
                          sqlite3_value* value,
                          FilteredRowIndex* index) const {
-  auto binary_op = sqlite_utils::GetPredicateForOp<uint64_t>(op);
-  uint64_t extracted = sqlite_utils::ExtractSqliteValue<uint64_t>(value);
-  index->FilterRows([this, &binary_op, extracted](uint32_t row) {
-    uint64_t val = (*ts_start_)[row] + (*dur_)[row];
-    return binary_op(val, extracted);
+  auto predicate = sqlite_utils::CreatePredicate<uint64_t>(op, value);
+  index->FilterRows([this, &predicate](uint32_t row) {
+    return predicate((*ts_start_)[row] + (*dur_)[row]);
   });
 }
 
