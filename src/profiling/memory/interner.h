@@ -26,6 +26,7 @@ namespace perfetto {
 namespace profiling {
 
 using InternID = uintptr_t;
+
 template <typename T>
 class Interner {
  private:
