@@ -664,8 +664,8 @@ void ProtoTraceParser::ParseRssStat(uint64_t timestamp,
                                     uint32_t pid,
                                     TraceBlobView view) {
   ProtoDecoder decoder(view.data(), view.length());
-  const uint32_t kRssStatMemberUnknown = rss_members_.size() - 1;
-  uint32_t member = kRssStatMemberUnknown;
+  const auto kRssStatUnknown = static_cast<uint32_t>(rss_members_.size()) - 1;
+  uint32_t member = kRssStatUnknown;
   uint32_t size = 0;
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
@@ -679,7 +679,7 @@ void ProtoTraceParser::ParseRssStat(uint64_t timestamp,
   }
   if (member >= rss_members_.size()) {
     // TODO(lalitm): this import error should be exposed in the stats.
-    member = kRssStatMemberUnknown;
+    member = kRssStatUnknown;
   }
   UniqueTid utid = context_->process_tracker->UpdateThread(timestamp, pid, 0);
 
