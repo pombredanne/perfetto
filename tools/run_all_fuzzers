@@ -45,5 +45,5 @@ done
 for job in `jobs -p`
 do
 echo $job
-    wait $job || cat
+    wait $job
 done
