@@ -33,7 +33,7 @@ ProcessMatcher::ProcessHandle& ProcessMatcher::ProcessHandle::operator=(
     ProcessHandle&& other) noexcept {
   // Construct this temporary because the RHS could be an lvalue cast to an
   // rvalue whose lifetime we do not know.
-  auto tmp = std::move(other);
+  ProcessHandle tmp(std::move(other));
   using std::swap;
   swap(*this, tmp);
   return *this;
@@ -59,7 +59,7 @@ ProcessMatcher::ProcessSetSpecHandle& ProcessMatcher::ProcessSetSpecHandle::
 operator=(ProcessSetSpecHandle&& other) noexcept {
   // Construct this temporary because the RHS could be an lvalue cast to an
   // rvalue whose lifetime we do not know.
-  auto tmp = std::move(other);
+  ProcessSetSpecHandle tmp(std::move(other));
   using std::swap;
   swap(*this, tmp);
   return *this;
