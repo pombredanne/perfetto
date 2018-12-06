@@ -193,7 +193,23 @@ void TraceBuffer::CopyChunkUntrusted(ProducerID producer_id_trusted,
   }
   DcheckIsAlignedAndWithinBounds(wptr_);
 
-  last_chunk_id_[std::make_pair(producer_id_trusted, writer_id)] = chunk_id;
+  // Chunks may be received out of order, so only update last_chunk_id if the
+  // new chunk_id is larger. But take into account overflows by only selecting
+  // the new ID if its distance to the latest ID is smaller than half the number
+  // space.
+  //
+  // This accounts for both the case where the new ID has just overflown and
+  // last_chunk_id be updated even though it's smaller (e.g. |chunk_id| = 1 and
+  // |last_chunk_id| = kMaxChunkId; chunk_id - last_chunk_id = 0) and the case
+  // where the new ID is an out-of-order ID right after an overflow and
+  // last_chunk_id shouldn't be updated even though it's larger (e.g. |chunk_id|
+  // = kMaxChunkId and |last_chunk_id| = 1; chunk_id - last_chunk_id =
+  // kMaxChunkId - 1).
+  auto ckey = std::make_pair(producer_id_trusted, writer_id);
+  ChunkID last_chunk_id = last_chunk_id_[ckey];
+  if (chunk_id - last_chunk_id < kMaxChunkID / 2) {
+    last_chunk_id_[ckey] = chunk_id;
+  }
 
   if (padding_size)
     AddPaddingRecord(padding_size);
