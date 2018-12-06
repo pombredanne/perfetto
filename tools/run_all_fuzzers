@@ -44,6 +44,5 @@ done
 
 for job in `jobs -p`
 do
-echo $job
     wait $job
 done
