@@ -881,12 +881,14 @@ void ProtoTraceParser::ParseOOMScoreAdjUpdate(uint64_t ts,
                                               TraceBlobView oom_update) {
   ProtoDecoder decoder(oom_update.data(), oom_update.length());
   uint32_t pid = 0;
-  int32_t oom_adj = 0;
+  int16_t oom_adj = 0;
 
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
       case protos::OomScoreAdjUpdateFtraceEvent::kOomScoreAdjFieldNumber:
-        oom_adj = fld.as_int32();
+        // TODO(b/120618641): The int16_t static cast is required because of the
+        // linked negative varint encoding bug.
+        oom_adj = static_cast<int16_t>(fld.as_int32());
         break;
       case protos::OomScoreAdjUpdateFtraceEvent::kPidFieldNumber:
         pid = fld.as_uint32();
