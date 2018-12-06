@@ -63,7 +63,7 @@ class SliceTracker {
   void CompleteSlice(UniqueTid tid);
 
   void MaybeCloseStack(int64_t end_ts, SlicesStack*);
-  uint64_t GetStackHash(const SlicesStack&);
+  int64_t GetStackHash(const SlicesStack&);
 
   TraceProcessorContext* const context_;
   std::unordered_map<UniqueTid, SlicesStack> threads_;

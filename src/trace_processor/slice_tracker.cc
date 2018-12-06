@@ -72,8 +72,7 @@ void SliceTracker::StartSlice(int64_t timestamp,
     PERFETTO_DFATAL("Slices with too large depth found.");
     return;
   }
-  uint64_t parent_stack_id =
-      depth == 0 ? 0 : slices->stack_ids()[stack->back()];
+  int64_t parent_stack_id = depth == 0 ? 0 : slices->stack_ids()[stack->back()];
   size_t slice_idx = slices->AddSlice(timestamp, duration, utid, cat, name,
                                       depth, 0, parent_stack_id);
   stack->emplace_back(slice_idx);
@@ -147,7 +146,7 @@ void SliceTracker::MaybeCloseStack(int64_t ts, SlicesStack* stack) {
   }
 }
 
-uint64_t SliceTracker::GetStackHash(const SlicesStack& stack) {
+int64_t SliceTracker::GetStackHash(const SlicesStack& stack) {
   PERFETTO_DCHECK(!stack.empty());
 
   const auto& slices = context_->storage->nestable_slices();
@@ -162,7 +161,7 @@ uint64_t SliceTracker::GetStackHash(const SlicesStack& stack) {
              sizeof(slices.names()[slice_idx]));
   }
   constexpr uint64_t kMask = uint64_t(-1) >> 1;
-  return (std::hash<std::string>{}(s)) & kMask;
+  return static_cast<int64_t>((std::hash<std::string>{}(s)) & kMask);
 }
 
 }  // namespace trace_processor

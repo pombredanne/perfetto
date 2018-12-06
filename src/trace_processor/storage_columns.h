@@ -157,8 +157,6 @@ class NumericColumn : public StorageColumn {
       return Table::ColumnType::kUint;
     } else if (std::is_same<T, int64_t>::value) {
       return Table::ColumnType::kLong;
-    } else if (std::is_same<T, uint64_t>::value) {
-      return Table::ColumnType::kUlong;
     } else if (std::is_same<T, double>::value) {
       return Table::ColumnType::kDouble;
     }

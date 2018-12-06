@@ -53,7 +53,7 @@ enum TableId : uint8_t {
 
 // The top 8 bits are set to the TableId and the bottom 32 to the row of the
 // table.
-using RowId = uint64_t;
+using RowId = int64_t;
 
 static const RowId kInvalidRowId = 0;
 
@@ -194,8 +194,8 @@ class TraceStorage {
                            StringId cat,
                            StringId name,
                            uint8_t depth,
-                           uint64_t stack_id,
-                           uint64_t parent_stack_id) {
+                           int64_t stack_id,
+                           int64_t parent_stack_id) {
       start_ns_.emplace_back(start_ns);
       durations_.emplace_back(duration_ns);
       utids_.emplace_back(utid);
@@ -211,7 +211,7 @@ class TraceStorage {
       durations_[index] = duration_ns;
     }
 
-    void set_stack_id(size_t index, uint64_t stack_id) {
+    void set_stack_id(size_t index, int64_t stack_id) {
       stack_ids_[index] = stack_id;
     }
 
@@ -222,8 +222,8 @@ class TraceStorage {
     const std::deque<StringId>& cats() const { return cats_; }
     const std::deque<StringId>& names() const { return names_; }
     const std::deque<uint8_t>& depths() const { return depths_; }
-    const std::deque<uint64_t>& stack_ids() const { return stack_ids_; }
-    const std::deque<uint64_t>& parent_stack_ids() const {
+    const std::deque<int64_t>& stack_ids() const { return stack_ids_; }
+    const std::deque<int64_t>& parent_stack_ids() const {
       return parent_stack_ids_;
     }
 
@@ -234,8 +234,8 @@ class TraceStorage {
     std::deque<StringId> cats_;
     std::deque<StringId> names_;
     std::deque<uint8_t> depths_;
-    std::deque<uint64_t> stack_ids_;
-    std::deque<uint64_t> parent_stack_ids_;
+    std::deque<int64_t> stack_ids_;
+    std::deque<int64_t> parent_stack_ids_;
   };
 
   class Counters {
