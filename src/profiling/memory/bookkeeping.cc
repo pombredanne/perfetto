@@ -126,9 +126,11 @@ void HeapTracker::Dump(
   // * We need to remove them after the callstacks were dumped, which currently
   //   happens after the allocations are dumped.
   // * This way, we do not destroy and recreate callstacks as frequently.
-  for (auto it : dead_callstack_allocations_) {
+  for (auto it_and_alloc : dead_callstack_allocations_) {
+    auto& it = it_and_alloc.first;
+    uint64_t allocated = it_and_alloc.second;
     const CallstackAllocations& alloc = it->second;
-    if (alloc.allocation_count == alloc.free_count)
+    if (alloc.allocation_count == allocated && alloc.free_count == allocated)
       callstack_allocations_.erase(it);
   }
   dead_callstack_allocations_.clear();
@@ -145,7 +147,7 @@ void HeapTracker::Dump(
     sample->set_free_count(alloc.free_count);
 
     if (alloc.allocation_count == alloc.free_count)
-      dead_callstack_allocations_.emplace_back(it);
+      dead_callstack_allocations_.emplace_back(it, alloc.allocation_count);
   }
 }
 

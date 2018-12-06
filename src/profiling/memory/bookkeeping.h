@@ -29,7 +29,7 @@
 #include "src/profiling/memory/interner.h"
 #include "src/profiling/memory/queue_messages.h"
 
-// Below is an illustration of the bookmark system state where
+// Below is an illustration of the bookkeeping system state where
 // PID 1 does the following allocations:
 // 0x123: 128 bytes at [bar main]
 // 0x234: 128 bytes at [bar main]
@@ -302,7 +302,7 @@ class HeapTracker {
   std::map<GlobalCallstackTrie::Node*, CallstackAllocations>
       callstack_allocations_;
 
-  std::vector<decltype(callstack_allocations_)::iterator>
+  std::vector<std::pair<decltype(callstack_allocations_)::iterator, uint64_t>>
       dead_callstack_allocations_;
 
   // Address -> (size, sequence_number, code location)
