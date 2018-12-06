@@ -234,9 +234,10 @@ export class TraceController extends Controller<States> {
     }
 
     const counters = await engine.query(`
-      select name, ref, ref_type, count(ref_type)
-      from counters group by name, ref, ref_type
-      and ref is not null
+      select name, ifnull(ref, -1) as numeric_ref, ref_type, count(ref_type)
+      from counters
+      where numeric_ref != -1
+      group by name, numeric_ref, ref_type
       order by ref_type desc
     `);
     const counterUpids = new Set<number>();
