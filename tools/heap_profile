@@ -100,8 +100,9 @@ def sigint_handler(sig, frame):
 
 def on_exit(enforcing):
   subprocess.check_output(['adb', 'shell', 'su root stop heapprofd'])
-  subprocess.check_output(
-      ['adb', 'shell', 'su root setenforce %s' % enforcing])
+  if enforcing:
+    subprocess.check_output(
+        ['adb', 'shell', 'su root setenforce %s' % enforcing])
 
 
 def main(argv):
@@ -161,7 +162,9 @@ def main(argv):
   cfg = CFG.format(all=str(args.all == True).lower(), interval=args.interval,
                    duration=args.duration, target_cfg=target_cfg)
 
-  enforcing = subprocess.check_output(['adb', 'shell', 'getenforce'])
+  enforcing = ""
+  if args.disable_selinux:
+    enforcing = subprocess.check_output(['adb', 'shell', 'getenforce'])
   atexit.register(on_exit, enforcing)
 
   if args.disable_selinux:
