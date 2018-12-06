@@ -1142,8 +1142,7 @@ void TracingServiceImpl::CopyProducerPageIntoLogBuffer(
 
   TraceBuffer* buf = GetBufferByID(buffer_id);
   if (!buf) {
-    // This should have been caught by the IsAllowedTargetBufferId check in
-    // ProducerEndpointImpl::CommitData.
+    // This should have been caught by the is_allowed_target_buffer check.
     PERFETTO_DFATAL("Could not find target buffer %" PRIu16
                     " for producer %" PRIu16,
                     buffer_id, producer_id_trusted);
