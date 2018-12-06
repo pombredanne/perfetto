@@ -46,16 +46,20 @@ class PerfettoTest : public ::testing::Test {
  public:
   void SetUp() override {
     // TODO(primiano): refactor this, it's copy/pasted in three places now.
-    size_t i = 0;
-    while (!(ftrace_procfs_ =
-                 FtraceProcfs::Create(FtraceController::kTracingPaths[i]))) {
-      i++;
+    size_t index = 0;
+    constexpr auto kTracingPaths = FtraceController::kTracingPaths;
+    while (!ftrace_procfs_ && kTracingPaths[index]) {
+      ftrace_procfs_ = FtraceProcfs::Create(kTracingPaths[index++]);
     }
-
+    if (!ftrace_procfs_)
+      return;
     ftrace_procfs_->SetTracingOn(false);
   }
 
-  void TearDown() override { ftrace_procfs_->SetTracingOn(false); }
+  void TearDown() override {
+    if (ftrace_procfs_)
+      ftrace_procfs_->SetTracingOn(false);
+  }
 
   std::unique_ptr<FtraceProcfs> ftrace_procfs_;
 };
@@ -222,7 +226,7 @@ TEST_F(PerfettoTest, TreeHuggerOnly(TestBatteryTracing)) {
     if (!packet.has_battery())
       continue;
     has_battery_packet = true;
-    EXPECT_NE(packet.battery().charge_counter_uah(), 0);
+    EXPECT_GE(packet.battery().charge_counter_uah(), 0);
     EXPECT_GE(packet.battery().capacity_percent(), 0);
     EXPECT_LE(packet.battery().capacity_percent(), 100);
   }
