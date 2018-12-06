@@ -247,6 +247,8 @@ class BookkeepingThread {
   class ProcessHandle {
    public:
     friend class BookkeepingThread;
+    friend void swap(ProcessHandle&, ProcessHandle&);
+
     ProcessHandle() = default;
 
     ~ProcessHandle();
@@ -282,6 +284,8 @@ class BookkeepingThread {
   std::map<pid_t, BookkeepingData> bookkeeping_data_;
   std::mutex bookkeeping_mutex_;
 };
+
+void swap(BookkeepingThread::ProcessHandle&, BookkeepingThread::ProcessHandle&);
 
 }  // namespace profiling
 }  // namespace perfetto

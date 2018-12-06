@@ -361,10 +361,17 @@ BookkeepingThread::ProcessHandle::ProcessHandle(ProcessHandle&& other) noexcept
 
 BookkeepingThread::ProcessHandle& BookkeepingThread::ProcessHandle::operator=(
     ProcessHandle&& other) noexcept {
-  bookkeeping_thread_ = other.bookkeeping_thread_;
-  pid_ = other.pid_;
-  other.bookkeeping_thread_ = nullptr;
+  auto tmp = std::move(other);
+  using std::swap;
+  swap(*this, tmp);
   return *this;
+}
+
+void swap(BookkeepingThread::ProcessHandle& a,
+          BookkeepingThread::ProcessHandle& b) {
+  using std::swap;
+  swap(a.bookkeeping_thread_, b.bookkeeping_thread_);
+  swap(a.pid_, b.pid_);
 }
 
 }  // namespace profiling
