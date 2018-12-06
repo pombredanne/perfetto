@@ -322,6 +322,7 @@ BookkeepingThread::ProcessHandle BookkeepingThread::NotifyProcessConnected(
   auto it_and_inserted = bookkeeping_data_.emplace(pid, &callsites_);
   BookkeepingData& bk = it_and_inserted.first->second;
   bk.ref_count++;
+  PERFETTO_LOG("Connect process %d", pid);
   return {this, pid};
 }
 
@@ -332,6 +333,7 @@ void BookkeepingThread::NotifyProcessDisconnected(pid_t pid) {
     PERFETTO_DFATAL("Client for %d not found", pid);
     return;
   }
+  PERFETTO_LOG("Disconnect process %d", pid);
   it->second.ref_count--;
 }
 

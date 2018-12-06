@@ -97,7 +97,7 @@ void SocketListener::ProcessInfo::Connected(
     bookkeeping_handle =
         bookkeeping_thread->NotifyProcessConnected(process.pid);
   }
-  connected = false;
+  connected = true;
 }
 
 void SocketListener::OnDisconnect(base::UnixSocket* self) {
