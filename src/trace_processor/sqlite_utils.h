@@ -149,15 +149,6 @@ inline double ExtractSqliteValue(sqlite3_value* value) {
   return sqlite3_value_double(value);
 }
 
-// On MacOS size_t !== uint64_t
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
-template <>
-inline size_t ExtractSqliteValue(sqlite3_value* value) {
-  PERFETTO_DCHECK(sqlite3_value_type(value) == SQLITE_INTEGER);
-  return static_cast<size_t>(sqlite3_value_int64(value));
-}
-#endif  // PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
-
 template <typename T>
 using is_float =
     typename std::enable_if<std::is_floating_point<T>::value, T>::type;

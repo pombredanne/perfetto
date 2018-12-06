@@ -172,7 +172,7 @@ ProtoTraceParser::ProtoTraceParser(TraceProcessorContext* context)
 
 ProtoTraceParser::~ProtoTraceParser() = default;
 
-void ProtoTraceParser::ParseTracePacket(uint64_t ts, TraceBlobView packet) {
+void ProtoTraceParser::ParseTracePacket(int64_t ts, TraceBlobView packet) {
   ProtoDecoder decoder(packet.data(), packet.length());
 
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
@@ -204,7 +204,7 @@ void ProtoTraceParser::ParseTracePacket(uint64_t ts, TraceBlobView packet) {
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 
-void ProtoTraceParser::ParseSysStats(uint64_t ts, TraceBlobView stats) {
+void ProtoTraceParser::ParseSysStats(int64_t ts, TraceBlobView stats) {
   ProtoDecoder decoder(stats.data(), stats.length());
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
@@ -256,7 +256,7 @@ void ProtoTraceParser::ParseSysStats(uint64_t ts, TraceBlobView stats) {
     }
   }
 }
-void ProtoTraceParser::ParseIrqCount(uint64_t ts,
+void ProtoTraceParser::ParseIrqCount(int64_t ts,
                                      TraceBlobView irq,
                                      bool is_soft) {
   ProtoDecoder decoder(irq.data(), irq.length());
@@ -277,7 +277,7 @@ void ProtoTraceParser::ParseIrqCount(uint64_t ts,
   context_->event_tracker->PushCounter(ts, value, name_id, key, ref_type);
 }
 
-void ProtoTraceParser::ParseMemInfo(uint64_t ts, TraceBlobView mem) {
+void ProtoTraceParser::ParseMemInfo(int64_t ts, TraceBlobView mem) {
   ProtoDecoder decoder(mem.data(), mem.length());
   uint32_t key = 0;
   uint32_t value = 0;
@@ -299,7 +299,7 @@ void ProtoTraceParser::ParseMemInfo(uint64_t ts, TraceBlobView mem) {
                                        RefType::kRefNoRef);
 }
 
-void ProtoTraceParser::ParseVmStat(uint64_t ts, TraceBlobView stat) {
+void ProtoTraceParser::ParseVmStat(int64_t ts, TraceBlobView stat) {
   ProtoDecoder decoder(stat.data(), stat.length());
   uint32_t key = 0;
   uint32_t value = 0;
@@ -321,25 +321,26 @@ void ProtoTraceParser::ParseVmStat(uint64_t ts, TraceBlobView stat) {
                                        RefType::kRefNoRef);
 }
 
-void ProtoTraceParser::ParseCpuTimes(uint64_t ts, TraceBlobView cpu_times) {
+void ProtoTraceParser::ParseCpuTimes(int64_t ts, TraceBlobView cpu_times) {
   ProtoDecoder decoder(cpu_times.data(), cpu_times.length());
-  uint64_t cpu = 0;
+  uint64_t raw_cpu = 0;
   uint32_t value = 0;
   // Speculate on CPU being first.
   constexpr auto kCpuFieldTag = protozero::proto_utils::MakeTagVarInt(
       protos::SysStats::CpuTimes::kCpuIdFieldNumber);
   if (cpu_times.length() > 2 && cpu_times.data()[0] == kCpuFieldTag &&
       cpu_times.data()[1] < 0x80) {
-    cpu = cpu_times.data()[1];
+    raw_cpu = cpu_times.data()[1];
   } else {
     if (!PERFETTO_LIKELY((
             decoder.FindIntField<protos::SysStats::CpuTimes::kCpuIdFieldNumber>(
-                &cpu)))) {
+                &raw_cpu)))) {
       PERFETTO_ELOG("CPU field not found in CpuTimes");
       return;
     }
   }
 
+  int64_t cpu = static_cast<int64_t>(raw_cpu);
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
       case protos::SysStats::CpuTimes::kUserNsFieldNumber: {
@@ -411,7 +412,7 @@ void ProtoTraceParser::ParseProcessTree(TraceBlobView pstree) {
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 
-void ProtoTraceParser::ParseProcessStats(uint64_t ts, TraceBlobView stats) {
+void ProtoTraceParser::ParseProcessStats(int64_t ts, TraceBlobView stats) {
   ProtoDecoder decoder(stats.data(), stats.length());
 
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
@@ -428,7 +429,7 @@ void ProtoTraceParser::ParseProcessStats(uint64_t ts, TraceBlobView stats) {
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 
-void ProtoTraceParser::ParseProcMemCounters(uint64_t ts,
+void ProtoTraceParser::ParseProcMemCounters(int64_t ts,
                                             TraceBlobView proc_stat) {
   ProtoDecoder decoder(proc_stat.data(), proc_stat.length());
   uint32_t pid = 0;
@@ -519,7 +520,7 @@ void ProtoTraceParser::ParseProcess(TraceBlobView process) {
 }
 
 void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
-                                         uint64_t timestamp,
+                                         int64_t timestamp,
                                          TraceBlobView ftrace) {
   ProtoDecoder decoder(ftrace.data(), ftrace.length());
   uint32_t pid = 0;
@@ -591,7 +592,7 @@ void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 
-void ProtoTraceParser::ParseSignalDeliver(uint64_t timestamp,
+void ProtoTraceParser::ParseSignalDeliver(int64_t timestamp,
                                           uint32_t pid,
                                           TraceBlobView view) {
   ProtoDecoder decoder(view.data(), view.length());
@@ -611,7 +612,7 @@ void ProtoTraceParser::ParseSignalDeliver(uint64_t timestamp,
 
 // This event has both the pid of the thread that sent the signal and the
 // destination of the signal. Currently storing the pid of the destination.
-void ProtoTraceParser::ParseSignalGenerate(uint64_t timestamp,
+void ProtoTraceParser::ParseSignalGenerate(int64_t timestamp,
                                            TraceBlobView view) {
   ProtoDecoder decoder(view.data(), view.length());
   uint32_t pid = 0;
@@ -632,7 +633,7 @@ void ProtoTraceParser::ParseSignalGenerate(uint64_t timestamp,
                             RefType::kRefUtid);
 }
 
-void ProtoTraceParser::ParseLowmemoryKill(uint64_t timestamp,
+void ProtoTraceParser::ParseLowmemoryKill(int64_t timestamp,
                                           TraceBlobView view) {
   // TODO(taylori): Store the pagecache_size, pagecache_limit and free fields
   // in an args table
@@ -658,7 +659,7 @@ void ProtoTraceParser::ParseLowmemoryKill(uint64_t timestamp,
   instants->AddInstantEvent(timestamp, 0, name, utid, RefType::kRefUtid);
 }
 
-void ProtoTraceParser::ParseRssStat(uint64_t timestamp,
+void ProtoTraceParser::ParseRssStat(int64_t timestamp,
                                     uint32_t pid,
                                     TraceBlobView view) {
   ProtoDecoder decoder(view.data(), view.length());
@@ -685,7 +686,7 @@ void ProtoTraceParser::ParseRssStat(uint64_t timestamp,
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 
-void ProtoTraceParser::ParseIonHeapGrow(uint64_t timestamp,
+void ProtoTraceParser::ParseIonHeapGrow(int64_t timestamp,
                                         uint32_t pid,
                                         TraceBlobView view) {
   ProtoDecoder decoder(view.data(), view.length());
@@ -705,7 +706,7 @@ void ProtoTraceParser::ParseIonHeapGrow(uint64_t timestamp,
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 
-void ProtoTraceParser::ParseIonHeapShrink(uint64_t timestamp,
+void ProtoTraceParser::ParseIonHeapShrink(int64_t timestamp,
                                           uint32_t pid,
                                           TraceBlobView view) {
   ProtoDecoder decoder(view.data(), view.length());
@@ -725,7 +726,7 @@ void ProtoTraceParser::ParseIonHeapShrink(uint64_t timestamp,
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 
-void ProtoTraceParser::ParseCpuFreq(uint64_t timestamp, TraceBlobView view) {
+void ProtoTraceParser::ParseCpuFreq(int64_t timestamp, TraceBlobView view) {
   ProtoDecoder decoder(view.data(), view.length());
 
   uint32_t cpu_affected = 0;
@@ -745,7 +746,7 @@ void ProtoTraceParser::ParseCpuFreq(uint64_t timestamp, TraceBlobView view) {
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 
-void ProtoTraceParser::ParseCpuIdle(uint64_t timestamp, TraceBlobView view) {
+void ProtoTraceParser::ParseCpuIdle(int64_t timestamp, TraceBlobView view) {
   ProtoDecoder decoder(view.data(), view.length());
 
   uint32_t cpu_affected = 0;
@@ -766,7 +767,7 @@ void ProtoTraceParser::ParseCpuIdle(uint64_t timestamp, TraceBlobView view) {
 }
 
 void ProtoTraceParser::ParseSchedSwitch(uint32_t cpu,
-                                        uint64_t timestamp,
+                                        int64_t timestamp,
                                         TraceBlobView sswitch) {
   ProtoDecoder decoder(sswitch.data(), sswitch.length());
 
@@ -798,7 +799,7 @@ void ProtoTraceParser::ParseSchedSwitch(uint32_t cpu,
 }
 
 void ProtoTraceParser::ParsePrint(uint32_t,
-                                  uint64_t timestamp,
+                                  int64_t timestamp,
                                   uint32_t pid,
                                   TraceBlobView print) {
   ProtoDecoder decoder(print.data(), print.length());
@@ -839,8 +840,7 @@ void ProtoTraceParser::ParsePrint(uint32_t,
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 
-void ProtoTraceParser::ParseBatteryCounters(uint64_t ts,
-                                            TraceBlobView battery) {
+void ProtoTraceParser::ParseBatteryCounters(int64_t ts, TraceBlobView battery) {
   ProtoDecoder decoder(battery.data(), battery.length());
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
