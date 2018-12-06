@@ -16,8 +16,6 @@
 
 #include "src/trace_processor/stats_table.h"
 
-#include "src/trace_processor/sqlite_utils.h"
-
 namespace perfetto {
 namespace trace_processor {
 
@@ -51,8 +49,7 @@ StatsTable::Cursor::Cursor(const TraceStorage* storage) : storage_(storage) {}
 int StatsTable::Cursor::Column(sqlite3_context* context, int N) {
   switch (N) {
     case Column::kKey:
-      sqlite3_result_text(context, KeyForRow(row_), -1,
-                          sqlite_utils::kSqliteStatic);
+      sqlite3_result_text(context, KeyForRow(row_), -1, nullptr);
       break;
     case Column::kValue:
       sqlite3_result_int(context, ValueForRow(row_));

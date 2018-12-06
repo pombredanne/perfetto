@@ -16,7 +16,6 @@
 
 #include "src/trace_processor/args_table.h"
 
-#include "src/trace_processor/sqlite_utils.h"
 #include "src/trace_processor/storage_cursor.h"
 #include "src/trace_processor/table_utils.h"
 
@@ -123,8 +122,9 @@ void ArgsTable::ValueColumn::ReportResult(sqlite3_context* ctx,
       sqlite_utils::ReportSqliteResult(ctx, value.real_value);
       break;
     case VarardicType::kString: {
+      const auto kSqliteStatic = reinterpret_cast<sqlite3_destructor_type>(0);
       const char* str = storage_->GetString(value.string_value).c_str();
-      sqlite3_result_text(ctx, str, -1, sqlite_utils::kSqliteStatic);
+      sqlite3_result_text(ctx, str, -1, kSqliteStatic);
       break;
     }
   }
@@ -141,40 +141,31 @@ void ArgsTable::ValueColumn::Filter(int op,
                                     FilteredRowIndex* index) const {
   switch (type_) {
     case VarardicType::kInt: {
-      auto binary_op = sqlite_utils::GetOptionalPredicateForOp<int64_t>(op);
+      auto binary_op = sqlite_utils::GetPredicateForOp<int64_t>(op);
       int64_t extracted = sqlite_utils::ExtractSqliteValue<int64_t>(value);
       index->FilterRows([this, &binary_op, extracted](uint32_t row) {
         const auto& arg = storage_->args().arg_values()[row];
-        if (arg.type == type_) {
-          return binary_op(arg.int_value, extracted);
-        }
-        return binary_op(base::nullopt, extracted);
+        return arg.type == type_ && binary_op(arg.int_value, extracted);
       });
       break;
     }
     case VarardicType::kReal: {
-      auto binary_op = sqlite_utils::GetOptionalPredicateForOp<double>(op);
+      auto binary_op = sqlite_utils::GetPredicateForOp<double>(op);
       double extracted = sqlite_utils::ExtractSqliteValue<double>(value);
       index->FilterRows([this, &binary_op, extracted](uint32_t row) {
         const auto& arg = storage_->args().arg_values()[row];
-        if (arg.type == type_) {
-          return binary_op(arg.real_value, extracted);
-        }
-        return binary_op(base::nullopt, extracted);
+        return arg.type == type_ && binary_op(arg.real_value, extracted);
       });
       break;
     }
     case VarardicType::kString: {
-      auto binary_op = sqlite_utils::GetOptionalPredicateForOp<std::string>(op);
+      auto binary_op = sqlite_utils::GetPredicateForOp<std::string>(op);
       const auto* extracted =
           reinterpret_cast<const char*>(sqlite3_value_text(value));
       index->FilterRows([this, &binary_op, extracted](uint32_t row) {
         const auto& arg = storage_->args().arg_values()[row];
         const auto& str = storage_->GetString(arg.string_value);
-        if (arg.type == type_) {
-          return binary_op(str, extracted);
-        }
-        return binary_op(base::nullopt, extracted);
+        return arg.type == type_ && binary_op(str, extracted);
       });
       break;
     }

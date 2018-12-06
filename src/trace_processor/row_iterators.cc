@@ -16,9 +16,11 @@
 
 #include "src/trace_processor/row_iterators.h"
 
-#include <algorithm>
+#include <memory>
 
+#include "perfetto/base/logging.h"
 #include "src/trace_processor/sqlite_utils.h"
+#include "src/trace_processor/table.h"
 
 namespace perfetto {
 namespace trace_processor {
@@ -41,8 +43,6 @@ uint32_t FindNextOffset(const std::vector<bool>& filter,
 }
 
 }  // namespace
-
-RowIterator::~RowIterator() = default;
 
 RangeRowIterator::RangeRowIterator(uint32_t start_row,
                                    uint32_t end_row,

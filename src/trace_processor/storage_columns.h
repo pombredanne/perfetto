@@ -203,7 +203,8 @@ class StringColumn final : public StorageColumn {
     if (str.empty()) {
       sqlite3_result_null(ctx);
     } else {
-      sqlite3_result_text(ctx, str.c_str(), -1, sqlite_utils::kSqliteStatic);
+      auto kStatic = static_cast<sqlite3_destructor_type>(0);
+      sqlite3_result_text(ctx, str.c_str(), -1, kStatic);
     }
   }
 

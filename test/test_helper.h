@@ -43,13 +43,11 @@ class TestHelper : public Consumer {
   FakeProducer* ConnectFakeProducer();
   void ConnectConsumer();
   void StartTracing(const TraceConfig& config);
-  void DisableTracing();
-  void FlushAndWait(uint32_t timeout_ms);
   void ReadData(uint32_t read_count = 0);
 
   void WaitForConsumerConnect();
   void WaitForProducerEnabled();
-  void WaitForTracingDisabled(uint32_t timeout_ms = 5000);
+  void WaitForTracingDisabled();
   void WaitForReadData(uint32_t read_count = 0);
 
   std::function<void()> WrapTask(const std::function<void()>& function);

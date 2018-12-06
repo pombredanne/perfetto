@@ -18,4 +18,3 @@ TAGS
 /compile_commands.json
 .vscode
 *.code-workspace
-/fuzz_out/

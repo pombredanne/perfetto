@@ -38,5 +38,7 @@ int StorageCursor::Column(sqlite3_context* context, int raw_col) {
   return SQLITE_OK;
 }
 
+StorageCursor::RowIterator::~RowIterator() = default;
+
 }  // namespace trace_processor
 }  // namespace perfetto
