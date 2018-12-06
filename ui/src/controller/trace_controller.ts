@@ -233,6 +233,7 @@ export class TraceController extends Controller<States> {
       }));
     }
 
+    // TODO(b/120605557): Replace with is not null when b/120605557 fixed.
     const counters = await engine.query(`
       select name, ifnull(ref, -1) as numeric_ref, ref_type, count(ref_type)
       from counters
