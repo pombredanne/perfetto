@@ -1346,6 +1346,7 @@ TEST_F(TraceBufferTest, Overwrite_ReCommitAfterFullRead) {
   ASSERT_THAT(ReadPacket(), IsEmpty());
 }
 
+// See also the Malicious_Override* tests above.
 TEST_F(TraceBufferTest, Overwrite_ReCommitInvalid) {
   ResetBuffer(4096);
   CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
