@@ -175,10 +175,8 @@ void TraceProcessorImpl::ExecuteQuery(
   int err = sqlite3_prepare_v2(*db_, sql.c_str(), static_cast<int>(sql.size()),
                                &raw_stmt, nullptr);
   ScopedStmt stmt(raw_stmt);
-
   int col_count = sqlite3_column_count(*stmt);
   int row_count = 0;
-
   while (!err) {
     int r = sqlite3_step(*stmt);
     if (r != SQLITE_ROW) {
@@ -187,43 +185,42 @@ void TraceProcessorImpl::ExecuteQuery(
       break;
     }
 
-    for (int col = 0; col < col_count; col++) {
+    for (int i = 0; i < col_count; i++) {
       if (row_count == 0) {
         // Setup the descriptors.
         auto* descriptor = proto.add_column_descriptors();
-        descriptor->set_name(sqlite3_column_name(*stmt, col));
-        descriptor->set_type(protos::RawQueryResult_ColumnDesc_Type_UNKNOWN);
+        descriptor->set_name(sqlite3_column_name(*stmt, i));
+
+        switch (sqlite3_column_type(*stmt, i)) {
+          case SQLITE_INTEGER:
+            descriptor->set_type(protos::RawQueryResult_ColumnDesc_Type_LONG);
+            break;
+          case SQLITE_FLOAT:
+            descriptor->set_type(protos::RawQueryResult_ColumnDesc_Type_DOUBLE);
+            break;
+          case SQLITE_NULL:
+          case SQLITE_TEXT:
+            descriptor->set_type(protos::RawQueryResult_ColumnDesc_Type_STRING);
+            break;
+        }
 
         // Add an empty column.
         proto.add_columns();
       }
 
-      auto* column = proto.mutable_columns(col);
-      auto* descriptor = proto.mutable_column_descriptors(col);
-      switch (sqlite3_column_type(*stmt, col)) {
-        case SQLITE_INTEGER:
-          descriptor->set_type(protos::RawQueryResult_ColumnDesc_Type_LONG);
-          column->add_long_values(sqlite3_column_int64(*stmt, col));
-          column->add_is_nulls(false);
+      auto* column = proto.mutable_columns(i);
+      switch (proto.column_descriptors(i).type()) {
+        case protos::RawQueryResult_ColumnDesc_Type_LONG:
+          column->add_long_values(sqlite3_column_int64(*stmt, i));
           break;
-        case SQLITE_TEXT: {
-          descriptor->set_type(protos::RawQueryResult_ColumnDesc_Type_STRING);
+        case protos::RawQueryResult_ColumnDesc_Type_STRING: {
           const char* str =
-              reinterpret_cast<const char*>(sqlite3_column_text(*stmt, col));
-          column->add_string_values(str);
-          column->add_is_nulls(false);
+              reinterpret_cast<const char*>(sqlite3_column_text(*stmt, i));
+          column->add_string_values(str ? str : "[NULL]");
           break;
         }
-        case SQLITE_FLOAT:
-          descriptor->set_type(protos::RawQueryResult_ColumnDesc_Type_DOUBLE);
-          column->add_double_values(sqlite3_column_double(*stmt, col));
-          column->add_is_nulls(false);
-          break;
-        case SQLITE_NULL:
-          column->add_long_values(0);
-          column->add_string_values("");
-          column->add_double_values(0);
-          column->add_is_nulls(true);
+        case protos::RawQueryResult_ColumnDesc_Type_DOUBLE:
+          column->add_double_values(sqlite3_column_double(*stmt, i));
           break;
       }
     }
