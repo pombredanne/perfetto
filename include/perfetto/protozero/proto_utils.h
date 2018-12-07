@@ -74,8 +74,20 @@ inline typename std::make_unsigned<T>::type ZigZagEncode(T value) {
 
 template <typename T>
 inline uint8_t* WriteVarInt(T value, uint8_t* target) {
-  // Avoid arithmetic (sign expanding) shifts.
-  using UnsignedType = typename std::make_unsigned<T>::type;
+  // If value is <= 0 we must first sign extend to int64_t (see [1]).
+  // Finally we always cast to an unsigned value to to avoid arithmetic
+  // (sign expanding) shifts in the while loop.
+  // [1]: "If you use int32 or int64 as the type for a negative number, the
+  // resulting varint is always ten bytes long".
+  // - developers.google.com/protocol-buffers/docs/encoding
+  // We can achive this with a single static cast for each type T:
+  // uintX_t -> uintX_t
+  // int8_t  -> uint64_t
+  // int16_t -> uint64_t
+  // int32_t -> uint64_t
+  // int64_t -> uint64_t
+  using UnsignedType =
+      typename std::conditional<std::is_unsigned<T>::value, T, uint64_t>::type;
   UnsignedType unsigned_value = static_cast<UnsignedType>(value);
 
   while (unsigned_value >= 0x80) {
