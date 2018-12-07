@@ -81,6 +81,7 @@ class ProtoTraceParser {
   void ParseSignalGenerate(int64_t ts, TraceBlobView);
   void ParseLowmemoryKill(int64_t ts, TraceBlobView);
   void ParseBatteryCounters(int64_t ts, TraceBlobView);
+  void ParseOOMScoreAdjUpdate(int64_t ts, TraceBlobView);
 
  private:
   TraceProcessorContext* context_;
@@ -107,6 +108,7 @@ class ProtoTraceParser {
   const StringId batt_capacity_id_;
   const StringId batt_current_id_;
   const StringId batt_current_avg_id_;
+  const StringId oom_score_adj_id_;
   std::vector<StringId> meminfo_strs_id_;
   std::vector<StringId> vmstat_strs_id_;
   std::vector<StringId> rss_members_;
