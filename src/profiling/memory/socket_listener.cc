@@ -78,6 +78,9 @@ ClientConfiguration MergeProcessSetSpecs(
     if (result.interval == 0 || result.interval > cfg.interval)
       result.interval = cfg.interval;
   }
+  PERFETTO_DCHECK(result.interval > 0);
+  if (result.interval < 1)
+    result.interval = 1;
   return result;
 }
 

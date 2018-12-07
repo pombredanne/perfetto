@@ -74,6 +74,7 @@ class ProcessMatcher {
   class ProcessHandle {
    public:
     friend class ProcessMatcher;
+    friend void swap(ProcessHandle&, ProcessHandle&);
     ProcessHandle() = default;
 
     ~ProcessHandle();
@@ -92,6 +93,7 @@ class ProcessMatcher {
   class ProcessSetSpecHandle {
    public:
     friend class ProcessMatcher;
+    friend void swap(ProcessSetSpecHandle&, ProcessSetSpecHandle&);
     ProcessSetSpecHandle() = default;
 
     ~ProcessSetSpecHandle();
@@ -178,6 +180,10 @@ class ProcessMatcher {
   std::multimap<std::string, ProcessSetSpecItem*> cmdline_to_process_set_;
   std::set<ProcessSetSpecItem*> process_set_for_all_;
 };
+
+void swap(ProcessMatcher::ProcessHandle& a, ProcessMatcher::ProcessHandle& b);
+void swap(ProcessMatcher::ProcessSetSpecHandle& a,
+          ProcessMatcher::ProcessSetSpecHandle& b);
 
 }  // namespace profiling
 }  // namespace perfetto

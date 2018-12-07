@@ -73,19 +73,19 @@ void ForEachPid(const char* file, Fn callback) {
   }
 }
 
-void FindAllProfilablePids(std::vector<pid_t>* pids) {
+void FindAllProfilablePids(std::set<pid_t>* pids) {
   ForEachPid("cmdline", [pids](pid_t pid, const char* filename_buf) {
     if (pid == getpid())
       return;
     struct stat statbuf;
     // Check if we have permission to the process.
     if (stat(filename_buf, &statbuf) == 0)
-      pids->emplace_back(pid);
+      pids->emplace(pid);
   });
 }
 
 void FindPidsForCmdlines(const std::vector<std::string>& cmdlines,
-                         std::vector<pid_t>* pids) {
+                         std::set<pid_t>* pids) {
   ForEachPid("cmdline", [&cmdlines, pids](pid_t pid, const char* filename_buf) {
     if (pid == getpid())
       return;
@@ -112,7 +112,7 @@ void FindPidsForCmdlines(const std::vector<std::string>& cmdlines,
 
     for (const std::string& cmdline : cmdlines) {
       if (process_cmdline == cmdline)
-        pids->emplace_back(static_cast<pid_t>(pid));
+        pids->emplace(static_cast<pid_t>(pid));
     }
   });
 }
@@ -195,6 +195,10 @@ void HeapprofdProducer::SetupDataSource(DataSourceInstanceID id,
                                         const DataSourceConfig& cfg) {
   PERFETTO_DLOG("Setting up data source.");
   const HeapprofdConfig& heapprofd_config = cfg.heapprofd_config();
+  if (heapprofd_config.all() && !heapprofd_config.pid().empty())
+    PERFETTO_ELOG("No point setting all and pid");
+  if (heapprofd_config.all() && !heapprofd_config.process_cmdline().empty())
+    PERFETTO_ELOG("No point setting all and process_cmdline");
 
   if (cfg.name() != kHeapprofdDataSource) {
     PERFETTO_DLOG("Invalid data source name.");
@@ -213,13 +217,11 @@ void HeapprofdProducer::SetupDataSource(DataSourceInstanceID id,
   ProcessSetSpec process_set_spec{};
   process_set_spec.all = heapprofd_config.all();
   process_set_spec.client_configuration = MakeClientConfiguration(cfg);
-  if (!process_set_spec.all) {
-    process_set_spec.pids.insert(heapprofd_config.pid().cbegin(),
-                                 heapprofd_config.pid().cend());
-    process_set_spec.process_cmdline.insert(
-        heapprofd_config.process_cmdline().cbegin(),
-        heapprofd_config.process_cmdline().cend());
-  }
+  process_set_spec.pids.insert(heapprofd_config.pid().cbegin(),
+                               heapprofd_config.pid().cend());
+  process_set_spec.process_cmdline.insert(
+      heapprofd_config.process_cmdline().cbegin(),
+      heapprofd_config.process_cmdline().cend());
 
   data_source.processes =
       socket_listener_.process_matcher().AwaitProcessSetSpec(
@@ -259,27 +261,20 @@ void HeapprofdProducer::StartDataSource(DataSourceInstanceID id,
   }
   DataSource& data_source = it->second;
 
-  if (heapprofd_config.all()) {
+  if (heapprofd_config.all())
     data_source.properties.emplace_back(properties_.SetAll());
-  } else {
-    for (std::string cmdline : heapprofd_config.process_cmdline())
-      data_source.properties.emplace_back(
-          properties_.SetProperty(std::move(cmdline)));
-  }
 
-  std::vector<pid_t> pids;
-  if (heapprofd_config.all()) {
+  for (std::string cmdline : heapprofd_config.process_cmdline())
+    data_source.properties.emplace_back(
+        properties_.SetProperty(std::move(cmdline)));
+
+  std::set<pid_t> pids;
+  if (heapprofd_config.all())
     FindAllProfilablePids(&pids);
-    if (!heapprofd_config.pid().empty())
-      PERFETTO_ELOG("Got all and pid. Ignoring pid.");
-    if (!heapprofd_config.process_cmdline().empty())
-      PERFETTO_ELOG("Got all and process_cmdline. Ignoring process_cmdline.");
-  } else {
-    for (uint64_t pid : heapprofd_config.pid())
-      pids.emplace_back(static_cast<pid_t>(pid));
+  for (uint64_t pid : heapprofd_config.pid())
+    pids.emplace(static_cast<pid_t>(pid));
 
-    FindPidsForCmdlines(heapprofd_config.process_cmdline(), &pids);
-  }
+  FindPidsForCmdlines(heapprofd_config.process_cmdline(), &pids);
 
   for (pid_t pid : pids) {
     PERFETTO_DLOG("Sending %d to %d", kHeapprofdSignal, pid);
