@@ -20,7 +20,7 @@ OUTDIR=out/linux_fuzzer_run
 
 tools/gn gen "$OUTDIR"
 EDITOR=true tools/gn args "$OUTDIR" \
-  --args="is_clang=true is_debug=false use_libfuzzer=true is_asan=true" \
+  --args="is_clang=true is_debug=false is_fuzzer=true is_asan=true" \
   --check
 
 tools/ninja -C $OUTDIR
