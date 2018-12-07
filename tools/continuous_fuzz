@@ -19,7 +19,7 @@ set -euo pipefail
 while true; do
   git fetch origin
   git checkout origin/master
-  tools/install-build-deps --no-android
+  tools/install-build-deps
   tools/run_all_fuzzers &
   PID=$!
   # Sleep 30min
