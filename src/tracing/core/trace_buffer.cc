@@ -136,12 +136,16 @@ void TraceBuffer::CopyChunkUntrusted(ProducerID producer_id_trusted,
 
   // Check whether we have already copied the same chunk previously. This may
   // happen if the service scrapes chunks in a potentially incomplete state
-  // before receiving a commit request for it from the producer.
+  // before receiving commit requests for them from the producer. Note that the
+  // service may scrape and thus override chunks in arbitrary order since the
+  // chunks aren't ordered in the SMB.
   const auto it = index_.find(key);
   if (PERFETTO_UNLIKELY(it != index_.end())) {
     ChunkRecord* prev = it->second.chunk_record;
 
     // Verify that the old chunk's metadata corresponds to the new one.
+    // Overridden chunks should never change size, since the page layout is
+    // fixed per writer.
     if (PERFETTO_UNLIKELY(prev->producer_id != producer_id_trusted ||
                           prev->writer_id != writer_id ||
                           prev->chunk_id != chunk_id ||
@@ -158,7 +162,7 @@ void TraceBuffer::CopyChunkUntrusted(ProducerID producer_id_trusted,
       return;
     }
 
-    // If this chunk was previously copied with the same number of fragmens and
+    // If this chunk was previously copied with the same number of fragments and
     // the number didn't change, there's no need to copy it again.
     if (prev->num_fragments == num_fragments) {
       TRACE_BUFFER_DLOG("  skipping recommit of identical chunk");
