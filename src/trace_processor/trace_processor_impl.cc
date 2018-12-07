@@ -200,7 +200,6 @@ void TraceProcessorImpl::ExecuteQuery(
 
       auto* column = proto.mutable_columns(col);
       auto* descriptor = proto.mutable_column_descriptors(col);
-      auto old_desc_type = descriptor->type();
       switch (sqlite3_column_type(*stmt, col)) {
         case SQLITE_INTEGER:
           descriptor->set_type(protos::RawQueryResult_ColumnDesc_Type_LONG);
@@ -221,31 +220,11 @@ void TraceProcessorImpl::ExecuteQuery(
           column->add_is_nulls(false);
           break;
         case SQLITE_NULL:
+          column->add_long_values(0);
+          column->add_string_values("");
+          column->add_double_values(0);
           column->add_is_nulls(true);
           break;
-      }
-
-      if (old_desc_type == protos::RawQueryResult_ColumnDesc_Type_UNKNOWN) {
-        switch (descriptor->type()) {
-          case protos::RawQueryResult_ColumnDesc_Type_LONG: {
-            for (int i = 0; i < column->is_nulls().size(); i++)
-              column->add_long_values(0);
-            break;
-          }
-          case protos::RawQueryResult_ColumnDesc_Type_DOUBLE: {
-            for (int i = 0; i < column->is_nulls().size(); i++)
-              column->add_double_values(0);
-            break;
-          }
-          case protos::RawQueryResult_ColumnDesc_Type_STRING: {
-            for (int i = 0; i < column->is_nulls().size(); i++)
-              column->add_string_values("");
-            break;
-          }
-          case protos::RawQueryResult_ColumnDesc_Type_UNKNOWN:
-            // Do nothing.
-            break;
-        }
       }
     }
     row_count++;
