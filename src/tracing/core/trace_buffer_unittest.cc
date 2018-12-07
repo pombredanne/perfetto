@@ -917,20 +917,6 @@ TEST_F(TraceBufferTest, Malicious_ChunkTooBig) {
   ASSERT_THAT(ReadPacket(), IsEmpty());
 }
 
-TEST_F(TraceBufferTest, Malicious_RepeatedChunkID) {
-  ResetBuffer(4096);
-  SuppressSanityDchecksForTesting();
-  CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
-      .AddPacket(2048, 'a')
-      .CopyIntoTraceBuffer();
-  CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
-      .AddPacket(1024, 'b')
-      .CopyIntoTraceBuffer();
-  trace_buffer()->BeginRead();
-  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(2048, 'a')));
-  ASSERT_THAT(ReadPacket(), IsEmpty());
-}
-
 TEST_F(TraceBufferTest, Malicious_DeclareMorePacketsBeyondBoundaries) {
   ResetBuffer(4096);
   SuppressSanityDchecksForTesting();
@@ -1122,7 +1108,23 @@ TEST_F(TraceBufferTest, Malicious_PatchOutOfBounds) {
   }
 }
 
-TEST_F(TraceBufferTest, Malicious_OverwriteShorter) {
+TEST_F(TraceBufferTest, Malicious_OverrideWithShorterChunkSize) {
+  ResetBuffer(4096);
+  SuppressSanityDchecksForTesting();
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
+      .AddPacket(2048, 'a')
+      .CopyIntoTraceBuffer();
+  // The service should ignore this override of the chunk since the chunk size
+  // is different.
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
+      .AddPacket(1024, 'b')
+      .CopyIntoTraceBuffer();
+  trace_buffer()->BeginRead();
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(2048, 'a')));
+  ASSERT_THAT(ReadPacket(), IsEmpty());
+}
+
+TEST_F(TraceBufferTest, Malicious_OverrideWithShorterChunkSizeAfterRead) {
   ResetBuffer(4096);
   SuppressSanityDchecksForTesting();
 
@@ -1134,9 +1136,8 @@ TEST_F(TraceBufferTest, Malicious_OverwriteShorter) {
   ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(30, 'a')));
   ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(40, 'b')));
 
-  // The attacker in this case speculates on the fact that the read pointer is
-  // @ 70 which is >> the size of the new chunk we overwrite.
-  // The service should detect that and invalidate completely the read.
+  // The service should ignore this override of the chunk since the chunk size
+  // is different.
   CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
       .AddPacket(10, 'a')
       .AddPacket(10, 'b')
@@ -1150,6 +1151,46 @@ TEST_F(TraceBufferTest, Malicious_OverwriteShorter) {
   CreateChunk(ProducerID(1), WriterID(1), ChunkID(1))
       .AddPacket(10, 'd')
       .AddPacket(10, 'e')
+      .CopyIntoTraceBuffer();
+  trace_buffer()->BeginRead();
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(10, 'd')));
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(10, 'e')));
+  ASSERT_THAT(ReadPacket(), IsEmpty());
+}
+
+TEST_F(TraceBufferTest, Malicious_OverrideWithDifferentOffsetAfterRead) {
+  ResetBuffer(4096);
+  SuppressSanityDchecksForTesting();
+
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
+      .AddPacket(30, 'a')
+      .AddPacket(40, 'b')
+      .PadTo(512)
+      .CopyIntoTraceBuffer();
+  trace_buffer()->BeginRead();
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(30, 'a')));
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(40, 'b')));
+
+  // The attacker in this case speculates on the fact that the read pointer is
+  // @ 70 which is >> the size of the new chunk we overwrite.
+  // The service will not discard this override since the chunk size is correct.
+  // However, it should detect that the packet headers at the current read
+  // offset are invalid and skip the read of this chunk.
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
+      .AddPacket(10, 'a')
+      .AddPacket(10, 'b')
+      .AddPacket(10, 'c')
+      .PadTo(512)
+      .CopyIntoTraceBuffer();
+  trace_buffer()->BeginRead();
+  ASSERT_THAT(ReadPacket(), IsEmpty());
+
+  // Test that the service didn't get stuck in some indeterminate state.
+  // Writing a valid chunk with a larger ID should make things work again.
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(1))
+      .AddPacket(10, 'd')
+      .AddPacket(10, 'e')
+      .PadTo(512)
       .CopyIntoTraceBuffer();
   trace_buffer()->BeginRead();
   ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(10, 'd')));
@@ -1434,9 +1475,6 @@ TEST_F(TraceBufferTest, Overwrite_ReCommitSameAfterRead) {
   ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(50, 'd')));
   ASSERT_THAT(ReadPacket(), IsEmpty());
 }
-
-// TODO malicious recommit with different chunk size.
-// TODO malicious recommit with different offsets.
 
 // TODO(primiano): test stats().
 // TODO(primiano): test multiple streams interleaved.
