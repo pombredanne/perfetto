@@ -142,6 +142,9 @@ inline double ExtractSqliteValue(sqlite3_value* value) {
   return sqlite3_value_double(value);
 }
 
+// Do not add a uint64_t version of ExtractSqliteValue. You should not be using
+// uint64_t at all given that SQLite doesn't support it.
+
 template <typename T>
 using is_float =
     typename std::enable_if<std::is_floating_point<T>::value, T>::type;
@@ -237,6 +240,9 @@ T FindEqBound(sqlite3_value* sqlite_val) {
 
 template <typename T>
 void ReportSqliteResult(sqlite3_context*, T value);
+
+// Do not add a uint64_t version of ReportSqliteResult. You should not be using
+// uint64_t at all given that SQLite doesn't support it.
 
 template <>
 inline void ReportSqliteResult(sqlite3_context* ctx, int32_t value) {
