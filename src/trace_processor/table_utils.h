@@ -29,10 +29,9 @@ namespace table_utils {
 
 namespace internal {
 
-inline RangeRowIterator CreateRangeIterator(
+inline FilteredRowIndex CreateRangeIterator(
     const StorageSchema& schema,
     uint32_t size,
-    bool desc,
     const std::vector<QueryConstraints::Constraint>& cs,
     sqlite3_value** argv) {
   // Try and bound the search space to the smallest possible index region and
@@ -51,7 +50,7 @@ inline RangeRowIterator CreateRangeIterator(
     // If the lower bound is higher than the upper bound, return a zero-sized
     // range iterator.
     if (min_idx >= max_idx)
-      return RangeRowIterator(min_idx, min_idx, desc);
+      return FilteredRowIndex(min_idx, min_idx);
 
     if (!bounds.consumed)
       bitvector_cs.emplace_back(i);
@@ -66,12 +65,7 @@ inline RangeRowIterator CreateRangeIterator(
     const auto& schema_col = schema.GetColumn(static_cast<size_t>(c.iColumn));
     schema_col.Filter(c.op, value, &index);
   }
-
-  if (index.all_set()) {
-    return RangeRowIterator(min_idx, max_idx, desc);
-  } else {
-    return RangeRowIterator(min_idx, desc, index.TakeBitvector());
-  }
+  return index;
 }
 
 inline std::pair<bool, bool> IsOrdered(
@@ -107,15 +101,14 @@ inline std::vector<QueryConstraints::OrderBy> RemoveRedundantOrderBy(
 
 inline std::vector<uint32_t> CreateSortedIndexVector(
     const StorageSchema& schema,
-    RangeRowIterator it,
+    FilteredRowIndex index,
     const std::vector<QueryConstraints::OrderBy>& obs) {
   PERFETTO_DCHECK(obs.size() > 0);
 
-  std::vector<uint32_t> sorted_rows(it.RowCount());
-  for (size_t i = 0; !it.IsEnd(); it.NextRow(), i++)
-    sorted_rows[i] = it.Row();
+  // Retrieve the index created above from the index.
+  std::vector<uint32_t> sorted_rows = index.ToRowVector();
 
-  std::vector<StorageSchema::Column::Comparator> comparators;
+  std::vector<StorageColumn::Comparator> comparators;
   for (const auto& ob : obs) {
     auto col = static_cast<size_t>(ob.iColumn);
     comparators.emplace_back(schema.GetColumn(col).Sort(ob));
@@ -138,11 +131,11 @@ inline std::vector<uint32_t> CreateSortedIndexVector(
 
 // Creates a row iterator which is optimized for a generic storage schema (i.e.
 // it does not make assumptions about values of columns).
-inline std::unique_ptr<StorageCursor::RowIterator>
-CreateBestRowIteratorForGenericSchema(const StorageSchema& schema,
-                                      uint32_t size,
-                                      const QueryConstraints& qc,
-                                      sqlite3_value** argv) {
+inline std::unique_ptr<RowIterator> CreateBestRowIteratorForGenericSchema(
+    const StorageSchema& schema,
+    uint32_t size,
+    const QueryConstraints& qc,
+    sqlite3_value** argv) {
   const auto& cs = qc.constraints();
   auto obs = internal::RemoveRedundantOrderBy(cs, qc.order_by());
 
@@ -152,15 +145,14 @@ CreateBestRowIteratorForGenericSchema(const StorageSchema& schema,
   std::tie(is_ordered, desc) = internal::IsOrdered(schema, obs);
 
   // Create the range iterator and if we are sorted, just return it.
-  auto it = internal::CreateRangeIterator(schema, size, desc, cs, argv);
-  if (is_ordered)
-    return std::unique_ptr<RangeRowIterator>(
-        new RangeRowIterator(std::move(it)));
-
+  auto index = internal::CreateRangeIterator(schema, size, cs, argv);
+  if (is_ordered) {
+    return index.ToRowIterator(desc);
+  }
   // Otherwise, create the sorted vector of indices and create the vector
   // iterator.
   return std::unique_ptr<VectorRowIterator>(new VectorRowIterator(
-      internal::CreateSortedIndexVector(schema, std::move(it), obs)));
+      internal::CreateSortedIndexVector(schema, std::move(index), obs)));
 }
 
 }  // namespace table_utils
