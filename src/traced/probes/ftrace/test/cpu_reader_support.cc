@@ -33,12 +33,12 @@ std::string GetBinaryDirectory() {
   char buf[512];
   ssize_t rd = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
   if (rd < 0) {
-    PERFETTO_LOG("Failed to readlink(\"/proc/self/exe\"");
+    PERFETTO_ELOG("Failed to readlink(\"/proc/self/exe\"");
     return "";
   }
   char* end = static_cast<char*>(memrchr(buf, '/', static_cast<size_t>(rd)));
   if (!end || end == buf + sizeof(buf) - 1) {
-    PERFETTO_LOG("Failed to find directory.");
+    PERFETTO_ELOG("Failed to find directory.");
     return "";
   }
   *(end + 1) = '\0';
