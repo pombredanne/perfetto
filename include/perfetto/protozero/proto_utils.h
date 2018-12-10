@@ -80,15 +80,18 @@ inline uint8_t* WriteVarInt(T value, uint8_t* target) {
   // [1]: "If you use int32 or int64 as the type for a negative number, the
   // resulting varint is always ten bytes long".
   // - developers.google.com/protocol-buffers/docs/encoding
-  // We can achive this with a single static cast for each type T:
-  // uintX_t -> uintX_t
-  // int8_t  -> uint64_t
-  // int16_t -> uint64_t
-  // int32_t -> uint64_t
-  // int64_t -> uint64_t
-  using UnsignedType =
-      typename std::conditional<std::is_unsigned<T>::value, T, uint64_t>::type;
-  UnsignedType unsigned_value = static_cast<UnsignedType>(value);
+  // So for each input type we do the following casts:
+  // uintX_t -> uintX_t -> uintX_t
+  // int8_t  -> int64_t -> uint64_t
+  // int16_t -> int64_t -> uint64_t
+  // int32_t -> int64_t -> uint64_t
+  // int64_t -> int64_t -> uint64_t
+  using MaybeExtendedType =
+      typename std::conditional<std::is_unsigned<T>::value, T, int64_t>::type;
+  using UnsignedType = typename std::make_unsigned<MaybeExtendedType>::type;
+
+  MaybeExtendedType extended_value = static_cast<MaybeExtendedType>(value);
+  UnsignedType unsigned_value = static_cast<UnsignedType>(extended_value);
 
   while (unsigned_value >= 0x80) {
     *target++ = static_cast<uint8_t>(unsigned_value) | 0x80;
