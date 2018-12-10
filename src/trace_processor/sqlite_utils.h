@@ -148,7 +148,7 @@ std::function<bool(base::Optional<T>)> CreatePredicate(int op,
     case SQLITE_INDEX_CONSTRAINT_LT:
       return [val](base::Optional<T> f) { return f.has_value() && *f < val; };
     default:
-      PERFETTO_CHECK(false);
+      PERFETTO_FATAL("For GCC");
   }
 }
 
