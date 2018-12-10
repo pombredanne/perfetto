@@ -92,13 +92,6 @@ inline uint32_t ExtractSqliteValue(sqlite3_value* value) {
 }
 
 template <>
-inline uint64_t ExtractSqliteValue(sqlite3_value* value) {
-  auto type = sqlite3_value_type(value);
-  PERFETTO_DCHECK(type == SQLITE_INTEGER);
-  return static_cast<uint64_t>(sqlite3_value_int64(value));
-}
-
-template <>
 inline int64_t ExtractSqliteValue(sqlite3_value* value) {
   auto type = sqlite3_value_type(value);
   PERFETTO_DCHECK(type == SQLITE_INTEGER);
@@ -112,6 +105,9 @@ inline double ExtractSqliteValue(sqlite3_value* value) {
   return sqlite3_value_double(value);
 }
 
+// Do not add a uint64_t version of ExtractSqliteValue. You should not be using
+// uint64_t at all given that SQLite doesn't support it.
+
 template <>
 inline std::string ExtractSqliteValue(sqlite3_value* value) {
   auto type = sqlite3_value_type(value);
@@ -120,15 +116,6 @@ inline std::string ExtractSqliteValue(sqlite3_value* value) {
       reinterpret_cast<const char*>(sqlite3_value_text(value));
   return std::string(extracted);
 }
-
-// On MacOS size_t !== uint64_t
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
-template <>
-inline size_t ExtractSqliteValue(sqlite3_value* value) {
-  PERFETTO_DCHECK(sqlite3_value_type(value) == SQLITE_INTEGER);
-  return static_cast<size_t>(sqlite3_value_int64(value));
-}
-#endif  // PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
 
 template <class T>
 std::function<bool(base::Optional<T>)> CreatePredicate(int op,
@@ -261,6 +248,9 @@ T FindEqBound(sqlite3_value* sqlite_val) {
 template <typename T>
 void ReportSqliteResult(sqlite3_context*, T value);
 
+// Do not add a uint64_t version of ReportSqliteResult. You should not be using
+// uint64_t at all given that SQLite doesn't support it.
+
 template <>
 inline void ReportSqliteResult(sqlite3_context* ctx, int32_t value) {
   sqlite3_result_int(ctx, value);
@@ -279,11 +269,6 @@ inline void ReportSqliteResult(sqlite3_context* ctx, uint8_t value) {
 template <>
 inline void ReportSqliteResult(sqlite3_context* ctx, uint32_t value) {
   sqlite3_result_int64(ctx, value);
-}
-
-template <>
-inline void ReportSqliteResult(sqlite3_context* ctx, uint64_t value) {
-  sqlite3_result_int64(ctx, static_cast<sqlite_int64>(value));
 }
 
 template <>
