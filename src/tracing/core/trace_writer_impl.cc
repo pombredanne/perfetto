@@ -93,8 +93,20 @@ TraceWriterImpl::TracePacketHandle TraceWriterImpl::NewTracePacket() {
   // It doesn't make sense to begin a packet that is going to fragment
   // immediately after (8 is just an arbitrary estimation on the minimum size of
   // a realistic packet).
-  if (protobuf_stream_writer_.bytes_available() < kPacketHeaderSize + 8)
+  if (protobuf_stream_writer_.bytes_available() < kPacketHeaderSize + 8) {
     protobuf_stream_writer_.Reset(GetNewBuffer());
+  } else {
+    // If we're not starting a new buffer, send any completed patches to the
+    // service to facilitate trace data recovery by the service. This should
+    // only happen when we're completing the first packet in a chunk which was a
+    // continuation from the previous chunk.
+    if (!patch_list_.empty() && patch_list_.front().is_patched()) {
+      PERFETTO_DCHECK(cur_chunk_.GetPacketCountAndFlags().first == 1);
+      PERFETTO_DCHECK(cur_chunk_.GetPacketCountAndFlags().second &
+                      ChunkHeader::kFirstPacketContinuesFromPrevChunk);
+      shmem_arbiter_->SendCompletedPatches(id_, target_buffer_, &patch_list_);
+    }
+  }
 
   cur_packet_->Reset(&protobuf_stream_writer_);
   uint8_t* header = protobuf_stream_writer_.ReserveBytes(kPacketHeaderSize);
