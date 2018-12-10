@@ -141,6 +141,7 @@ void SharedMemoryArbiterImpl::ReturnCompletedChunk(Chunk chunk,
 void SharedMemoryArbiterImpl::SendCompletedPatches(WriterID writer_id,
                                                    BufferID target_buffer,
                                                    PatchList* patch_list) {
+  PERFETTO_DCHECK(!patch_list->empty() && patch_list->front().is_patched());
   UpdateCommitDataRequest(Chunk(), writer_id, target_buffer, patch_list);
 }
 
