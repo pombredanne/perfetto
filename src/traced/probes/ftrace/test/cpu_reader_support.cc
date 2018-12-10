@@ -42,7 +42,7 @@ std::string GetBinaryDirectory() {
     return "";
   }
   *(end + 1) = '\0';
-  return buf;
+  return std::string(buf);
 }
 
 }  // namespace
