@@ -6,7 +6,6 @@
 
 namespace perfetto {
 namespace trace_processor {
-
 namespace {
 
 std::array<MessageDescriptor, 328> descriptors{{
@@ -3180,7 +3179,7 @@ std::array<MessageDescriptor, 328> descriptors{{
 }  // namespace
 
 MessageDescriptor* GetMessageDescriptorForId(size_t id) {
-  PERFETTO_DCHECK(id < descriptors.size());
+  PERFETTO_CHECK(id < descriptors.size());
   return &descriptors[id];
 }
 
