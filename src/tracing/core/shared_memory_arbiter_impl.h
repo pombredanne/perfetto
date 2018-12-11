@@ -85,10 +85,10 @@ class SharedMemoryArbiterImpl : public SharedMemoryArbiter {
 
   // Send a request to the service to apply completed patches from |patch_list|.
   // |writer_id| is the ID of the TraceWriter that calls this method,
-  // |target_buffer| is the absolute trace buffer ID of its target buffer.
-  void SendCompletedPatches(WriterID writer_id,
-                            BufferID target_buffer,
-                            PatchList* patch_list);
+  // |target_buffer| is the global trace buffer ID of its target buffer.
+  void SendPatches(WriterID writer_id,
+                   BufferID target_buffer,
+                   PatchList* patch_list);
 
   // Forces a synchronous commit of the completed packets without waiting for
   // the next task.
