@@ -200,27 +200,41 @@ void TraceProcessorImpl::ExecuteQuery(
       }
 
       auto* column = proto.mutable_columns(col);
-      auto* descriptor = proto.mutable_column_descriptors(col);
-      switch (sqlite3_column_type(*stmt, col)) {
-        case SQLITE_INTEGER:
-          descriptor->set_type(protos::RawQueryResult_ColumnDesc_Type_LONG);
+      auto* desc = proto.mutable_column_descriptors(col);
+      if (desc->type() == protos::RawQueryResult_ColumnDesc_Type_UNKNOWN) {
+        switch (sqlite3_column_type(*stmt, col)) {
+          case SQLITE_INTEGER:
+            descriptor->set_type(protos::RawQueryResult_ColumnDesc_Type_LONG);
+            break;
+          case SQLITE_TEXT: {
+            descriptor->set_type(protos::RawQueryResult_ColumnDesc_Type_STRING);
+            break;
+          }
+          case SQLITE_FLOAT:
+            descriptor->set_type(protos::RawQueryResult_ColumnDesc_Type_DOUBLE);
+            break;
+          case SQLITE_NULL:
+            break;
+        }
+      }
+
+      switch (desc->type()) {
+        case protos::RawQueryResult_ColumnDesc_Type_LONG:
           column->add_long_values(sqlite3_column_int64(*stmt, col));
           column->add_is_nulls(false);
           break;
-        case SQLITE_TEXT: {
-          descriptor->set_type(protos::RawQueryResult_ColumnDesc_Type_STRING);
+        case protos::RawQueryResult_ColumnDesc_Type_STRING: {
           const char* str =
               reinterpret_cast<const char*>(sqlite3_column_text(*stmt, col));
           column->add_string_values(str);
           column->add_is_nulls(false);
           break;
         }
-        case SQLITE_FLOAT:
-          descriptor->set_type(protos::RawQueryResult_ColumnDesc_Type_DOUBLE);
+        case protos::RawQueryResult_ColumnDesc_Type_DOUBLE:
           column->add_double_values(sqlite3_column_double(*stmt, col));
           column->add_is_nulls(false);
           break;
-        case SQLITE_NULL:
+        case protos::RawQueryResult_ColumnDesc_Type_UNKNOWN:
           column->add_long_values(0);
           column->add_string_values("");
           column->add_double_values(0);
