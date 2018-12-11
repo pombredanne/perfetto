@@ -25,6 +25,8 @@
 
 namespace perfetto {
 
+// Uses the ftrace event descriptor file to generate a
+// file with just the names and field types for each ftrace event.
 static void GenerateFtraceDescriptors(
     const google::protobuf::DescriptorPool& descriptor_pool,
     std::ostream* fout) {
@@ -41,8 +43,11 @@ static void GenerateFtraceDescriptors(
   #include "src/trace_processor/ftrace_descriptors.h"
 
   namespace perfetto {
+  namespace trace_processor {
+  
+  namespace {
 
-  static std::array<MessageDescriptor,
+  std::array<MessageDescriptor,
   )";
   *fout << std::to_string(max_id + 1) + "> descriptors{{";
 
@@ -69,13 +74,13 @@ static void GenerateFtraceDescriptors(
     for (int j = 0; j < event_descriptor->field_count(); j++) {
       const google::protobuf::FieldDescriptor* field =
           event_descriptor->field(j);
-      // For field ids with no field outpit an empty field.
+      // For field ids with no field output an empty field.
       while (field_id != field->number()) {
         *fout << "{},";
         ++field_id;
       }
       ProtoType type = ProtoType::FromDescriptor(field->type());
-      *fout << "{\"" + field->name() + "\", ProtoFieldType::kProto" +
+      *fout << "{\"" + field->name() + "\", ProtoSchemaType::k" +
                    ToCamelCase(type.ToString()) + "},";
       ++field_id;
     }
@@ -84,16 +89,18 @@ static void GenerateFtraceDescriptors(
   }
   *fout << "}};\n";
   *fout << R"(
+  } // namespace
+
   MessageDescriptor* GetMessageDescriptorForId(size_t id) {
     PERFETTO_DCHECK(id < descriptors.size());
     return &descriptors[id];
   }
 
-  size_t DescriptorsSize() {
+  size_t GetDescriptorsSize() {
     return descriptors.size();
   }
   )";
-  *fout << "} // namespace perfetto\n";
+  *fout << "} // namespace trace_processor\n} // namespace perfetto\n";
 }
 }  // namespace perfetto
 #endif  // TOOLS_FTRACE_PROTO_GEN_FTRACE_DESCRIPTOR_GEN_H_

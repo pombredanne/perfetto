@@ -7,7 +7,7 @@
 
 namespace perfetto {
 
-using protozero::proto_utils::ProtoFieldType;
+using protozero::proto_utils::ProtoSchemaType;
 
 std::vector<Event> GetStaticEventInfo() {
   std::vector<Event> events;
@@ -18,18 +18,14 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "binder_transaction";
     event->group = "binder";
     event->proto_field_id = 50;
+    event->fields.push_back(MakeField("debug_id", 1, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("debug_id", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("target_node", 2, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("to_proc", 3, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("to_thread", 4, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("reply", 5, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("code", 6, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("flags", 7, ProtoFieldType::kProtoUint32));
+        MakeField("target_node", 2, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("to_proc", 3, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("to_thread", 4, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("reply", 5, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("code", 6, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("flags", 7, ProtoSchemaType::kUint32));
   }
 
   {
@@ -38,8 +34,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "binder_transaction_received";
     event->group = "binder";
     event->proto_field_id = 51;
-    event->fields.push_back(
-        MakeField("debug_id", 1, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("debug_id", 1, ProtoSchemaType::kInt32));
   }
 
   {
@@ -48,15 +43,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "binder_set_priority";
     event->group = "binder";
     event->proto_field_id = 52;
-    event->fields.push_back(MakeField("proc", 1, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("proc", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("thread", 2, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("old_prio", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("new_prio", 4, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("thread", 2, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("old_prio", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("new_prio", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("desired_prio", 5, ProtoFieldType::kProtoUint32));
+        MakeField("desired_prio", 5, ProtoSchemaType::kUint32));
   }
 
   {
@@ -65,7 +57,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "binder_lock";
     event->group = "binder";
     event->proto_field_id = 53;
-    event->fields.push_back(MakeField("tag", 1, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("tag", 1, ProtoSchemaType::kString));
   }
 
   {
@@ -74,7 +66,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "binder_locked";
     event->group = "binder";
     event->proto_field_id = 54;
-    event->fields.push_back(MakeField("tag", 1, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("tag", 1, ProtoSchemaType::kString));
   }
 
   {
@@ -83,7 +75,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "binder_unlock";
     event->group = "binder";
     event->proto_field_id = 55;
-    event->fields.push_back(MakeField("tag", 1, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("tag", 1, ProtoSchemaType::kString));
   }
 
   {
@@ -93,11 +85,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "binder";
     event->proto_field_id = 323;
     event->fields.push_back(
-        MakeField("data_size", 1, ProtoFieldType::kProtoUint64));
+        MakeField("data_size", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("debug_id", 2, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("debug_id", 2, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("offsets_size", 3, ProtoFieldType::kProtoUint64));
+        MakeField("offsets_size", 3, ProtoSchemaType::kUint64));
   }
 
   {
@@ -106,16 +97,14 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "block_rq_issue";
     event->group = "block";
     event->proto_field_id = 45;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("sector", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("sector", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("nr_sector", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("bytes", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("rwbs", 5, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("comm", 6, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("cmd", 7, ProtoFieldType::kProtoString));
+        MakeField("nr_sector", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("bytes", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("rwbs", 5, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("comm", 6, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("cmd", 7, ProtoSchemaType::kString));
   }
 
   {
@@ -124,13 +113,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "block_bio_backmerge";
     event->group = "block";
     event->proto_field_id = 115;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("sector", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("sector", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("nr_sector", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("rwbs", 4, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("comm", 5, ProtoFieldType::kProtoString));
+        MakeField("nr_sector", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("rwbs", 4, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("comm", 5, ProtoSchemaType::kString));
   }
 
   {
@@ -139,13 +127,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "block_bio_bounce";
     event->group = "block";
     event->proto_field_id = 116;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("sector", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("sector", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("nr_sector", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("rwbs", 4, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("comm", 5, ProtoFieldType::kProtoString));
+        MakeField("nr_sector", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("rwbs", 4, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("comm", 5, ProtoSchemaType::kString));
   }
 
   {
@@ -154,13 +141,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "block_bio_complete";
     event->group = "block";
     event->proto_field_id = 117;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("sector", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("sector", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("nr_sector", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("error", 4, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("rwbs", 5, ProtoFieldType::kProtoString));
+        MakeField("nr_sector", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("error", 4, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("rwbs", 5, ProtoSchemaType::kString));
   }
 
   {
@@ -169,13 +155,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "block_bio_frontmerge";
     event->group = "block";
     event->proto_field_id = 118;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("sector", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("sector", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("nr_sector", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("rwbs", 4, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("comm", 5, ProtoFieldType::kProtoString));
+        MakeField("nr_sector", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("rwbs", 4, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("comm", 5, ProtoSchemaType::kString));
   }
 
   {
@@ -184,13 +169,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "block_bio_queue";
     event->group = "block";
     event->proto_field_id = 119;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("sector", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("sector", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("nr_sector", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("rwbs", 4, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("comm", 5, ProtoFieldType::kProtoString));
+        MakeField("nr_sector", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("rwbs", 4, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("comm", 5, ProtoSchemaType::kString));
   }
 
   {
@@ -199,16 +183,14 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "block_bio_remap";
     event->group = "block";
     event->proto_field_id = 120;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("sector", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("sector", 2, ProtoFieldType::kProtoUint64));
+        MakeField("nr_sector", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("old_dev", 4, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("nr_sector", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("old_dev", 4, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("old_sector", 5, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("rwbs", 6, ProtoFieldType::kProtoString));
+        MakeField("old_sector", 5, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("rwbs", 6, ProtoSchemaType::kString));
   }
 
   {
@@ -217,10 +199,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "block_dirty_buffer";
     event->group = "block";
     event->proto_field_id = 121;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("sector", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("size", 3, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("sector", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("size", 3, ProtoSchemaType::kUint64));
   }
 
   {
@@ -229,13 +210,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "block_getrq";
     event->group = "block";
     event->proto_field_id = 122;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("sector", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("sector", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("nr_sector", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("rwbs", 4, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("comm", 5, ProtoFieldType::kProtoString));
+        MakeField("nr_sector", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("rwbs", 4, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("comm", 5, ProtoSchemaType::kString));
   }
 
   {
@@ -244,7 +224,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "block_plug";
     event->group = "block";
     event->proto_field_id = 123;
-    event->fields.push_back(MakeField("comm", 1, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("comm", 1, ProtoSchemaType::kString));
   }
 
   {
@@ -253,15 +233,13 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "block_rq_abort";
     event->group = "block";
     event->proto_field_id = 124;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("sector", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("sector", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("nr_sector", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("errors", 4, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("rwbs", 5, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("cmd", 6, ProtoFieldType::kProtoString));
+        MakeField("nr_sector", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("errors", 4, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("rwbs", 5, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("cmd", 6, ProtoSchemaType::kString));
   }
 
   {
@@ -270,15 +248,13 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "block_rq_complete";
     event->group = "block";
     event->proto_field_id = 125;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("sector", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("sector", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("nr_sector", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("errors", 4, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("rwbs", 5, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("cmd", 6, ProtoFieldType::kProtoString));
+        MakeField("nr_sector", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("errors", 4, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("rwbs", 5, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("cmd", 6, ProtoSchemaType::kString));
   }
 
   {
@@ -287,16 +263,14 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "block_rq_insert";
     event->group = "block";
     event->proto_field_id = 126;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("sector", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("sector", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("nr_sector", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("bytes", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("rwbs", 5, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("comm", 6, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("cmd", 7, ProtoFieldType::kProtoString));
+        MakeField("nr_sector", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("bytes", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("rwbs", 5, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("comm", 6, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("cmd", 7, ProtoSchemaType::kString));
   }
 
   {
@@ -305,18 +279,15 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "block_rq_remap";
     event->group = "block";
     event->proto_field_id = 128;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("sector", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("sector", 2, ProtoFieldType::kProtoUint64));
+        MakeField("nr_sector", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("old_dev", 4, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("nr_sector", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("old_dev", 4, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("old_sector", 5, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("nr_bios", 6, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("rwbs", 7, ProtoFieldType::kProtoString));
+        MakeField("old_sector", 5, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("nr_bios", 6, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("rwbs", 7, ProtoSchemaType::kString));
   }
 
   {
@@ -325,15 +296,13 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "block_rq_requeue";
     event->group = "block";
     event->proto_field_id = 129;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("sector", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("sector", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("nr_sector", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("errors", 4, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("rwbs", 5, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("cmd", 6, ProtoFieldType::kProtoString));
+        MakeField("nr_sector", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("errors", 4, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("rwbs", 5, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("cmd", 6, ProtoSchemaType::kString));
   }
 
   {
@@ -342,13 +311,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "block_sleeprq";
     event->group = "block";
     event->proto_field_id = 130;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("sector", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("sector", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("nr_sector", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("rwbs", 4, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("comm", 5, ProtoFieldType::kProtoString));
+        MakeField("nr_sector", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("rwbs", 4, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("comm", 5, ProtoSchemaType::kString));
   }
 
   {
@@ -357,13 +325,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "block_split";
     event->group = "block";
     event->proto_field_id = 131;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("sector", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("sector", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("new_sector", 3, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("rwbs", 4, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("comm", 5, ProtoFieldType::kProtoString));
+        MakeField("new_sector", 3, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("rwbs", 4, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("comm", 5, ProtoSchemaType::kString));
   }
 
   {
@@ -372,10 +339,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "block_touch_buffer";
     event->group = "block";
     event->proto_field_id = 132;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("sector", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("size", 3, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("sector", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("size", 3, ProtoSchemaType::kUint64));
   }
 
   {
@@ -384,8 +350,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "block_unplug";
     event->group = "block";
     event->proto_field_id = 133;
-    event->fields.push_back(MakeField("nr_rq", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("comm", 2, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("nr_rq", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("comm", 2, ProtoSchemaType::kString));
   }
 
   {
@@ -394,14 +360,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "cgroup_attach_task";
     event->group = "cgroup";
     event->proto_field_id = 67;
-    event->fields.push_back(
-        MakeField("dst_root", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("dst_id", 2, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("pid", 3, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("comm", 4, ProtoFieldType::kProtoString));
-    event->fields.push_back(
-        MakeField("cname", 5, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("dst_root", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("dst_id", 2, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("pid", 3, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("comm", 4, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("cname", 5, ProtoSchemaType::kString));
   }
 
   {
@@ -410,10 +373,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "cgroup_mkdir";
     event->group = "cgroup";
     event->proto_field_id = 68;
-    event->fields.push_back(MakeField("root", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("id", 2, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("cname", 3, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("root", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("id", 2, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("cname", 3, ProtoSchemaType::kString));
   }
 
   {
@@ -422,10 +384,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "cgroup_remount";
     event->group = "cgroup";
     event->proto_field_id = 69;
-    event->fields.push_back(MakeField("root", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("ss_mask", 2, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("name", 3, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("root", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("ss_mask", 2, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("name", 3, ProtoSchemaType::kString));
   }
 
   {
@@ -434,10 +395,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "cgroup_rmdir";
     event->group = "cgroup";
     event->proto_field_id = 70;
-    event->fields.push_back(MakeField("root", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("id", 2, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("cname", 3, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("root", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("id", 2, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("cname", 3, ProtoSchemaType::kString));
   }
 
   {
@@ -446,14 +406,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "cgroup_transfer_tasks";
     event->group = "cgroup";
     event->proto_field_id = 71;
-    event->fields.push_back(
-        MakeField("dst_root", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("dst_id", 2, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("pid", 3, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("comm", 4, ProtoFieldType::kProtoString));
-    event->fields.push_back(
-        MakeField("cname", 5, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("dst_root", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("dst_id", 2, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("pid", 3, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("comm", 4, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("cname", 5, ProtoSchemaType::kString));
   }
 
   {
@@ -462,10 +419,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "cgroup_destroy_root";
     event->group = "cgroup";
     event->proto_field_id = 72;
-    event->fields.push_back(MakeField("root", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("ss_mask", 2, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("name", 3, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("root", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("ss_mask", 2, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("name", 3, ProtoSchemaType::kString));
   }
 
   {
@@ -474,10 +430,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "cgroup_release";
     event->group = "cgroup";
     event->proto_field_id = 73;
-    event->fields.push_back(MakeField("root", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("id", 2, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("cname", 3, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("root", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("id", 2, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("cname", 3, ProtoSchemaType::kString));
   }
 
   {
@@ -486,10 +441,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "cgroup_rename";
     event->group = "cgroup";
     event->proto_field_id = 74;
-    event->fields.push_back(MakeField("root", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("id", 2, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("cname", 3, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("root", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("id", 2, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("cname", 3, ProtoSchemaType::kString));
   }
 
   {
@@ -498,10 +452,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "cgroup_setup_root";
     event->group = "cgroup";
     event->proto_field_id = 75;
-    event->fields.push_back(MakeField("root", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("ss_mask", 2, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("name", 3, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("root", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("ss_mask", 2, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("name", 3, ProtoSchemaType::kString));
   }
 
   {
@@ -510,7 +463,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "clk_enable";
     event->group = "clk";
     event->proto_field_id = 320;
-    event->fields.push_back(MakeField("name", 1, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("name", 1, ProtoSchemaType::kString));
   }
 
   {
@@ -519,7 +472,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "clk_disable";
     event->group = "clk";
     event->proto_field_id = 321;
-    event->fields.push_back(MakeField("name", 1, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("name", 1, ProtoSchemaType::kString));
   }
 
   {
@@ -528,8 +481,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "clk_set_rate";
     event->group = "clk";
     event->proto_field_id = 322;
-    event->fields.push_back(MakeField("name", 1, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("rate", 2, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("name", 1, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("rate", 2, ProtoSchemaType::kUint64));
   }
 
   {
@@ -539,14 +492,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "compaction";
     event->proto_field_id = 99;
     event->fields.push_back(
-        MakeField("zone_start", 1, ProtoFieldType::kProtoUint64));
+        MakeField("zone_start", 1, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("migrate_pfn", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("free_pfn", 3, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("zone_end", 4, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("sync", 5, ProtoFieldType::kProtoUint32));
+        MakeField("migrate_pfn", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("free_pfn", 3, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("zone_end", 4, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("sync", 5, ProtoSchemaType::kUint32));
   }
 
   {
@@ -555,15 +506,15 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mm_compaction_defer_compaction";
     event->group = "compaction";
     event->proto_field_id = 100;
-    event->fields.push_back(MakeField("nid", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("idx", 2, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("order", 3, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("nid", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("idx", 2, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("order", 3, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("considered", 4, ProtoFieldType::kProtoUint32));
+        MakeField("considered", 4, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("defer_shift", 5, ProtoFieldType::kProtoUint32));
+        MakeField("defer_shift", 5, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("order_failed", 6, ProtoFieldType::kProtoInt32));
+        MakeField("order_failed", 6, ProtoSchemaType::kInt32));
   }
 
   {
@@ -572,15 +523,15 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mm_compaction_deferred";
     event->group = "compaction";
     event->proto_field_id = 101;
-    event->fields.push_back(MakeField("nid", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("idx", 2, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("order", 3, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("nid", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("idx", 2, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("order", 3, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("considered", 4, ProtoFieldType::kProtoUint32));
+        MakeField("considered", 4, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("defer_shift", 5, ProtoFieldType::kProtoUint32));
+        MakeField("defer_shift", 5, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("order_failed", 6, ProtoFieldType::kProtoInt32));
+        MakeField("order_failed", 6, ProtoSchemaType::kInt32));
   }
 
   {
@@ -589,15 +540,15 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mm_compaction_defer_reset";
     event->group = "compaction";
     event->proto_field_id = 102;
-    event->fields.push_back(MakeField("nid", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("idx", 2, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("order", 3, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("nid", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("idx", 2, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("order", 3, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("considered", 4, ProtoFieldType::kProtoUint32));
+        MakeField("considered", 4, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("defer_shift", 5, ProtoFieldType::kProtoUint32));
+        MakeField("defer_shift", 5, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("order_failed", 6, ProtoFieldType::kProtoInt32));
+        MakeField("order_failed", 6, ProtoSchemaType::kInt32));
   }
 
   {
@@ -607,16 +558,13 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "compaction";
     event->proto_field_id = 103;
     event->fields.push_back(
-        MakeField("zone_start", 1, ProtoFieldType::kProtoUint64));
+        MakeField("zone_start", 1, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("migrate_pfn", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("free_pfn", 3, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("zone_end", 4, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("sync", 5, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("status", 6, ProtoFieldType::kProtoInt32));
+        MakeField("migrate_pfn", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("free_pfn", 3, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("zone_end", 4, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("sync", 5, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("status", 6, ProtoSchemaType::kInt32));
   }
 
   {
@@ -625,10 +573,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mm_compaction_finished";
     event->group = "compaction";
     event->proto_field_id = 104;
-    event->fields.push_back(MakeField("nid", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("idx", 2, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("order", 3, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("ret", 4, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("nid", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("idx", 2, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("order", 3, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("ret", 4, ProtoSchemaType::kInt32));
   }
 
   {
@@ -638,13 +586,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "compaction";
     event->proto_field_id = 105;
     event->fields.push_back(
-        MakeField("start_pfn", 1, ProtoFieldType::kProtoUint64));
+        MakeField("start_pfn", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("end_pfn", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("end_pfn", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("nr_scanned", 3, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("nr_taken", 4, ProtoFieldType::kProtoUint64));
+        MakeField("nr_scanned", 3, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("nr_taken", 4, ProtoSchemaType::kUint64));
   }
 
   {
@@ -654,13 +600,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "compaction";
     event->proto_field_id = 106;
     event->fields.push_back(
-        MakeField("start_pfn", 1, ProtoFieldType::kProtoUint64));
+        MakeField("start_pfn", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("end_pfn", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("end_pfn", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("nr_scanned", 3, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("nr_taken", 4, ProtoFieldType::kProtoUint64));
+        MakeField("nr_scanned", 3, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("nr_taken", 4, ProtoSchemaType::kUint64));
   }
 
   {
@@ -669,7 +613,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mm_compaction_kcompactd_sleep";
     event->group = "compaction";
     event->proto_field_id = 107;
-    event->fields.push_back(MakeField("nid", 1, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("nid", 1, ProtoSchemaType::kInt32));
   }
 
   {
@@ -678,10 +622,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mm_compaction_kcompactd_wake";
     event->group = "compaction";
     event->proto_field_id = 108;
-    event->fields.push_back(MakeField("nid", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("order", 2, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("nid", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("order", 2, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("classzone_idx", 3, ProtoFieldType::kProtoUint32));
+        MakeField("classzone_idx", 3, ProtoSchemaType::kUint32));
   }
 
   {
@@ -691,9 +635,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "compaction";
     event->proto_field_id = 109;
     event->fields.push_back(
-        MakeField("nr_migrated", 1, ProtoFieldType::kProtoUint64));
+        MakeField("nr_migrated", 1, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("nr_failed", 2, ProtoFieldType::kProtoUint64));
+        MakeField("nr_failed", 2, ProtoSchemaType::kUint64));
   }
 
   {
@@ -702,10 +646,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mm_compaction_suitable";
     event->group = "compaction";
     event->proto_field_id = 110;
-    event->fields.push_back(MakeField("nid", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("idx", 2, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("order", 3, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("ret", 4, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("nid", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("idx", 2, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("order", 3, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("ret", 4, ProtoSchemaType::kInt32));
   }
 
   {
@@ -714,10 +658,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mm_compaction_try_to_compact_pages";
     event->group = "compaction";
     event->proto_field_id = 111;
-    event->fields.push_back(MakeField("order", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("gfp_mask", 2, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("mode", 3, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("order", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("gfp_mask", 2, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("mode", 3, ProtoSchemaType::kUint32));
   }
 
   {
@@ -726,10 +669,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mm_compaction_wakeup_kcompactd";
     event->group = "compaction";
     event->proto_field_id = 112;
-    event->fields.push_back(MakeField("nid", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("order", 2, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("nid", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("order", 2, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("classzone_idx", 3, ProtoFieldType::kProtoUint32));
+        MakeField("classzone_idx", 3, ProtoSchemaType::kUint32));
   }
 
   {
@@ -738,12 +681,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_da_write_begin";
     event->group = "ext4";
     event->proto_field_id = 41;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("pos", 3, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(MakeField("len", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("flags", 5, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("pos", 3, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("len", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("flags", 5, ProtoSchemaType::kUint32));
   }
 
   {
@@ -752,12 +694,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_da_write_end";
     event->group = "ext4";
     event->proto_field_id = 42;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("pos", 3, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(MakeField("len", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("copied", 5, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("pos", 3, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("len", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("copied", 5, ProtoSchemaType::kUint32));
   }
 
   {
@@ -766,12 +707,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_sync_file_enter";
     event->group = "ext4";
     event->proto_field_id = 43;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("parent", 3, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("datasync", 4, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("parent", 3, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("datasync", 4, ProtoSchemaType::kInt32));
   }
 
   {
@@ -780,9 +719,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_sync_file_exit";
     event->group = "ext4";
     event->proto_field_id = 44;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ret", 3, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ret", 3, ProtoSchemaType::kInt32));
   }
 
   {
@@ -791,12 +730,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_alloc_da_blocks";
     event->group = "ext4";
     event->proto_field_id = 134;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("data_blocks", 3, ProtoFieldType::kProtoUint32));
+        MakeField("data_blocks", 3, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("meta_blocks", 4, ProtoFieldType::kProtoUint32));
+        MakeField("meta_blocks", 4, ProtoSchemaType::kUint32));
   }
 
   {
@@ -805,24 +744,17 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_allocate_blocks";
     event->group = "ext4";
     event->proto_field_id = 135;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("block", 3, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("len", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("logical", 5, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("lleft", 6, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("lright", 7, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("goal", 8, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("pleft", 9, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("pright", 10, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("flags", 11, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("block", 3, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("len", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("logical", 5, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("lleft", 6, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("lright", 7, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("goal", 8, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("pleft", 9, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("pright", 10, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("flags", 11, ProtoSchemaType::kUint32));
   }
 
   {
@@ -831,10 +763,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_allocate_inode";
     event->group = "ext4";
     event->proto_field_id = 136;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("dir", 3, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("mode", 4, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("dir", 3, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("mode", 4, ProtoSchemaType::kUint32));
   }
 
   {
@@ -843,10 +775,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_begin_ordered_truncate";
     event->group = "ext4";
     event->proto_field_id = 137;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("new_size", 3, ProtoFieldType::kProtoInt64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("new_size", 3, ProtoSchemaType::kInt64));
   }
 
   {
@@ -855,11 +786,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_collapse_range";
     event->group = "ext4";
     event->proto_field_id = 138;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("offset", 3, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(MakeField("len", 4, ProtoFieldType::kProtoInt64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("offset", 3, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("len", 4, ProtoSchemaType::kInt64));
   }
 
   {
@@ -868,19 +798,18 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_da_release_space";
     event->group = "ext4";
     event->proto_field_id = 139;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("i_blocks", 3, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("i_blocks", 3, ProtoFieldType::kProtoUint64));
+        MakeField("freed_blocks", 4, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("freed_blocks", 4, ProtoFieldType::kProtoInt32));
+        MakeField("reserved_data_blocks", 5, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("reserved_data_blocks", 5, ProtoFieldType::kProtoInt32));
+        MakeField("reserved_meta_blocks", 6, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("reserved_meta_blocks", 6, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("allocated_meta_blocks", 7, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("mode", 8, ProtoFieldType::kProtoUint32));
+        MakeField("allocated_meta_blocks", 7, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("mode", 8, ProtoSchemaType::kUint32));
   }
 
   {
@@ -889,17 +818,15 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_da_reserve_space";
     event->group = "ext4";
     event->proto_field_id = 140;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("i_blocks", 3, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("i_blocks", 3, ProtoFieldType::kProtoUint64));
+        MakeField("reserved_data_blocks", 4, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("reserved_data_blocks", 4, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("reserved_meta_blocks", 5, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("mode", 6, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("md_needed", 7, ProtoFieldType::kProtoInt32));
+        MakeField("reserved_meta_blocks", 5, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("mode", 6, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("md_needed", 7, ProtoSchemaType::kInt32));
   }
 
   {
@@ -908,21 +835,20 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_da_update_reserve_space";
     event->group = "ext4";
     event->proto_field_id = 141;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("i_blocks", 3, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("i_blocks", 3, ProtoFieldType::kProtoUint64));
+        MakeField("used_blocks", 4, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("used_blocks", 4, ProtoFieldType::kProtoInt32));
+        MakeField("reserved_data_blocks", 5, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("reserved_data_blocks", 5, ProtoFieldType::kProtoInt32));
+        MakeField("reserved_meta_blocks", 6, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("reserved_meta_blocks", 6, ProtoFieldType::kProtoInt32));
+        MakeField("allocated_meta_blocks", 7, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("allocated_meta_blocks", 7, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("quota_claim", 8, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("mode", 9, ProtoFieldType::kProtoUint32));
+        MakeField("quota_claim", 8, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("mode", 9, ProtoSchemaType::kUint32));
   }
 
   {
@@ -931,24 +857,20 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_da_write_pages";
     event->group = "ext4";
     event->proto_field_id = 142;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("first_page", 3, ProtoFieldType::kProtoUint64));
+        MakeField("first_page", 3, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("nr_to_write", 4, ProtoFieldType::kProtoInt64));
+        MakeField("nr_to_write", 4, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("sync_mode", 5, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("sync_mode", 5, ProtoFieldType::kProtoInt32));
+        MakeField("b_blocknr", 6, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("b_size", 7, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("b_state", 8, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("io_done", 9, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("b_blocknr", 6, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("b_size", 7, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("b_state", 8, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("io_done", 9, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("pages_written", 10, ProtoFieldType::kProtoInt32));
+        MakeField("pages_written", 10, ProtoSchemaType::kInt32));
   }
 
   {
@@ -957,12 +879,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_da_write_pages_extent";
     event->group = "ext4";
     event->proto_field_id = 143;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("lblk", 3, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("len", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("flags", 5, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("lblk", 3, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("len", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("flags", 5, ProtoSchemaType::kUint32));
   }
 
   {
@@ -971,11 +892,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_direct_IO_enter";
     event->group = "ext4";
     event->proto_field_id = 144;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("pos", 3, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(MakeField("len", 4, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("rw", 5, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("pos", 3, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("len", 4, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("rw", 5, ProtoSchemaType::kInt32));
   }
 
   {
@@ -984,12 +905,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_direct_IO_exit";
     event->group = "ext4";
     event->proto_field_id = 145;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("pos", 3, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(MakeField("len", 4, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("rw", 5, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("ret", 6, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("pos", 3, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("len", 4, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("rw", 5, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("ret", 6, ProtoSchemaType::kInt32));
   }
 
   {
@@ -998,10 +919,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_discard_blocks";
     event->group = "ext4";
     event->proto_field_id = 146;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("blk", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("count", 3, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("blk", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("count", 3, ProtoSchemaType::kUint64));
   }
 
   {
@@ -1010,8 +930,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_discard_preallocations";
     event->group = "ext4";
     event->proto_field_id = 147;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
   }
 
   {
@@ -1020,9 +940,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_drop_inode";
     event->group = "ext4";
     event->proto_field_id = 148;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("drop", 3, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("drop", 3, ProtoSchemaType::kInt32));
   }
 
   {
@@ -1031,13 +951,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_es_cache_extent";
     event->group = "ext4";
     event->proto_field_id = 149;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("lblk", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("len", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("pblk", 5, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("status", 6, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("lblk", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("len", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("pblk", 5, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("status", 6, ProtoSchemaType::kUint32));
   }
 
   {
@@ -1046,9 +965,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_es_find_delayed_extent_range_enter";
     event->group = "ext4";
     event->proto_field_id = 150;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("lblk", 3, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("lblk", 3, ProtoSchemaType::kUint32));
   }
 
   {
@@ -1057,13 +976,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_es_find_delayed_extent_range_exit";
     event->group = "ext4";
     event->proto_field_id = 151;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("lblk", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("len", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("pblk", 5, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("status", 6, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("lblk", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("len", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("pblk", 5, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("status", 6, ProtoSchemaType::kUint64));
   }
 
   {
@@ -1072,13 +990,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_es_insert_extent";
     event->group = "ext4";
     event->proto_field_id = 152;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("lblk", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("len", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("pblk", 5, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("status", 6, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("lblk", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("len", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("pblk", 5, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("status", 6, ProtoSchemaType::kUint64));
   }
 
   {
@@ -1087,9 +1004,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_es_lookup_extent_enter";
     event->group = "ext4";
     event->proto_field_id = 153;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("lblk", 3, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("lblk", 3, ProtoSchemaType::kUint32));
   }
 
   {
@@ -1098,14 +1015,13 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_es_lookup_extent_exit";
     event->group = "ext4";
     event->proto_field_id = 154;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("lblk", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("len", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("pblk", 5, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("status", 6, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("found", 7, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("lblk", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("len", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("pblk", 5, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("status", 6, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("found", 7, ProtoSchemaType::kInt32));
   }
 
   {
@@ -1114,10 +1030,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_es_remove_extent";
     event->group = "ext4";
     event->proto_field_id = 155;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("lblk", 3, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(MakeField("len", 4, ProtoFieldType::kProtoInt64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("lblk", 3, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("len", 4, ProtoSchemaType::kInt64));
   }
 
   {
@@ -1126,15 +1042,13 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_es_shrink";
     event->group = "ext4";
     event->proto_field_id = 156;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("nr_shrunk", 2, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("nr_shrunk", 2, ProtoFieldType::kProtoInt32));
+        MakeField("scan_time", 3, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("scan_time", 3, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("nr_skipped", 4, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("retried", 5, ProtoFieldType::kProtoInt32));
+        MakeField("nr_skipped", 4, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("retried", 5, ProtoSchemaType::kInt32));
   }
 
   {
@@ -1143,11 +1057,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_es_shrink_count";
     event->group = "ext4";
     event->proto_field_id = 157;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("nr_to_scan", 2, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("cache_cnt", 3, ProtoFieldType::kProtoInt32));
+        MakeField("nr_to_scan", 2, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("cache_cnt", 3, ProtoSchemaType::kInt32));
   }
 
   {
@@ -1156,11 +1069,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_es_shrink_scan_enter";
     event->group = "ext4";
     event->proto_field_id = 158;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("nr_to_scan", 2, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("cache_cnt", 3, ProtoFieldType::kProtoInt32));
+        MakeField("nr_to_scan", 2, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("cache_cnt", 3, ProtoSchemaType::kInt32));
   }
 
   {
@@ -1169,11 +1081,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_es_shrink_scan_exit";
     event->group = "ext4";
     event->proto_field_id = 159;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("nr_shrunk", 2, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("cache_cnt", 3, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("nr_shrunk", 2, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("cache_cnt", 3, ProtoSchemaType::kInt32));
   }
 
   {
@@ -1182,9 +1092,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_evict_inode";
     event->group = "ext4";
     event->proto_field_id = 160;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("nlink", 3, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("nlink", 3, ProtoSchemaType::kInt32));
   }
 
   {
@@ -1193,18 +1103,13 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_ext_convert_to_initialized_enter";
     event->group = "ext4";
     event->proto_field_id = 161;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("m_lblk", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("m_len", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("u_lblk", 5, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("u_len", 6, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("u_pblk", 7, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("m_lblk", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("m_len", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("u_lblk", 5, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("u_len", 6, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("u_pblk", 7, ProtoSchemaType::kUint64));
   }
 
   {
@@ -1213,24 +1118,16 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_ext_convert_to_initialized_fastpath";
     event->group = "ext4";
     event->proto_field_id = 162;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("m_lblk", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("m_len", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("u_lblk", 5, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("u_len", 6, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("u_pblk", 7, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("i_lblk", 8, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("i_len", 9, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("i_pblk", 10, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("m_lblk", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("m_len", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("u_lblk", 5, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("u_len", 6, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("u_pblk", 7, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("i_lblk", 8, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("i_len", 9, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("i_pblk", 10, ProtoSchemaType::kUint64));
   }
 
   {
@@ -1239,16 +1136,15 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_ext_handle_unwritten_extents";
     event->group = "ext4";
     event->proto_field_id = 163;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("flags", 3, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("lblk", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("pblk", 5, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("len", 6, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("flags", 3, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("lblk", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("pblk", 5, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("len", 6, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("allocated", 7, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("newblk", 8, ProtoFieldType::kProtoUint64));
+        MakeField("allocated", 7, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("newblk", 8, ProtoSchemaType::kUint64));
   }
 
   {
@@ -1257,10 +1153,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_ext_in_cache";
     event->group = "ext4";
     event->proto_field_id = 164;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("lblk", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("ret", 4, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("lblk", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("ret", 4, ProtoSchemaType::kInt32));
   }
 
   {
@@ -1269,10 +1165,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_ext_load_extent";
     event->group = "ext4";
     event->proto_field_id = 165;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("pblk", 3, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("lblk", 4, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("pblk", 3, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("lblk", 4, ProtoSchemaType::kUint32));
   }
 
   {
@@ -1281,12 +1177,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_ext_map_blocks_enter";
     event->group = "ext4";
     event->proto_field_id = 166;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("lblk", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("len", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("flags", 5, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("lblk", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("len", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("flags", 5, ProtoSchemaType::kUint32));
   }
 
   {
@@ -1295,16 +1190,14 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_ext_map_blocks_exit";
     event->group = "ext4";
     event->proto_field_id = 167;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("flags", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("pblk", 4, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("lblk", 5, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("len", 6, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("mflags", 7, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("ret", 8, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("flags", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("pblk", 4, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("lblk", 5, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("len", 6, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("mflags", 7, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("ret", 8, ProtoSchemaType::kInt32));
   }
 
   {
@@ -1313,12 +1206,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_ext_put_in_cache";
     event->group = "ext4";
     event->proto_field_id = 168;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("lblk", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("len", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("start", 5, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("lblk", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("len", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("start", 5, ProtoSchemaType::kUint64));
   }
 
   {
@@ -1327,12 +1219,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_ext_remove_space";
     event->group = "ext4";
     event->proto_field_id = 169;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("start", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("end", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("depth", 5, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("start", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("end", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("depth", 5, ProtoSchemaType::kInt32));
   }
 
   {
@@ -1341,16 +1232,14 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_ext_remove_space_done";
     event->group = "ext4";
     event->proto_field_id = 170;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("start", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("end", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("depth", 5, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("partial", 6, ProtoSchemaType::kInt64));
     event->fields.push_back(
-        MakeField("start", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("end", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("depth", 5, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("partial", 6, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(
-        MakeField("eh_entries", 7, ProtoFieldType::kProtoUint32));
+        MakeField("eh_entries", 7, ProtoSchemaType::kUint32));
   }
 
   {
@@ -1359,9 +1248,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_ext_rm_idx";
     event->group = "ext4";
     event->proto_field_id = 171;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("pblk", 3, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("pblk", 3, ProtoSchemaType::kUint64));
   }
 
   {
@@ -1370,18 +1259,13 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_ext_rm_leaf";
     event->group = "ext4";
     event->proto_field_id = 172;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("partial", 3, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(
-        MakeField("start", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("ee_lblk", 5, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("ee_pblk", 6, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("ee_len", 7, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("partial", 3, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("start", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("ee_lblk", 5, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("ee_pblk", 6, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ee_len", 7, ProtoSchemaType::kInt32));
   }
 
   {
@@ -1390,11 +1274,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_ext_show_extent";
     event->group = "ext4";
     event->proto_field_id = 173;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("pblk", 3, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("lblk", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("len", 5, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("pblk", 3, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("lblk", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("len", 5, ProtoSchemaType::kUint32));
   }
 
   {
@@ -1403,13 +1287,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_fallocate_enter";
     event->group = "ext4";
     event->proto_field_id = 174;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("offset", 3, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(MakeField("len", 4, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(MakeField("mode", 5, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("pos", 6, ProtoFieldType::kProtoInt64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("offset", 3, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("len", 4, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("mode", 5, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("pos", 6, ProtoSchemaType::kInt64));
   }
 
   {
@@ -1418,12 +1301,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_fallocate_exit";
     event->group = "ext4";
     event->proto_field_id = 175;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("pos", 3, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(
-        MakeField("blocks", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("ret", 5, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("pos", 3, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("blocks", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("ret", 5, ProtoSchemaType::kInt32));
   }
 
   {
@@ -1432,15 +1314,14 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_find_delalloc_range";
     event->group = "ext4";
     event->proto_field_id = 176;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("from", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("to", 4, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("from", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("to", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("reverse", 5, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("found", 6, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("reverse", 5, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("found", 6, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("found_blk", 7, ProtoFieldType::kProtoUint32));
+        MakeField("found_blk", 7, ProtoSchemaType::kUint32));
   }
 
   {
@@ -1449,13 +1330,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_forget";
     event->group = "ext4";
     event->proto_field_id = 177;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("block", 3, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("block", 3, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("is_metadata", 4, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("mode", 5, ProtoFieldType::kProtoUint32));
+        MakeField("is_metadata", 4, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("mode", 5, ProtoSchemaType::kUint32));
   }
 
   {
@@ -1464,14 +1344,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_free_blocks";
     event->group = "ext4";
     event->proto_field_id = 178;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("block", 3, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("count", 4, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("flags", 5, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("mode", 6, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("block", 3, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("count", 4, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("flags", 5, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("mode", 6, ProtoSchemaType::kUint32));
   }
 
   {
@@ -1480,13 +1358,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_free_inode";
     event->group = "ext4";
     event->proto_field_id = 179;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("uid", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("gid", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("blocks", 5, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("mode", 6, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("uid", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("gid", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("blocks", 5, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("mode", 6, ProtoSchemaType::kUint32));
   }
 
   {
@@ -1495,13 +1372,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_get_implied_cluster_alloc_exit";
     event->group = "ext4";
     event->proto_field_id = 180;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("flags", 2, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("lblk", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("pblk", 4, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("len", 5, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("ret", 6, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("flags", 2, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("lblk", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("pblk", 4, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("len", 5, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("ret", 6, ProtoSchemaType::kInt32));
   }
 
   {
@@ -1510,10 +1386,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_get_reserved_cluster_alloc";
     event->group = "ext4";
     event->proto_field_id = 181;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("lblk", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("len", 4, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("lblk", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("len", 4, ProtoSchemaType::kUint32));
   }
 
   {
@@ -1522,12 +1398,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_ind_map_blocks_enter";
     event->group = "ext4";
     event->proto_field_id = 182;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("lblk", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("len", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("flags", 5, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("lblk", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("len", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("flags", 5, ProtoSchemaType::kUint32));
   }
 
   {
@@ -1536,16 +1411,14 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_ind_map_blocks_exit";
     event->group = "ext4";
     event->proto_field_id = 183;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("flags", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("pblk", 4, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("lblk", 5, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("len", 6, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("mflags", 7, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("ret", 8, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("flags", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("pblk", 4, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("lblk", 5, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("len", 6, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("mflags", 7, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("ret", 8, ProtoSchemaType::kInt32));
   }
 
   {
@@ -1554,11 +1427,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_insert_range";
     event->group = "ext4";
     event->proto_field_id = 184;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("offset", 3, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(MakeField("len", 4, ProtoFieldType::kProtoInt64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("offset", 3, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("len", 4, ProtoSchemaType::kInt64));
   }
 
   {
@@ -1567,14 +1439,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_invalidatepage";
     event->group = "ext4";
     event->proto_field_id = 185;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("index", 3, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("offset", 4, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("length", 5, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("index", 3, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("offset", 4, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("length", 5, ProtoSchemaType::kUint32));
   }
 
   {
@@ -1583,14 +1452,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_journal_start";
     event->group = "ext4";
     event->proto_field_id = 186;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ip", 2, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ip", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("blocks", 3, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("blocks", 3, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("rsv_blocks", 4, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("nblocks", 5, ProtoFieldType::kProtoInt32));
+        MakeField("rsv_blocks", 4, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("nblocks", 5, ProtoSchemaType::kInt32));
   }
 
   {
@@ -1599,10 +1466,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_journal_start_reserved";
     event->group = "ext4";
     event->proto_field_id = 187;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ip", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("blocks", 3, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ip", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("blocks", 3, ProtoSchemaType::kInt32));
   }
 
   {
@@ -1611,14 +1477,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_journalled_invalidatepage";
     event->group = "ext4";
     event->proto_field_id = 188;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("index", 3, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("offset", 4, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("length", 5, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("index", 3, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("offset", 4, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("length", 5, ProtoSchemaType::kUint32));
   }
 
   {
@@ -1627,12 +1490,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_journalled_write_end";
     event->group = "ext4";
     event->proto_field_id = 189;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("pos", 3, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(MakeField("len", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("copied", 5, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("pos", 3, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("len", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("copied", 5, ProtoSchemaType::kUint32));
   }
 
   {
@@ -1641,8 +1503,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_load_inode";
     event->group = "ext4";
     event->proto_field_id = 190;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
   }
 
   {
@@ -1651,9 +1513,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_load_inode_bitmap";
     event->group = "ext4";
     event->proto_field_id = 191;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("group", 2, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("group", 2, ProtoSchemaType::kUint32));
   }
 
   {
@@ -1662,9 +1523,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_mark_inode_dirty";
     event->group = "ext4";
     event->proto_field_id = 192;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ip", 3, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ip", 3, ProtoSchemaType::kUint64));
   }
 
   {
@@ -1673,9 +1534,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_mb_bitmap_load";
     event->group = "ext4";
     event->proto_field_id = 193;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("group", 2, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("group", 2, ProtoSchemaType::kUint32));
   }
 
   {
@@ -1684,9 +1544,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_mb_buddy_bitmap_load";
     event->group = "ext4";
     event->proto_field_id = 194;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("group", 2, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("group", 2, ProtoSchemaType::kUint32));
   }
 
   {
@@ -1695,9 +1554,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_mb_discard_preallocations";
     event->group = "ext4";
     event->proto_field_id = 195;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("needed", 2, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("needed", 2, ProtoSchemaType::kInt32));
   }
 
   {
@@ -1706,14 +1564,13 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_mb_new_group_pa";
     event->group = "ext4";
     event->proto_field_id = 196;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("pa_pstart", 3, ProtoFieldType::kProtoUint64));
+        MakeField("pa_pstart", 3, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("pa_lstart", 4, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("pa_len", 5, ProtoFieldType::kProtoUint32));
+        MakeField("pa_lstart", 4, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("pa_len", 5, ProtoSchemaType::kUint32));
   }
 
   {
@@ -1722,14 +1579,13 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_mb_new_inode_pa";
     event->group = "ext4";
     event->proto_field_id = 197;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("pa_pstart", 3, ProtoFieldType::kProtoUint64));
+        MakeField("pa_pstart", 3, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("pa_lstart", 4, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("pa_len", 5, ProtoFieldType::kProtoUint32));
+        MakeField("pa_lstart", 4, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("pa_len", 5, ProtoSchemaType::kUint32));
   }
 
   {
@@ -1738,11 +1594,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_mb_release_group_pa";
     event->group = "ext4";
     event->proto_field_id = 198;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("pa_pstart", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("pa_len", 3, ProtoFieldType::kProtoUint32));
+        MakeField("pa_pstart", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("pa_len", 3, ProtoSchemaType::kUint32));
   }
 
   {
@@ -1751,12 +1606,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_mb_release_inode_pa";
     event->group = "ext4";
     event->proto_field_id = 199;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("block", 3, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("count", 4, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("block", 3, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("count", 4, ProtoSchemaType::kUint32));
   }
 
   {
@@ -1765,43 +1618,36 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_mballoc_alloc";
     event->group = "ext4";
     event->proto_field_id = 200;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("orig_logical", 3, ProtoFieldType::kProtoUint32));
+        MakeField("orig_logical", 3, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("orig_start", 4, ProtoFieldType::kProtoInt32));
+        MakeField("orig_start", 4, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("orig_group", 5, ProtoFieldType::kProtoUint32));
+        MakeField("orig_group", 5, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("orig_len", 6, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("orig_len", 6, ProtoFieldType::kProtoInt32));
+        MakeField("goal_logical", 7, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("goal_logical", 7, ProtoFieldType::kProtoUint32));
+        MakeField("goal_start", 8, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("goal_start", 8, ProtoFieldType::kProtoInt32));
+        MakeField("goal_group", 9, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("goal_len", 10, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("goal_group", 9, ProtoFieldType::kProtoUint32));
+        MakeField("result_logical", 11, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("goal_len", 10, ProtoFieldType::kProtoInt32));
+        MakeField("result_start", 12, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("result_logical", 11, ProtoFieldType::kProtoUint32));
+        MakeField("result_group", 13, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("result_start", 12, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("result_group", 13, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("result_len", 14, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("found", 15, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("groups", 16, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("buddy", 17, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("flags", 18, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("tail", 19, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("cr", 20, ProtoFieldType::kProtoUint32));
+        MakeField("result_len", 14, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("found", 15, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("groups", 16, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("buddy", 17, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("flags", 18, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("tail", 19, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("cr", 20, ProtoSchemaType::kUint32));
   }
 
   {
@@ -1810,14 +1656,14 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_mballoc_discard";
     event->group = "ext4";
     event->proto_field_id = 201;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("result_start", 3, ProtoFieldType::kProtoInt32));
+        MakeField("result_start", 3, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("result_group", 4, ProtoFieldType::kProtoUint32));
+        MakeField("result_group", 4, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("result_len", 5, ProtoFieldType::kProtoInt32));
+        MakeField("result_len", 5, ProtoSchemaType::kInt32));
   }
 
   {
@@ -1826,14 +1672,14 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_mballoc_free";
     event->group = "ext4";
     event->proto_field_id = 202;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("result_start", 3, ProtoFieldType::kProtoInt32));
+        MakeField("result_start", 3, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("result_group", 4, ProtoFieldType::kProtoUint32));
+        MakeField("result_group", 4, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("result_len", 5, ProtoFieldType::kProtoInt32));
+        MakeField("result_len", 5, ProtoSchemaType::kInt32));
   }
 
   {
@@ -1842,24 +1688,23 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_mballoc_prealloc";
     event->group = "ext4";
     event->proto_field_id = 203;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("orig_logical", 3, ProtoFieldType::kProtoUint32));
+        MakeField("orig_logical", 3, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("orig_start", 4, ProtoFieldType::kProtoInt32));
+        MakeField("orig_start", 4, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("orig_group", 5, ProtoFieldType::kProtoUint32));
+        MakeField("orig_group", 5, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("orig_len", 6, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("orig_len", 6, ProtoFieldType::kProtoInt32));
+        MakeField("result_logical", 7, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("result_logical", 7, ProtoFieldType::kProtoUint32));
+        MakeField("result_start", 8, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("result_start", 8, ProtoFieldType::kProtoInt32));
+        MakeField("result_group", 9, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("result_group", 9, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("result_len", 10, ProtoFieldType::kProtoInt32));
+        MakeField("result_len", 10, ProtoSchemaType::kInt32));
   }
 
   {
@@ -1868,13 +1713,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_other_inode_update_time";
     event->group = "ext4";
     event->proto_field_id = 204;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("orig_ino", 3, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("uid", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("gid", 5, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("mode", 6, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("orig_ino", 3, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("uid", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("gid", 5, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("mode", 6, ProtoSchemaType::kUint32));
   }
 
   {
@@ -1883,12 +1727,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_punch_hole";
     event->group = "ext4";
     event->proto_field_id = 205;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("offset", 3, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(MakeField("len", 4, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(MakeField("mode", 5, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("offset", 3, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("len", 4, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("mode", 5, ProtoSchemaType::kInt32));
   }
 
   {
@@ -1897,9 +1740,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_read_block_bitmap_load";
     event->group = "ext4";
     event->proto_field_id = 206;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("group", 2, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("group", 2, ProtoSchemaType::kUint32));
   }
 
   {
@@ -1908,10 +1750,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_readpage";
     event->group = "ext4";
     event->proto_field_id = 207;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("index", 3, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("index", 3, ProtoSchemaType::kUint64));
   }
 
   {
@@ -1920,10 +1761,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_releasepage";
     event->group = "ext4";
     event->proto_field_id = 208;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("index", 3, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("index", 3, ProtoSchemaType::kUint64));
   }
 
   {
@@ -1932,18 +1772,14 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_remove_blocks";
     event->group = "ext4";
     event->proto_field_id = 209;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("from", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("to", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("partial", 5, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(
-        MakeField("ee_pblk", 6, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("ee_lblk", 7, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("ee_len", 8, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("from", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("to", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("partial", 5, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("ee_pblk", 6, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ee_lblk", 7, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("ee_len", 8, ProtoSchemaType::kUint32));
   }
 
   {
@@ -1952,22 +1788,16 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_request_blocks";
     event->group = "ext4";
     event->proto_field_id = 210;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("len", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("logical", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("lleft", 5, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("lright", 6, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("goal", 7, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("pleft", 8, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("pright", 9, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("flags", 10, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("len", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("logical", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("lleft", 5, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("lright", 6, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("goal", 7, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("pleft", 8, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("pright", 9, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("flags", 10, ProtoSchemaType::kUint32));
   }
 
   {
@@ -1976,9 +1806,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_request_inode";
     event->group = "ext4";
     event->proto_field_id = 211;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("dir", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("mode", 3, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("dir", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("mode", 3, ProtoSchemaType::kUint32));
   }
 
   {
@@ -1987,8 +1817,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_sync_fs";
     event->group = "ext4";
     event->proto_field_id = 212;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("wait", 2, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("wait", 2, ProtoSchemaType::kInt32));
   }
 
   {
@@ -1997,14 +1827,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_trim_all_free";
     event->group = "ext4";
     event->proto_field_id = 213;
-    event->fields.push_back(
-        MakeField("dev_major", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("dev_minor", 2, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("group", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("start", 4, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("len", 5, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev_major", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("dev_minor", 2, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("group", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("start", 4, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("len", 5, ProtoSchemaType::kInt32));
   }
 
   {
@@ -2013,14 +1840,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_trim_extent";
     event->group = "ext4";
     event->proto_field_id = 214;
-    event->fields.push_back(
-        MakeField("dev_major", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("dev_minor", 2, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("group", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("start", 4, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("len", 5, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev_major", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("dev_minor", 2, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("group", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("start", 4, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("len", 5, ProtoSchemaType::kInt32));
   }
 
   {
@@ -2029,10 +1853,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_truncate_enter";
     event->group = "ext4";
     event->proto_field_id = 215;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("blocks", 3, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("blocks", 3, ProtoSchemaType::kUint64));
   }
 
   {
@@ -2041,10 +1864,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_truncate_exit";
     event->group = "ext4";
     event->proto_field_id = 216;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("blocks", 3, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("blocks", 3, ProtoSchemaType::kUint64));
   }
 
   {
@@ -2053,11 +1875,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_unlink_enter";
     event->group = "ext4";
     event->proto_field_id = 217;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("parent", 3, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("size", 4, ProtoFieldType::kProtoInt64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("parent", 3, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("size", 4, ProtoSchemaType::kInt64));
   }
 
   {
@@ -2066,9 +1887,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_unlink_exit";
     event->group = "ext4";
     event->proto_field_id = 218;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ret", 3, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ret", 3, ProtoSchemaType::kInt32));
   }
 
   {
@@ -2077,12 +1898,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_write_begin";
     event->group = "ext4";
     event->proto_field_id = 219;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("pos", 3, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(MakeField("len", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("flags", 5, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("pos", 3, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("len", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("flags", 5, ProtoSchemaType::kUint32));
   }
 
   {
@@ -2091,12 +1911,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_write_end";
     event->group = "ext4";
     event->proto_field_id = 230;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("pos", 3, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(MakeField("len", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("copied", 5, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("pos", 3, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("len", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("copied", 5, ProtoSchemaType::kUint32));
   }
 
   {
@@ -2105,10 +1924,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_writepage";
     event->group = "ext4";
     event->proto_field_id = 231;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("index", 3, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("index", 3, ProtoSchemaType::kUint64));
   }
 
   {
@@ -2117,24 +1935,22 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_writepages";
     event->group = "ext4";
     event->proto_field_id = 232;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("nr_to_write", 3, ProtoFieldType::kProtoInt64));
+        MakeField("nr_to_write", 3, ProtoSchemaType::kInt64));
     event->fields.push_back(
-        MakeField("pages_skipped", 4, ProtoFieldType::kProtoInt64));
+        MakeField("pages_skipped", 4, ProtoSchemaType::kInt64));
     event->fields.push_back(
-        MakeField("range_start", 5, ProtoFieldType::kProtoInt64));
+        MakeField("range_start", 5, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("range_end", 6, ProtoSchemaType::kInt64));
     event->fields.push_back(
-        MakeField("range_end", 6, ProtoFieldType::kProtoInt64));
+        MakeField("writeback_index", 7, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("sync_mode", 8, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("writeback_index", 7, ProtoFieldType::kProtoUint64));
+        MakeField("for_kupdate", 9, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("sync_mode", 8, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("for_kupdate", 9, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("range_cyclic", 10, ProtoFieldType::kProtoUint32));
+        MakeField("range_cyclic", 10, ProtoSchemaType::kUint32));
   }
 
   {
@@ -2143,17 +1959,16 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_writepages_result";
     event->group = "ext4";
     event->proto_field_id = 233;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ret", 3, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ret", 3, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("pages_written", 4, ProtoFieldType::kProtoInt32));
+        MakeField("pages_written", 4, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("pages_skipped", 5, ProtoFieldType::kProtoInt64));
+        MakeField("pages_skipped", 5, ProtoSchemaType::kInt64));
     event->fields.push_back(
-        MakeField("writeback_index", 6, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("sync_mode", 7, ProtoFieldType::kProtoInt32));
+        MakeField("writeback_index", 6, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("sync_mode", 7, ProtoSchemaType::kInt32));
   }
 
   {
@@ -2162,12 +1977,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ext4_zero_range";
     event->group = "ext4";
     event->proto_field_id = 234;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("offset", 3, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(MakeField("len", 4, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(MakeField("mode", 5, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("offset", 3, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("len", 4, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("mode", 5, ProtoSchemaType::kInt32));
   }
 
   {
@@ -2176,12 +1990,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "f2fs_do_submit_bio";
     event->group = "f2fs";
     event->proto_field_id = 243;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("btype", 2, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("sync", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("sector", 4, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("size", 5, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("btype", 2, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("sync", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("sector", 4, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("size", 5, ProtoSchemaType::kUint32));
   }
 
   {
@@ -2190,17 +2003,14 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "f2fs_evict_inode";
     event->group = "f2fs";
     event->proto_field_id = 244;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("pino", 3, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("mode", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("size", 5, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(
-        MakeField("nlink", 6, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("blocks", 7, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("advise", 8, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("pino", 3, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("mode", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("size", 5, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("nlink", 6, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("blocks", 7, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("advise", 8, ProtoSchemaType::kUint32));
   }
 
   {
@@ -2209,16 +2019,14 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "f2fs_fallocate";
     event->group = "f2fs";
     event->proto_field_id = 245;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("mode", 3, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("offset", 4, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(MakeField("len", 5, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(MakeField("size", 6, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(
-        MakeField("blocks", 7, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ret", 8, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("mode", 3, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("offset", 4, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("len", 5, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("size", 6, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("blocks", 7, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ret", 8, ProtoSchemaType::kInt32));
   }
 
   {
@@ -2227,15 +2035,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "f2fs_get_data_block";
     event->group = "f2fs";
     event->proto_field_id = 246;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("iblock", 3, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("bh_start", 4, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("bh_size", 5, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ret", 6, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("iblock", 3, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("bh_start", 4, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("bh_size", 5, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ret", 6, ProtoSchemaType::kInt32));
   }
 
   {
@@ -2244,24 +2049,18 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "f2fs_get_victim";
     event->group = "f2fs";
     event->proto_field_id = 247;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("type", 2, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("type", 2, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("gc_type", 3, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("gc_type", 3, ProtoFieldType::kProtoInt32));
+        MakeField("alloc_mode", 4, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("gc_mode", 5, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("victim", 6, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("ofs_unit", 7, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("alloc_mode", 4, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("gc_mode", 5, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("victim", 6, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("ofs_unit", 7, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("pre_victim", 8, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("prefree", 9, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("free", 10, ProtoFieldType::kProtoUint32));
+        MakeField("pre_victim", 8, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("prefree", 9, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("free", 10, ProtoSchemaType::kUint32));
   }
 
   {
@@ -2270,17 +2069,14 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "f2fs_iget";
     event->group = "f2fs";
     event->proto_field_id = 248;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("pino", 3, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("mode", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("size", 5, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(
-        MakeField("nlink", 6, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("blocks", 7, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("advise", 8, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("pino", 3, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("mode", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("size", 5, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("nlink", 6, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("blocks", 7, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("advise", 8, ProtoSchemaType::kUint32));
   }
 
   {
@@ -2289,9 +2085,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "f2fs_iget_exit";
     event->group = "f2fs";
     event->proto_field_id = 249;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ret", 3, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ret", 3, ProtoSchemaType::kInt32));
   }
 
   {
@@ -2300,9 +2096,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "f2fs_new_inode";
     event->group = "f2fs";
     event->proto_field_id = 250;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ret", 3, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ret", 3, ProtoSchemaType::kInt32));
   }
 
   {
@@ -2311,13 +2107,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "f2fs_readpage";
     event->group = "f2fs";
     event->proto_field_id = 251;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("index", 3, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("blkaddr", 4, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("type", 5, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("index", 3, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("blkaddr", 4, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("type", 5, ProtoSchemaType::kInt32));
   }
 
   {
@@ -2326,10 +2120,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "f2fs_reserve_new_block";
     event->group = "f2fs";
     event->proto_field_id = 252;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("nid", 2, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("nid", 2, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("ofs_in_node", 3, ProtoFieldType::kProtoUint32));
+        MakeField("ofs_in_node", 3, ProtoSchemaType::kUint32));
   }
 
   {
@@ -2338,13 +2132,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "f2fs_set_page_dirty";
     event->group = "f2fs";
     event->proto_field_id = 253;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("type", 3, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("dir", 4, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("index", 5, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("dirty", 6, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("type", 3, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("dir", 4, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("index", 5, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("dirty", 6, ProtoSchemaType::kInt32));
   }
 
   {
@@ -2353,13 +2146,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "f2fs_submit_write_page";
     event->group = "f2fs";
     event->proto_field_id = 254;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("type", 3, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("index", 4, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("block", 5, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("type", 3, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("index", 4, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("block", 5, ProtoSchemaType::kUint32));
   }
 
   {
@@ -2368,17 +2159,14 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "f2fs_sync_file_enter";
     event->group = "f2fs";
     event->proto_field_id = 255;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("pino", 3, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("mode", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("size", 5, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(
-        MakeField("nlink", 6, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("blocks", 7, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("advise", 8, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("pino", 3, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("mode", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("size", 5, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("nlink", 6, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("blocks", 7, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("advise", 8, ProtoSchemaType::kUint32));
   }
 
   {
@@ -2387,13 +2175,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "f2fs_sync_file_exit";
     event->group = "f2fs";
     event->proto_field_id = 256;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("need_cp", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("datasync", 4, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("ret", 5, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("need_cp", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("datasync", 4, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("ret", 5, ProtoSchemaType::kInt32));
   }
 
   {
@@ -2402,9 +2188,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "f2fs_sync_fs";
     event->group = "f2fs";
     event->proto_field_id = 257;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("dirty", 2, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("wait", 3, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("dirty", 2, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("wait", 3, ProtoSchemaType::kInt32));
   }
 
   {
@@ -2413,17 +2199,14 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "f2fs_truncate";
     event->group = "f2fs";
     event->proto_field_id = 258;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("pino", 3, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("mode", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("size", 5, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(
-        MakeField("nlink", 6, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("blocks", 7, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("advise", 8, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("pino", 3, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("mode", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("size", 5, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("nlink", 6, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("blocks", 7, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("advise", 8, ProtoSchemaType::kUint32));
   }
 
   {
@@ -2432,12 +2215,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "f2fs_truncate_blocks_enter";
     event->group = "f2fs";
     event->proto_field_id = 259;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("size", 3, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(
-        MakeField("blocks", 4, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("from", 5, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("size", 3, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("blocks", 4, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("from", 5, ProtoSchemaType::kUint64));
   }
 
   {
@@ -2446,9 +2228,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "f2fs_truncate_blocks_exit";
     event->group = "f2fs";
     event->proto_field_id = 260;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ret", 3, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ret", 3, ProtoSchemaType::kInt32));
   }
 
   {
@@ -2457,11 +2239,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "f2fs_truncate_data_blocks_range";
     event->group = "f2fs";
     event->proto_field_id = 261;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("nid", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("ofs", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("free", 5, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("nid", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("ofs", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("free", 5, ProtoSchemaType::kInt32));
   }
 
   {
@@ -2470,12 +2252,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "f2fs_truncate_inode_blocks_enter";
     event->group = "f2fs";
     event->proto_field_id = 262;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("size", 3, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(
-        MakeField("blocks", 4, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("from", 5, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("size", 3, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("blocks", 4, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("from", 5, ProtoSchemaType::kUint64));
   }
 
   {
@@ -2484,9 +2265,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "f2fs_truncate_inode_blocks_exit";
     event->group = "f2fs";
     event->proto_field_id = 263;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ret", 3, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ret", 3, ProtoSchemaType::kInt32));
   }
 
   {
@@ -2495,11 +2276,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "f2fs_truncate_node";
     event->group = "f2fs";
     event->proto_field_id = 264;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("nid", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("blk_addr", 4, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("nid", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("blk_addr", 4, ProtoSchemaType::kUint32));
   }
 
   {
@@ -2508,11 +2288,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "f2fs_truncate_nodes_enter";
     event->group = "f2fs";
     event->proto_field_id = 265;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("nid", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("blk_addr", 4, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("nid", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("blk_addr", 4, ProtoSchemaType::kUint32));
   }
 
   {
@@ -2521,9 +2300,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "f2fs_truncate_nodes_exit";
     event->group = "f2fs";
     event->proto_field_id = 266;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ret", 3, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ret", 3, ProtoSchemaType::kInt32));
   }
 
   {
@@ -2532,11 +2311,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "f2fs_truncate_partial_nodes";
     event->group = "f2fs";
     event->proto_field_id = 267;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("nid", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("depth", 4, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("err", 5, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("nid", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("depth", 4, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("err", 5, ProtoSchemaType::kInt32));
   }
 
   {
@@ -2545,12 +2324,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "f2fs_unlink_enter";
     event->group = "f2fs";
     event->proto_field_id = 268;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("size", 3, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(
-        MakeField("blocks", 4, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("name", 5, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("size", 3, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("blocks", 4, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("name", 5, ProtoSchemaType::kString));
   }
 
   {
@@ -2559,9 +2337,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "f2fs_unlink_exit";
     event->group = "f2fs";
     event->proto_field_id = 269;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ret", 3, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ret", 3, ProtoSchemaType::kInt32));
   }
 
   {
@@ -2570,13 +2348,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "f2fs_vm_page_mkwrite";
     event->group = "f2fs";
     event->proto_field_id = 270;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("type", 3, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("dir", 4, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("index", 5, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("dirty", 6, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("type", 3, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("dir", 4, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("index", 5, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("dirty", 6, ProtoSchemaType::kInt32));
   }
 
   {
@@ -2585,12 +2362,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "f2fs_write_begin";
     event->group = "f2fs";
     event->proto_field_id = 271;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("pos", 3, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(MakeField("len", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("flags", 5, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("pos", 3, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("len", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("flags", 5, ProtoSchemaType::kUint32));
   }
 
   {
@@ -2599,10 +2375,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "f2fs_write_checkpoint";
     event->group = "f2fs";
     event->proto_field_id = 272;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("is_umount", 2, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("msg", 3, ProtoFieldType::kProtoString));
+        MakeField("is_umount", 2, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("msg", 3, ProtoSchemaType::kString));
   }
 
   {
@@ -2611,12 +2387,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "f2fs_write_end";
     event->group = "f2fs";
     event->proto_field_id = 273;
-    event->fields.push_back(MakeField("dev", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("pos", 3, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(MakeField("len", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("copied", 5, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("dev", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("pos", 3, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("len", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("copied", 5, ProtoSchemaType::kUint32));
   }
 
   {
@@ -2625,14 +2400,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "fence_init";
     event->group = "fence";
     event->proto_field_id = 316;
-    event->fields.push_back(
-        MakeField("context", 1, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("driver", 2, ProtoFieldType::kProtoString));
-    event->fields.push_back(
-        MakeField("seqno", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("timeline", 4, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("context", 1, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("driver", 2, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("seqno", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("timeline", 4, ProtoSchemaType::kString));
   }
 
   {
@@ -2641,14 +2412,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "fence_destroy";
     event->group = "fence";
     event->proto_field_id = 317;
-    event->fields.push_back(
-        MakeField("context", 1, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("driver", 2, ProtoFieldType::kProtoString));
-    event->fields.push_back(
-        MakeField("seqno", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("timeline", 4, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("context", 1, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("driver", 2, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("seqno", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("timeline", 4, ProtoSchemaType::kString));
   }
 
   {
@@ -2657,14 +2424,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "fence_enable_signal";
     event->group = "fence";
     event->proto_field_id = 318;
-    event->fields.push_back(
-        MakeField("context", 1, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("driver", 2, ProtoFieldType::kProtoString));
-    event->fields.push_back(
-        MakeField("seqno", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("timeline", 4, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("context", 1, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("driver", 2, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("seqno", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("timeline", 4, ProtoSchemaType::kString));
   }
 
   {
@@ -2673,14 +2436,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "fence_signaled";
     event->group = "fence";
     event->proto_field_id = 319;
-    event->fields.push_back(
-        MakeField("context", 1, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("driver", 2, ProtoFieldType::kProtoString));
-    event->fields.push_back(
-        MakeField("seqno", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("timeline", 4, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("context", 1, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("driver", 2, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("seqno", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("timeline", 4, ProtoSchemaType::kString));
   }
 
   {
@@ -2689,14 +2448,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mm_filemap_add_to_page_cache";
     event->group = "filemap";
     event->proto_field_id = 97;
-    event->fields.push_back(MakeField("pfn", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("i_ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("index", 3, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("s_dev", 4, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("page", 5, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("pfn", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("i_ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("index", 3, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("s_dev", 4, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("page", 5, ProtoSchemaType::kUint64));
   }
 
   {
@@ -2705,14 +2461,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mm_filemap_delete_from_page_cache";
     event->group = "filemap";
     event->proto_field_id = 98;
-    event->fields.push_back(MakeField("pfn", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("i_ino", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("index", 3, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("s_dev", 4, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("page", 5, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("pfn", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("i_ino", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("index", 3, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("s_dev", 4, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("page", 5, ProtoSchemaType::kUint64));
   }
 
   {
@@ -2721,8 +2474,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "print";
     event->group = "ftrace";
     event->proto_field_id = 3;
-    event->fields.push_back(MakeField("ip", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("buf", 2, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("ip", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("buf", 2, ProtoSchemaType::kString));
   }
 
   {
@@ -2732,13 +2485,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "i2c";
     event->proto_field_id = 27;
     event->fields.push_back(
-        MakeField("adapter_nr", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("msg_nr", 2, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("addr", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("flags", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("len", 5, ProtoFieldType::kProtoUint32));
+        MakeField("adapter_nr", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("msg_nr", 2, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("addr", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("flags", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("len", 5, ProtoSchemaType::kUint32));
   }
 
   {
@@ -2748,14 +2499,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "i2c";
     event->proto_field_id = 28;
     event->fields.push_back(
-        MakeField("adapter_nr", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("msg_nr", 2, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("addr", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("flags", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("len", 5, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("buf", 6, ProtoFieldType::kProtoUint32));
+        MakeField("adapter_nr", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("msg_nr", 2, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("addr", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("flags", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("len", 5, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("buf", 6, ProtoSchemaType::kUint32));
   }
 
   {
@@ -2765,10 +2514,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "i2c";
     event->proto_field_id = 29;
     event->fields.push_back(
-        MakeField("adapter_nr", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("nr_msgs", 2, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("ret", 3, ProtoFieldType::kProtoInt32));
+        MakeField("adapter_nr", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("nr_msgs", 2, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("ret", 3, ProtoSchemaType::kInt32));
   }
 
   {
@@ -2778,14 +2526,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "i2c";
     event->proto_field_id = 30;
     event->fields.push_back(
-        MakeField("adapter_nr", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("msg_nr", 2, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("addr", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("flags", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("len", 5, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("buf", 6, ProtoFieldType::kProtoUint32));
+        MakeField("adapter_nr", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("msg_nr", 2, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("addr", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("flags", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("len", 5, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("buf", 6, ProtoSchemaType::kUint32));
   }
 
   {
@@ -2795,14 +2541,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "i2c";
     event->proto_field_id = 31;
     event->fields.push_back(
-        MakeField("adapter_nr", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("flags", 2, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("addr", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("command", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("protocol", 5, ProtoFieldType::kProtoUint32));
+        MakeField("adapter_nr", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("flags", 2, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("addr", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("command", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("protocol", 5, ProtoSchemaType::kUint32));
   }
 
   {
@@ -2812,15 +2555,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "i2c";
     event->proto_field_id = 32;
     event->fields.push_back(
-        MakeField("adapter_nr", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("addr", 2, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("flags", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("command", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("len", 5, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("protocol", 6, ProtoFieldType::kProtoUint32));
+        MakeField("adapter_nr", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("addr", 2, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("flags", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("command", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("len", 5, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("protocol", 6, ProtoSchemaType::kUint32));
   }
 
   {
@@ -2830,17 +2570,14 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "i2c";
     event->proto_field_id = 33;
     event->fields.push_back(
-        MakeField("adapter_nr", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("addr", 2, ProtoFieldType::kProtoUint32));
+        MakeField("adapter_nr", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("addr", 2, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("flags", 3, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("flags", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("read_write", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("command", 5, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("res", 6, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("protocol", 7, ProtoFieldType::kProtoUint32));
+        MakeField("read_write", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("command", 5, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("res", 6, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("protocol", 7, ProtoSchemaType::kUint32));
   }
 
   {
@@ -2850,15 +2587,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "i2c";
     event->proto_field_id = 34;
     event->fields.push_back(
-        MakeField("adapter_nr", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("addr", 2, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("flags", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("command", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("len", 5, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("protocol", 6, ProtoFieldType::kProtoUint32));
+        MakeField("adapter_nr", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("addr", 2, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("flags", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("command", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("len", 5, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("protocol", 6, ProtoSchemaType::kUint32));
   }
 
   {
@@ -2867,8 +2601,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ipi_entry";
     event->group = "ipi";
     event->proto_field_id = 21;
-    event->fields.push_back(
-        MakeField("reason", 1, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("reason", 1, ProtoSchemaType::kString));
   }
 
   {
@@ -2877,8 +2610,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ipi_exit";
     event->group = "ipi";
     event->proto_field_id = 22;
-    event->fields.push_back(
-        MakeField("reason", 1, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("reason", 1, ProtoSchemaType::kString));
   }
 
   {
@@ -2888,9 +2620,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "ipi";
     event->proto_field_id = 23;
     event->fields.push_back(
-        MakeField("target_cpus", 1, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("reason", 2, ProtoFieldType::kProtoString));
+        MakeField("target_cpus", 1, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("reason", 2, ProtoSchemaType::kString));
   }
 
   {
@@ -2899,7 +2630,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "softirq_entry";
     event->group = "irq";
     event->proto_field_id = 24;
-    event->fields.push_back(MakeField("vec", 1, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("vec", 1, ProtoSchemaType::kUint32));
   }
 
   {
@@ -2908,7 +2639,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "softirq_exit";
     event->group = "irq";
     event->proto_field_id = 25;
-    event->fields.push_back(MakeField("vec", 1, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("vec", 1, ProtoSchemaType::kUint32));
   }
 
   {
@@ -2917,7 +2648,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "softirq_raise";
     event->group = "irq";
     event->proto_field_id = 26;
-    event->fields.push_back(MakeField("vec", 1, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("vec", 1, ProtoSchemaType::kUint32));
   }
 
   {
@@ -2926,10 +2657,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "irq_handler_entry";
     event->group = "irq";
     event->proto_field_id = 36;
-    event->fields.push_back(MakeField("irq", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("name", 2, ProtoFieldType::kProtoString));
-    event->fields.push_back(
-        MakeField("handler", 3, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("irq", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("name", 2, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("handler", 3, ProtoSchemaType::kUint32));
   }
 
   {
@@ -2938,8 +2668,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "irq_handler_exit";
     event->group = "irq";
     event->proto_field_id = 37;
-    event->fields.push_back(MakeField("irq", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("ret", 2, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("irq", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("ret", 2, ProtoSchemaType::kInt32));
   }
 
   {
@@ -2949,9 +2679,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "kmem";
     event->proto_field_id = 274;
     event->fields.push_back(
-        MakeField("gfp_flags", 1, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("order", 2, ProtoFieldType::kProtoUint32));
+        MakeField("gfp_flags", 1, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("order", 2, ProtoSchemaType::kUint32));
   }
 
   {
@@ -2961,9 +2690,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "kmem";
     event->proto_field_id = 275;
     event->fields.push_back(
-        MakeField("gfp_flags", 1, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("order", 2, ProtoFieldType::kProtoUint32));
+        MakeField("gfp_flags", 1, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("order", 2, ProtoSchemaType::kUint32));
   }
 
   {
@@ -2973,9 +2701,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "kmem";
     event->proto_field_id = 276;
     event->fields.push_back(
-        MakeField("gfp_flags", 1, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("order", 2, ProtoFieldType::kProtoUint32));
+        MakeField("gfp_flags", 1, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("order", 2, ProtoSchemaType::kUint32));
   }
 
   {
@@ -2985,9 +2712,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "kmem";
     event->proto_field_id = 277;
     event->fields.push_back(
-        MakeField("gfp_flags", 1, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("order", 2, ProtoFieldType::kProtoUint32));
+        MakeField("gfp_flags", 1, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("order", 2, ProtoSchemaType::kUint32));
   }
 
   {
@@ -2997,9 +2723,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "kmem";
     event->proto_field_id = 278;
     event->fields.push_back(
-        MakeField("gfp_flags", 1, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("order", 2, ProtoFieldType::kProtoUint32));
+        MakeField("gfp_flags", 1, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("order", 2, ProtoSchemaType::kUint32));
   }
 
   {
@@ -3009,9 +2734,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "kmem";
     event->proto_field_id = 279;
     event->fields.push_back(
-        MakeField("gfp_flags", 1, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("order", 2, ProtoFieldType::kProtoUint32));
+        MakeField("gfp_flags", 1, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("order", 2, ProtoSchemaType::kUint32));
   }
 
   {
@@ -3020,7 +2744,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "dma_alloc_contiguous_retry";
     event->group = "kmem";
     event->proto_field_id = 280;
-    event->fields.push_back(MakeField("tries", 1, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("tries", 1, ProtoSchemaType::kInt32));
   }
 
   {
@@ -3030,10 +2754,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "kmem";
     event->proto_field_id = 281;
     event->fields.push_back(
-        MakeField("chunk_size", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("len", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("pa", 3, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("va", 4, ProtoFieldType::kProtoUint64));
+        MakeField("chunk_size", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("len", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("pa", 3, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("va", 4, ProtoSchemaType::kUint64));
   }
 
   {
@@ -3042,12 +2766,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "iommu_sec_ptbl_map_range_end";
     event->group = "kmem";
     event->proto_field_id = 282;
-    event->fields.push_back(MakeField("len", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("num", 2, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("pa", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("sec_id", 4, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("va", 5, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("len", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("num", 2, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("pa", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("sec_id", 4, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("va", 5, ProtoSchemaType::kUint64));
   }
 
   {
@@ -3056,12 +2779,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "iommu_sec_ptbl_map_range_start";
     event->group = "kmem";
     event->proto_field_id = 283;
-    event->fields.push_back(MakeField("len", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("num", 2, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("pa", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("sec_id", 4, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("va", 5, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("len", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("num", 2, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("pa", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("sec_id", 4, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("va", 5, ProtoSchemaType::kUint64));
   }
 
   {
@@ -3071,13 +2793,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "kmem";
     event->proto_field_id = 284;
     event->fields.push_back(
-        MakeField("client_name", 1, ProtoFieldType::kProtoString));
+        MakeField("client_name", 1, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("flags", 2, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("flags", 2, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("heap_name", 3, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("len", 4, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("mask", 5, ProtoFieldType::kProtoUint32));
+        MakeField("heap_name", 3, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("len", 4, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("mask", 5, ProtoSchemaType::kUint32));
   }
 
   {
@@ -3087,14 +2808,13 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "kmem";
     event->proto_field_id = 285;
     event->fields.push_back(
-        MakeField("client_name", 1, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("error", 2, ProtoFieldType::kProtoInt64));
+        MakeField("client_name", 1, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("error", 2, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("flags", 3, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("flags", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("heap_name", 4, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("len", 5, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("mask", 6, ProtoFieldType::kProtoUint32));
+        MakeField("heap_name", 4, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("len", 5, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("mask", 6, ProtoSchemaType::kUint32));
   }
 
   {
@@ -3104,14 +2824,13 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "kmem";
     event->proto_field_id = 286;
     event->fields.push_back(
-        MakeField("client_name", 1, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("error", 2, ProtoFieldType::kProtoInt64));
+        MakeField("client_name", 1, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("error", 2, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("flags", 3, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("flags", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("heap_name", 4, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("len", 5, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("mask", 6, ProtoFieldType::kProtoUint32));
+        MakeField("heap_name", 4, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("len", 5, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("mask", 6, ProtoSchemaType::kUint32));
   }
 
   {
@@ -3121,13 +2840,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "kmem";
     event->proto_field_id = 287;
     event->fields.push_back(
-        MakeField("client_name", 1, ProtoFieldType::kProtoString));
+        MakeField("client_name", 1, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("flags", 2, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("flags", 2, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("heap_name", 3, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("len", 4, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("mask", 5, ProtoFieldType::kProtoUint32));
+        MakeField("heap_name", 3, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("len", 4, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("mask", 5, ProtoSchemaType::kUint32));
   }
 
   {
@@ -3136,7 +2854,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ion_cp_alloc_retry";
     event->group = "kmem";
     event->proto_field_id = 288;
-    event->fields.push_back(MakeField("tries", 1, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("tries", 1, ProtoSchemaType::kInt32));
   }
 
   {
@@ -3145,13 +2863,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ion_cp_secure_buffer_end";
     event->group = "kmem";
     event->proto_field_id = 289;
+    event->fields.push_back(MakeField("align", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("flags", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("align", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("flags", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("heap_name", 3, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("len", 4, ProtoFieldType::kProtoUint64));
+        MakeField("heap_name", 3, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("len", 4, ProtoSchemaType::kUint64));
   }
 
   {
@@ -3160,13 +2876,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ion_cp_secure_buffer_start";
     event->group = "kmem";
     event->proto_field_id = 290;
+    event->fields.push_back(MakeField("align", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("flags", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("align", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("flags", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("heap_name", 3, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("len", 4, ProtoFieldType::kProtoUint64));
+        MakeField("heap_name", 3, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("len", 4, ProtoSchemaType::kUint64));
   }
 
   {
@@ -3175,7 +2889,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ion_prefetching";
     event->group = "kmem";
     event->proto_field_id = 291;
-    event->fields.push_back(MakeField("len", 1, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("len", 1, ProtoSchemaType::kUint64));
   }
 
   {
@@ -3185,10 +2899,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "kmem";
     event->proto_field_id = 292;
     event->fields.push_back(
-        MakeField("is_prefetch", 1, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("len", 2, ProtoFieldType::kProtoUint64));
+        MakeField("is_prefetch", 1, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("len", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("pool_total", 3, ProtoFieldType::kProtoInt32));
+        MakeField("pool_total", 3, ProtoSchemaType::kInt32));
   }
 
   {
@@ -3198,10 +2912,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "kmem";
     event->proto_field_id = 293;
     event->fields.push_back(
-        MakeField("is_prefetch", 1, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("len", 2, ProtoFieldType::kProtoUint64));
+        MakeField("is_prefetch", 1, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("len", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("pool_total", 3, ProtoFieldType::kProtoInt32));
+        MakeField("pool_total", 3, ProtoSchemaType::kInt32));
   }
 
   {
@@ -3210,13 +2924,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ion_secure_cma_allocate_end";
     event->group = "kmem";
     event->proto_field_id = 294;
+    event->fields.push_back(MakeField("align", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("flags", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("align", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("flags", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("heap_name", 3, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("len", 4, ProtoFieldType::kProtoUint64));
+        MakeField("heap_name", 3, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("len", 4, ProtoSchemaType::kUint64));
   }
 
   {
@@ -3225,13 +2937,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "ion_secure_cma_allocate_start";
     event->group = "kmem";
     event->proto_field_id = 295;
+    event->fields.push_back(MakeField("align", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("flags", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("align", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("flags", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("heap_name", 3, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("len", 4, ProtoFieldType::kProtoUint64));
+        MakeField("heap_name", 3, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("len", 4, ProtoSchemaType::kUint64));
   }
 
   {
@@ -3241,9 +2951,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "kmem";
     event->proto_field_id = 296;
     event->fields.push_back(
-        MakeField("drained_size", 1, ProtoFieldType::kProtoUint64));
+        MakeField("drained_size", 1, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("skipped_size", 2, ProtoFieldType::kProtoUint64));
+        MakeField("skipped_size", 2, ProtoSchemaType::kUint64));
   }
 
   {
@@ -3253,9 +2963,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "kmem";
     event->proto_field_id = 297;
     event->fields.push_back(
-        MakeField("drained_size", 1, ProtoFieldType::kProtoUint64));
+        MakeField("drained_size", 1, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("skipped_size", 2, ProtoFieldType::kProtoUint64));
+        MakeField("skipped_size", 2, ProtoSchemaType::kUint64));
   }
 
   {
@@ -3265,8 +2975,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "kmem";
     event->proto_field_id = 298;
     event->fields.push_back(
-        MakeField("call_site", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ptr", 2, ProtoFieldType::kProtoUint64));
+        MakeField("call_site", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ptr", 2, ProtoSchemaType::kUint64));
   }
 
   {
@@ -3276,14 +2986,14 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "kmem";
     event->proto_field_id = 299;
     event->fields.push_back(
-        MakeField("bytes_alloc", 1, ProtoFieldType::kProtoUint64));
+        MakeField("bytes_alloc", 1, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("bytes_req", 2, ProtoFieldType::kProtoUint64));
+        MakeField("bytes_req", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("call_site", 3, ProtoFieldType::kProtoUint64));
+        MakeField("call_site", 3, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("gfp_flags", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("ptr", 5, ProtoFieldType::kProtoUint64));
+        MakeField("gfp_flags", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("ptr", 5, ProtoSchemaType::kUint64));
   }
 
   {
@@ -3293,15 +3003,15 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "kmem";
     event->proto_field_id = 300;
     event->fields.push_back(
-        MakeField("bytes_alloc", 1, ProtoFieldType::kProtoUint64));
+        MakeField("bytes_alloc", 1, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("bytes_req", 2, ProtoFieldType::kProtoUint64));
+        MakeField("bytes_req", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("call_site", 3, ProtoFieldType::kProtoUint64));
+        MakeField("call_site", 3, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("gfp_flags", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("node", 5, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("ptr", 6, ProtoFieldType::kProtoUint64));
+        MakeField("gfp_flags", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("node", 5, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("ptr", 6, ProtoSchemaType::kUint64));
   }
 
   {
@@ -3311,14 +3021,14 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "kmem";
     event->proto_field_id = 301;
     event->fields.push_back(
-        MakeField("bytes_alloc", 1, ProtoFieldType::kProtoUint64));
+        MakeField("bytes_alloc", 1, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("bytes_req", 2, ProtoFieldType::kProtoUint64));
+        MakeField("bytes_req", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("call_site", 3, ProtoFieldType::kProtoUint64));
+        MakeField("call_site", 3, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("gfp_flags", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("ptr", 5, ProtoFieldType::kProtoUint64));
+        MakeField("gfp_flags", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("ptr", 5, ProtoSchemaType::kUint64));
   }
 
   {
@@ -3328,15 +3038,15 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "kmem";
     event->proto_field_id = 302;
     event->fields.push_back(
-        MakeField("bytes_alloc", 1, ProtoFieldType::kProtoUint64));
+        MakeField("bytes_alloc", 1, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("bytes_req", 2, ProtoFieldType::kProtoUint64));
+        MakeField("bytes_req", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("call_site", 3, ProtoFieldType::kProtoUint64));
+        MakeField("call_site", 3, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("gfp_flags", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("node", 5, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("ptr", 6, ProtoFieldType::kProtoUint64));
+        MakeField("gfp_flags", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("node", 5, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("ptr", 6, ProtoSchemaType::kUint64));
   }
 
   {
@@ -3346,8 +3056,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "kmem";
     event->proto_field_id = 303;
     event->fields.push_back(
-        MakeField("call_site", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("ptr", 2, ProtoFieldType::kProtoUint64));
+        MakeField("call_site", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ptr", 2, ProtoSchemaType::kUint64));
   }
 
   {
@@ -3356,7 +3066,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "migrate_pages_end";
     event->group = "kmem";
     event->proto_field_id = 304;
-    event->fields.push_back(MakeField("mode", 1, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("mode", 1, ProtoSchemaType::kInt32));
   }
 
   {
@@ -3365,7 +3075,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "migrate_pages_start";
     event->group = "kmem";
     event->proto_field_id = 305;
-    event->fields.push_back(MakeField("mode", 1, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("mode", 1, ProtoSchemaType::kInt32));
   }
 
   {
@@ -3374,7 +3084,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "migrate_retry";
     event->group = "kmem";
     event->proto_field_id = 306;
-    event->fields.push_back(MakeField("tries", 1, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("tries", 1, ProtoSchemaType::kInt32));
   }
 
   {
@@ -3384,13 +3094,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "kmem";
     event->proto_field_id = 307;
     event->fields.push_back(
-        MakeField("gfp_flags", 1, ProtoFieldType::kProtoUint32));
+        MakeField("gfp_flags", 1, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("migratetype", 2, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("order", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("page", 4, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("pfn", 5, ProtoFieldType::kProtoUint64));
+        MakeField("migratetype", 2, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("order", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("page", 4, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("pfn", 5, ProtoSchemaType::kUint64));
   }
 
   {
@@ -3400,17 +3109,17 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "kmem";
     event->proto_field_id = 308;
     event->fields.push_back(
-        MakeField("alloc_migratetype", 1, ProtoFieldType::kProtoInt32));
+        MakeField("alloc_migratetype", 1, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("alloc_order", 2, ProtoFieldType::kProtoInt32));
+        MakeField("alloc_order", 2, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("fallback_migratetype", 3, ProtoFieldType::kProtoInt32));
+        MakeField("fallback_migratetype", 3, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("fallback_order", 4, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("page", 5, ProtoFieldType::kProtoUint64));
+        MakeField("fallback_order", 4, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("page", 5, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("change_ownership", 6, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("pfn", 7, ProtoFieldType::kProtoUint64));
+        MakeField("change_ownership", 6, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("pfn", 7, ProtoSchemaType::kUint64));
   }
 
   {
@@ -3420,11 +3129,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "kmem";
     event->proto_field_id = 309;
     event->fields.push_back(
-        MakeField("migratetype", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("order", 2, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("page", 3, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("pfn", 4, ProtoFieldType::kProtoUint64));
+        MakeField("migratetype", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("order", 2, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("page", 3, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("pfn", 4, ProtoSchemaType::kUint64));
   }
 
   {
@@ -3433,10 +3141,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mm_page_free";
     event->group = "kmem";
     event->proto_field_id = 310;
-    event->fields.push_back(
-        MakeField("order", 1, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("page", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("pfn", 3, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("order", 1, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("page", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("pfn", 3, ProtoSchemaType::kUint64));
   }
 
   {
@@ -3445,9 +3152,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mm_page_free_batched";
     event->group = "kmem";
     event->proto_field_id = 311;
-    event->fields.push_back(MakeField("cold", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("page", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("pfn", 3, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("cold", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("page", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("pfn", 3, ProtoSchemaType::kUint64));
   }
 
   {
@@ -3457,11 +3164,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "kmem";
     event->proto_field_id = 312;
     event->fields.push_back(
-        MakeField("migratetype", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("order", 2, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("page", 3, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("pfn", 4, ProtoFieldType::kProtoUint64));
+        MakeField("migratetype", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("order", 2, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("page", 3, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("pfn", 4, ProtoSchemaType::kUint64));
   }
 
   {
@@ -3470,9 +3176,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "rss_stat";
     event->group = "kmem";
     event->proto_field_id = 313;
-    event->fields.push_back(
-        MakeField("member", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("size", 2, ProtoFieldType::kProtoInt64));
+    event->fields.push_back(MakeField("member", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("size", 2, ProtoSchemaType::kInt64));
   }
 
   {
@@ -3482,10 +3187,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "kmem";
     event->proto_field_id = 314;
     event->fields.push_back(
-        MakeField("heap_name", 1, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("len", 2, ProtoFieldType::kProtoUint64));
+        MakeField("heap_name", 1, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("len", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("total_allocated", 3, ProtoFieldType::kProtoInt64));
+        MakeField("total_allocated", 3, ProtoSchemaType::kInt64));
   }
 
   {
@@ -3495,10 +3200,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "kmem";
     event->proto_field_id = 315;
     event->fields.push_back(
-        MakeField("heap_name", 1, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("len", 2, ProtoFieldType::kProtoUint64));
+        MakeField("heap_name", 1, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("len", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("total_allocated", 3, ProtoFieldType::kProtoInt64));
+        MakeField("total_allocated", 3, ProtoSchemaType::kInt64));
   }
 
   {
@@ -3507,13 +3212,13 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "lowmemory_kill";
     event->group = "lowmemorykiller";
     event->proto_field_id = 35;
-    event->fields.push_back(MakeField("comm", 1, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("pid", 2, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("comm", 1, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("pid", 2, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("pagecache_size", 3, ProtoFieldType::kProtoInt64));
+        MakeField("pagecache_size", 3, ProtoSchemaType::kInt64));
     event->fields.push_back(
-        MakeField("pagecache_limit", 4, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(MakeField("free", 5, ProtoFieldType::kProtoInt64));
+        MakeField("pagecache_limit", 4, ProtoSchemaType::kInt64));
+    event->fields.push_back(MakeField("free", 5, ProtoSchemaType::kInt64));
   }
 
   {
@@ -3522,10 +3227,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mdp_cmd_kickoff";
     event->group = "mdss";
     event->proto_field_id = 76;
+    event->fields.push_back(MakeField("ctl_num", 1, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("ctl_num", 1, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("kickoff_cnt", 2, ProtoFieldType::kProtoInt32));
+        MakeField("kickoff_cnt", 2, ProtoSchemaType::kInt32));
   }
 
   {
@@ -3534,13 +3238,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mdp_commit";
     event->group = "mdss";
     event->proto_field_id = 77;
-    event->fields.push_back(MakeField("num", 1, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("num", 1, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("play_cnt", 2, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("clk_rate", 3, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("play_cnt", 2, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("clk_rate", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("bandwidth", 4, ProtoFieldType::kProtoUint64));
+        MakeField("bandwidth", 4, ProtoSchemaType::kUint64));
   }
 
   {
@@ -3549,13 +3251,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mdp_perf_set_ot";
     event->group = "mdss";
     event->proto_field_id = 78;
-    event->fields.push_back(MakeField("pnum", 1, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("pnum", 1, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("xin_id", 2, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("rd_lim", 3, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("xin_id", 2, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("rd_lim", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("is_vbif_rt", 4, ProtoFieldType::kProtoUint32));
+        MakeField("is_vbif_rt", 4, ProtoSchemaType::kUint32));
   }
 
   {
@@ -3564,37 +3264,22 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mdp_sspp_change";
     event->group = "mdss";
     event->proto_field_id = 79;
-    event->fields.push_back(MakeField("num", 1, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("play_cnt", 2, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("mixer", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("stage", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("flags", 5, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("format", 6, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("img_w", 7, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("img_h", 8, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("src_x", 9, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("src_y", 10, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("src_w", 11, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("src_h", 12, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("dst_x", 13, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("dst_y", 14, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("dst_w", 15, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("dst_h", 16, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("num", 1, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("play_cnt", 2, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("mixer", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("stage", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("flags", 5, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("format", 6, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("img_w", 7, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("img_h", 8, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("src_x", 9, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("src_y", 10, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("src_w", 11, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("src_h", 12, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("dst_x", 13, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("dst_y", 14, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("dst_w", 15, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("dst_h", 16, ProtoSchemaType::kUint32));
   }
 
   {
@@ -3603,11 +3288,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "tracing_mark_write";
     event->group = "mdss";
     event->proto_field_id = 80;
-    event->fields.push_back(MakeField("pid", 1, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("pid", 1, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("trace_name", 2, ProtoFieldType::kProtoString));
+        MakeField("trace_name", 2, ProtoSchemaType::kString));
     event->fields.push_back(
-        MakeField("trace_begin", 3, ProtoFieldType::kProtoUint32));
+        MakeField("trace_begin", 3, ProtoSchemaType::kUint32));
   }
 
   {
@@ -3616,14 +3301,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mdp_cmd_pingpong_done";
     event->group = "mdss";
     event->proto_field_id = 81;
-    event->fields.push_back(
-        MakeField("ctl_num", 1, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("intf_num", 2, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("pp_num", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("koff_cnt", 4, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("ctl_num", 1, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("intf_num", 2, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("pp_num", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("koff_cnt", 4, ProtoSchemaType::kInt32));
   }
 
   {
@@ -3632,22 +3313,16 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mdp_compare_bw";
     event->group = "mdss";
     event->proto_field_id = 82;
+    event->fields.push_back(MakeField("new_ab", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("new_ib", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("new_wb", 3, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("old_ab", 4, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("old_ib", 5, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("old_wb", 6, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("new_ab", 1, ProtoFieldType::kProtoUint64));
+        MakeField("params_changed", 7, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("new_ib", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("new_wb", 3, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("old_ab", 4, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("old_ib", 5, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("old_wb", 6, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("params_changed", 7, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("update_bw", 8, ProtoFieldType::kProtoUint32));
+        MakeField("update_bw", 8, ProtoSchemaType::kUint32));
   }
 
   {
@@ -3656,13 +3331,13 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mdp_perf_set_panic_luts";
     event->group = "mdss";
     event->proto_field_id = 83;
-    event->fields.push_back(MakeField("pnum", 1, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("fmt", 2, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("mode", 3, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("pnum", 1, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("fmt", 2, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("mode", 3, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("panic_lut", 4, ProtoFieldType::kProtoUint32));
+        MakeField("panic_lut", 4, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("robust_lut", 5, ProtoFieldType::kProtoUint32));
+        MakeField("robust_lut", 5, ProtoSchemaType::kUint32));
   }
 
   {
@@ -3671,37 +3346,22 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mdp_sspp_set";
     event->group = "mdss";
     event->proto_field_id = 84;
-    event->fields.push_back(MakeField("num", 1, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("play_cnt", 2, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("mixer", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("stage", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("flags", 5, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("format", 6, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("img_w", 7, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("img_h", 8, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("src_x", 9, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("src_y", 10, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("src_w", 11, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("src_h", 12, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("dst_x", 13, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("dst_y", 14, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("dst_w", 15, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("dst_h", 16, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("num", 1, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("play_cnt", 2, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("mixer", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("stage", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("flags", 5, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("format", 6, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("img_w", 7, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("img_h", 8, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("src_x", 9, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("src_y", 10, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("src_w", 11, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("src_h", 12, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("dst_x", 13, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("dst_y", 14, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("dst_w", 15, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("dst_h", 16, ProtoSchemaType::kUint32));
   }
 
   {
@@ -3710,10 +3370,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mdp_cmd_readptr_done";
     event->group = "mdss";
     event->proto_field_id = 85;
-    event->fields.push_back(
-        MakeField("ctl_num", 1, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("koff_cnt", 2, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("ctl_num", 1, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("koff_cnt", 2, ProtoSchemaType::kInt32));
   }
 
   {
@@ -3722,11 +3380,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mdp_misr_crc";
     event->group = "mdss";
     event->proto_field_id = 86;
+    event->fields.push_back(MakeField("block_id", 1, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("block_id", 1, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("vsync_cnt", 2, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("crc", 3, ProtoFieldType::kProtoUint32));
+        MakeField("vsync_cnt", 2, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("crc", 3, ProtoSchemaType::kUint32));
   }
 
   {
@@ -3735,14 +3392,13 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mdp_perf_set_qos_luts";
     event->group = "mdss";
     event->proto_field_id = 87;
-    event->fields.push_back(MakeField("pnum", 1, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("fmt", 2, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("intf", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("rot", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("fl", 5, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("lut", 6, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("linear", 7, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("pnum", 1, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("fmt", 2, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("intf", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("rot", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("fl", 5, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("lut", 6, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("linear", 7, ProtoSchemaType::kUint32));
   }
 
   {
@@ -3751,10 +3407,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mdp_trace_counter";
     event->group = "mdss";
     event->proto_field_id = 88;
-    event->fields.push_back(MakeField("pid", 1, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("pid", 1, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("counter_name", 2, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("value", 3, ProtoFieldType::kProtoInt32));
+        MakeField("counter_name", 2, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("value", 3, ProtoSchemaType::kInt32));
   }
 
   {
@@ -3763,8 +3419,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mdp_cmd_release_bw";
     event->group = "mdss";
     event->proto_field_id = 89;
-    event->fields.push_back(
-        MakeField("ctl_num", 1, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("ctl_num", 1, ProtoSchemaType::kUint32));
   }
 
   {
@@ -3774,7 +3429,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "mdss";
     event->proto_field_id = 90;
     event->fields.push_back(
-        MakeField("mixer_num", 1, ProtoFieldType::kProtoUint32));
+        MakeField("mixer_num", 1, ProtoSchemaType::kUint32));
   }
 
   {
@@ -3783,18 +3438,16 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mdp_perf_set_wm_levels";
     event->group = "mdss";
     event->proto_field_id = 91;
-    event->fields.push_back(MakeField("pnum", 1, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("pnum", 1, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("use_space", 2, ProtoFieldType::kProtoUint32));
+        MakeField("use_space", 2, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("priority_bytes", 3, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("wm0", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("wm1", 5, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("wm2", 6, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("mb_cnt", 7, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("mb_size", 8, ProtoFieldType::kProtoUint32));
+        MakeField("priority_bytes", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("wm0", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("wm1", 5, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("wm2", 6, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("mb_cnt", 7, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("mb_size", 8, ProtoSchemaType::kUint32));
   }
 
   {
@@ -3803,10 +3456,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mdp_video_underrun_done";
     event->group = "mdss";
     event->proto_field_id = 92;
+    event->fields.push_back(MakeField("ctl_num", 1, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("ctl_num", 1, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("underrun_cnt", 2, ProtoFieldType::kProtoUint32));
+        MakeField("underrun_cnt", 2, ProtoSchemaType::kUint32));
   }
 
   {
@@ -3815,10 +3467,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mdp_cmd_wait_pingpong";
     event->group = "mdss";
     event->proto_field_id = 93;
+    event->fields.push_back(MakeField("ctl_num", 1, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("ctl_num", 1, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("kickoff_cnt", 2, ProtoFieldType::kProtoInt32));
+        MakeField("kickoff_cnt", 2, ProtoSchemaType::kInt32));
   }
 
   {
@@ -3827,24 +3478,19 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mdp_perf_prefill_calc";
     event->group = "mdss";
     event->proto_field_id = 94;
-    event->fields.push_back(MakeField("pnum", 1, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("pnum", 1, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("latency_buf", 2, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("ot", 3, ProtoFieldType::kProtoUint32));
+        MakeField("latency_buf", 2, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("ot", 3, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("y_buf", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("y_scaler", 5, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("pp_lines", 6, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("pp_bytes", 7, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("post_sc", 8, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("y_buf", 4, ProtoFieldType::kProtoUint32));
+        MakeField("fbc_bytes", 9, ProtoSchemaType::kUint32));
     event->fields.push_back(
-        MakeField("y_scaler", 5, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("pp_lines", 6, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("pp_bytes", 7, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("post_sc", 8, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("fbc_bytes", 9, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("prefill_bytes", 10, ProtoFieldType::kProtoUint32));
+        MakeField("prefill_bytes", 10, ProtoSchemaType::kUint32));
   }
 
   {
@@ -3853,12 +3499,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mdp_perf_update_bus";
     event->group = "mdss";
     event->proto_field_id = 95;
-    event->fields.push_back(
-        MakeField("client", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("ab_quota", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("ib_quota", 3, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("client", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("ab_quota", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("ib_quota", 3, ProtoSchemaType::kUint64));
   }
 
   {
@@ -3867,8 +3510,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "rotator_bw_ao_as_context";
     event->group = "mdss";
     event->proto_field_id = 96;
-    event->fields.push_back(
-        MakeField("state", 1, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("state", 1, ProtoSchemaType::kUint32));
   }
 
   {
@@ -3877,10 +3519,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "oom_score_adj_update";
     event->group = "oom";
     event->proto_field_id = 326;
-    event->fields.push_back(MakeField("comm", 1, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("comm", 1, ProtoSchemaType::kString));
     event->fields.push_back(
-        MakeField("oom_score_adj", 2, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("pid", 3, ProtoFieldType::kProtoInt32));
+        MakeField("oom_score_adj", 2, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("pid", 3, ProtoSchemaType::kInt32));
   }
 
   {
@@ -3889,10 +3531,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "cpu_frequency";
     event->group = "power";
     event->proto_field_id = 11;
-    event->fields.push_back(
-        MakeField("state", 1, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("cpu_id", 2, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("state", 1, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("cpu_id", 2, ProtoSchemaType::kUint32));
   }
 
   {
@@ -3901,12 +3541,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "cpu_frequency_limits";
     event->group = "power";
     event->proto_field_id = 12;
-    event->fields.push_back(
-        MakeField("min_freq", 1, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("max_freq", 2, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("cpu_id", 3, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("min_freq", 1, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("max_freq", 2, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("cpu_id", 3, ProtoSchemaType::kUint32));
   }
 
   {
@@ -3915,10 +3552,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "cpu_idle";
     event->group = "power";
     event->proto_field_id = 13;
-    event->fields.push_back(
-        MakeField("state", 1, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(
-        MakeField("cpu_id", 2, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("state", 1, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("cpu_id", 2, ProtoSchemaType::kUint32));
   }
 
   {
@@ -3927,11 +3562,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "clock_enable";
     event->group = "power";
     event->proto_field_id = 14;
-    event->fields.push_back(MakeField("name", 1, ProtoFieldType::kProtoString));
-    event->fields.push_back(
-        MakeField("state", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("cpu_id", 3, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("name", 1, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("state", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("cpu_id", 3, ProtoSchemaType::kUint64));
   }
 
   {
@@ -3940,11 +3573,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "clock_disable";
     event->group = "power";
     event->proto_field_id = 15;
-    event->fields.push_back(MakeField("name", 1, ProtoFieldType::kProtoString));
-    event->fields.push_back(
-        MakeField("state", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("cpu_id", 3, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("name", 1, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("state", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("cpu_id", 3, ProtoSchemaType::kUint64));
   }
 
   {
@@ -3953,11 +3584,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "clock_set_rate";
     event->group = "power";
     event->proto_field_id = 16;
-    event->fields.push_back(MakeField("name", 1, ProtoFieldType::kProtoString));
-    event->fields.push_back(
-        MakeField("state", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("cpu_id", 3, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("name", 1, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("state", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("cpu_id", 3, ProtoSchemaType::kUint64));
   }
 
   {
@@ -3966,11 +3595,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "suspend_resume";
     event->group = "power";
     event->proto_field_id = 113;
-    event->fields.push_back(
-        MakeField("action", 1, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("val", 2, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("start", 3, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("action", 1, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("val", 2, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("start", 3, ProtoSchemaType::kUint32));
   }
 
   {
@@ -3979,7 +3606,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "regulator_disable";
     event->group = "regulator";
     event->proto_field_id = 60;
-    event->fields.push_back(MakeField("name", 1, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("name", 1, ProtoSchemaType::kString));
   }
 
   {
@@ -3988,7 +3615,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "regulator_disable_complete";
     event->group = "regulator";
     event->proto_field_id = 61;
-    event->fields.push_back(MakeField("name", 1, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("name", 1, ProtoSchemaType::kString));
   }
 
   {
@@ -3997,7 +3624,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "regulator_enable";
     event->group = "regulator";
     event->proto_field_id = 62;
-    event->fields.push_back(MakeField("name", 1, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("name", 1, ProtoSchemaType::kString));
   }
 
   {
@@ -4006,7 +3633,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "regulator_enable_complete";
     event->group = "regulator";
     event->proto_field_id = 63;
-    event->fields.push_back(MakeField("name", 1, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("name", 1, ProtoSchemaType::kString));
   }
 
   {
@@ -4015,7 +3642,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "regulator_enable_delay";
     event->group = "regulator";
     event->proto_field_id = 64;
-    event->fields.push_back(MakeField("name", 1, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("name", 1, ProtoSchemaType::kString));
   }
 
   {
@@ -4024,9 +3651,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "regulator_set_voltage";
     event->group = "regulator";
     event->proto_field_id = 65;
-    event->fields.push_back(MakeField("name", 1, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("min", 2, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("max", 3, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("name", 1, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("min", 2, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("max", 3, ProtoSchemaType::kInt32));
   }
 
   {
@@ -4035,8 +3662,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "regulator_set_voltage_complete";
     event->group = "regulator";
     event->proto_field_id = 66;
-    event->fields.push_back(MakeField("name", 1, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("val", 2, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("name", 1, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("val", 2, ProtoSchemaType::kUint32));
   }
 
   {
@@ -4046,19 +3673,15 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "sched";
     event->proto_field_id = 4;
     event->fields.push_back(
-        MakeField("prev_comm", 1, ProtoFieldType::kProtoString));
+        MakeField("prev_comm", 1, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("prev_pid", 2, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("prev_prio", 3, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("prev_pid", 2, ProtoFieldType::kProtoInt32));
+        MakeField("prev_state", 4, ProtoSchemaType::kInt64));
     event->fields.push_back(
-        MakeField("prev_prio", 3, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("prev_state", 4, ProtoFieldType::kProtoInt64));
-    event->fields.push_back(
-        MakeField("next_comm", 5, ProtoFieldType::kProtoString));
-    event->fields.push_back(
-        MakeField("next_pid", 6, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("next_prio", 7, ProtoFieldType::kProtoInt32));
+        MakeField("next_comm", 5, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("next_pid", 6, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("next_prio", 7, ProtoSchemaType::kInt32));
   }
 
   {
@@ -4067,13 +3690,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "sched_wakeup";
     event->group = "sched";
     event->proto_field_id = 17;
-    event->fields.push_back(MakeField("comm", 1, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("pid", 2, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("prio", 3, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("comm", 1, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("pid", 2, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("prio", 3, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("success", 4, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("success", 4, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("target_cpu", 5, ProtoFieldType::kProtoInt32));
+        MakeField("target_cpu", 5, ProtoSchemaType::kInt32));
   }
 
   {
@@ -4082,11 +3704,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "sched_blocked_reason";
     event->group = "sched";
     event->proto_field_id = 18;
-    event->fields.push_back(MakeField("pid", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("caller", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("io_wait", 3, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("pid", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("caller", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("io_wait", 3, ProtoSchemaType::kUint32));
   }
 
   {
@@ -4096,10 +3716,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "sched";
     event->proto_field_id = 19;
     event->fields.push_back(
-        MakeField("affected_cpu", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("error", 2, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("status", 3, ProtoFieldType::kProtoInt32));
+        MakeField("affected_cpu", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("error", 2, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("status", 3, ProtoSchemaType::kInt32));
   }
 
   {
@@ -4108,13 +3727,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "sched_waking";
     event->group = "sched";
     event->proto_field_id = 20;
-    event->fields.push_back(MakeField("comm", 1, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("pid", 2, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("prio", 3, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("comm", 1, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("pid", 2, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("prio", 3, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("success", 4, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("success", 4, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("target_cpu", 5, ProtoFieldType::kProtoInt32));
+        MakeField("target_cpu", 5, ProtoSchemaType::kInt32));
   }
 
   {
@@ -4123,13 +3741,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "sched_wakeup_new";
     event->group = "sched";
     event->proto_field_id = 114;
-    event->fields.push_back(MakeField("comm", 1, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("pid", 2, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("prio", 3, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("comm", 1, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("pid", 2, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("prio", 3, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("success", 4, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("success", 4, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("target_cpu", 5, ProtoFieldType::kProtoInt32));
+        MakeField("target_cpu", 5, ProtoSchemaType::kInt32));
   }
 
   {
@@ -4138,11 +3755,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "sched_process_exec";
     event->group = "sched";
     event->proto_field_id = 237;
-    event->fields.push_back(
-        MakeField("filename", 1, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("pid", 2, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("old_pid", 3, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("filename", 1, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("pid", 2, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("old_pid", 3, ProtoSchemaType::kInt32));
   }
 
   {
@@ -4151,10 +3766,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "sched_process_exit";
     event->group = "sched";
     event->proto_field_id = 238;
-    event->fields.push_back(MakeField("comm", 1, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("pid", 2, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("tgid", 3, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("prio", 4, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("comm", 1, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("pid", 2, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("tgid", 3, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("prio", 4, ProtoSchemaType::kInt32));
   }
 
   {
@@ -4164,13 +3779,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "sched";
     event->proto_field_id = 239;
     event->fields.push_back(
-        MakeField("parent_comm", 1, ProtoFieldType::kProtoString));
+        MakeField("parent_comm", 1, ProtoSchemaType::kString));
     event->fields.push_back(
-        MakeField("parent_pid", 2, ProtoFieldType::kProtoInt32));
+        MakeField("parent_pid", 2, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("child_comm", 3, ProtoFieldType::kProtoString));
-    event->fields.push_back(
-        MakeField("child_pid", 4, ProtoFieldType::kProtoInt32));
+        MakeField("child_comm", 3, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("child_pid", 4, ProtoSchemaType::kInt32));
   }
 
   {
@@ -4179,9 +3793,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "sched_process_free";
     event->group = "sched";
     event->proto_field_id = 240;
-    event->fields.push_back(MakeField("comm", 1, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("pid", 2, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("prio", 3, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("comm", 1, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("pid", 2, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("prio", 3, ProtoSchemaType::kInt32));
   }
 
   {
@@ -4190,8 +3804,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "sched_process_hang";
     event->group = "sched";
     event->proto_field_id = 241;
-    event->fields.push_back(MakeField("comm", 1, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("pid", 2, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("comm", 1, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("pid", 2, ProtoSchemaType::kInt32));
   }
 
   {
@@ -4200,9 +3814,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "sched_process_wait";
     event->group = "sched";
     event->proto_field_id = 242;
-    event->fields.push_back(MakeField("comm", 1, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("pid", 2, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("prio", 3, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("comm", 1, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("pid", 2, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("prio", 3, ProtoSchemaType::kInt32));
   }
 
   {
@@ -4211,10 +3825,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "signal_deliver";
     event->group = "signal";
     event->proto_field_id = 324;
-    event->fields.push_back(MakeField("code", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("sa_flags", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(MakeField("sig", 3, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("code", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("sa_flags", 2, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("sig", 3, ProtoSchemaType::kInt32));
   }
 
   {
@@ -4223,13 +3836,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "signal_generate";
     event->group = "signal";
     event->proto_field_id = 325;
-    event->fields.push_back(MakeField("code", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("comm", 2, ProtoFieldType::kProtoString));
-    event->fields.push_back(MakeField("group", 3, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("pid", 4, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("result", 5, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("sig", 6, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("code", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("comm", 2, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("group", 3, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("pid", 4, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("result", 5, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("sig", 6, ProtoSchemaType::kInt32));
   }
 
   {
@@ -4238,10 +3850,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "sync_pt";
     event->group = "sync";
     event->proto_field_id = 38;
-    event->fields.push_back(
-        MakeField("timeline", 1, ProtoFieldType::kProtoString));
-    event->fields.push_back(
-        MakeField("value", 2, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("timeline", 1, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("value", 2, ProtoSchemaType::kString));
   }
 
   {
@@ -4250,9 +3860,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "sync_timeline";
     event->group = "sync";
     event->proto_field_id = 39;
-    event->fields.push_back(MakeField("name", 1, ProtoFieldType::kProtoString));
-    event->fields.push_back(
-        MakeField("value", 2, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("name", 1, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("value", 2, ProtoSchemaType::kString));
   }
 
   {
@@ -4261,11 +3870,9 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "sync_wait";
     event->group = "sync";
     event->proto_field_id = 40;
-    event->fields.push_back(MakeField("name", 1, ProtoFieldType::kProtoString));
-    event->fields.push_back(
-        MakeField("status", 2, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(
-        MakeField("begin", 3, ProtoFieldType::kProtoUint32));
+    event->fields.push_back(MakeField("name", 1, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("status", 2, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("begin", 3, ProtoSchemaType::kUint32));
   }
 
   {
@@ -4274,12 +3881,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "task_newtask";
     event->group = "task";
     event->proto_field_id = 235;
-    event->fields.push_back(MakeField("pid", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("comm", 2, ProtoFieldType::kProtoString));
+    event->fields.push_back(MakeField("pid", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("comm", 2, ProtoSchemaType::kString));
     event->fields.push_back(
-        MakeField("clone_flags", 3, ProtoFieldType::kProtoUint64));
+        MakeField("clone_flags", 3, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("oom_score_adj", 4, ProtoFieldType::kProtoInt32));
+        MakeField("oom_score_adj", 4, ProtoSchemaType::kInt32));
   }
 
   {
@@ -4288,13 +3895,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "task_rename";
     event->group = "task";
     event->proto_field_id = 236;
-    event->fields.push_back(MakeField("pid", 1, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("pid", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("oldcomm", 2, ProtoSchemaType::kString));
+    event->fields.push_back(MakeField("newcomm", 3, ProtoSchemaType::kString));
     event->fields.push_back(
-        MakeField("oldcomm", 2, ProtoFieldType::kProtoString));
-    event->fields.push_back(
-        MakeField("newcomm", 3, ProtoFieldType::kProtoString));
-    event->fields.push_back(
-        MakeField("oom_score_adj", 4, ProtoFieldType::kProtoInt32));
+        MakeField("oom_score_adj", 4, ProtoSchemaType::kInt32));
   }
 
   {
@@ -4303,11 +3908,11 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mm_vmscan_direct_reclaim_begin";
     event->group = "vmscan";
     event->proto_field_id = 46;
-    event->fields.push_back(MakeField("order", 1, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("order", 1, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("may_writepage", 2, ProtoFieldType::kProtoInt32));
+        MakeField("may_writepage", 2, ProtoSchemaType::kInt32));
     event->fields.push_back(
-        MakeField("gfp_flags", 3, ProtoFieldType::kProtoUint32));
+        MakeField("gfp_flags", 3, ProtoSchemaType::kUint32));
   }
 
   {
@@ -4317,7 +3922,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "vmscan";
     event->proto_field_id = 47;
     event->fields.push_back(
-        MakeField("nr_reclaimed", 1, ProtoFieldType::kProtoUint64));
+        MakeField("nr_reclaimed", 1, ProtoSchemaType::kUint64));
   }
 
   {
@@ -4326,8 +3931,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mm_vmscan_kswapd_wake";
     event->group = "vmscan";
     event->proto_field_id = 48;
-    event->fields.push_back(MakeField("nid", 1, ProtoFieldType::kProtoInt32));
-    event->fields.push_back(MakeField("order", 2, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("nid", 1, ProtoSchemaType::kInt32));
+    event->fields.push_back(MakeField("order", 2, ProtoSchemaType::kInt32));
   }
 
   {
@@ -4336,7 +3941,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "mm_vmscan_kswapd_sleep";
     event->group = "vmscan";
     event->proto_field_id = 49;
-    event->fields.push_back(MakeField("nid", 1, ProtoFieldType::kProtoInt32));
+    event->fields.push_back(MakeField("nid", 1, ProtoSchemaType::kInt32));
   }
 
   {
@@ -4345,7 +3950,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "workqueue_activate_work";
     event->group = "workqueue";
     event->proto_field_id = 56;
-    event->fields.push_back(MakeField("work", 1, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("work", 1, ProtoSchemaType::kUint64));
   }
 
   {
@@ -4354,7 +3959,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "workqueue_execute_end";
     event->group = "workqueue";
     event->proto_field_id = 57;
-    event->fields.push_back(MakeField("work", 1, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("work", 1, ProtoSchemaType::kUint64));
   }
 
   {
@@ -4363,9 +3968,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "workqueue_execute_start";
     event->group = "workqueue";
     event->proto_field_id = 58;
-    event->fields.push_back(MakeField("work", 1, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("function", 2, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("work", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("function", 2, ProtoSchemaType::kUint64));
   }
 
   {
@@ -4374,14 +3978,12 @@ std::vector<Event> GetStaticEventInfo() {
     event->name = "workqueue_queue_work";
     event->group = "workqueue";
     event->proto_field_id = 59;
-    event->fields.push_back(MakeField("work", 1, ProtoFieldType::kProtoUint64));
+    event->fields.push_back(MakeField("work", 1, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("function", 2, ProtoSchemaType::kUint64));
     event->fields.push_back(
-        MakeField("function", 2, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("workqueue", 3, ProtoFieldType::kProtoUint64));
-    event->fields.push_back(
-        MakeField("req_cpu", 4, ProtoFieldType::kProtoUint32));
-    event->fields.push_back(MakeField("cpu", 5, ProtoFieldType::kProtoUint32));
+        MakeField("workqueue", 3, ProtoSchemaType::kUint64));
+    event->fields.push_back(MakeField("req_cpu", 4, ProtoSchemaType::kUint32));
+    event->fields.push_back(MakeField("cpu", 5, ProtoSchemaType::kUint32));
   }
 
   return events;

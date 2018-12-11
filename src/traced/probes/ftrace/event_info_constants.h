@@ -140,7 +140,7 @@ struct Field {
   const char* ftrace_name;
 
   uint32_t proto_field_id;
-  protozero::proto_utils::ProtoFieldType proto_field_type;
+  protozero::proto_utils::ProtoSchemaType proto_field_type;
 
   TranslationStrategy strategy;
 };
@@ -170,12 +170,12 @@ struct Event {
 std::vector<Field> GetStaticCommonFieldsInfo();
 
 bool SetTranslationStrategy(FtraceFieldType ftrace,
-                            protozero::proto_utils::ProtoFieldType proto,
+                            protozero::proto_utils::ProtoSchemaType proto,
                             TranslationStrategy* out);
 
 Field MakeField(const char* name,
                 uint32_t id,
-                protozero::proto_utils::ProtoFieldType type);
+                protozero::proto_utils::ProtoSchemaType type);
 
 }  // namespace perfetto
 

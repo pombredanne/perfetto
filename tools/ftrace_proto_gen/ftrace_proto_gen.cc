@@ -202,7 +202,7 @@ std::string SingleEventInfo(perfetto::Proto proto,
 
   for (const auto& field : proto.SortedFields()) {
     s += "    event->fields.push_back(MakeField(\"" + field->name + "\", " +
-         std::to_string(field->number) + ", ProtoFieldType::kProto" +
+         std::to_string(field->number) + ", ProtoSchemaType::k" +
          ToCamelCase(field->type.ToString()) + "));\n";
   }
   return s;
@@ -220,7 +220,7 @@ void GenerateEventInfo(const std::vector<std::string>& events_info,
 
 namespace perfetto {
 
-using protozero::proto_utils::ProtoFieldType;
+using protozero::proto_utils::ProtoSchemaType;
 
 std::vector<Event> GetStaticEventInfo() {
   std::vector<Event> events;
