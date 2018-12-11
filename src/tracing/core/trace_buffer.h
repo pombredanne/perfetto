@@ -522,15 +522,13 @@ class TraceBuffer {
   // It becomes invalid after any call to methods that alters the |index_|.
   SequenceIterator read_iter_;
 
-  // These maps keep track of the highest ChunkID read/written for a given
-  // writer, taking into account a potential overflow of ChunkIDs. In the case
-  // of overflow, they stores the highest ChunkID read/written since the
-  // overflow.
+  // Keeps track of the highest ChunkID written for a given sequence, taking
+  // into account a potential overflow of ChunkIDs. In the case of overflow,
+  // stores the highest ChunkID written since the overflow.
   //
-  // TODO(primiano): should clean up keys from these maps. Right now they grows
+  // TODO(primiano): should clean up keys from this map. Right now it grows
   // without bounds (although realistically is not a problem unless we have too
   // many producers/writers within the same trace session).
-  std::map<std::pair<ProducerID, WriterID>, ChunkID> last_chunk_id_read_;
   std::map<std::pair<ProducerID, WriterID>, ChunkID> last_chunk_id_written_;
 
   // Statistics about buffer usage.

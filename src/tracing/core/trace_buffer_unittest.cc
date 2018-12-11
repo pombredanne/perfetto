@@ -1137,7 +1137,7 @@ TEST_F(TraceBufferTest, Iterator_OneStreamOrdered) {
   });
   ASSERT_TRUE(IteratorSeqEq(ProducerID(1), WriterID(2), {}));
   ASSERT_TRUE(IteratorSeqEq(ProducerID(-1), WriterID(-1), {}));
-  ASSERT_TRUE(IteratorSeqEq(ProducerID(1), WriterID(1), {0, 1, 2, 5, 6, 7}));
+  ASSERT_TRUE(IteratorSeqEq(ProducerID(1), WriterID(1), {0, 1, 2}));
 }
 
 TEST_F(TraceBufferTest, Iterator_OneStreamWrapping) {
@@ -1164,36 +1164,36 @@ TEST_F(TraceBufferTest, Iterator_ManyStreamsOrdered) {
       {ProducerID(1), WriterID(1), ChunkID(1)},
       {ProducerID(1), WriterID(2), ChunkID(0)},
       {ProducerID(3), WriterID(1), ChunkID(0)},
-      {ProducerID(1), WriterID(2), ChunkID(3)},
-      {ProducerID(1), WriterID(2), ChunkID(5)},
-      {ProducerID(3), WriterID(1), ChunkID(7)},
-      {ProducerID(1), WriterID(1), ChunkID(6)},
-      {ProducerID(3), WriterID(1), ChunkID(8)},
+      {ProducerID(1), WriterID(2), ChunkID(1)},
+      {ProducerID(1), WriterID(2), ChunkID(2)},
+      {ProducerID(3), WriterID(1), ChunkID(1)},
+      {ProducerID(1), WriterID(1), ChunkID(2)},
+      {ProducerID(3), WriterID(1), ChunkID(2)},
   });
-  ASSERT_TRUE(IteratorSeqEq(ProducerID(1), WriterID(1), {0, 1, 6}));
-  ASSERT_TRUE(IteratorSeqEq(ProducerID(1), WriterID(2), {0, 3, 5}));
-  ASSERT_TRUE(IteratorSeqEq(ProducerID(3), WriterID(1), {0, 7, 8}));
+  ASSERT_TRUE(IteratorSeqEq(ProducerID(1), WriterID(1), {0, 1, 2}));
+  ASSERT_TRUE(IteratorSeqEq(ProducerID(1), WriterID(2), {0, 1, 2}));
+  ASSERT_TRUE(IteratorSeqEq(ProducerID(3), WriterID(1), {0, 1, 2}));
 }
 
 TEST_F(TraceBufferTest, Iterator_ManyStreamsWrapping) {
   ResetBuffer(64 * 1024);
   auto Neg = [](int x) -> ChunkID {
-    return kMaxChunkID + static_cast<ChunkID>(x);
+    return kMaxChunkID + static_cast<ChunkID>(x) + 1;
   };
   AppendChunks({
-      {ProducerID(1), WriterID(1), ChunkID(Neg(-4))},
-      {ProducerID(1), WriterID(1), ChunkID(Neg(-3))},
-      {ProducerID(1), WriterID(2), ChunkID(Neg(-2))},
+      {ProducerID(1), WriterID(1), ChunkID(Neg(-2))},
+      {ProducerID(1), WriterID(1), ChunkID(Neg(-1))},
+      {ProducerID(1), WriterID(2), ChunkID(Neg(-1))},
       {ProducerID(3), WriterID(1), ChunkID(Neg(-1))},
       {ProducerID(1), WriterID(2), ChunkID(0)},
       {ProducerID(1), WriterID(2), ChunkID(1)},
-      {ProducerID(3), WriterID(1), ChunkID(2)},
-      {ProducerID(1), WriterID(1), ChunkID(3)},
-      {ProducerID(3), WriterID(1), ChunkID(4)},
+      {ProducerID(3), WriterID(1), ChunkID(0)},
+      {ProducerID(1), WriterID(1), ChunkID(0)},
+      {ProducerID(3), WriterID(1), ChunkID(1)},
   });
-  ASSERT_TRUE(IteratorSeqEq(ProducerID(1), WriterID(1), {Neg(-4), Neg(-3), 3}));
-  ASSERT_TRUE(IteratorSeqEq(ProducerID(1), WriterID(2), {Neg(-2), 0, 1}));
-  ASSERT_TRUE(IteratorSeqEq(ProducerID(3), WriterID(1), {Neg(-1), 2, 4}));
+  ASSERT_TRUE(IteratorSeqEq(ProducerID(1), WriterID(1), {Neg(-2), Neg(-1), 0}));
+  ASSERT_TRUE(IteratorSeqEq(ProducerID(1), WriterID(2), {Neg(-1), 0, 1}));
+  ASSERT_TRUE(IteratorSeqEq(ProducerID(3), WriterID(1), {Neg(-1), 0, 1}));
 }
 
 // TODO(primiano): test stats().
