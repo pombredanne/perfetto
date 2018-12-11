@@ -69,7 +69,7 @@ ProtoDecoder::Field ProtoDecoder::ReadField() {
   const uint8_t* new_pos = nullptr;
   uint64_t field_intvalue = 0;
   switch (field.type) {
-    case kProtoWireVarInt: {
+    case ProtoWireType::kVarInt: {
       new_pos = ParseVarInt(pos, end, &field.int_value);
 
       // new_pos not being greater than pos means ParseVarInt could not fully
@@ -82,7 +82,7 @@ ProtoDecoder::Field ProtoDecoder::ReadField() {
       pos = new_pos;
       break;
     }
-    case kProtoWireLengthDelimited: {
+    case ProtoWireType::kLengthDelimited: {
       new_pos = ParseVarInt(pos, end, &field_intvalue);
 
       // new_pos not being greater than pos means ParseVarInt could not fully
@@ -100,7 +100,7 @@ ProtoDecoder::Field ProtoDecoder::ReadField() {
       pos += field_intvalue;
       break;
     }
-    case kProtoWireFixed64: {
+    case ProtoWireType::kFixed64: {
       if (pos + sizeof(uint64_t) > end) {
         return field;
       }
@@ -109,7 +109,7 @@ ProtoDecoder::Field ProtoDecoder::ReadField() {
       pos += sizeof(uint64_t);
       break;
     }
-    case kProtoWireFixed32: {
+    case ProtoWireType::kFixed32: {
       if (pos + sizeof(uint32_t) > end) {
         return field;
       }

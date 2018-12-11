@@ -31,11 +31,11 @@ namespace proto_utils {
 // See https://developers.google.com/protocol-buffers/docs/encoding wire types.
 // This is a type encoded into the proto that provides just enough info to
 // find the length of the following value.
-enum ProtoWireType : uint32_t {
-  kProtoWireVarInt = 0,
-  kProtoWireFixed64 = 1,
-  kProtoWireLengthDelimited = 2,
-  kProtoWireFixed32 = 5,
+enum class ProtoWireType : uint32_t {
+  kVarInt = 0,
+  kFixed64 = 1,
+  kLengthDelimited = 2,
+  kFixed32 = 5,
 };
 
 // This is the type defined in the proto for each field. This information
@@ -119,7 +119,7 @@ constexpr size_t kMaxSimpleFieldEncodedSize = kMaxTagEncodedSize + 10;
 
 // Proto types: (int|uint|sint)(32|64), bool, enum.
 constexpr uint32_t MakeTagVarInt(uint32_t field_id) {
-  return (field_id << 3) | kProtoWireVarInt;
+  return (field_id << 3) | static_cast<uint32_t>(ProtoWireType::kVarInt);
 }
 
 // Proto types: fixed64, sfixed64, fixed32, sfixed32, double, float.
@@ -127,12 +127,14 @@ template <typename T>
 constexpr uint32_t MakeTagFixed(uint32_t field_id) {
   static_assert(sizeof(T) == 8 || sizeof(T) == 4, "Value must be 4 or 8 bytes");
   return (field_id << 3) |
-         (sizeof(T) == 8 ? kProtoWireFixed64 : kProtoWireFixed32);
+         static_cast<uint32_t>((sizeof(T) == 8 ? ProtoWireType::kFixed64
+                                               : ProtoWireType::kFixed32));
 }
 
 // Proto types: string, bytes, embedded messages.
 constexpr uint32_t MakeTagLengthDelimited(uint32_t field_id) {
-  return (field_id << 3) | kProtoWireLengthDelimited;
+  return (field_id << 3) |
+         static_cast<uint32_t>(ProtoWireType::kLengthDelimited);
 }
 
 // Proto types: sint64, sint32.

@@ -33,6 +33,7 @@ namespace perfetto {
 
 namespace {
 
+using protozero::proto_utils::ProtoSchemaType;
 using protos::pbzero::GenericFtraceEvent;
 
 ProtoTranslationTable::FtracePageHeaderSpec MakeFtracePageHeaderSpec(
@@ -169,14 +170,14 @@ bool Match(const char* string, const char* pattern) {
 
 // Set proto field type and id based on the ftrace type.
 void SetProtoType(FtraceFieldType ftrace_type,
-                  protozero::proto_utils::ProtoSchemaType* proto_type,
+                  ProtoSchemaType* proto_type,
                   uint32_t* proto_field_id) {
   switch (ftrace_type) {
     case kFtraceCString:
     case kFtraceFixedCString:
     case kFtraceStringPtr:
     case kFtraceDataLoc:
-      *proto_type = protozero::proto_utils::ProtoSchemaType::kString;
+      *proto_type = ProtoSchemaType::kString;
       *proto_field_id = GenericFtraceEvent::Field::kStrValueFieldNumber;
       break;
     case kFtraceInt8:
@@ -185,7 +186,7 @@ void SetProtoType(FtraceFieldType ftrace_type,
     case kFtracePid32:
     case kFtraceCommonPid32:
     case kFtraceInt64:
-      *proto_type = protozero::proto_utils::ProtoSchemaType::kInt64;
+      *proto_type = ProtoSchemaType::kInt64;
       *proto_field_id = GenericFtraceEvent::Field::kIntValueFieldNumber;
       break;
     case kFtraceUint8:
@@ -197,7 +198,7 @@ void SetProtoType(FtraceFieldType ftrace_type,
     case kFtraceUint64:
     case kFtraceInode32:
     case kFtraceInode64:
-      *proto_type = protozero::proto_utils::ProtoSchemaType::kUint64;
+      *proto_type = ProtoSchemaType::kUint64;
       *proto_field_id = GenericFtraceEvent::Field::kUintValueFieldNumber;
       break;
   }
