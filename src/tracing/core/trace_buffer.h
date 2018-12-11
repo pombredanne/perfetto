@@ -342,6 +342,9 @@ class TraceBuffer {
 
     uint16_t num_fragments_read = 0;   // Number of fragments already read.
 
+    static constexpr size_t kMaxNumFragments =
+        std::numeric_limits<decltype(num_fragments)>::max();
+
     // The start offset of the next fragment (the |num_fragments_read|-th) to be
     // read. This is the offset in bytes from the beginning of the ChunkRecord's
     // payload (the 1st fragment starts at |chunk_record| +
@@ -443,6 +446,12 @@ class TraceBuffer {
   // packets.
   ReadAheadResult ReadAhead(TracePacket*);
 
+  // Marks the given chunk as fully read. Called when the read iterator
+  // progresses past |chunk_meta| to subsequent chunk. Future reads will skip
+  // this chunk, and CopyChunkUntrusted() will prevent the chunk from being
+  // overridden in the future.
+  void MarkChunkReadComplete(ChunkMeta* chunk_meta);
+
   // Deletes (by marking the record invalid and removing form the index) all
   // chunks from |wptr_| to |wptr_| + |bytes_to_clear|. Returns the size of the
   // gap left between the next valid Chunk and the end of the deletion range, or
@@ -530,15 +539,13 @@ class TraceBuffer {
   // It becomes invalid after any call to methods that alters the |index_|.
   SequenceIterator read_iter_;
 
-  // These maps keep track of the highest ChunkID read/written for a given
-  // writer, taking into account a potential overflow of ChunkIDs. In the case
-  // of overflow, they stores the highest ChunkID read/written since the
-  // overflow.
+  // Keeps track of the highest ChunkID written for a given sequence, taking
+  // into account a potential overflow of ChunkIDs. In the case of overflow,
+  // stores the highest ChunkID written since the overflow.
   //
-  // TODO(primiano): should clean up keys from these maps. Right now they grows
+  // TODO(primiano): should clean up keys from this map. Right now it grows
   // without bounds (although realistically is not a problem unless we have too
   // many producers/writers within the same trace session).
-  std::map<std::pair<ProducerID, WriterID>, ChunkID> last_chunk_id_read_;
   std::map<std::pair<ProducerID, WriterID>, ChunkID> last_chunk_id_written_;
 
   // Statistics about buffer usage.
