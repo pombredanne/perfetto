@@ -45,6 +45,7 @@ class CounterTrack extends Track<Config, Data> {
   private reqPending = false;
   private mouseXpos = 0;
   private hoveredValue: number|undefined = undefined;
+  private hoveredTs: number|undefined = undefined;
 
   constructor(trackState: TrackState) {
     super(trackState);
@@ -121,13 +122,13 @@ class CounterTrack extends Track<Config, Data> {
     for (let i = 0; i < data.values.length; i++) {
       const value = data.values[i];
       const startTime = data.timestamps[i];
+      const nextY = zeroY - Math.round((value / yRange) * RECT_HEIGHT);
+      if (nextY === lastY) continue;
 
       lastX = Math.floor(timeScale.timeToPx(startTime));
       ctx.lineTo(lastX, lastY);
-
-      const height = Math.round((value / yRange) * RECT_HEIGHT);
-      lastY = zeroY - height;
-      ctx.lineTo(lastX, lastY);
+      ctx.lineTo(lastX, nextY);
+      lastY = nextY;
     }
     ctx.lineTo(endPx, lastY);
     ctx.lineTo(endPx, zeroY);
@@ -146,7 +147,7 @@ class CounterTrack extends Track<Config, Data> {
 
     ctx.font = '10px Google Sans';
 
-    if (this.hoveredValue !== undefined) {
+    if (this.hoveredValue !== undefined && this.hoveredTs !== undefined) {
       // Draw a vertical bar to highlight the mouse cursor.
       ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
       const height = Math.round(RECT_HEIGHT * this.hoveredValue / yMax);
@@ -163,6 +164,17 @@ class CounterTrack extends Track<Config, Data> {
       ctx.fillStyle = 'hsl(200, 50%, 40%)';
       ctx.textAlign = 'left';
       ctx.fillText(text, this.mouseXpos + 8, 18);
+
+      // Draw change marker.
+      const x = Math.floor(timeScale.timeToPx(this.hoveredTs));
+      const y = zeroY - Math.round((this.hoveredValue / yRange) * RECT_HEIGHT);
+      ctx.fillStyle = `hsl(${hue}, 45%, 75%)`;
+      ctx.strokeStyle = `hsl(${hue}, 45%, 45%)`;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(x, y, 3 /*r*/, 0 /*start angle*/, 2 * Math.PI /*end angle*/);
+      ctx.fill();
+      ctx.stroke();
     }
 
     // Write the Y scale on the top left corner.
@@ -188,15 +200,18 @@ class CounterTrack extends Track<Config, Data> {
     this.mouseXpos = x;
     const {timeScale} = globals.frontendLocalState;
     const time = timeScale.pxToTime(x);
+    this.hoveredTs = undefined;
     this.hoveredValue = undefined;
     for (let i = 0; i < data.values.length; i++) {
       if (data.timestamps[i] > time) break;
+      this.hoveredTs = data.timestamps[i];
       this.hoveredValue = data.values[i];
     }
   }
 
   onMouseOut() {
     this.hoveredValue = undefined;
+    this.hoveredTs = undefined;
   }
 }
 
