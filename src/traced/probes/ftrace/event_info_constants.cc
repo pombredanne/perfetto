@@ -17,7 +17,7 @@
 #include "src/traced/probes/ftrace/event_info_constants.h"
 
 namespace perfetto {
-using namespace protozero::proto_utils;
+using protozero::proto_utils::ProtoSchemaType;
 
 Field MakeField(const char* name, uint32_t id, ProtoSchemaType type) {
   Field field{};

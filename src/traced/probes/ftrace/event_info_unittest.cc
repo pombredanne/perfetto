@@ -21,7 +21,7 @@
 
 namespace perfetto {
 namespace {
-using namespace protozero::proto_utils;
+using protozero::proto_utils::ProtoSchemaType;
 
 TEST(EventInfoTest, GetStaticEventInfoSanityCheck) {
   std::vector<Event> events = GetStaticEventInfo();
