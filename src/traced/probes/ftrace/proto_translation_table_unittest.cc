@@ -36,6 +36,7 @@ using testing::Pointee;
 
 namespace perfetto {
 namespace {
+using namespace protozero::proto_utils;
 
 class MockFtraceProcfs : public FtraceProcfs {
  public:
@@ -110,6 +111,7 @@ TEST(TranslationTableTest, Seed) {
   FtraceProcfs ftrace_procfs(path);
   auto table = ProtoTranslationTable::Create(
       &ftrace_procfs, GetStaticEventInfo(), GetStaticCommonFieldsInfo());
+  PERFETTO_CHECK(table);
   const Field& pid_field = table->common_fields().at(0);
   EXPECT_EQ(std::string(pid_field.ftrace_name), "common_pid");
   EXPECT_EQ(pid_field.proto_field_id, 2u);
@@ -233,6 +235,7 @@ print fmt: "some format")"));
 
   auto table = ProtoTranslationTable::Create(&ftrace, std::move(events),
                                              std::move(common_fields));
+  PERFETTO_CHECK(table);
   EXPECT_EQ(table->largest_id(), 42ul);
   EXPECT_EQ(table->EventToFtraceId(GroupAndName("group", "foo")), 42ul);
   EXPECT_EQ(table->EventToFtraceId(GroupAndName("group", "bar")), 0ul);
@@ -395,6 +398,7 @@ print fmt: "some format")"));
 
   auto table = ProtoTranslationTable::Create(&ftrace, std::move(events),
                                              std::move(common_fields));
+  PERFETTO_CHECK(table);
   EXPECT_EQ(table->largest_id(), 0ul);
   GroupAndName group_and_name("group", "foo");
   const Event* e = table->GetOrCreateEvent(group_and_name);
