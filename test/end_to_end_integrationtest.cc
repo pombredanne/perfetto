@@ -83,6 +83,8 @@ class PerfettoTest : public ::testing::Test {
 #endif
 
 TEST_F(PerfettoTest, TreeHuggerOnly(TestFtraceProducer)) {
+  base::ignore_result(TEST_PRODUCER_SOCK_NAME);
+
   base::TestTaskRunner task_runner;
 
   TestHelper helper(&task_runner);
