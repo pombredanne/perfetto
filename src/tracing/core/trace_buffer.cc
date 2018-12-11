@@ -256,7 +256,6 @@ size_t TraceBuffer::DeleteNextChunksFor(size_t bytes_to_clear) {
         const ChunkMeta& meta = it->second;
         if (PERFETTO_UNLIKELY(meta.num_fragments_read < meta.num_fragments))
           stats_.chunks_overwritten++;
-
         index_.erase(it);
         removed = true;
       }
