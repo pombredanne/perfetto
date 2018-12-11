@@ -76,12 +76,6 @@ class PerfettoTest : public ::testing::Test {
 #endif
 
 // TODO(b/73453011): reenable on more platforms (including standalone Android).
-#if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
-#define TreeHuggerOnly(x) x
-#else
-#define TreeHuggerOnly(x) DISABLED_##x
-#endif
-
 TEST_F(PerfettoTest, TreeHuggerOnly(TestFtraceProducer)) {
   base::ignore_result(TEST_PRODUCER_SOCK_NAME);
 
@@ -127,6 +121,7 @@ TEST_F(PerfettoTest, TreeHuggerOnly(TestFtraceProducer)) {
   }
 }
 
+// TODO(b/73453011): reenable on more platforms (including standalone Android).
 TEST_F(PerfettoTest, TreeHuggerOnly(TestFtraceFlush)) {
   base::TestTaskRunner task_runner;
 
@@ -185,6 +180,7 @@ TEST_F(PerfettoTest, TreeHuggerOnly(TestFtraceFlush)) {
   ASSERT_EQ(marker_found, 1);
 }
 
+// TODO(b/73453011): reenable on more platforms (including standalone Android).
 TEST_F(PerfettoTest, TreeHuggerOnly(TestBatteryTracing)) {
   base::TestTaskRunner task_runner;
 

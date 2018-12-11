@@ -52,7 +52,8 @@ class HeapprofdDelegate : public ThreadDelegate {
   std::unique_ptr<HeapprofdProducer> producer_;
 };
 
-TEST(HeapprofdEndToEnd, Smoke) {
+// TODO(b/120850358): The platform on Kokoro is too old to run this test.
+TEST(HeapprofdEndToEnd, TreeHuggerOnly(Smoke)) {
   base::TestTaskRunner task_runner;
 
   TestHelper helper(&task_runner);
