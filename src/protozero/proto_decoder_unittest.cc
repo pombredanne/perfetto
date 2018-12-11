@@ -48,7 +48,7 @@ TEST(ProtoDecoder, ReadString) {
   ProtoDecoder::Field field = decoder.ReadField();
 
   ASSERT_EQ(field.id, 1u);
-  ASSERT_EQ(field.type, proto_utils::FieldType::kFieldTypeLengthDelimited);
+  ASSERT_EQ(field.type, proto_utils::ProtoWireType::kProtoWireLengthDelimited);
   ASSERT_EQ(field.length_limited.length, sizeof(kTestString) - 1);
   for (size_t i = 0; i < sizeof(kTestString) - 1; i++) {
     ASSERT_EQ(field.length_limited.data[i], kTestString[i]);
@@ -60,27 +60,27 @@ TEST(ProtoDecoder, FixedData) {
     const char* encoded;
     size_t encoded_size;
     uint32_t id;
-    FieldType type;
+    ProtoWireType type;
     uint64_t int_value;
   };
 
   const FieldExpectation kFieldExpectations[] = {
-      {"\x08\x00", 2, 1, kFieldTypeVarInt, 0},
-      {"\x08\x42", 2, 1, kFieldTypeVarInt, 0x42},
-      {"\xF8\x07\x42", 3, 127, kFieldTypeVarInt, 0x42},
-      {"\x90\x4D\xFF\xFF\xFF\xFF\x0F", 7, 1234, kFieldTypeVarInt, 0xFFFFFFFF},
-      {"\x7D\x42\x00\x00\x00", 5, 15, kFieldTypeFixed32, 0x42},
-      {"\x95\x4D\x78\x56\x34\x12", 6, 1234, kFieldTypeFixed32, 0x12345678},
-      {"\x79\x42\x00\x00\x00\x00\x00\x00\x00", 9, 15, kFieldTypeFixed64, 0x42},
-      {"\x91\x4D\x08\x07\x06\x05\x04\x03\x02\x01", 10, 1234, kFieldTypeFixed64,
+      {"\x08\x00", 2, 1, kProtoWireVarInt, 0},
+      {"\x08\x42", 2, 1, kProtoWireVarInt, 0x42},
+      {"\xF8\x07\x42", 3, 127, kProtoWireVarInt, 0x42},
+      {"\x90\x4D\xFF\xFF\xFF\xFF\x0F", 7, 1234, kProtoWireVarInt, 0xFFFFFFFF},
+      {"\x7D\x42\x00\x00\x00", 5, 15, kProtoWireFixed32, 0x42},
+      {"\x95\x4D\x78\x56\x34\x12", 6, 1234, kProtoWireFixed32, 0x12345678},
+      {"\x79\x42\x00\x00\x00\x00\x00\x00\x00", 9, 15, kProtoWireFixed64, 0x42},
+      {"\x91\x4D\x08\x07\x06\x05\x04\x03\x02\x01", 10, 1234, kProtoWireFixed64,
        0x0102030405060708},
-      {"\x0A\x00", 2, 1, kFieldTypeLengthDelimited, 0},
-      {"\x0A\x04|abc", 6, 1, kFieldTypeLengthDelimited, 4},
-      {"\x92\x4D\x04|abc", 7, 1234, kFieldTypeLengthDelimited, 4},
+      {"\x0A\x00", 2, 1, kProtoWireLengthDelimited, 0},
+      {"\x0A\x04|abc", 6, 1, kProtoWireLengthDelimited, 4},
+      {"\x92\x4D\x04|abc", 7, 1234, kProtoWireLengthDelimited, 4},
       {"\x92\x4D\x83\x01|abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzab"
        "cdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstu"
        "vwx",
-       135, 1234, kFieldTypeLengthDelimited, 131},
+       135, 1234, kProtoWireLengthDelimited, 131},
   };
 
   for (size_t i = 0; i < perfetto::base::ArraySize(kFieldExpectations); ++i) {
@@ -92,7 +92,7 @@ TEST(ProtoDecoder, FixedData) {
     ASSERT_EQ(exp.id, field.id);
     ASSERT_EQ(exp.type, field.type);
 
-    if (field.type == kFieldTypeLengthDelimited) {
+    if (field.type == kProtoWireLengthDelimited) {
       ASSERT_EQ(exp.int_value, field.length_limited.length);
     } else {
       ASSERT_EQ(exp.int_value, field.int_value);

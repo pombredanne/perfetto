@@ -29,13 +29,83 @@ namespace protozero {
 namespace proto_utils {
 
 // See https://developers.google.com/protocol-buffers/docs/encoding wire types.
-
-enum FieldType : uint32_t {
-  kFieldTypeVarInt = 0,
-  kFieldTypeFixed64 = 1,
-  kFieldTypeLengthDelimited = 2,
-  kFieldTypeFixed32 = 5,
+// This is a type encoded into the proto that provides just enough info to
+// find the length of the following value.
+enum ProtoWireType : uint32_t {
+  kProtoWireVarInt = 0,
+  kProtoWireFixed64 = 1,
+  kProtoWireLengthDelimited = 2,
+  kProtoWireFixed32 = 5,
 };
+
+// This is the type defined in the proto for each field. This information
+enum class ProtoSchemaType {
+  kUnknown = 0,
+  kDouble,
+  kFloat,
+  kInt64,
+  kUint64,
+  kInt32,
+  kFixed64,
+  kFixed32,
+  kBool,
+  kString,
+  kGroup,  // Deprecated (proto2 only)
+  kMessage,
+  kBytes,
+  kUint32,
+  kEnum,
+  kSfixed32,
+  kSfixed64,
+  kSint32,
+  kSint64,
+};
+
+inline const char* ProtoSchemaToString(ProtoSchemaType v) {
+  switch (v) {
+    case ProtoSchemaType::kUnknown:
+      return "unknown";
+    case ProtoSchemaType::kDouble:
+      return "double";
+    case ProtoSchemaType::kFloat:
+      return "float";
+    case ProtoSchemaType::kInt64:
+      return "int64";
+    case ProtoSchemaType::kUint64:
+      return "uint64";
+    case ProtoSchemaType::kInt32:
+      return "int32";
+    case ProtoSchemaType::kFixed64:
+      return "fixed64";
+    case ProtoSchemaType::kFixed32:
+      return "fixed32";
+    case ProtoSchemaType::kBool:
+      return "bool";
+    case ProtoSchemaType::kString:
+      return "string";
+    case ProtoSchemaType::kGroup:
+      return "group";
+    case ProtoSchemaType::kMessage:
+      return "message";
+    case ProtoSchemaType::kBytes:
+      return "bytes";
+    case ProtoSchemaType::kUint32:
+      return "uint32";
+    case ProtoSchemaType::kEnum:
+      return "enum";
+    case ProtoSchemaType::kSfixed32:
+      return "sfixed32";
+    case ProtoSchemaType::kSfixed64:
+      return "sfixed64";
+    case ProtoSchemaType::kSint32:
+      return "sint32";
+    case ProtoSchemaType::kSint64:
+      return "sint64";
+  }
+  // For gcc:
+  PERFETTO_DCHECK(false);
+  return "";
+}
 
 // Maximum message size supported: 256 MiB (4 x 7-bit due to varint encoding).
 constexpr size_t kMessageLengthFieldSize = 4;
@@ -49,7 +119,7 @@ constexpr size_t kMaxSimpleFieldEncodedSize = kMaxTagEncodedSize + 10;
 
 // Proto types: (int|uint|sint)(32|64), bool, enum.
 constexpr uint32_t MakeTagVarInt(uint32_t field_id) {
-  return (field_id << 3) | kFieldTypeVarInt;
+  return (field_id << 3) | kProtoWireVarInt;
 }
 
 // Proto types: fixed64, sfixed64, fixed32, sfixed32, double, float.
@@ -57,12 +127,12 @@ template <typename T>
 constexpr uint32_t MakeTagFixed(uint32_t field_id) {
   static_assert(sizeof(T) == 8 || sizeof(T) == 4, "Value must be 4 or 8 bytes");
   return (field_id << 3) |
-         (sizeof(T) == 8 ? kFieldTypeFixed64 : kFieldTypeFixed32);
+         (sizeof(T) == 8 ? kProtoWireFixed64 : kProtoWireFixed32);
 }
 
 // Proto types: string, bytes, embedded messages.
 constexpr uint32_t MakeTagLengthDelimited(uint32_t field_id) {
-  return (field_id << 3) | kFieldTypeLengthDelimited;
+  return (field_id << 3) | kProtoWireLengthDelimited;
 }
 
 // Proto types: sint64, sint32.
