@@ -44,7 +44,6 @@ static void GenerateFtraceDescriptors(
 
   namespace perfetto {
   namespace trace_processor {
-  
   namespace {
 
   std::array<MessageDescriptor,

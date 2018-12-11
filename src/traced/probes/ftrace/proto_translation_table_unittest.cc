@@ -36,7 +36,7 @@ using testing::Pointee;
 
 namespace perfetto {
 namespace {
-using namespace protozero::proto_utils;
+using protozero::proto_utils::ProtoSchemaType;
 
 class MockFtraceProcfs : public FtraceProcfs {
  public:

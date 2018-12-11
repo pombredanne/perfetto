@@ -76,7 +76,7 @@ bool MergeFieldInfo(const FtraceEvent::Field& ftrace_field,
                     const char* event_name_for_debug) {
   PERFETTO_DCHECK(field->ftrace_name);
   PERFETTO_DCHECK(field->proto_field_id);
-  PERFETTO_DCHECK(field->proto_field_type);
+  PERFETTO_DCHECK(static_cast<int>(field->proto_field_type));
   PERFETTO_DCHECK(!field->ftrace_offset);
   PERFETTO_DCHECK(!field->ftrace_size);
   PERFETTO_DCHECK(!field->ftrace_type);
@@ -348,7 +348,7 @@ std::unique_ptr<ProtoTranslationTable> ProtoTranslationTable::Create(
   }
   if (!ParseFtraceEventBody(std::move(page_header), nullptr,
                             &page_header_fields)) {
-    PERFETTO_DCHECK("Failed to parse page header.");
+    PERFETTO_DFATAL("Failed to parse page header.");
     return nullptr;
   }
 
