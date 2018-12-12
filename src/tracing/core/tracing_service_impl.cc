@@ -214,28 +214,26 @@ void TracingServiceImpl::DisconnectConsumer(ConsumerEndpointImpl* consumer) {
   PERFETTO_DCHECK(!std::any_of(
       tracing_sessions_.begin(), tracing_sessions_.end(),
       [consumer](const std::pair<const TracingSessionID, TracingSession>& kv) {
-        return kv.second.consumer == consumer;
+        return kv.second.consumer_maybe_null == consumer;
       }));
 #endif
 }
 
-void TracingServiceImpl::DetachConsumer(ConsumerEndpointImpl* consumer) {
+TracingSessionID TracingServiceImpl::DetachConsumer(
+    ConsumerEndpointImpl* consumer) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   PERFETTO_DLOG("Consumer %p detached", reinterpret_cast<void*>(consumer));
   PERFETTO_DCHECK(consumers_.count(consumer));
 
-  TracingSession* tracing_session;
   TracingSessionID tsid = consumer->tracing_session_id_;
-  if (tsid && (tracing_session = GetTracingSession(tsid))) {
-    PERFETTO_DCHECK(tracing_session->consumer == consumer);
-    tracing_session->consumer = nullptr;
-    consumer->tracing_session_id_ = 0;
-  } else {
-    tsid = 0;  // Notify 0 as a failure code.
-  }
-  // TODO just return the ID and have the consumer doing the notify.
-  // same for attach
-  consumer->NotifyOnDetach(tsid);
+  TracingSession* tracing_session;
+  if (!tsid || !(tracing_session = GetTracingSession(tsid)))
+    return 0;
+
+  PERFETTO_DCHECK(tracing_session->consumer_maybe_null == consumer);
+  tracing_session->consumer_maybe_null = nullptr;
+  consumer->tracing_session_id_ = 0;
+  return tsid;
 }
 
 bool TracingServiceImpl::AttachConsumer(ConsumerEndpointImpl* consumer,
@@ -265,7 +263,7 @@ bool TracingServiceImpl::AttachConsumer(ConsumerEndpointImpl* consumer,
     return false;
   }
 
-  tracing_session->consumer = consumer;
+  tracing_session->consumer_maybe_null = consumer;
   consumer->tracing_session_id_ = tsid;
   return true;
 }
@@ -621,8 +619,8 @@ void TracingServiceImpl::DisableTracingNotifyConsumerAndFlushFile(
     ReadBuffers(tracing_session->id, nullptr);
   }
 
-  if (tracing_session->consumer)
-    tracing_session->consumer->NotifyOnTracingDisabled();
+  if (tracing_session->consumer_maybe_null)
+    tracing_session->consumer_maybe_null->NotifyOnTracingDisabled();
 }
 
 void TracingServiceImpl::Flush(TracingSessionID tsid,
@@ -1462,25 +1460,6 @@ void TracingServiceImpl::ConsumerEndpointImpl::NotifyOnTracingDisabled() {
   });
 }
 
-void TracingServiceImpl::ConsumerEndpointImpl::NotifyOnDetach(
-    TracingSessionID tsid) {
-  PERFETTO_DCHECK_THREAD(thread_checker_);
-  auto weak_this = GetWeakPtr();
-  task_runner_->PostTask([weak_this, tsid] {
-    if (weak_this)
-      weak_this->consumer_->OnDetach(tsid);
-  });
-}
-
-void TracingServiceImpl::ConsumerEndpointImpl::NotifyOnAttach(bool success) {
-  PERFETTO_DCHECK_THREAD(thread_checker_);
-  auto weak_this = GetWeakPtr();
-  task_runner_->PostTask([weak_this, success] {
-    if (weak_this)
-      weak_this->consumer_->OnAttach(success);
-  });
-}
-
 void TracingServiceImpl::ConsumerEndpointImpl::EnableTracing(
     const TraceConfig& cfg,
     base::ScopedFile fd) {
@@ -1538,12 +1517,22 @@ void TracingServiceImpl::ConsumerEndpointImpl::Flush(uint32_t timeout_ms,
 
 void TracingServiceImpl::ConsumerEndpointImpl::Detach() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  service_->DetachConsumer(this);
+  TracingSessionID tsid = service_->DetachConsumer(this);
+  auto weak_this = GetWeakPtr();
+  task_runner_->PostTask([weak_this, tsid] {
+    if (weak_this)
+      weak_this->consumer_->OnDetach(tsid);
+  });
 }
 
 void TracingServiceImpl::ConsumerEndpointImpl::Attach(TracingSessionID tsid) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  service_->AttachConsumer(this, tsid);
+  bool success = service_->AttachConsumer(this, tsid);
+  auto weak_this = GetWeakPtr();
+  task_runner_->PostTask([weak_this, success] {
+    if (weak_this)
+      weak_this->consumer_->OnAttach(success);
+  });
 }
 
 base::WeakPtr<TracingServiceImpl::ConsumerEndpointImpl>
@@ -1784,10 +1773,10 @@ void TracingServiceImpl::ProducerEndpointImpl::OnFreeBuffers(
 
 TracingServiceImpl::TracingSession::TracingSession(
     TracingSessionID session_id,
-    ConsumerEndpointImpl* consumer_ptr,
+    ConsumerEndpointImpl* consumer,
     const TraceConfig& new_config)
     : id(session_id),
-      consumer(consumer_ptr),
+      consumer_maybe_null(consumer),
       consumer_uid(consumer->uid_),
       config(new_config) {}
 

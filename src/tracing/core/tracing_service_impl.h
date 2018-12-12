@@ -133,8 +133,6 @@ class TracingServiceImpl : public TracingService {
     ~ConsumerEndpointImpl() override;
 
     void NotifyOnTracingDisabled();
-    void NotifyOnDetach(TracingSessionID);
-    void NotifyOnAttach(bool success);
     base::WeakPtr<ConsumerEndpointImpl> GetWeakPtr();
 
     // TracingService::ConsumerEndpoint implementation.
@@ -184,7 +182,7 @@ class TracingServiceImpl : public TracingService {
   void NotifyDataSourceStopped(ProducerID, const DataSourceInstanceID);
 
   // Called by ConsumerEndpointImpl.
-  void DetachConsumer(ConsumerEndpointImpl*);
+  TracingSessionID DetachConsumer(ConsumerEndpointImpl*);
   bool AttachConsumer(ConsumerEndpointImpl*, TracingSessionID);
   void DisconnectConsumer(ConsumerEndpointImpl*);
   bool EnableTracing(ConsumerEndpointImpl*,
@@ -245,9 +243,7 @@ class TracingServiceImpl : public TracingService {
 
   struct PendingFlush {
     std::set<ProducerID> producers;
-    ConsumerEndpoint::FlushCallback callback;  // TODO remember about this //
-                                               // DNS should be fine because of
-                                               // weakptr.
+    ConsumerEndpoint::FlushCallback callback;
     explicit PendingFlush(decltype(callback) cb) : callback(std::move(cb)) {}
   };
 
@@ -275,10 +271,10 @@ class TracingServiceImpl : public TracingService {
 
     // The consumer that started the session.
     // Can be nullptr if the consumer detached from the session.
-    ConsumerEndpointImpl* consumer;  // TODO rename to consumer_maybe_null? DNS
+    ConsumerEndpointImpl* consumer_maybe_null;
 
-    // UID of the consumer. This is valid even after the consumer detaches and
-    // does not change for the entire duration of the session. It is used to
+    // Unix uid of the consumer. This is valid even after the consumer detaches
+    // and does not change for the entire duration of the session. It is used to
     // prevent that a consumer re-attaches to a session from a different uid.
     uid_t const consumer_uid;
 
