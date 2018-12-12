@@ -17,8 +17,6 @@
 #include "src/trace_processor/slice_table.h"
 
 #include "src/trace_processor/storage_columns.h"
-#include "src/trace_processor/storage_cursor.h"
-#include "src/trace_processor/table_utils.h"
 
 namespace perfetto {
 namespace trace_processor {
@@ -30,7 +28,7 @@ void SliceTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
   Table::Register<SliceTable>(db, storage, "slices");
 }
 
-Table::Schema SliceTable::CreateSchema(int, const char* const*) {
+base::Optional<Table::Schema> SliceTable::Init(int, const char* const*) {
   const auto& slices = storage_->nestable_slices();
   std::unique_ptr<StorageColumn> cols[] = {
       NumericColumnPtr("ts", &slices.start_ns(), false /* hidden */,
@@ -54,10 +52,9 @@ std::unique_ptr<Table::Cursor> SliceTable::CreateCursor(
     sqlite3_value** argv) {
   uint32_t count =
       static_cast<uint32_t>(storage_->nestable_slices().slice_count());
-  auto it = table_utils::CreateBestRowIteratorForGenericSchema(schema_, count,
-                                                               qc, argv);
+  auto it = CreateBestRowIteratorForGenericSchema(count, qc, argv);
   return std::unique_ptr<Table::Cursor>(
-      new StorageCursor(std::move(it), schema_.mutable_columns()));
+      new Cursor(std::move(it), schema_.mutable_columns()));
 }
 
 int SliceTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
