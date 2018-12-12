@@ -31,7 +31,7 @@ std::map<std::string, std::unique_ptr<ProtoTranslationTable>>* g_tables;
 
 std::string GetBinaryDirectory() {
   std::string buf(512, '\0');
-  ssize_t rd = readlink("/proc/self/exe", &buf[0], buf.size() - 1);
+  ssize_t rd = readlink("/proc/self/exe", &buf[0], buf.size());
   if (rd < 0) {
     PERFETTO_ELOG("Failed to readlink(\"/proc/self/exe\"");
     return "";
@@ -42,7 +42,7 @@ std::string GetBinaryDirectory() {
     PERFETTO_ELOG("Failed to find directory.");
     return "";
   }
-  return buf;
+  return buf.substr(0, end + 1);
 }
 
 }  // namespace
