@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef SRC_PROFILING_MEMORY_SOCKET_LISTENER_H_
-#define SRC_PROFILING_MEMORY_SOCKET_LISTENER_H_
+#ifndef SRC_PROFILING_MEMORY_SHARED_RING_BUFFER_H_
+#define SRC_PROFILING_MEMORY_SHARED_RING_BUFFER_H_
 
 #include "perfetto/base/optional.h"
 #include "perfetto/base/unix_socket.h"
@@ -43,19 +43,44 @@ namespace profiling {
 // untrusted contexts.
 //
 // TODO:
-// - The writer should hold a spinlock only for updating the write pointer. The
-//   underlying memcpy() should happen outside of the lock. Requires some small
-//   juggling with atomics, the size field should be written at the end with a
-//   release store (and matched with an acquire load on the reader side).
-// - The reader should be able to ahold of a buffer without copying it, with a
-//   BeginRead/EndRead API. That must prevent the writer from overwriting the
-//   data though.
-// - Rename methods to TryRead / TryWrite.
 // - Write a benchmark.
 // - Make the stats ifdef-able.
 class SharedRingBuffer {
  public:
-  using BufferAndSize = std::pair<std::unique_ptr<uint8_t[]>, size_t>;
+  class BufferAndSize {
+   public:
+    friend class SharedRingBuffer;
+    friend void swap(BufferAndSize&, BufferAndSize&);
+
+    BufferAndSize() = default;
+    ~BufferAndSize();
+
+    BufferAndSize(const BufferAndSize&) = delete;
+    BufferAndSize& operator=(const BufferAndSize&) = delete;
+
+    BufferAndSize(BufferAndSize&&) noexcept;
+    BufferAndSize& operator=(BufferAndSize&&) noexcept;
+
+    uint8_t* payload() const { return data_; }
+    size_t payload_size() const { return size_; }
+    operator bool() const { return ring_buffer_ != nullptr; }
+
+   private:
+    BufferAndSize(uint8_t* data,
+                  size_t size,
+                  size_t size_with_header,
+                  SharedRingBuffer* ring_buffer)
+        : data_(data),
+          size_(size),
+          size_with_header_(size_with_header),
+          ring_buffer_(ring_buffer) {}
+
+    uint8_t* data_ = nullptr;
+    size_t size_ = 0;
+    size_t size_with_header_ = 0;
+    SharedRingBuffer* ring_buffer_ = nullptr;
+  };
+
   static base::Optional<SharedRingBuffer> Create(size_t);
   static base::Optional<SharedRingBuffer> Attach(base::ScopedFile);
 
@@ -66,7 +91,7 @@ class SharedRingBuffer {
   bool is_valid() const { return !!mem_; }
   size_t size() const { return size_; }
   int fd() const { return *mem_fd_; }
-  bool Write(const void*, size_t) PERFETTO_WARN_UNUSED_RESULT;
+  bool TryWrite(const void*, size_t) PERFETTO_WARN_UNUSED_RESULT;
   BufferAndSize Read();
 
  private:
@@ -93,6 +118,7 @@ class SharedRingBuffer {
   SharedRingBuffer(AttachFlag, base::ScopedFile mem_fd);
   void Initialize(base::ScopedFile mem_fd);
   bool IsCorrupt();
+  void Return(const BufferAndSize&);
 
   // Must be called holding the spinlock.
   inline size_t read_avail() {
@@ -118,7 +144,9 @@ class SharedRingBuffer {
   // Remember to update the move ctor when adding new fields.
 };
 
+void swap(SharedRingBuffer::BufferAndSize&, SharedRingBuffer::BufferAndSize&);
+
 }  // namespace profiling
 }  // namespace perfetto
 
-#endif  // SRC_PROFILING_MEMORY_SOCKET_LISTENER_H_
+#endif  // SRC_PROFILING_MEMORY_SHARED_RING_BUFFER_H_

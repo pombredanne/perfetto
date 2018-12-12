@@ -37,6 +37,7 @@ namespace perfetto {
 namespace profiling {
 
 namespace {
+
 constexpr auto kMetaPageSize = base::kPageSize;
 constexpr auto kAlignment = 8;  // 64 bits to use aligned memcpy().
 constexpr auto kHeaderSize = kAlignment;
@@ -44,14 +45,14 @@ constexpr auto kGuardSize = base::kPageSize * 1024 * 16;  // 64 MB.
 
 class ScopedSpinlock {
  public:
-  ScopedSpinlock(std::atomic<bool>* lock) : lock_(lock) {
+  ScopedSpinlock(std::atomic<bool>* lock, bool force) : lock_(lock) {
     if (PERFETTO_LIKELY(!(*lock_).exchange(true, std::memory_order_acquire))) {
       locked_ = true;
       return;
     }
 
     // Slowpath.
-    for (size_t attempt = 0; attempt < 1024 * 10; attempt++) {
+    for (size_t attempt = 0; force || attempt < 1024 * 10; attempt++) {
       if (!(*lock_).load(std::memory_order_relaxed) &&
           PERFETTO_LIKELY(
               !(*lock_).exchange(true, std::memory_order_acquire))) {
@@ -174,10 +175,10 @@ void SharedRingBuffer::Initialize(base::ScopedFile mem_fd) {
   mem_fd_ = std::move(mem_fd);
 }
 
-bool SharedRingBuffer::Write(const void* src, size_t size) {
+bool SharedRingBuffer::TryWrite(const void* src, size_t size) {
   uint8_t* wr_ptr;
   {
-    ScopedSpinlock try_spinlock(&meta_->spinlock);
+    ScopedSpinlock try_spinlock(&meta_->spinlock, false);
     if (!try_spinlock.locked()) {
       // This is not really thread safe as the spinlock is not held, but it's
       // best-effort anyways.
@@ -196,41 +197,35 @@ bool SharedRingBuffer::Write(const void* src, size_t size) {
     }
 
     wr_ptr = at(meta_->write_pos);
-    uint32_t size32 = static_cast<uint32_t>(size);
-    memcpy(aligned(wr_ptr), &size32, sizeof(size32));
-    wr_ptr += kHeaderSize;
     meta_->write_pos += size_with_header;
     meta_->bytes_written += size;
     meta_->num_writes_succeeded++;
-    memcpy(aligned(wr_ptr), src,
-           size);  // TODO: move out with acquire/release on size.
-    PERFETTO_DCHECK(!IsCorrupt());
   }  // spinlock
 
+  memcpy(aligned(wr_ptr + kHeaderSize), src, size);
+
+  uint32_t size32 = static_cast<uint32_t>(size);
+  memcpy(aligned(wr_ptr), &size32, sizeof(size32));
+  reinterpret_cast<std::atomic<uint32_t>*>(aligned(wr_ptr))
+      ->store(size32, std::memory_order_release);
+  PERFETTO_DCHECK(!IsCorrupt());
   return true;
 }
 
 SharedRingBuffer::BufferAndSize SharedRingBuffer::Read() {
-  ScopedSpinlock try_spinlock(&meta_->spinlock);
-
-  // TODO we should probably keep tring here instead of giving up.
-  if (!try_spinlock.locked()) {
-    meta_->failed_spinlocks++;
-    meta_->num_reads_failed++;
-    return BufferAndSize(nullptr, 0);
-  }
+  ScopedSpinlock try_spinlock(&meta_->spinlock, true);
 
   if (IsCorrupt()) {
     meta_->num_reads_failed++;
-    return BufferAndSize(nullptr, 0);
+    return BufferAndSize();
   }
 
   if (read_avail() < kHeaderSize)
-    return BufferAndSize(nullptr, 0);  // No data
+    return BufferAndSize();  // No data
 
   uint8_t* rd_ptr = at(meta_->read_pos);
-  uint32_t size;
-  memcpy(&size, aligned(rd_ptr), sizeof(size));
+  uint32_t size = reinterpret_cast<std::atomic<uint32_t>*>(rd_ptr)->load(
+      std::memory_order_acquire);
   const size_t size_with_header = base::AlignUp<kAlignment>(size + kHeaderSize);
 
   if (size_with_header > read_avail()) {
@@ -238,14 +233,16 @@ SharedRingBuffer::BufferAndSize SharedRingBuffer::Read() {
                   ", read_avail=%zu, rd=%" PRIu64 ", wr=%" PRIu64,
                   size, read_avail(), meta_->read_pos, meta_->write_pos);
     meta_->num_reads_failed++;
-    return BufferAndSize(nullptr, 0);
+    return BufferAndSize();
   }
 
   rd_ptr += kHeaderSize;
-  BufferAndSize res{new uint8_t[size], size};
-  memcpy(&res.first[0], aligned(rd_ptr), size);
-  meta_->read_pos += size_with_header;
-  return res;
+  return BufferAndSize(rd_ptr, size, size_with_header, this);
+}
+
+void SharedRingBuffer::Return(const BufferAndSize& buf) {
+  ScopedSpinlock try_spinlock(&meta_->spinlock, true);
+  meta_->read_pos += buf.size_with_header_;
 }
 
 bool SharedRingBuffer::IsCorrupt() {
@@ -287,6 +284,36 @@ base::Optional<SharedRingBuffer> SharedRingBuffer::Attach(
   if (!buf.is_valid())
     return base::nullopt;
   return base::make_optional(std::move(buf));
+}
+
+SharedRingBuffer::BufferAndSize::~BufferAndSize() {
+  if (ring_buffer_)
+    ring_buffer_->Return(*this);
+}
+
+SharedRingBuffer::BufferAndSize::BufferAndSize(BufferAndSize&& other) noexcept
+    : data_(other.data_),
+      size_(other.size_),
+      size_with_header_(other.size_with_header_),
+      ring_buffer_(other.ring_buffer_) {
+  other.ring_buffer_ = nullptr;
+}
+
+SharedRingBuffer::BufferAndSize& SharedRingBuffer::BufferAndSize::operator=(
+    BufferAndSize&& other) noexcept {
+  BufferAndSize tmp(std::move(other));
+  using std::swap;
+  swap(*this, tmp);
+  return *this;
+}
+
+void swap(SharedRingBuffer::BufferAndSize& a,
+          SharedRingBuffer::BufferAndSize& b) {
+  using std::swap;
+  swap(a.data_, b.data_);
+  swap(a.size_, b.size_);
+  swap(a.size_with_header_, b.size_with_header_);
+  swap(a.ring_buffer_, b.ring_buffer_);
 }
 
 }  // namespace profiling

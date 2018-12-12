@@ -30,8 +30,8 @@ namespace profiling {
 namespace {
 
 std::string ToString(const SharedRingBuffer::BufferAndSize& buf_and_size) {
-  return std::string(reinterpret_cast<const char*>(&buf_and_size.first[0]),
-                     buf_and_size.second);
+  return std::string(reinterpret_cast<const char*>(&buf_and_size.payload()[0]),
+                     buf_and_size.payload_size());
 }
 
 void StructuredTest(SharedRingBuffer* wr, SharedRingBuffer* rd) {
@@ -41,69 +41,85 @@ void StructuredTest(SharedRingBuffer* wr, SharedRingBuffer* rd) {
   const size_t buf_size = wr->size();
 
   // Test small writes.
-  ASSERT_TRUE(wr->Write("foo", 4));
-  ASSERT_TRUE(wr->Write("bar", 4));
+  ASSERT_TRUE(wr->TryWrite("foo", 4));
+  ASSERT_TRUE(wr->TryWrite("bar", 4));
 
-  auto buf_and_size = rd->Read();
-  ASSERT_EQ(buf_and_size.second, 4);
-  ASSERT_STREQ(reinterpret_cast<const char*>(&buf_and_size.first[0]), "foo");
-
-  ASSERT_EQ(buf_and_size.second, 4);
-  buf_and_size = rd->Read();
-  ASSERT_STREQ(reinterpret_cast<const char*>(&buf_and_size.first[0]), "bar");
+  {
+    auto buf_and_size = rd->Read();
+    ASSERT_EQ(buf_and_size.payload_size(), 4);
+    ASSERT_STREQ(reinterpret_cast<const char*>(&buf_and_size.payload()[0]),
+                 "foo");
+  }
+  {
+    auto buf_and_size = rd->Read();
+    ASSERT_EQ(buf_and_size.payload_size(), 4);
+    ASSERT_STREQ(reinterpret_cast<const char*>(&buf_and_size.payload()[0]),
+                 "bar");
+  }
 
   for (int i = 0; i < 3; i++) {
-    buf_and_size = rd->Read();
-    ASSERT_EQ(buf_and_size.first, nullptr);
-    ASSERT_EQ(buf_and_size.second, 0);
+    auto buf_and_size = rd->Read();
+    ASSERT_EQ(buf_and_size.payload(), nullptr);
+    ASSERT_EQ(buf_and_size.payload_size(), 0);
   }
 
   // Test extremely large writes (fill the buffer)
   for (int i = 0; i < 3; i++) {
-    // Write precisely |buf_size| bytes (minus the size header itself).
+    // TryWrite precisely |buf_size| bytes (minus the size header itself).
     std::string data(buf_size - sizeof(uint64_t), '.' + static_cast<char>(i));
-    ASSERT_TRUE(wr->Write(data.data(), data.size()));
-    ASSERT_FALSE(wr->Write(data.data(), data.size()));
-    ASSERT_FALSE(wr->Write("?", 1));
+    ASSERT_TRUE(wr->TryWrite(data.data(), data.size()));
+    ASSERT_FALSE(wr->TryWrite(data.data(), data.size()));
+    ASSERT_FALSE(wr->TryWrite("?", 1));
 
     // And read it back
-    buf_and_size = rd->Read();
+    auto buf_and_size = rd->Read();
     ASSERT_EQ(ToString(buf_and_size), data);
   }
 
   // Test large writes that wrap.
   std::string data(buf_size / 4 * 3 - sizeof(uint64_t), '!');
-  ASSERT_TRUE(wr->Write(data.data(), data.size()));
-  ASSERT_FALSE(wr->Write(data.data(), data.size()));
-  buf_and_size = rd->Read();
-  ASSERT_EQ(ToString(buf_and_size), data);
-
+  ASSERT_TRUE(wr->TryWrite(data.data(), data.size()));
+  ASSERT_FALSE(wr->TryWrite(data.data(), data.size()));
+  {
+    auto buf_and_size = rd->Read();
+    ASSERT_EQ(ToString(buf_and_size), data);
+  }
   data = std::string(base::kPageSize - sizeof(uint64_t), '#');
   for (int i = 0; i < 4; i++)
-    ASSERT_TRUE(wr->Write(data.data(), data.size()));
+    ASSERT_TRUE(wr->TryWrite(data.data(), data.size()));
 
   for (int i = 0; i < 4; i++) {
-    buf_and_size = rd->Read();
-    ASSERT_EQ(buf_and_size.second, data.size());
+    auto buf_and_size = rd->Read();
+    ASSERT_EQ(buf_and_size.payload_size(), data.size());
     ASSERT_EQ(ToString(buf_and_size), data);
   }
 
   // Test misaligned writes.
-  ASSERT_TRUE(wr->Write("1", 1));
-  ASSERT_TRUE(wr->Write("22", 2));
-  ASSERT_TRUE(wr->Write("333", 3));
-  ASSERT_TRUE(wr->Write("55555", 5));
-  ASSERT_TRUE(wr->Write("7777777", 7));
-  buf_and_size = rd->Read();
-  ASSERT_EQ(ToString(buf_and_size), "1");
-  buf_and_size = rd->Read();
-  ASSERT_EQ(ToString(buf_and_size), "22");
-  buf_and_size = rd->Read();
-  ASSERT_EQ(ToString(buf_and_size), "333");
-  buf_and_size = rd->Read();
-  ASSERT_EQ(ToString(buf_and_size), "55555");
-  buf_and_size = rd->Read();
-  ASSERT_EQ(ToString(buf_and_size), "7777777");
+  ASSERT_TRUE(wr->TryWrite("1", 1));
+  ASSERT_TRUE(wr->TryWrite("22", 2));
+  ASSERT_TRUE(wr->TryWrite("333", 3));
+  ASSERT_TRUE(wr->TryWrite("55555", 5));
+  ASSERT_TRUE(wr->TryWrite("7777777", 7));
+  {
+    auto buf_and_size = rd->Read();
+    ASSERT_EQ(ToString(buf_and_size), "1");
+  }
+  {
+    auto buf_and_size = rd->Read();
+    ASSERT_EQ(ToString(buf_and_size), "22");
+  }
+  {
+    auto buf_and_size = rd->Read();
+    ASSERT_EQ(ToString(buf_and_size), "333");
+  }
+  {
+    auto buf_and_size = rd->Read();
+    ASSERT_EQ(ToString(buf_and_size), "55555");
+  }
+  {
+    auto buf_and_size = rd->Read();
+    ASSERT_EQ(ToString(buf_and_size), "7777777");
+  }
 }
 
 TEST(SharedRingBufferTest, SingleThreadSameInstance) {
@@ -118,82 +134,6 @@ TEST(SharedRingBufferTest, SingleThreadAttach) {
   base::Optional<SharedRingBuffer> buf2 =
       SharedRingBuffer::Attach(base::ScopedFile(dup(buf1->fd())));
   StructuredTest(&*buf1, &*buf2);
-}
-
-TEST(SharedRingBufferTest, MultiThreadingTest) {
-  constexpr auto kBufSize = base::kPageSize * 1024;  // 4 MB
-  SharedRingBuffer rd = *SharedRingBuffer::Create(kBufSize);
-  SharedRingBuffer wr =
-      *SharedRingBuffer::Attach(base::ScopedFile(dup(rd.fd())));
-
-  std::mutex mutex;
-  std::unordered_map<std::string, int64_t> expected_contents;
-  std::atomic<bool> writers_enabled{false};
-
-  auto writer_thread_fn = [&wr, &expected_contents, &mutex,
-                           &writers_enabled](size_t thread_id) {
-    while (!writers_enabled.load()) {
-    }
-    std::minstd_rand0 rnd_engine(static_cast<uint32_t>(thread_id));
-    std::uniform_int_distribution<size_t> dist(1, base::kPageSize * 8);
-    for (int i = 0; i < 10000; i++) {
-      size_t size = dist(rnd_engine);
-      std::string data;
-      data.resize(size);
-      std::generate(data.begin(), data.end(), rnd_engine);
-      if (wr.Write(data.data(), data.size())) {
-        std::lock_guard<std::mutex> lock(mutex);
-        expected_contents[std::move(data)]++;
-      } else {
-        std::this_thread::yield();
-      }
-    }
-  };
-
-  auto reader_thread_fn = [&rd, &expected_contents, &mutex, &writers_enabled] {
-    for (;;) {
-      auto buf_and_size = rd.Read();
-      if (!buf_and_size.first) {
-        if (!writers_enabled.load()) {
-          // Failing to read after the writers are done means that there is no
-          // data left in the ring buffer.
-          return;
-        } else {
-          std::this_thread::yield();
-          continue;
-        }
-      }
-      ASSERT_GT(buf_and_size.second, 0);
-      std::string data = ToString(buf_and_size);
-      std::lock_guard<std::mutex> lock(mutex);
-      expected_contents[std::move(data)]--;
-    }
-  };
-
-  constexpr size_t kNumWriterThreads = 4;
-  constexpr size_t kNumReaderThreads = 4;
-  std::array<std::thread, kNumWriterThreads> writer_threads;
-  for (size_t i = 0; i < kNumWriterThreads; i++)
-    writer_threads[i] = std::thread(writer_thread_fn, i);
-
-  writers_enabled.store(true);
-
-  std::array<std::thread, kNumReaderThreads> reader_threads;
-  for (size_t i = 0; i < kNumReaderThreads; i++)
-    reader_threads[i] = std::thread(reader_thread_fn);
-
-  for (size_t i = 0; i < kNumWriterThreads; i++)
-    writer_threads[i].join();
-
-  writers_enabled.store(false);
-
-  for (size_t i = 0; i < kNumReaderThreads; i++)
-    reader_threads[i].join();
-
-  std::lock_guard<std::mutex> lock(mutex);
-  for (const auto& kv : expected_contents) {
-    EXPECT_EQ(kv.second, 0) << kv.first << " = " << kv.second;
-  }
 }
 
 }  // namespace
