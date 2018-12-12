@@ -40,9 +40,9 @@ TEST(JsonTraceParserTest, CoerceToInt64) {
 }
 
 TEST(JsonTraceParserTest, CoerceToNs) {
-  ASSERT_EQ(CoerceToNs(Json::Value(42)).value_or(-1), 42000000);
-  ASSERT_EQ(CoerceToNs(Json::Value("42")).value_or(-1), 42000000);
-  ASSERT_EQ(CoerceToNs(Json::Value(42.1)).value_or(-1), 42100000);
+  ASSERT_EQ(CoerceToNs(Json::Value(42)).value_or(-1), 42000);
+  ASSERT_EQ(CoerceToNs(Json::Value("42")).value_or(-1), 42000);
+  ASSERT_EQ(CoerceToNs(Json::Value(42.1)).value_or(-1), 42100);
   ASSERT_FALSE(CoerceToNs(Json::Value("foo")).has_value());
   ASSERT_FALSE(CoerceToNs(Json::Value("1234!")).has_value());
 }
