@@ -36,7 +36,7 @@
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/scoped_file.h"
-#include "perfetto/base/thread.h"
+#include "perfetto/base/thread_utils.h"
 
 #if PERFETTO_BUILDFLAG(PERFETTO_CHROMIUM_BUILD)
 #error perfetto::base::Watchdog should not be used in Chromium

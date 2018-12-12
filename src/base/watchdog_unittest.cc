@@ -20,7 +20,7 @@
 #include "perfetto/base/logging.h"
 #include "perfetto/base/paged_memory.h"
 #include "perfetto/base/scoped_file.h"
-#include "perfetto/base/thread.h"
+#include "perfetto/base/thread_utils.h"
 
 #include <signal.h>
 #include <time.h>

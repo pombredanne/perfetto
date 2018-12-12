@@ -36,7 +36,7 @@
 
 #include "perfetto/base/logging.h"
 #include "perfetto/base/scoped_file.h"
-#include "perfetto/base/thread.h"
+#include "perfetto/base/thread_utils.h"
 #include "perfetto/base/unix_socket.h"
 #include "perfetto/base/utils.h"
 #include "src/profiling/memory/sampler.h"
