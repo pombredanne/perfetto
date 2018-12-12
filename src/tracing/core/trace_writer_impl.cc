@@ -94,7 +94,7 @@ TraceWriterImpl::TracePacketHandle TraceWriterImpl::NewTracePacket() {
   // immediately after (8 is just an arbitrary estimation on the minimum size of
   // a realistic packet).
   bool chunk_too_full =
-      protobuf_stream_writer_.bytes_available() > kPacketHeaderSize + 8;
+      protobuf_stream_writer_.bytes_available() < kPacketHeaderSize + 8;
   bool exceeded_packets_per_chunk = cur_chunk_.GetPacketCountAndFlags().first ==
                                     ChunkHeader::Packets::kMaxCount;
   if (chunk_too_full || exceeded_packets_per_chunk) {
