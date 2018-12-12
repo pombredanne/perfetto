@@ -70,6 +70,17 @@ service ConsumerPort {
   //   FlushResponse is rejected and fails).
   rpc Flush(FlushRequest) returns (FlushResponse) {}
 
+  // Allows the consumer to detach from the session. The session will keep
+  // running even if the consumer disconnects and the consumer will not receive
+  // any further IPC until reattached.
+  rpc Detach(DetachRequest) returns (DetachResponse) {}
+
+  // Allows the consumer to re-attach to a previously detached session. The
+  // consumer will start receiving IPC notification for that session.
+  // The session will be terminated if the consumer closes the IPC channel, as
+  // in the standard non-detached case.
+  rpc Attach(AttachRequest) returns (AttachResponse) {}
+
   // TODO rpc ListDataSources(), for the UI.
 }
 
@@ -135,3 +146,15 @@ message FlushRequest {
 }
 
 message FlushResponse {}
+
+// Arguments for rpc Detach
+message DetachRequest {}
+message DetachResponse {
+  optional uint64 session_id = 1;
+}
+
+// Arguments for rpc Attach.
+message AttachRequest {
+  optional uint64 session_id = 1;
+}
+message AttachResponse {}

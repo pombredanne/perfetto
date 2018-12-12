@@ -65,6 +65,8 @@ class ConsumerIPCClientImpl : public TracingService::ConsumerEndpoint,
   void ReadBuffers() override;
   void FreeBuffers() override;
   void Flush(uint32_t timeout_ms, FlushCallback) override;
+  void Detach() override;
+  void Attach(TracingSessionID) override;
 
   // ipc::ServiceProxy::EventListener implementation.
   // These methods are invoked by the IPC layer, which knows nothing about

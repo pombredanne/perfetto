@@ -188,4 +188,41 @@ void ConsumerIPCClientImpl::Flush(uint32_t timeout_ms, FlushCallback callback) {
   consumer_port_.Flush(req, std::move(async_response));
 }
 
+void ConsumerIPCClientImpl::Detach() {
+  if (!connected_) {
+    PERFETTO_DLOG("Cannot Detach(), not connected to tracing service");
+    return;
+  }
+
+  protos::DetachRequest req;
+  ipc::Deferred<protos::DetachResponse> async_response;
+  auto weak_this = weak_ptr_factory_.GetWeakPtr();
+
+  async_response.Bind(
+      [weak_this](ipc::AsyncResult<protos::DetachResponse> response) {
+        if (weak_this)
+          weak_this->consumer_->OnDetach(response ? response->session_id() : 0);
+      });
+  consumer_port_.Detach(req, std::move(async_response));
+}
+
+void ConsumerIPCClientImpl::Attach(TracingSessionID tsid) {
+  if (!connected_) {
+    PERFETTO_DLOG("Cannot Attach(), not connected to tracing service");
+    return;
+  }
+
+  protos::AttachRequest req;
+  req.set_session_id(tsid);
+  ipc::Deferred<protos::AttachResponse> async_response;
+  auto weak_this = weak_ptr_factory_.GetWeakPtr();
+
+  async_response.Bind(
+      [weak_this](ipc::AsyncResult<protos::AttachResponse> response) {
+        if (weak_this)
+          weak_this->consumer_->OnAttach(!!response);
+      });
+  consumer_port_.Attach(req, std::move(async_response));
+}
+
 }  // namespace perfetto

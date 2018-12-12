@@ -568,6 +568,10 @@ void PerfettoCmd::SetupCtrlCSignalHandler() {
   });
 }
 
+void PerfettoCmd::OnDetach(TracingSessionID) {}
+
+void PerfettoCmd::OnAttach(bool) {}
+
 int __attribute__((visibility("default")))
 PerfettoCmdMain(int argc, char** argv) {
   g_consumer_cmd = new perfetto::PerfettoCmd();

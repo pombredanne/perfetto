@@ -187,11 +187,11 @@ TracingServiceImpl::ProducerEndpointImpl* TracingServiceImpl::GetProducer(
 }
 
 std::unique_ptr<TracingService::ConsumerEndpoint>
-TracingServiceImpl::ConnectConsumer(Consumer* consumer) {
+TracingServiceImpl::ConnectConsumer(Consumer* consumer, uid_t uid) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   PERFETTO_DLOG("Consumer %p connected", reinterpret_cast<void*>(consumer));
   std::unique_ptr<ConsumerEndpointImpl> endpoint(
-      new ConsumerEndpointImpl(this, task_runner_, consumer));
+      new ConsumerEndpointImpl(this, task_runner_, consumer, uid));
   auto it_and_inserted = consumers_.emplace(endpoint.get());
   PERFETTO_DCHECK(it_and_inserted.second);
   task_runner_->PostTask(std::bind(&Consumer::OnConnect, endpoint->consumer_));
@@ -217,6 +217,57 @@ void TracingServiceImpl::DisconnectConsumer(ConsumerEndpointImpl* consumer) {
         return kv.second.consumer == consumer;
       }));
 #endif
+}
+
+void TracingServiceImpl::DetachConsumer(ConsumerEndpointImpl* consumer) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  PERFETTO_DLOG("Consumer %p detached", reinterpret_cast<void*>(consumer));
+  PERFETTO_DCHECK(consumers_.count(consumer));
+
+  TracingSession* tracing_session;
+  TracingSessionID tsid = consumer->tracing_session_id_;
+  if (tsid && (tracing_session = GetTracingSession(tsid))) {
+    PERFETTO_DCHECK(tracing_session->consumer == consumer);
+    tracing_session->consumer = nullptr;
+    consumer->tracing_session_id_ = 0;
+  } else {
+    tsid = 0;  // Notify 0 as a failure code.
+  }
+  // TODO just return the ID and have the consumer doing the notify.
+  // same for attach
+  consumer->NotifyOnDetach(tsid);
+}
+
+bool TracingServiceImpl::AttachConsumer(ConsumerEndpointImpl* consumer,
+                                        TracingSessionID tsid) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  PERFETTO_DLOG("Consumer %p attaching to session %" PRIu64,
+                reinterpret_cast<void*>(consumer), tsid);
+  PERFETTO_DCHECK(consumers_.count(consumer));
+
+  if (consumer->tracing_session_id_) {
+    PERFETTO_ELOG("Cannot reattach consumer to session %" PRIu64
+                  " while it already owns tracing session %" PRIu64,
+                  tsid, consumer->tracing_session_id_);
+    return false;
+  }
+
+  auto* tracing_session = GetTracingSession(tsid);
+  if (!tracing_session)
+    return false;
+
+  if (tracing_session->consumer_uid != consumer->uid_) {
+    PERFETTO_ELOG(
+        "Consumer is trying to reattach to a session with a different UID "
+        "(session uid: %d, consumer uid: %d)",
+        static_cast<int>(tracing_session->consumer_uid),
+        static_cast<int>(consumer->uid_));
+    return false;
+  }
+
+  tracing_session->consumer = consumer;
+  consumer->tracing_session_id_ = tsid;
+  return true;
 }
 
 bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
@@ -570,7 +621,8 @@ void TracingServiceImpl::DisableTracingNotifyConsumerAndFlushFile(
     ReadBuffers(tracing_session->id, nullptr);
   }
 
-  tracing_session->consumer->NotifyOnTracingDisabled();
+  if (tracing_session->consumer)
+    tracing_session->consumer->NotifyOnTracingDisabled();
 }
 
 void TracingServiceImpl::Flush(TracingSessionID tsid,
@@ -1388,10 +1440,12 @@ void TracingServiceImpl::MaybeEmitTraceConfig(
 TracingServiceImpl::ConsumerEndpointImpl::ConsumerEndpointImpl(
     TracingServiceImpl* service,
     base::TaskRunner* task_runner,
-    Consumer* consumer)
+    Consumer* consumer,
+    uid_t uid)
     : task_runner_(task_runner),
       service_(service),
       consumer_(consumer),
+      uid_(uid),
       weak_ptr_factory_(this) {}
 
 TracingServiceImpl::ConsumerEndpointImpl::~ConsumerEndpointImpl() {
@@ -1405,6 +1459,25 @@ void TracingServiceImpl::ConsumerEndpointImpl::NotifyOnTracingDisabled() {
   task_runner_->PostTask([weak_this] {
     if (weak_this)
       weak_this->consumer_->OnTracingDisabled();
+  });
+}
+
+void TracingServiceImpl::ConsumerEndpointImpl::NotifyOnDetach(
+    TracingSessionID tsid) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  auto weak_this = GetWeakPtr();
+  task_runner_->PostTask([weak_this, tsid] {
+    if (weak_this)
+      weak_this->consumer_->OnDetach(tsid);
+  });
+}
+
+void TracingServiceImpl::ConsumerEndpointImpl::NotifyOnAttach(bool success) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  auto weak_this = GetWeakPtr();
+  task_runner_->PostTask([weak_this, success] {
+    if (weak_this)
+      weak_this->consumer_->OnAttach(success);
   });
 }
 
@@ -1461,6 +1534,16 @@ void TracingServiceImpl::ConsumerEndpointImpl::Flush(uint32_t timeout_ms,
     return;
   }
   service_->Flush(tracing_session_id_, timeout_ms, callback);
+}
+
+void TracingServiceImpl::ConsumerEndpointImpl::Detach() {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  service_->DetachConsumer(this);
+}
+
+void TracingServiceImpl::ConsumerEndpointImpl::Attach(TracingSessionID tsid) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  service_->AttachConsumer(this, tsid);
 }
 
 base::WeakPtr<TracingServiceImpl::ConsumerEndpointImpl>
@@ -1703,6 +1786,9 @@ TracingServiceImpl::TracingSession::TracingSession(
     TracingSessionID session_id,
     ConsumerEndpointImpl* consumer_ptr,
     const TraceConfig& new_config)
-    : id(session_id), consumer(consumer_ptr), config(new_config) {}
+    : id(session_id),
+      consumer(consumer_ptr),
+      consumer_uid(consumer->uid_),
+      config(new_config) {}
 
 }  // namespace perfetto

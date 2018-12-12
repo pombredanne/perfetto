@@ -39,13 +39,14 @@ ConsumerIPCService::~ConsumerIPCService() = default;
 ConsumerIPCService::RemoteConsumer*
 ConsumerIPCService::GetConsumerForCurrentRequest() {
   const ipc::ClientID ipc_client_id = ipc::Service::client_info().client_id();
+  const uid_t uid = ipc::Service::client_info().uid();
   PERFETTO_CHECK(ipc_client_id);
   auto it = consumers_.find(ipc_client_id);
   if (it == consumers_.end()) {
     auto* remote_consumer = new RemoteConsumer();
     consumers_[ipc_client_id].reset(remote_consumer);
     remote_consumer->service_endpoint =
-        core_service_->ConnectConsumer(remote_consumer);
+        core_service_->ConnectConsumer(remote_consumer, uid);
     return remote_consumer;
   }
   return it->second.get();
@@ -112,6 +113,24 @@ void ConsumerIPCService::Flush(const protos::FlushRequest& req,
   };
   GetConsumerForCurrentRequest()->service_endpoint->Flush(req.timeout_ms(),
                                                           std::move(callback));
+}
+
+// Called by the IPC layer.
+void ConsumerIPCService::Detach(const protos::DetachRequest&,
+                                DeferredDetachResponse resp) {
+  // OnDetach() will resolve the |detach_response|.
+  RemoteConsumer* remote_consumer = GetConsumerForCurrentRequest();
+  remote_consumer->detach_response = std::move(resp);
+  GetConsumerForCurrentRequest()->service_endpoint->Detach();
+}
+
+// Called by the IPC layer.
+void ConsumerIPCService::Attach(const protos::AttachRequest& req,
+                                DeferredAttachResponse resp) {
+  // OnAttach() will resolve the |detach_response|.
+  RemoteConsumer* remote_consumer = GetConsumerForCurrentRequest();
+  remote_consumer->attach_response = std::move(resp);
+  GetConsumerForCurrentRequest()->service_endpoint->Attach(req.session_id());
 }
 
 // Called by the service in response to a service_endpoint->Flush() request.
@@ -199,6 +218,25 @@ void ConsumerIPCService::RemoteConsumer::OnTraceData(
     }
   }
   send_ipc_reply(has_more);
+}
+
+void ConsumerIPCService::RemoteConsumer::OnDetach(TracingSessionID tsid) {
+  if (!tsid) {
+    std::move(detach_response).Reject();
+    return;
+  }
+  auto result = ipc::AsyncResult<protos::DetachResponse>::Create();
+  result->set_session_id(tsid);
+  std::move(detach_response).Resolve(std::move(result));
+}
+
+void ConsumerIPCService::RemoteConsumer::OnAttach(bool success) {
+  if (!success) {
+    std::move(attach_response).Reject();
+    return;
+  }
+  auto result = ipc::AsyncResult<protos::AttachResponse>::Create();
+  std::move(attach_response).Resolve(std::move(result));
 }
 
 }  // namespace perfetto

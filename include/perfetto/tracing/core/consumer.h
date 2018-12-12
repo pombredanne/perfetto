@@ -56,6 +56,21 @@ class PERFETTO_EXPORT Consumer {
   // TracePacket(s). Upon the last call, |has_more| is set to true (i.e.
   // |has_more| is a !EOF).
   virtual void OnTraceData(std::vector<TracePacket>, bool has_more) = 0;
+
+  // Called back by the Service (or transport layer) after invoking
+  // TracingService::ConsumerEndpoint::Detach().
+  // The consumer can disconnect at this point and the trace session will keep
+  // on going. A new consumer can later re-attach passing back the
+  // TraceSessionID, but only if the two consumer have the same uid.
+  // The passed TracingSessionID argument is:
+  //   > 0 if the detach succeeded. The id can be passed to Attach(id) in
+  //   future. = 0 if detach failed (e.g., the tracing session wasn't even
+  //   started).
+  virtual void OnDetach(TracingSessionID) = 0;
+
+  // Called back by the Service (or transport layer) after invoking
+  // TracingService::ConsumerEndpoint::Detach().
+  virtual void OnAttach(bool success) = 0;
 };
 
 }  // namespace perfetto
