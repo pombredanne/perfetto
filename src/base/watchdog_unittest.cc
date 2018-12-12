@@ -146,7 +146,7 @@ TEST(WatchdogTest, TimerCrashDeliveredToCallerThread) {
       TestWatchdog watchdog(100);
       watchdog.Start();
       auto handle = watchdog.CreateFatalTimer(2);
-      usleep(200 * 1000);
+      usleep(200 * 1000);  // This will be interrupted by the fatal timer.
       std::unique_lock<std::mutex> lock(mutex);
       quit = true;
       cv.notify_all();
