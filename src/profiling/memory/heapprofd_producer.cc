@@ -302,7 +302,7 @@ void HeapprofdProducer::StartDataSource(DataSourceInstanceID id,
 void HeapprofdProducer::StopDataSource(DataSourceInstanceID id) {
   auto weak_producer = weak_factory_.GetWeakPtr();
   auto callback = [weak_producer, id] {
-    PERFETTO_LOG("Stop flush.");
+    PERFETTO_DLOG("Stop flush.");
     if (!weak_producer)
       return;
     // DataSource holds ProfilingSession handles which on being destructed tear
