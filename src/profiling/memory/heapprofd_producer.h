@@ -77,9 +77,9 @@ class HeapprofdProducer : public Producer {
   std::unique_ptr<base::UnixSocket> MakeSocket();
 
   void FinishDataSourceFlush(FlushRequestID flush_id);
-  bool Dump(DataSourceInstanceID id,
-            FlushRequestID flush_id,
-            bool has_flush_id);
+  bool Dump(DataSourceInstanceID id, std::function<void()> callback);
+  bool Dump(DataSourceInstanceID id);
+  bool Dump(DataSourceInstanceID id, FlushRequestID flush_id);
   void DoContinuousDump(DataSourceInstanceID id, uint32_t dump_interval);
 
   struct DataSource {

@@ -236,7 +236,7 @@ void HeapprofdProducer::SetupDataSource(DataSourceInstanceID id,
 
 void HeapprofdProducer::DoContinuousDump(DataSourceInstanceID id,
                                          uint32_t dump_interval) {
-  if (!Dump(id, 0 /* flush_id */, false /* is_flush */))
+  if (!Dump(id))
     return;
   auto weak_producer = weak_factory_.GetWeakPtr();
   task_runner_->PostDelayedTask(
@@ -299,18 +299,24 @@ void HeapprofdProducer::StartDataSource(DataSourceInstanceID id,
 }
 
 void HeapprofdProducer::StopDataSource(DataSourceInstanceID id) {
-  // DataSource holds ProfilingSession handles which on being destructed tear
-  // down the profiling on the client.
-  if (data_sources_.erase(id) != 1)
-    PERFETTO_DFATAL("Trying to stop non existing data source: %" PRIu64, id);
+  auto weak_producer = weak_factory_.GetWeakPtr();
+  auto callback = [weak_producer, id] {
+    PERFETTO_LOG("Stop flush.");
+    if (!weak_producer)
+      return;
+    // DataSource holds ProfilingSession handles which on being destructed tear
+    // down the profiling on the client.
+    if (weak_producer->data_sources_.erase(id) != 1)
+      PERFETTO_DFATAL("Trying to stop non existing data source: %" PRIu64, id);
+  };
+  Dump(id, std::move(callback));
 }
 
 void HeapprofdProducer::OnTracingSetup() {}
 
 bool HeapprofdProducer::Dump(DataSourceInstanceID id,
-                             FlushRequestID flush_id,
-                             bool has_flush_id) {
-  PERFETTO_DLOG("Dumping %" PRIu64 ", flush: %d", id, has_flush_id);
+                             std::function<void()> callback) {
+  PERFETTO_DLOG("Dumping %" PRIu64, id);
   auto it = data_sources_.find(id);
   if (it == data_sources_.end()) {
     return false;
@@ -323,22 +329,26 @@ bool HeapprofdProducer::Dump(DataSourceInstanceID id,
   std::set<pid_t> pids = data_source.processes.GetPIDs();
   dump_record.pids.insert(dump_record.pids.begin(), pids.cbegin(), pids.cend());
   dump_record.trace_writer = data_source.trace_writer;
-
-  auto weak_producer = weak_factory_.GetWeakPtr();
-  base::TaskRunner* task_runner = task_runner_;
-  if (has_flush_id) {
-    dump_record.callback = [task_runner, weak_producer, flush_id] {
-      task_runner->PostTask([weak_producer, flush_id] {
-        if (!weak_producer)
-          return weak_producer->FinishDataSourceFlush(flush_id);
-      });
-    };
-  } else {
-    dump_record.callback = [] {};
-  }
+  dump_record.callback = callback;
 
   bookkeeping_queue_.Add(std::move(record));
   return true;
+}
+
+bool HeapprofdProducer::Dump(DataSourceInstanceID id) {
+  return Dump(id, [] {});
+}
+
+bool HeapprofdProducer::Dump(DataSourceInstanceID id, FlushRequestID flush_id) {
+  auto weak_producer = weak_factory_.GetWeakPtr();
+  base::TaskRunner* task_runner = task_runner_;
+  auto callback = [task_runner, weak_producer, flush_id] {
+    task_runner->PostTask([weak_producer, flush_id] {
+      if (!weak_producer)
+        return weak_producer->FinishDataSourceFlush(flush_id);
+    });
+  };
+  return Dump(id, std::move(callback));
 }
 
 void HeapprofdProducer::Flush(FlushRequestID flush_id,
@@ -351,7 +361,7 @@ void HeapprofdProducer::Flush(FlushRequestID flush_id,
   PERFETTO_DCHECK(flush_in_progress == 0);
   flush_in_progress = num_ids;
   for (size_t i = 0; i < num_ids; ++i)
-    Dump(ids[i], flush_id, true);
+    Dump(ids[i], flush_id);
 }
 
 void HeapprofdProducer::FinishDataSourceFlush(FlushRequestID flush_id) {
@@ -438,7 +448,7 @@ void HeapprofdProducer::ConnectWithRetries(const char* socket_name) {
 
 void HeapprofdProducer::DumpAll() {
   for (const auto& id_and_data_source : data_sources_) {
-    if (!Dump(id_and_data_source.first, 0 /* flush_id */, false /* is_flush */))
+    if (!Dump(id_and_data_source.first))
       PERFETTO_DLOG("Failed to dump %" PRIu64, id_and_data_source.first);
   }
 }
