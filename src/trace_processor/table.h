@@ -24,7 +24,6 @@
 #include <string>
 #include <vector>
 
-#include "perfetto/base/optional.h"
 #include "src/trace_processor/query_constraints.h"
 
 namespace perfetto {
@@ -115,7 +114,7 @@ class Table : public sqlite3_vtab {
     Schema(const Schema&);
     Schema& operator=(const Schema& t);
 
-    std::string ToCreateTableStmt() const;
+    std::string ToCreateTableStmt();
 
     const std::vector<Column>& columns() const { return columns_; }
     const std::vector<size_t> primary_keys() { return primary_keys_; }
@@ -154,7 +153,7 @@ class Table : public sqlite3_vtab {
   }
 
   // Methods to be implemented by derived table classes.
-  virtual base::Optional<Schema> Init(int argc, const char* const* argv) = 0;
+  virtual Schema CreateSchema(int argc, const char* const* argv) = 0;
   virtual std::unique_ptr<Cursor> CreateCursor(const QueryConstraints& qc,
                                                sqlite3_value** argv) = 0;
   virtual int BestIndex(const QueryConstraints& qc, BestIndexInfo* info) = 0;

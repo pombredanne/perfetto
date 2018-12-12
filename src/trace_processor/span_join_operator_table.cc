@@ -40,7 +40,7 @@ bool IsRequiredColumn(const std::string& name) {
   return name == kTsColumnName || name == kDurColumnName;
 }
 
-bool CheckRequiredColumns(const std::vector<Table::Column>& cols) {
+void CheckRequiredColumns(const std::vector<Table::Column>& cols) {
   int required_columns_found = 0;
   for (const auto& col : cols) {
     if (IsRequiredColumn(col.name())) {
@@ -48,18 +48,14 @@ bool CheckRequiredColumns(const std::vector<Table::Column>& cols) {
       if (col.type() != Table::ColumnType::kUlong &&
           col.type() != Table::ColumnType::kUnknown) {
         PERFETTO_ELOG("Invalid column type for %s", col.name().c_str());
-        return false;
       }
     }
   }
   if (required_columns_found != 2) {
     PERFETTO_ELOG("Required columns not found (found %d)",
                   required_columns_found);
-    return false;
   }
-  return true;
 }
-
 }  // namespace
 
 SpanJoinOperatorTable::SpanJoinOperatorTable(sqlite3* db, const TraceStorage*)
@@ -72,13 +68,12 @@ void SpanJoinOperatorTable::RegisterTable(sqlite3* db,
                                          /* requires_args */ true);
 }
 
-base::Optional<Table::Schema> SpanJoinOperatorTable::Init(
-    int argc,
-    const char* const* argv) {
+Table::Schema SpanJoinOperatorTable::CreateSchema(int argc,
+                                                  const char* const* argv) {
   // argv[0] - argv[2] are SQLite populated fields which are always present.
   if (argc < 5) {
     PERFETTO_ELOG("SPAN JOIN expected at least 2 args, received %d", argc - 3);
-    return base::nullopt;
+    return Table::Schema({}, {});
   }
 
   std::string t1_raw_desc = reinterpret_cast<const char*>(argv[3]);
@@ -94,12 +89,9 @@ base::Optional<Table::Schema> SpanJoinOperatorTable::Init(
   // TODO(lalitm): add logic to ensure that the tables that are being joined
   // are actually valid to be joined i.e. they have the same partition.
   auto t1_cols = sqlite_utils::GetColumnsForTable(db_, t1_desc.name);
-  if (!CheckRequiredColumns(t1_cols))
-    return base::nullopt;
-
+  CheckRequiredColumns(t1_cols);
   auto t2_cols = sqlite_utils::GetColumnsForTable(db_, t2_desc.name);
-  if (!CheckRequiredColumns(t2_cols))
-    return base::nullopt;
+  CheckRequiredColumns(t2_cols);
 
   t1_defn_ = TableDefinition(t1_desc.name, t1_desc.partition_col, t1_cols);
   t2_defn_ = TableDefinition(t2_desc.name, t2_desc.partition_col, t2_cols);
