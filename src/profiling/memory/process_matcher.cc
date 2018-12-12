@@ -135,8 +135,7 @@ void ProcessMatcher::RemoveProcess(pid_t pid) {
   for (auto process_it = range.first; process_it != range.second;
        ++process_it) {
     if (process_it->second == &process_item) {
-      size_t erased = cmdline_to_process_.erase(process_item.process.cmdline);
-      PERFETTO_DCHECK(erased);
+      cmdline_to_process_.erase(process_it);
       break;
     }
   }
