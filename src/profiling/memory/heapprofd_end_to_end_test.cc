@@ -52,8 +52,9 @@ class HeapprofdDelegate : public ThreadDelegate {
   std::unique_ptr<HeapprofdProducer> producer_;
 };
 
-// TODO(b/120850358): The platform on Kokoro is too old to run this test.
-TEST(HeapprofdEndToEnd, TreeHuggerOnly(Smoke)) {
+// This test only works when run on Android using an Android Q version of
+// Bionic.
+TEST(HeapprofdEndToEnd, Smoke) {
   base::TestTaskRunner task_runner;
 
   TestHelper helper(&task_runner);
@@ -72,10 +73,12 @@ TEST(HeapprofdEndToEnd, TreeHuggerOnly(Smoke)) {
 
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(10 * 1024);
-  trace_config.set_duration_ms(5000);
+  trace_config.set_duration_ms(1000);
 
   pid_t pid = fork();
   switch (pid) {
+    case -1:
+      PERFETTO_FATAL("Failed to fork.");
     case 0:
       for (;;) {
         // This volatile is needed to prevent the compiler from trying to be
@@ -99,7 +102,7 @@ TEST(HeapprofdEndToEnd, TreeHuggerOnly(Smoke)) {
   heapprofd_config->mutable_continuous_dump_config()->set_dump_interval_ms(100);
 
   helper.StartTracing(trace_config);
-  helper.WaitForTracingDisabled(10000);
+  helper.WaitForTracingDisabled(5000);
 
   helper.ReadData();
   helper.WaitForReadData();

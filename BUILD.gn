@@ -151,7 +151,7 @@ if (perfetto_build_standalone || perfetto_build_with_android) {
     if (perfetto_build_with_android) {
       cflags = [ "-DPERFETTO_BUILD_WITH_ANDROID" ]
     }
-    if (should_build_heapprofd) {
+    if (should_build_heapprofd && is_android) {
       deps += [ "src/profiling/memory:end_to_end_tests" ]
     }
   }
