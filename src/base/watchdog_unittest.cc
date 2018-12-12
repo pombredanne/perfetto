@@ -147,6 +147,9 @@ TEST(WatchdogTest, TimerCrashDeliveredToCallerThread) {
       watchdog.Start();
       auto handle = watchdog.CreateFatalTimer(2);
       usleep(200 * 1000);
+      std::unique_lock<std::mutex> lock(mutex);
+      quit = true;
+      cv.notify_all();
     } else {
       std::unique_lock<std::mutex> lock(mutex);
       cv.wait(lock, [&quit] { return !quit; });
@@ -157,23 +160,11 @@ TEST(WatchdogTest, TimerCrashDeliveredToCallerThread) {
   for (size_t i = 0; i < 8; i++)
     threads.emplace_back(thread_fn, i);
 
-  // Wait for the selected thread to terminate and then check that the signal
-  // was delivered to that one.
-  threads[kKillThreadNum].join();
-  EXPECT_EQ(g_aborted_thread, expected_tid);
-
-  // Wake up all the other threads.
-  {
-    std::lock_guard<std::mutex> lock(mutex);
-    quit = true;
-  }
-  cv.notify_all();
-
   // Join them all.
-  for (size_t i = 0; i < 8; i++) {
-    if (i != kKillThreadNum)
-      threads[i].join();
-  }
+  for (auto& thread : threads)
+    thread.join();
+
+  EXPECT_EQ(g_aborted_thread, expected_tid);
 }
 
 }  // namespace
