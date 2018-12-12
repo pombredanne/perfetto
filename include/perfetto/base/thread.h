@@ -21,7 +21,9 @@
 
 #include "perfetto/base/build_config.h"
 
-#if !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+#include <processthreadsapi.h>
+#else
 #include <pthread.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
@@ -47,7 +49,7 @@ inline uint64_t GetThreadId() {
 }
 #elif PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 inline uint64_t GetThreadId() {
-  return GetCurrentThreadId();
+  return static_cast<uint64_t>(GetCurrentThreadId());
 }
 #endif
 
