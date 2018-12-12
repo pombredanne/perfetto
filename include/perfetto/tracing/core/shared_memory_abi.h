@@ -305,6 +305,7 @@ class SharedMemoryABI {
       // monotonically updated by the Producer with release store semantic after
       // the packet has been written into the chunk.
       uint16_t count : 10;
+      static constexpr size_t kMaxCount = (1 << 10) - 1;
 
       // See Flags above.
       uint16_t flags : 6;
