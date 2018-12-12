@@ -152,7 +152,7 @@ TEST(WatchdogTest, TimerCrashDeliveredToCallerThread) {
       cv.notify_all();
     } else {
       std::unique_lock<std::mutex> lock(mutex);
-      cv.wait(lock, [&quit] { return !quit; });
+      cv.wait(lock, [&quit] { return quit; });
     }
   };
 
