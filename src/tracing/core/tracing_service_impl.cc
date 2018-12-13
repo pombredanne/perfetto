@@ -1528,8 +1528,7 @@ void TracingServiceImpl::ProducerEndpointImpl::RegisterTraceWriter(
     uint32_t writer_id,
     uint32_t target_buffer) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  PERFETTO_DCHECK(
-      !buffer_id_for_writer(static_cast<WriterID>(writer_id)).has_value());
+  PERFETTO_DCHECK(!buffer_id_for_writer(static_cast<WriterID>(writer_id)));
   writers_[static_cast<WriterID>(writer_id)] =
       static_cast<BufferID>(target_buffer);
 }
@@ -1537,8 +1536,7 @@ void TracingServiceImpl::ProducerEndpointImpl::RegisterTraceWriter(
 void TracingServiceImpl::ProducerEndpointImpl::UnregisterTraceWriter(
     uint32_t writer_id) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  PERFETTO_DCHECK(
-      buffer_id_for_writer(static_cast<WriterID>(writer_id)).has_value());
+  PERFETTO_DCHECK(buffer_id_for_writer(static_cast<WriterID>(writer_id)));
   writers_.erase(static_cast<WriterID>(writer_id));
 }
 
