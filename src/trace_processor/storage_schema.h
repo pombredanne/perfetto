@@ -46,7 +46,7 @@ class StorageSchema {
     Builder& AddNumericColumn(std::string column_name,
                               const std::deque<T>* vals,
                               bool hidden = false,
-                              bool ordered = true) {
+                              bool ordered = false) {
       columns_.emplace_back(
           new NumericColumn<T>(column_name, vals, hidden, ordered));
       return *this;

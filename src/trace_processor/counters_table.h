@@ -19,6 +19,10 @@
 
 #include "src/trace_processor/storage_table.h"
 
+#include <deque>
+#include <memory>
+#include <string>
+
 namespace perfetto {
 namespace trace_processor {
 
