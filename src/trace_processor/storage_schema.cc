@@ -21,6 +21,7 @@
 namespace perfetto {
 namespace trace_processor {
 
+StorageSchema::StorageSchema() = default;
 StorageSchema::StorageSchema(Columns columns,
                              std::vector<std::string> primary_keys)
     : columns_(std::move(columns)), primary_keys_(std::move(primary_keys)) {}

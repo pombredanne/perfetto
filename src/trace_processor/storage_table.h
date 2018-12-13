@@ -64,7 +64,7 @@ class StorageTable : public Table {
       const QueryConstraints& qc,
       sqlite3_value** argv);
 
-  base::Optional<StorageSchema> schema_;
+  StorageSchema schema_;
 
  private:
   FilteredRowIndex CreateRangeIterator(
