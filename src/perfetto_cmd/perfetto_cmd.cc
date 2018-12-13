@@ -170,6 +170,8 @@ int PerfettoCmd::Main(int argc, char** argv) {
     OPT_DROPBOX,
     OPT_ATRACE_APP,
     OPT_IGNORE_GUARDRAILS,
+    OPT_DETACH,
+    OPT_ATTACH,
   };
   static const struct option long_options[] = {
       // |option_index| relies on the order of options, don't reshuffle them.
@@ -187,6 +189,8 @@ int PerfettoCmd::Main(int argc, char** argv) {
       {"config-id", required_argument, nullptr, OPT_CONFIG_ID},
       {"config-uid", required_argument, nullptr, OPT_CONFIG_UID},
       {"reset-guardrails", no_argument, nullptr, OPT_RESET_GUARDRAILS},
+      {"detach", no_argument, nullptr, OPT_DETACH},
+      {"attach", required_argument, nullptr, OPT_ATTACH},
       {"app", required_argument, nullptr, OPT_ATRACE_APP},
       {nullptr, 0, nullptr, 0}};
 
@@ -311,12 +315,39 @@ int PerfettoCmd::Main(int argc, char** argv) {
       continue;
     }
 
+    if (option == OPT_DETACH) {
+      detach_ = true;
+      continue;
+    }
+
+    if (option == OPT_ATTACH) {
+      attach_tsid_ = static_cast<TracingSessionID>(atoll(optarg));
+      continue;
+    }
+
     return PrintUsage(argv[0]);
   }
 
   for (ssize_t i = optind; i < argc; i++) {
     has_config_options = true;
     config_options.categories.push_back(argv[i]);
+  }
+
+  if ((detach_ ? 1 : 0) + (attach_tsid_ ? 1 : 0) + (background ? 1 : 0) > 1) {
+    PERFETTO_ELOG("--attach, --detach and --background are mutually exclusive");
+    return 1;
+  }
+
+  if (attach_tsid_) {
+    if (has_config_options || !trace_config_raw.empty()) {
+      PERFETTO_ELOG("Cannot pass a config when using --attach");
+      return 1;
+    }
+    consumer_endpoint_ =
+      ConsumerIPCClient::Connect(GetConsumerSocket(), this, &task_runner_);
+    SetupCtrlCSignalHandler();
+    task_runner_.Run();
+    exit(0);
   }
 
   if (!trace_out_path_.empty() && !dropbox_tag_.empty()) {
@@ -414,6 +445,10 @@ int PerfettoCmd::Main(int argc, char** argv) {
 }
 
 void PerfettoCmd::OnConnect() {
+  if (attach_tsid_) {
+    consumer_endpoint_->Attach(attach_tsid_);
+    return;
+  }
   PERFETTO_LOG(
       "Connected to the Perfetto traced service, starting tracing for %d ms",
       trace_config_->duration_ms());
@@ -425,6 +460,11 @@ void PerfettoCmd::OnConnect() {
     optional_fd.reset(dup(fileno(*trace_out_stream_)));
 
   consumer_endpoint_->EnableTracing(*trace_config_, std::move(optional_fd));
+
+  if (detach_) {
+    consumer_endpoint_->Detach();  // Will invoke OnDetach() soon.
+    return;
+  }
 
   // Failsafe mechanism to avoid waiting indefinitely if the service hangs.
   if (trace_config_->duration_ms()) {
@@ -568,9 +608,15 @@ void PerfettoCmd::SetupCtrlCSignalHandler() {
   });
 }
 
-void PerfettoCmd::OnDetach(TracingSessionID) {}
+void PerfettoCmd::OnDetach(TracingSessionID tsid) {
+  printf("%" PRIu64 "\n", tsid);
+  exit(0);
+}
 
-void PerfettoCmd::OnAttach(bool) {}
+void PerfettoCmd::OnAttach(bool success) {
+  if (!success)
+    PERFETTO_ELOG("Session re-attach failed");
+}
 
 int __attribute__((visibility("default")))
 PerfettoCmdMain(int argc, char** argv) {
