@@ -16,6 +16,10 @@
 
 #include "src/trace_processor/counters_table.h"
 
+#include "src/trace_processor/storage_columns.h"
+#include "src/trace_processor/storage_cursor.h"
+#include "src/trace_processor/table_utils.h"
+
 namespace perfetto {
 namespace trace_processor {
 
@@ -35,7 +39,7 @@ void CountersTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
   Table::Register<CountersTable>(db, storage, "counters");
 }
 
-base::Optional<Table::Schema> CountersTable::Init(int, const char* const*) {
+Table::Schema CountersTable::CreateSchema(int, const char* const*) {
   const auto& counters = storage_->counters();
   std::unique_ptr<StorageColumn> cols[] = {
       IdColumnPtr("id", TableId::kCounters),
@@ -58,9 +62,10 @@ std::unique_ptr<Table::Cursor> CountersTable::CreateCursor(
     const QueryConstraints& qc,
     sqlite3_value** argv) {
   uint32_t count = static_cast<uint32_t>(storage_->counters().counter_count());
-  auto it = CreateBestRowIteratorForGenericSchema(count, qc, argv);
+  auto it = table_utils::CreateBestRowIteratorForGenericSchema(schema_, count,
+                                                               qc, argv);
   return std::unique_ptr<Table::Cursor>(
-      new Cursor(std::move(it), schema_.mutable_columns()));
+      new StorageCursor(std::move(it), schema_.mutable_columns()));
 }
 
 int CountersTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {

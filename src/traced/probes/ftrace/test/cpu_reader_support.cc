@@ -30,19 +30,19 @@ namespace {
 std::map<std::string, std::unique_ptr<ProtoTranslationTable>>* g_tables;
 
 std::string GetBinaryDirectory() {
-  std::string buf(512, '\0');
-  ssize_t rd = readlink("/proc/self/exe", &buf[0], buf.size());
+  char buf[512];
+  ssize_t rd = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
   if (rd < 0) {
     PERFETTO_ELOG("Failed to readlink(\"/proc/self/exe\"");
     return "";
   }
-  buf.resize(static_cast<size_t>(rd));
-  size_t end = buf.rfind('/');
-  if (end == std::string::npos) {
+  char* end = static_cast<char*>(memrchr(buf, '/', static_cast<size_t>(rd)));
+  if (!end || end == buf + sizeof(buf) - 1) {
     PERFETTO_ELOG("Failed to find directory.");
     return "";
   }
-  return buf.substr(0, end + 1);
+  *(end + 1) = '\0';
+  return std::string(buf);
 }
 
 }  // namespace

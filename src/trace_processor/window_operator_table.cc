@@ -32,24 +32,23 @@ void WindowOperatorTable::RegisterTable(sqlite3* db,
   Table::Register<WindowOperatorTable>(db, storage, "window", true);
 }
 
-base::Optional<Table::Schema> WindowOperatorTable::Init(int,
-                                                        const char* const*) {
+Table::Schema WindowOperatorTable::CreateSchema(int, const char* const*) {
   const bool kHidden = true;
   return Schema(
       {
           // These are the operator columns:
-          Table::Column(Column::kRowId, "rowid", ColumnType::kLong, kHidden),
-          Table::Column(Column::kQuantum, "quantum", ColumnType::kLong,
+          Table::Column(Column::kRowId, "rowid", ColumnType::kUlong, kHidden),
+          Table::Column(Column::kQuantum, "quantum", ColumnType::kUlong,
                         kHidden),
-          Table::Column(Column::kWindowStart, "window_start", ColumnType::kLong,
-                        kHidden),
-          Table::Column(Column::kWindowDur, "window_dur", ColumnType::kLong,
+          Table::Column(Column::kWindowStart, "window_start",
+                        ColumnType::kUlong, kHidden),
+          Table::Column(Column::kWindowDur, "window_dur", ColumnType::kUlong,
                         kHidden),
           // These are the ouput columns:
-          Table::Column(Column::kTs, "ts", ColumnType::kLong),
-          Table::Column(Column::kDuration, "dur", ColumnType::kLong),
+          Table::Column(Column::kTs, "ts", ColumnType::kUlong),
+          Table::Column(Column::kDuration, "dur", ColumnType::kUlong),
           Table::Column(Column::kCpu, "cpu", ColumnType::kUint),
-          Table::Column(Column::kQuantumTs, "quantum_ts", ColumnType::kLong),
+          Table::Column(Column::kQuantumTs, "quantum_ts", ColumnType::kUlong),
       },
       {Column::kRowId});
 }

@@ -35,8 +35,9 @@ namespace trace_processor {
 
 class TraceProcessorContext;
 
-base::Optional<int64_t> CoerceToInt64(const Json::Value& value);
-base::Optional<uint32_t> CoerceToUint32(const Json::Value& value);
+// TODO(hjd): Make optional.
+bool CoerceToInt64(const Json::Value& value, int64_t* integer_ptr);
+bool CoerceToUint32(const Json::Value& value, uint32_t* integer_ptr);
 
 // Parses legacy chrome JSON traces. The support for now is extremely rough
 // and supports only explicit TRACE_EVENT_BEGIN/END events.

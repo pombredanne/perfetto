@@ -17,13 +17,15 @@
 #ifndef SRC_TRACE_PROCESSOR_ARGS_TABLE_H_
 #define SRC_TRACE_PROCESSOR_ARGS_TABLE_H_
 
-#include "src/trace_processor/storage_table.h"
+#include "src/trace_processor/storage_columns.h"
+#include "src/trace_processor/storage_schema.h"
+#include "src/trace_processor/table.h"
 #include "src/trace_processor/trace_storage.h"
 
 namespace perfetto {
 namespace trace_processor {
 
-class ArgsTable : public StorageTable {
+class ArgsTable : public Table {
  public:
   using VarardicType = TraceStorage::Args::Varardic::Type;
 
@@ -32,7 +34,7 @@ class ArgsTable : public StorageTable {
   ArgsTable(sqlite3*, const TraceStorage*);
 
   // Table implementation.
-  base::Optional<Table::Schema> Init(int, const char* const*) override;
+  Table::Schema CreateSchema(int argc, const char* const* argv) override;
   std::unique_ptr<Table::Cursor> CreateCursor(const QueryConstraints&,
                                               sqlite3_value**) override;
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
@@ -85,6 +87,7 @@ class ArgsTable : public StorageTable {
     const TraceStorage* storage_ = nullptr;
   };
 
+  StorageSchema schema_;
   const TraceStorage* const storage_;
 };
 

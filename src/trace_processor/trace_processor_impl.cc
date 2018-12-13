@@ -247,6 +247,8 @@ void TraceProcessorImpl::ExecuteQuery(
           column->add_double_values(sqlite3_column_double(*stmt, col));
           column->add_is_nulls(false);
           break;
+        case ColumnDesc::UNKNOWN:
+          PERFETTO_FATAL("Handled in if statement above.")
       }
     }
     row_count++;

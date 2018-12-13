@@ -274,8 +274,7 @@ void HeapprofdProducer::StartDataSource(DataSourceInstanceID id,
   for (uint64_t pid : heapprofd_config.pid())
     pids.emplace(static_cast<pid_t>(pid));
 
-  if (!heapprofd_config.process_cmdline().empty())
-    FindPidsForCmdlines(heapprofd_config.process_cmdline(), &pids);
+  FindPidsForCmdlines(heapprofd_config.process_cmdline(), &pids);
 
   for (pid_t pid : pids) {
     PERFETTO_DLOG("Sending %d to %d", kHeapprofdSignal, pid);

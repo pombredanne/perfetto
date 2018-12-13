@@ -14,40 +14,29 @@
  * limitations under the License.
  */
 
-#include "src/trace_processor/json_trace_parser.h"
-
-#include <json/value.h>
-
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "src/trace_processor/storage_cursor.h"
 
 namespace perfetto {
 namespace trace_processor {
-namespace {
 
-TEST(JsonTraceParserTest, CoerceToUint32) {
-  uint32_t n = 0;
+StorageCursor::StorageCursor(std::unique_ptr<RowIterator> iterator,
+                             std::vector<std::unique_ptr<StorageColumn>>* cols)
+    : iterator_(std::move(iterator)), columns_(std::move(cols)) {}
 
-  ASSERT_TRUE(CoerceToUint32(Json::Value(42), &n));
-  EXPECT_EQ(n, 42);
-
-  ASSERT_TRUE(CoerceToUint32(Json::Value("42"), &n));
-  EXPECT_EQ(n, 42);
+int StorageCursor::Next() {
+  iterator_->NextRow();
+  return SQLITE_OK;
 }
 
-TEST(JsonTraceParserTest, CoerceToUint64) {
-  int64_t n = 0;
-
-  ASSERT_TRUE(CoerceToInt64(Json::Value(42), &n));
-  EXPECT_EQ(n, 42);
-
-  ASSERT_TRUE(CoerceToInt64(Json::Value("42"), &n));
-  EXPECT_EQ(n, 42);
-
-  ASSERT_FALSE(CoerceToInt64(Json::Value("foo"), &n));
-  ASSERT_FALSE(CoerceToInt64(Json::Value("1234!"), &n));
+int StorageCursor::Eof() {
+  return iterator_->IsEnd();
 }
 
-}  // namespace
+int StorageCursor::Column(sqlite3_context* context, int raw_col) {
+  size_t column = static_cast<size_t>(raw_col);
+  (*columns_)[column]->ReportResult(context, iterator_->Row());
+  return SQLITE_OK;
+}
+
 }  // namespace trace_processor
 }  // namespace perfetto

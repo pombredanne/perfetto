@@ -16,6 +16,10 @@
 
 #include "src/trace_processor/instants_table.h"
 
+#include "src/trace_processor/storage_columns.h"
+#include "src/trace_processor/storage_cursor.h"
+#include "src/trace_processor/table_utils.h"
+
 namespace perfetto {
 namespace trace_processor {
 
@@ -34,7 +38,7 @@ void InstantsTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
   Table::Register<InstantsTable>(db, storage, "instants");
 }
 
-base::Optional<Table::Schema> InstantsTable::Init(int, const char* const*) {
+Table::Schema InstantsTable::CreateSchema(int, const char* const*) {
   const auto& instants = storage_->instants();
   std::unique_ptr<StorageColumn> cols[] = {
       NumericColumnPtr("ts", &instants.timestamps(), false /* hidden */,
@@ -54,9 +58,10 @@ std::unique_ptr<Table::Cursor> InstantsTable::CreateCursor(
     const QueryConstraints& qc,
     sqlite3_value** argv) {
   uint32_t count = static_cast<uint32_t>(storage_->instants().instant_count());
-  auto it = CreateBestRowIteratorForGenericSchema(count, qc, argv);
+  auto it = table_utils::CreateBestRowIteratorForGenericSchema(schema_, count,
+                                                               qc, argv);
   return std::unique_ptr<Table::Cursor>(
-      new Cursor(std::move(it), schema_.mutable_columns()));
+      new StorageCursor(std::move(it), schema_.mutable_columns()));
 }
 
 int InstantsTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {

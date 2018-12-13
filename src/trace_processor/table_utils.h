@@ -14,38 +14,23 @@
  * limitations under the License.
  */
 
-#include "src/trace_processor/storage_table.h"
+#ifndef SRC_TRACE_PROCESSOR_TABLE_UTILS_H_
+#define SRC_TRACE_PROCESSOR_TABLE_UTILS_H_
+
+#include <memory>
+#include <set>
+
+#include "src/trace_processor/row_iterators.h"
+#include "src/trace_processor/storage_schema.h"
 
 namespace perfetto {
 namespace trace_processor {
+namespace table_utils {
 
-StorageTable::StorageTable() = default;
-StorageTable::~StorageTable() = default;
+namespace internal {
 
-std::unique_ptr<RowIterator>
-StorageTable::CreateBestRowIteratorForGenericSchema(uint32_t size,
-                                                    const QueryConstraints& qc,
-                                                    sqlite3_value** argv) {
-  const auto& cs = qc.constraints();
-  auto obs = RemoveRedundantOrderBy(cs, qc.order_by());
-
-  // Figure out whether the data is already ordered and which order we should
-  // traverse the data.
-  bool is_ordered, is_desc = false;
-  std::tie(is_ordered, is_desc) = IsOrdered(obs);
-
-  // Create the range iterator and if we are sorted, just return it.
-  auto index = CreateRangeIterator(size, cs, argv);
-  if (is_ordered)
-    return index.ToRowIterator(is_desc);
-
-  // Otherwise, create the sorted vector of indices and create the vector
-  // iterator.
-  return std::unique_ptr<VectorRowIterator>(
-      new VectorRowIterator(CreateSortedIndexVector(std::move(index), obs)));
-}
-
-FilteredRowIndex StorageTable::CreateRangeIterator(
+inline FilteredRowIndex CreateRangeIterator(
+    const StorageSchema& schema,
     uint32_t size,
     const std::vector<QueryConstraints::Constraint>& cs,
     sqlite3_value** argv) {
@@ -57,7 +42,7 @@ FilteredRowIndex StorageTable::CreateRangeIterator(
   for (size_t i = 0; i < cs.size(); i++) {
     const auto& c = cs[i];
     size_t column = static_cast<size_t>(c.iColumn);
-    auto bounds = schema_.GetColumn(column).BoundFilter(c.op, argv[i]);
+    auto bounds = schema.GetColumn(column).BoundFilter(c.op, argv[i]);
 
     min_idx = std::max(min_idx, bounds.min_idx);
     max_idx = std::min(max_idx, bounds.max_idx);
@@ -77,13 +62,14 @@ FilteredRowIndex StorageTable::CreateRangeIterator(
     const auto& c = cs[c_idx];
     auto* value = argv[c_idx];
 
-    const auto& schema_col = schema_.GetColumn(static_cast<size_t>(c.iColumn));
+    const auto& schema_col = schema.GetColumn(static_cast<size_t>(c.iColumn));
     schema_col.Filter(c.op, value, &index);
   }
   return index;
 }
 
-std::pair<bool, bool> StorageTable::IsOrdered(
+inline std::pair<bool, bool> IsOrdered(
+    const StorageSchema& schema,
     const std::vector<QueryConstraints::OrderBy>& obs) {
   if (obs.size() == 0)
     return std::make_pair(true, false);
@@ -93,10 +79,10 @@ std::pair<bool, bool> StorageTable::IsOrdered(
 
   const auto& ob = obs[0];
   auto col = static_cast<size_t>(ob.iColumn);
-  return std::make_pair(schema_.GetColumn(col).IsNaturallyOrdered(), ob.desc);
+  return std::make_pair(schema.GetColumn(col).IsNaturallyOrdered(), ob.desc);
 }
 
-std::vector<QueryConstraints::OrderBy> StorageTable::RemoveRedundantOrderBy(
+inline std::vector<QueryConstraints::OrderBy> RemoveRedundantOrderBy(
     const std::vector<QueryConstraints::Constraint>& cs,
     const std::vector<QueryConstraints::OrderBy>& obs) {
   std::vector<QueryConstraints::OrderBy> filtered;
@@ -113,7 +99,8 @@ std::vector<QueryConstraints::OrderBy> StorageTable::RemoveRedundantOrderBy(
   return filtered;
 }
 
-std::vector<uint32_t> StorageTable::CreateSortedIndexVector(
+inline std::vector<uint32_t> CreateSortedIndexVector(
+    const StorageSchema& schema,
     FilteredRowIndex index,
     const std::vector<QueryConstraints::OrderBy>& obs) {
   PERFETTO_DCHECK(obs.size() > 0);
@@ -124,7 +111,7 @@ std::vector<uint32_t> StorageTable::CreateSortedIndexVector(
   std::vector<StorageColumn::Comparator> comparators;
   for (const auto& ob : obs) {
     auto col = static_cast<size_t>(ob.iColumn);
-    comparators.emplace_back(schema_.GetColumn(col).Sort(ob));
+    comparators.emplace_back(schema.GetColumn(col).Sort(ob));
   }
 
   auto comparator = [&comparators](uint32_t f, uint32_t s) {
@@ -140,24 +127,36 @@ std::vector<uint32_t> StorageTable::CreateSortedIndexVector(
   return sorted_rows;
 }
 
-StorageTable::Cursor::Cursor(std::unique_ptr<RowIterator> iterator,
-                             std::vector<std::unique_ptr<StorageColumn>>* cols)
-    : iterator_(std::move(iterator)), columns_(std::move(cols)) {}
+}  // namespace internal
 
-int StorageTable::Cursor::Next() {
-  iterator_->NextRow();
-  return SQLITE_OK;
+// Creates a row iterator which is optimized for a generic storage schema (i.e.
+// it does not make assumptions about values of columns).
+inline std::unique_ptr<RowIterator> CreateBestRowIteratorForGenericSchema(
+    const StorageSchema& schema,
+    uint32_t size,
+    const QueryConstraints& qc,
+    sqlite3_value** argv) {
+  const auto& cs = qc.constraints();
+  auto obs = internal::RemoveRedundantOrderBy(cs, qc.order_by());
+
+  // Figure out whether the data is already ordered and which order we should
+  // traverse the data.
+  bool is_ordered, desc = false;
+  std::tie(is_ordered, desc) = internal::IsOrdered(schema, obs);
+
+  // Create the range iterator and if we are sorted, just return it.
+  auto index = internal::CreateRangeIterator(schema, size, cs, argv);
+  if (is_ordered) {
+    return index.ToRowIterator(desc);
+  }
+  // Otherwise, create the sorted vector of indices and create the vector
+  // iterator.
+  return std::unique_ptr<VectorRowIterator>(new VectorRowIterator(
+      internal::CreateSortedIndexVector(schema, std::move(index), obs)));
 }
 
-int StorageTable::Cursor::Eof() {
-  return iterator_->IsEnd();
-}
-
-int StorageTable::Cursor::Column(sqlite3_context* context, int raw_col) {
-  size_t column = static_cast<size_t>(raw_col);
-  (*columns_)[column]->ReportResult(context, iterator_->Row());
-  return SQLITE_OK;
-}
-
+}  // namespace table_utils
 }  // namespace trace_processor
 }  // namespace perfetto
+
+#endif  // SRC_TRACE_PROCESSOR_TABLE_UTILS_H_
