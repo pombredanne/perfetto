@@ -202,8 +202,9 @@ void TraceProcessorImpl::ExecuteQuery(
 
       auto* column = proto.mutable_columns(col);
       auto* desc = proto.mutable_column_descriptors(col);
+      auto col_type = sqlite3_column_type(*stmt, col);
       if (desc->type() == ColumnDesc::UNKNOWN) {
-        switch (sqlite3_column_type(*stmt, col)) {
+        switch (col_type) {
           case SQLITE_INTEGER:
             desc->set_type(ColumnDesc::LONG);
             break;
@@ -219,6 +220,17 @@ void TraceProcessorImpl::ExecuteQuery(
         }
       }
 
+      // If either the column type is null or we still don't know the type,
+      // just add null values to all the columns.
+      if (col_type == SQLITE_NULL || desc->type() == ColumnDesc::UNKNOWN) {
+        column->add_long_values(0);
+        column->add_string_values("");
+        column->add_double_values(0);
+        column->add_is_nulls(true);
+        continue;
+      }
+
+      // Cast the sqlite value to the type of the column.
       switch (desc->type()) {
         case ColumnDesc::LONG:
           column->add_long_values(sqlite3_column_int64(*stmt, col));
@@ -234,12 +246,6 @@ void TraceProcessorImpl::ExecuteQuery(
         case ColumnDesc::DOUBLE:
           column->add_double_values(sqlite3_column_double(*stmt, col));
           column->add_is_nulls(false);
-          break;
-        case ColumnDesc::UNKNOWN:
-          column->add_long_values(0);
-          column->add_string_values("");
-          column->add_double_values(0);
-          column->add_is_nulls(true);
           break;
       }
     }
