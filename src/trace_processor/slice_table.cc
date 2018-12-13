@@ -31,9 +31,7 @@ void SliceTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
 StorageSchema SliceTable::CreateStorageSchema() {
   const auto& slices = storage_->nestable_slices();
   return StorageSchema::Builder()
-      .AddNumericColumn("ts", &slices.start_ns(), false /* hidden */,
-                        true /* ordered */)
-      .AddNumericColumn("dur", &slices.durations())
+      .AddOrderedNumericColumn("ts", &slices.start_ns())
       .AddNumericColumn("utid", &slices.utids())
       .AddStringColumn("cat", &slices.cats(), &storage_->string_pool())
       .AddStringColumn("name", &slices.names(), &storage_->string_pool())

@@ -60,10 +60,7 @@ class StorageTable : public Table {
   virtual uint32_t RowCount() = 0;
 
  protected:
-  const StorageSchema& schema() const {
-    PERFETTO_CHECK(schema_.has_value());
-    return schema_.value();
-  }
+  const StorageSchema& schema() const { return schema_; }
 
  private:
   // Creates a row iterator which is optimized for a generic storage schema
@@ -86,7 +83,7 @@ class StorageTable : public Table {
       FilteredRowIndex index,
       const std::vector<QueryConstraints::OrderBy>& obs);
 
-  base::Optional<StorageSchema> schema_;
+  StorageSchema schema_;
 };
 
 }  // namespace trace_processor

@@ -44,11 +44,17 @@ class StorageSchema {
 
     template <class T>
     Builder& AddNumericColumn(std::string column_name,
-                              const std::deque<T>* vals,
-                              bool hidden = false,
-                              bool ordered = false) {
+                              const std::deque<T>* vals) {
       columns_.emplace_back(
-          new NumericColumn<T>(column_name, vals, hidden, ordered));
+          new NumericColumn<T>(column_name, vals, false, false));
+      return *this;
+    }
+
+    template <class T>
+    Builder& AddOrderedNumericColumn(std::string column_name,
+                                     const std::deque<T>* vals) {
+      columns_.emplace_back(
+          new NumericColumn<T>(column_name, vals, false, true));
       return *this;
     }
 
@@ -68,6 +74,7 @@ class StorageSchema {
     Columns columns_;
   };
 
+  StorageSchema();
   StorageSchema(Columns columns, std::vector<std::string> primary_keys);
 
   Table::Schema ToTableSchema();

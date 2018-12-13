@@ -39,8 +39,7 @@ StorageSchema CountersTable::CreateStorageSchema() {
   const auto& cs = storage_->counters();
   return StorageSchema::Builder()
       .AddColumn<IdColumn>("id", TableId::kCounters)
-      .AddNumericColumn("ts", &cs.timestamps(), false /* hidden */,
-                        true /* ordered */)
+      .AddOrderedNumericColumn("ts", &cs.timestamps())
       .AddStringColumn("name", &cs.name_ids(), &storage_->string_pool())
       .AddNumericColumn("value", &cs.values())
       .AddNumericColumn("dur", &cs.durations())
