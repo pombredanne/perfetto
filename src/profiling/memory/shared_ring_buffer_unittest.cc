@@ -136,6 +136,74 @@ TEST(SharedRingBufferTest, SingleThreadAttach) {
   StructuredTest(&*buf1, &*buf2);
 }
 
+TEST(SharedRingBufferTest, MultiThreadingTest) {
+  constexpr auto kBufSize = base::kPageSize * 1024;  // 4 MB
+  SharedRingBuffer rd = *SharedRingBuffer::Create(kBufSize);
+  SharedRingBuffer wr =
+      *SharedRingBuffer::Attach(base::ScopedFile(dup(rd.fd())));
+
+  std::mutex mutex;
+  std::unordered_map<std::string, int64_t> expected_contents;
+  std::atomic<bool> writers_enabled{false};
+
+  auto writer_thread_fn = [&wr, &expected_contents, &mutex,
+                           &writers_enabled](size_t thread_id) {
+    while (!writers_enabled.load()) {
+    }
+    std::minstd_rand0 rnd_engine(static_cast<uint32_t>(thread_id));
+    std::uniform_int_distribution<size_t> dist(1, base::kPageSize * 8);
+    for (int i = 0; i < 10000; i++) {
+      size_t size = dist(rnd_engine);
+      ASSERT_GT(size, 0);
+      std::string data;
+      data.resize(size);
+      std::generate(data.begin(), data.end(), rnd_engine);
+      if (wr.TryWrite(data.data(), data.size())) {
+        std::lock_guard<std::mutex> lock(mutex);
+        expected_contents[std::move(data)]++;
+      } else {
+        std::this_thread::yield();
+      }
+    }
+  };
+
+  auto reader_thread_fn = [&rd, &expected_contents, &mutex, &writers_enabled] {
+    for (;;) {
+      auto buf_and_size = rd.Read();
+      if (!buf_and_size) {
+        if (!writers_enabled.load()) {
+          // Failing to read after the writers are done means that there is no
+          // data left in the ring buffer.
+          return;
+        } else {
+          std::this_thread::yield();
+          continue;
+        }
+      }
+      ASSERT_GT(buf_and_size.payload_size(), 0);
+      std::string data = ToString(buf_and_size);
+      std::lock_guard<std::mutex> lock(mutex);
+      expected_contents[std::move(data)]--;
+    }
+  };
+
+  constexpr size_t kNumWriterThreads = 4;
+  std::array<std::thread, kNumWriterThreads> writer_threads;
+  for (size_t i = 0; i < kNumWriterThreads; i++)
+    writer_threads[i] = std::thread(writer_thread_fn, i);
+
+  writers_enabled.store(true);
+
+  std::thread reader_thread(reader_thread_fn);
+
+  for (size_t i = 0; i < kNumWriterThreads; i++)
+    writer_threads[i].join();
+
+  writers_enabled.store(false);
+
+  reader_thread.join();
+}
+
 }  // namespace
 }  // namespace profiling
 }  // namespace perfetto

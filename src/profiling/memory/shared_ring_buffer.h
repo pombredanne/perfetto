@@ -30,14 +30,13 @@
 namespace perfetto {
 namespace profiling {
 
-// A concurrent, multi-writer multi-reader ring buffer FIFO, based on a circular
-// buffer over shared memory.
-// It has similar semantics to a SEQ_PACKET + O_NONBLOCK socket, specifically:
-// - Writes are atomic, data is either written fully in the buffer or not.
-// - New writes are discarded if the buffer is full.
-// - If a write succeeds, the reader is guaranteed to see the whole buffer.
-// - Reads are atomic, no fragmentation.
-// - The reader sees writes in write order (% discarding).
+// A concurrent, multi-writer single-reader ring buffer FIFO, based on a
+// circular buffer over shared memory. It has similar semantics to a SEQ_PACKET
+// + O_NONBLOCK socket, specifically: - Writes are atomic, data is either
+// written fully in the buffer or not. - New writes are discarded if the buffer
+// is full. - If a write succeeds, the reader is guaranteed to see the whole
+// buffer. - Reads are atomic, no fragmentation. - The reader sees writes in
+// write order (% discarding).
 //
 // This class assumes that reader and write trust each other. Don't use in
 // untrusted contexts.

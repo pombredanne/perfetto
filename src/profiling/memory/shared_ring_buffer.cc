@@ -46,16 +46,15 @@ constexpr auto kGuardSize = base::kPageSize * 1024 * 16;  // 64 MB.
 class ScopedSpinlock {
  public:
   ScopedSpinlock(std::atomic<bool>* lock, bool force) : lock_(lock) {
-    if (PERFETTO_LIKELY(!(*lock_).exchange(true, std::memory_order_acquire))) {
+    if (PERFETTO_LIKELY(!lock_->exchange(true, std::memory_order_acquire))) {
       locked_ = true;
       return;
     }
 
     // Slowpath.
     for (size_t attempt = 0; force || attempt < 1024 * 10; attempt++) {
-      if (!(*lock_).load(std::memory_order_relaxed) &&
-          PERFETTO_LIKELY(
-              !(*lock_).exchange(true, std::memory_order_acquire))) {
+      if (!lock_->load(std::memory_order_relaxed) &&
+          PERFETTO_LIKELY(!lock_->exchange(true, std::memory_order_acquire))) {
         locked_ = true;
         return;
       }
@@ -67,7 +66,7 @@ class ScopedSpinlock {
   ~ScopedSpinlock() {
     if (locked_) {
       PERFETTO_DCHECK((*lock_).load());
-      (*lock_).store(false, std::memory_order_release);
+      lock_->store(false, std::memory_order_release);
     }
   }
 
@@ -158,7 +157,7 @@ void SharedRingBuffer::Initialize(base::ScopedFile mem_fd) {
   void* reg1 = mmap(region, size_with_meta, PROT_READ | PROT_WRITE,
                     MAP_SHARED | MAP_FIXED, *mem_fd, 0);
 
-  // When map again the buffer, skipping the metadta page. The final result is:
+  // When map again the buffer, skipping the metadata page. The final result is:
   // [ METADATA ] [ RING BUFFER SHMEM ] [ RING BUFFER SHMEM ]
   void* reg2 = mmap(region + size_with_meta, size, PROT_READ | PROT_WRITE,
                     MAP_SHARED | MAP_FIXED, *mem_fd,
@@ -204,10 +203,8 @@ bool SharedRingBuffer::TryWrite(const void* src, size_t size) {
 
   memcpy(aligned(wr_ptr + kHeaderSize), src, size);
 
-  uint32_t size32 = static_cast<uint32_t>(size);
-  memcpy(aligned(wr_ptr), &size32, sizeof(size32));
-  reinterpret_cast<std::atomic<uint32_t>*>(aligned(wr_ptr))
-      ->store(size32, std::memory_order_release);
+  reinterpret_cast<std::atomic<uint32_t>*>(wr_ptr)->store(
+      static_cast<uint32_t>(size), std::memory_order_release);
   PERFETTO_DCHECK(!IsCorrupt());
   return true;
 }
@@ -227,6 +224,9 @@ SharedRingBuffer::BufferAndSize SharedRingBuffer::Read() {
   uint32_t size = reinterpret_cast<std::atomic<uint32_t>*>(rd_ptr)->load(
       std::memory_order_acquire);
   const size_t size_with_header = base::AlignUp<kAlignment>(size + kHeaderSize);
+
+  if (size == 0)
+    return BufferAndSize();
 
   if (size_with_header > read_avail()) {
     PERFETTO_ELOG("Corrupted header detected, size=%" PRIu32
