@@ -24,6 +24,9 @@ message RawQueryArgs {
 
   // Wall time when the query was queued. Used only for query stats.
   optional uint64 time_queued_ns = 2;
+
+  // An optional request id, which can be used later to cancel this request.
+  optional uint64 id = 3;
 }
 
 message RawQueryResult {

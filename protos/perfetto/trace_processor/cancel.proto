@@ -19,7 +19,9 @@ option optimize_for = LITE_RUNTIME;
 
 package perfetto.protos;
 
-message Sched {
-  // TODO(primiano): fill in next CLs.
-  optional string test = 1;
+// Cancel a previous request with the corresponding id.
+// Canceling requests is inherently racy, so this API is best effort - indeed
+// clients may not implement it at all and silently ignore this RPC.
+message CancelArgs {
+  optional uint64 id = 1;
 }

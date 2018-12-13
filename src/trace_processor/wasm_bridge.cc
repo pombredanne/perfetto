@@ -21,8 +21,8 @@
 #include "perfetto/base/logging.h"
 #include "perfetto/trace_processor/trace_processor.h"
 
+#include "perfetto/trace_processor/cancel.pb.h"
 #include "perfetto/trace_processor/raw_query.pb.h"
-#include "perfetto/trace_processor/sched.pb.h"
 
 namespace perfetto {
 namespace trace_processor {
@@ -108,6 +108,23 @@ void trace_processor_rawQuery(RequestID id,
   };
 
   g_trace_processor->ExecuteQuery(query, callback);
+}
+
+void EMSCRIPTEN_KEEPALIVE trace_processor_cancel(RequestID,
+                                                 const uint8_t*,
+                                                 int);
+void trace_processor_cancel(RequestID id, const uint8_t* data, int size) {
+  protos::CancelArgs cancel;
+  bool parsed = cancel.ParseFromArray(data, size);
+  if (!parsed) {
+    std::string err = "Failed to parse cancel request";
+    g_reply(id, false, err.data(), err.size());
+    return;
+  }
+
+  PERFETTO_ILOG("Cancel request with id: %llu", cancel.id());
+  PERFETTO_CHECK(cancel.id() > 0);
+  g_reply(id, true, "", 0);
 }
 
 }  // extern "C"
