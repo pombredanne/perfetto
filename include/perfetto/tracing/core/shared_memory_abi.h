@@ -375,17 +375,19 @@ class SharedMemoryABI {
     }
 
     // Increases |packets.count| with release semantics (note, however, that the
-    // packet count is incremented *before* starting writing a packet).
-    // The increment is atomic but NOT race-free (i.e. no CAS). Only the
-    // Producer is supposed to perform this increment, and it's supposed to do
-    // that in a thread-safe way (holding a lock). A Chunk cannot be shared by
-    // multiple Producer threads without locking. The packet count is cleared by
-    // TryAcquireChunk(), when passing the new header for the chunk.
-    void IncrementPacketCount() {
+    // packet count is incremented *before* starting writing a packet). Returns
+    // the new packet count. The increment is atomic but NOT race-free (i.e. no
+    // CAS). Only the Producer is supposed to perform this increment, and it's
+    // supposed to do that in a thread-safe way (holding a lock). A Chunk cannot
+    // be shared by multiple Producer threads without locking. The packet count
+    // is cleared by TryAcquireChunk(), when passing the new header for the
+    // chunk.
+    uint16_t IncrementPacketCount() {
       ChunkHeader* chunk_header = header();
       auto packets = chunk_header->packets.load(std::memory_order_relaxed);
       packets.count++;
       chunk_header->packets.store(packets, std::memory_order_release);
+      return packets.count;
     }
 
     // Flags are cleared by TryAcquireChunk(), by passing the new header for

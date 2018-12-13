@@ -95,10 +95,7 @@ TraceWriterImpl::TracePacketHandle TraceWriterImpl::NewTracePacket() {
   // a realistic packet).
   bool chunk_too_full =
       protobuf_stream_writer_.bytes_available() < kPacketHeaderSize + 8;
-  bool exceeded_packets_per_chunk =
-      cur_chunk_.is_valid() && cur_chunk_.GetPacketCountAndFlags().first ==
-                                   ChunkHeader::Packets::kMaxCount;
-  if (chunk_too_full || exceeded_packets_per_chunk) {
+  if (chunk_too_full || reached_max_packets_per_chunk_) {
     protobuf_stream_writer_.Reset(GetNewBuffer());
   }
 
@@ -114,7 +111,9 @@ TraceWriterImpl::TracePacketHandle TraceWriterImpl::NewTracePacket() {
   uint8_t* header = protobuf_stream_writer_.ReserveBytes(kPacketHeaderSize);
   memset(header, 0, kPacketHeaderSize);
   cur_packet_->set_size_field(header);
-  cur_chunk_.IncrementPacketCount();
+  uint16_t new_packet_count = cur_chunk_.IncrementPacketCount();
+  reached_max_packets_per_chunk_ =
+      new_packet_count == ChunkHeader::Packets::kMaxCount;
   TracePacketHandle handle(cur_packet_.get());
   cur_fragment_start_ = protobuf_stream_writer_.write_ptr();
   fragmenting_packet_ = true;
@@ -205,6 +204,7 @@ protozero::ContiguousMemoryRange TraceWriterImpl::GetNewBuffer() {
   header.packets.store(packets, std::memory_order_relaxed);
 
   cur_chunk_ = shmem_arbiter_->GetNewChunk(header);
+  reached_max_packets_per_chunk_ = false;
   uint8_t* payload_begin = cur_chunk_.payload_begin();
   if (fragmenting_packet_) {
     cur_packet_->set_size_field(payload_begin);
