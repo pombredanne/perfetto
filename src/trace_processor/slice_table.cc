@@ -32,9 +32,7 @@ base::Optional<Table::Schema> SliceTable::Init(int, const char* const*) {
   const auto& slices = storage_->nestable_slices();
   schema_ =
       StorageSchema::Builder()
-          .AddNumericColumn("ts", &slices.start_ns(), false /* hidden */,
-                            true /* ordered */)
-          .AddNumericColumn("dur", &slices.durations())
+          .AddOrderedNumericColumn("ts", &slices.start_ns())
           .AddNumericColumn("utid", &slices.utids())
           .AddStringColumn("cat", &slices.cats(), &storage_->string_pool())
           .AddStringColumn("name", &slices.names(), &storage_->string_pool())
@@ -42,7 +40,7 @@ base::Optional<Table::Schema> SliceTable::Init(int, const char* const*) {
           .AddNumericColumn("stack_id", &slices.stack_ids())
           .AddNumericColumn("parent_stack_id", &slices.parent_stack_ids())
           .Build({"utid", "ts", "depth"});
-  return schema_->ToTableSchema();
+  return schema_.ToTableSchema();
 }
 
 std::unique_ptr<Table::Cursor> SliceTable::CreateCursor(
@@ -52,7 +50,7 @@ std::unique_ptr<Table::Cursor> SliceTable::CreateCursor(
       static_cast<uint32_t>(storage_->nestable_slices().slice_count());
   auto it = CreateBestRowIteratorForGenericSchema(count, qc, argv);
   return std::unique_ptr<Table::Cursor>(
-      new Cursor(std::move(it), schema_->mutable_columns()));
+      new Cursor(std::move(it), schema_.mutable_columns()));
 }
 
 int SliceTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
@@ -61,8 +59,8 @@ int SliceTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
 
   // Only the string columns are handled by SQLite
   info->order_by_consumed = true;
-  size_t name_index = schema_->ColumnIndexFromName("name");
-  size_t cat_index = schema_->ColumnIndexFromName("cat");
+  size_t name_index = schema_.ColumnIndexFromName("name");
+  size_t cat_index = schema_.ColumnIndexFromName("cat");
   for (size_t i = 0; i < qc.constraints().size(); i++) {
     info->omit[i] =
         qc.constraints()[i].iColumn != static_cast<int>(name_index) &&

@@ -41,7 +41,7 @@ base::Optional<Table::Schema> ArgsTable::Init(int, const char* const*) {
                                   storage_)
           .AddColumn<ValueColumn>("real_value", VarardicType::kReal, storage_)
           .Build({"id", "key"});
-  return schema_->ToTableSchema();
+  return schema_.ToTableSchema();
 }
 
 std::unique_ptr<Table::Cursor> ArgsTable::CreateCursor(
@@ -50,13 +50,13 @@ std::unique_ptr<Table::Cursor> ArgsTable::CreateCursor(
   uint32_t count = static_cast<uint32_t>(storage_->args().args_count());
   auto it = CreateBestRowIteratorForGenericSchema(count, qc, argv);
   return std::unique_ptr<Cursor>(
-      new Cursor(std::move(it), schema_->mutable_columns()));
+      new Cursor(std::move(it), schema_.mutable_columns()));
 }
 
 int ArgsTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
   // In the case of an id equality filter, we can do a very efficient lookup.
   if (qc.constraints().size() == 1) {
-    auto id = static_cast<int>(schema_->ColumnIndexFromName("id"));
+    auto id = static_cast<int>(schema_.ColumnIndexFromName("id"));
     const auto& cs = qc.constraints().back();
     if (cs.iColumn == id && sqlite_utils::IsOpEq(cs.op)) {
       info->estimated_cost = 1;

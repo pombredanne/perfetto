@@ -29,15 +29,14 @@ void SchedSliceTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
 base::Optional<Table::Schema> SchedSliceTable::Init(int, const char* const*) {
   const auto& slices = storage_->slices();
   schema_ = StorageSchema::Builder()
-                .AddNumericColumn("ts", &slices.start_ns(), false /* hidden */,
-                                  true /* ordered */)
+                .AddOrderedNumericColumn("ts", &slices.start_ns())
                 .AddNumericColumn("cpu", &slices.cpus())
                 .AddNumericColumn("dur", &slices.durations())
                 .AddColumn<TsEndColumn>("ts_end", &slices.start_ns(),
                                         &slices.durations())
                 .AddNumericColumn("utid", &slices.utids())
                 .Build({"cpu", "ts"});
-  return schema_->ToTableSchema();
+  return schema_.ToTableSchema();
 }
 
 std::unique_ptr<Table::Cursor> SchedSliceTable::CreateCursor(
@@ -46,13 +45,13 @@ std::unique_ptr<Table::Cursor> SchedSliceTable::CreateCursor(
   uint32_t count = static_cast<uint32_t>(storage_->slices().slice_count());
   auto it = CreateBestRowIteratorForGenericSchema(count, qc, argv);
   return std::unique_ptr<Table::Cursor>(
-      new Cursor(std::move(it), schema_->mutable_columns()));
+      new Cursor(std::move(it), schema_.mutable_columns()));
 }
 
 int SchedSliceTable::BestIndex(const QueryConstraints& qc,
                                BestIndexInfo* info) {
   const auto& cs = qc.constraints();
-  size_t ts_idx = schema_->ColumnIndexFromName("ts");
+  size_t ts_idx = schema_.ColumnIndexFromName("ts");
   auto has_ts_column = [ts_idx](const QueryConstraints::Constraint& c) {
     return c.iColumn == static_cast<int>(ts_idx);
   };

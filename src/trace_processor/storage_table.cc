@@ -26,8 +26,6 @@ std::unique_ptr<RowIterator>
 StorageTable::CreateBestRowIteratorForGenericSchema(uint32_t size,
                                                     const QueryConstraints& qc,
                                                     sqlite3_value** argv) {
-  PERFETTO_DCHECK(schema_.has_value());
-
   const auto& cs = qc.constraints();
   auto obs = RemoveRedundantOrderBy(cs, qc.order_by());
 
@@ -59,7 +57,7 @@ FilteredRowIndex StorageTable::CreateRangeIterator(
   for (size_t i = 0; i < cs.size(); i++) {
     const auto& c = cs[i];
     size_t column = static_cast<size_t>(c.iColumn);
-    auto bounds = schema_->GetColumn(column).BoundFilter(c.op, argv[i]);
+    auto bounds = schema_.GetColumn(column).BoundFilter(c.op, argv[i]);
 
     min_idx = std::max(min_idx, bounds.min_idx);
     max_idx = std::min(max_idx, bounds.max_idx);
@@ -79,7 +77,7 @@ FilteredRowIndex StorageTable::CreateRangeIterator(
     const auto& c = cs[c_idx];
     auto* value = argv[c_idx];
 
-    const auto& schema_col = schema_->GetColumn(static_cast<size_t>(c.iColumn));
+    const auto& schema_col = schema_.GetColumn(static_cast<size_t>(c.iColumn));
     schema_col.Filter(c.op, value, &index);
   }
   return index;
@@ -95,7 +93,7 @@ std::pair<bool, bool> StorageTable::IsOrdered(
 
   const auto& ob = obs[0];
   auto col = static_cast<size_t>(ob.iColumn);
-  return std::make_pair(schema_->GetColumn(col).IsNaturallyOrdered(), ob.desc);
+  return std::make_pair(schema_.GetColumn(col).IsNaturallyOrdered(), ob.desc);
 }
 
 std::vector<QueryConstraints::OrderBy> StorageTable::RemoveRedundantOrderBy(
@@ -126,7 +124,7 @@ std::vector<uint32_t> StorageTable::CreateSortedIndexVector(
   std::vector<StorageColumn::Comparator> comparators;
   for (const auto& ob : obs) {
     auto col = static_cast<size_t>(ob.iColumn);
-    comparators.emplace_back(schema_->GetColumn(col).Sort(ob));
+    comparators.emplace_back(schema_.GetColumn(col).Sort(ob));
   }
 
   auto comparator = [&comparators](uint32_t f, uint32_t s) {
