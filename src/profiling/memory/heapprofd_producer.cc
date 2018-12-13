@@ -336,7 +336,7 @@ bool HeapprofdProducer::Dump(DataSourceInstanceID id,
       if (trace_writer)
         trace_writer->Flush();
       task_runner->PostTask([weak_producer, flush_id] {
-        if (!weak_producer)
+        if (weak_producer)
           return weak_producer->FinishDataSourceFlush(flush_id);
       });
     };
