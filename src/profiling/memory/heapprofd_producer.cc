@@ -274,7 +274,8 @@ void HeapprofdProducer::StartDataSource(DataSourceInstanceID id,
   for (uint64_t pid : heapprofd_config.pid())
     pids.emplace(static_cast<pid_t>(pid));
 
-  FindPidsForCmdlines(heapprofd_config.process_cmdline(), &pids);
+  if (!heapprofd_config.process_cmdline().empty())
+    FindPidsForCmdlines(heapprofd_config.process_cmdline(), &pids);
 
   for (pid_t pid : pids) {
     PERFETTO_DLOG("Sending %d to %d", kHeapprofdSignal, pid);
@@ -329,7 +330,7 @@ bool HeapprofdProducer::Dump(DataSourceInstanceID id,
   if (has_flush_id) {
     dump_record.callback = [task_runner, weak_producer, flush_id] {
       task_runner->PostTask([weak_producer, flush_id] {
-        if (!weak_producer)
+        if (weak_producer)
           return weak_producer->FinishDataSourceFlush(flush_id);
       });
     };

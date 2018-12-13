@@ -208,10 +208,9 @@ void TraceProcessorImpl::ExecuteQuery(
           case SQLITE_INTEGER:
             desc->set_type(ColumnDesc::LONG);
             break;
-          case SQLITE_TEXT: {
+          case SQLITE_TEXT:
             desc->set_type(ColumnDesc::STRING);
             break;
-          }
           case SQLITE_FLOAT:
             desc->set_type(ColumnDesc::DOUBLE);
             break;
@@ -224,7 +223,7 @@ void TraceProcessorImpl::ExecuteQuery(
       // just add null values to all the columns.
       if (col_type == SQLITE_NULL || desc->type() == ColumnDesc::UNKNOWN) {
         column->add_long_values(0);
-        column->add_string_values("");
+        column->add_string_values("[NULL]");
         column->add_double_values(0);
         column->add_is_nulls(true);
         continue;
@@ -248,7 +247,7 @@ void TraceProcessorImpl::ExecuteQuery(
           column->add_is_nulls(false);
           break;
         case ColumnDesc::UNKNOWN:
-          PERFETTO_FATAL("Handled in if statement above.")
+          PERFETTO_FATAL("Handled in if statement above.");
       }
     }
     row_count++;
