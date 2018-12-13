@@ -24,19 +24,18 @@
 
 #include <sys/system_properties.h>
 
-// If we're building on Android and starting the daemons ourselves,
-// create the sockets in a world-writable location.
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID) && \
-    PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
-#define TEST_PRODUCER_SOCK_NAME "/data/local/tmp/traced_producer"
-#else
-#define TEST_PRODUCER_SOCK_NAME ::perfetto::GetProducerSocket()
-#endif
-
 // This test only works when run on Android using an Android Q version of
 // Bionic.
 #if !PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
 #error "This test can only be used on Android."
+#endif
+
+// If we're building on Android and starting the daemons ourselves,
+// create the sockets in a world-writable location.
+#if PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
+#define TEST_PRODUCER_SOCK_NAME "/data/local/tmp/traced_producer"
+#else
+#define TEST_PRODUCER_SOCK_NAME ::perfetto::GetProducerSocket()
 #endif
 
 namespace perfetto {
@@ -59,14 +58,12 @@ class HeapprofdDelegate : public ThreadDelegate {
   std::unique_ptr<HeapprofdProducer> producer_;
 };
 
-#if !PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
 constexpr const char* kEnableHeapprofdProperty = "persist.heapprofd.enable";
 
-int ResetProperty(const char* value) {
+int __attribute__((unused)) SetProperty(const char* value) {
   __system_property_set(kEnableHeapprofdProperty, value);
   return 0;
 }
-#endif
 
 TEST(HeapprofdEndToEnd, Smoke) {
   base::TestTaskRunner task_runner;
@@ -91,7 +88,7 @@ TEST(HeapprofdEndToEnd, Smoke) {
         &prev_property_value);
   }
   __system_property_set(kEnableHeapprofdProperty, "1");
-  base::ScopedResource<const char*, ResetProperty, nullptr> unset_property(
+  base::ScopedResource<const char*, SetProperty, nullptr> unset_property(
       prev_property_value.c_str());
 #endif
 
