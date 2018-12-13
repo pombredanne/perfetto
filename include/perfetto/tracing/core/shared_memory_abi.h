@@ -302,8 +302,10 @@ class SharedMemoryABI {
     struct Packets {
       // Number of valid TracePacket protobuf messages contained in the chunk.
       // Each TracePacket is prefixed by its own size. This field is
-      // monotonically updated by the Producer with release store semantic after
-      // the packet has been written into the chunk.
+      // monotonically updated by the Producer with release store semantic when
+      // the packet at position |count| is started. This last packet may not be
+      // considered complete until |count| is incremented for the subsequent
+      // packet or the chunk is completed.
       uint16_t count : 10;
       static constexpr size_t kMaxCount = (1 << 10) - 1;
 
