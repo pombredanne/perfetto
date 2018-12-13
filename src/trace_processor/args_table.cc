@@ -35,6 +35,7 @@ base::Optional<Table::Schema> ArgsTable::Init(int, const char* const*) {
           .AddColumn<IdColumn>("id", storage_, &args.ids())
           .AddStringColumn("flat_key", &args.flat_keys(),
                            &storage_->string_pool())
+          .AddStringColumn("key", &args.keys(), &storage_->string_pool())
           .AddColumn<ValueColumn>("int_value", VarardicType::kInt, storage_)
           .AddColumn<ValueColumn>("string_value", VarardicType::kString,
                                   storage_)
