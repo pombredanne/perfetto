@@ -330,7 +330,7 @@ void BookkeepingThread::HandleBookkeepingRecord(BookkeepingRecord* rec) {
         it = bookkeeping_data_.erase(it);
       }
     }
-    profile_packet->Finalize();
+    trace_writer->Finalize();
     dump_rec.callback();
   } else if (rec->record_type == BookkeepingRecord::Type::Free) {
     FreeRecord& free_rec = rec->free_record;
