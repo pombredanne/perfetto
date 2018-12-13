@@ -140,31 +140,30 @@ void TraceBuffer::CopyChunkUntrusted(ProducerID producer_id_trusted,
   // chunks aren't ordered in the SMB.
   const auto it = index_.find(key);
   if (PERFETTO_UNLIKELY(it != index_.end())) {
-    ChunkRecord* prev = it->second.chunk_record;
+    ChunkMeta* record_meta = &it->second;
+    ChunkRecord* prev = record_meta->chunk_record;
 
     // Verify that the old chunk's metadata corresponds to the new one.
     // Overridden chunks should never change size, since the page layout is
-    // fixed per writer.
-    if (PERFETTO_UNLIKELY(prev->producer_id != producer_id_trusted ||
-                          prev->writer_id != writer_id ||
-                          prev->chunk_id != chunk_id ||
-                          prev->size != record_size)) {
+    // fixed per writer. The number of fragments should also never decrease.
+    if (PERFETTO_UNLIKELY(ChunkMeta::Key(*prev) != key ||
+                          prev->size != record_size ||
+                          prev->num_fragments > num_fragments)) {
       stats_.abi_violations++;
       PERFETTO_DCHECK(suppress_sanity_dchecks_for_testing_);
       return;
     }
 
-    // Number of fragments shouldn't decrease.
-    if (PERFETTO_UNLIKELY(prev->num_fragments > num_fragments)) {
-      stats_.abi_violations++;
-      PERFETTO_DCHECK(suppress_sanity_dchecks_for_testing_);
-      return;
-    }
-
-    // We set num_fragments_read to kMaxNumFragments when we've completed
-    // reading a chunk and moved on to reading from a subsequent chunk. Make
-    // sure we don't override such a completed chunk.
-    if (PERFETTO_UNLIKELY(num_fragments < it->second.num_fragments_read)) {
+    // If we've already started reading from chunk N+1 following this chunk N,
+    // don't override chunk N. Otherwise we may end up reading a packet from
+    // chunk N after having read from chunk N+1, thereby violating sequential
+    // read of packets. This shouldn't happen if the producer is well-behaved,
+    // because it shouldn't start chunk N+1 before completing chunk N.
+    ChunkMeta::Key subsequent_key = key;
+    subsequent_key.chunk_id++;
+    const auto subsequent_it = index_.find(subsequent_key);
+    if (subsequent_it != index_.end() &&
+        subsequent_it->second.num_fragments_read > 0) {
       stats_.abi_violations++;
       PERFETTO_DCHECK(suppress_sanity_dchecks_for_testing_);
       return;
@@ -177,29 +176,21 @@ void TraceBuffer::CopyChunkUntrusted(ProducerID producer_id_trusted,
       return;
     }
 
+    // We should not have read past the last packet.
+    if (record_meta->num_fragments_read > prev->num_fragments) {
+      PERFETTO_ELOG(
+          "TraceBuffer read too many fragments from an incomplete chunk");
+      PERFETTO_DCHECK(suppress_sanity_dchecks_for_testing_);
+      return;
+    }
+
     uint8_t* wptr = reinterpret_cast<uint8_t*>(prev);
     TRACE_BUFFER_DLOG("  overriding chunk @ %lu, size=%zu", wptr - begin(),
                       record_size);
 
-    uint16_t last_frag_read = it->second.num_fragments_read;
-    uint16_t last_frag_off = it->second.cur_fragment_offset;
-
-    // We should not have read past the last packet.
-    if (last_frag_read > prev->num_fragments) {
-      PERFETTO_ELOG(
-          "TraceBuffer read too many fragments from an incomplete chunk");
-      PERFETTO_DCHECK(suppress_sanity_dchecks_for_testing_);
-    }
-
-    // Number of fragments and flags may have changed, so replace index entry.
-    index_.erase(it);
-    auto it_and_inserted = index_.emplace(
-        key, ChunkMeta(prev, num_fragments, chunk_flags, producer_uid_trusted));
-    PERFETTO_DCHECK(it_and_inserted.second);
-
-    ChunkMeta& new_meta = it_and_inserted.first->second;
-    new_meta.num_fragments_read = last_frag_read;
-    new_meta.cur_fragment_offset = last_frag_off;
+    // Update num_fragments and chunk_flags stored in the index.
+    record_meta->num_fragments = num_fragments;
+    record_meta->flags = chunk_flags;
 
     // Override the ChunkRecord contents at the original |wptr|.
     TRACE_BUFFER_DLOG("  copying @ [%lu - %lu] %zu", wptr - begin(),
@@ -207,6 +198,7 @@ void TraceBuffer::CopyChunkUntrusted(ProducerID producer_id_trusted,
     WriteChunkRecord(wptr, record, src, size);
     TRACE_BUFFER_DLOG("Chunk raw: %s", HexDump(wptr, record_size).c_str());
 
+    // TODO(eseckler): Add a stat for rewritten chunks.
     return;
   }
 
@@ -501,8 +493,6 @@ bool TraceBuffer::ReadNextTracePacket(TracePacket* packet,
   // Just in case we forget to initialize it below.
   *producer_uid = kInvalidUid;
 
-  ChunkMeta* last_chunk_meta = nullptr;
-
 #if PERFETTO_DCHECK_IS_ON()
   PERFETTO_DCHECK(!changed_since_last_read_);
 #endif
@@ -519,7 +509,6 @@ bool TraceBuffer::ReadNextTracePacket(TracePacket* packet,
       // GetReadIterForSequence() knows how to deal with that.
       read_iter_ = GetReadIterForSequence(read_iter_.seq_end);
       PERFETTO_DCHECK(read_iter_.is_valid() && read_iter_.cur != index_.end());
-      last_chunk_meta = nullptr;
     }
 
     ChunkMeta* chunk_meta = &*read_iter_;
@@ -532,10 +521,6 @@ bool TraceBuffer::ReadNextTracePacket(TracePacket* packet,
     }
 
     const uid_t trusted_uid = chunk_meta->trusted_uid;
-
-    // We intend to read from this chunk, so mark the previous one completed.
-    if (last_chunk_meta)
-      MarkChunkReadComplete(last_chunk_meta);
 
     // At this point we have a chunk in |chunk_meta| that has not been fully
     // read. We don't know yet whether we have enough data to read the full
@@ -561,9 +546,8 @@ bool TraceBuffer::ReadNextTracePacket(TracePacket* packet,
     // | Packet 3  ... |   |                   |  | Packet 5 ...  |
     // +---------------+   +-------------------+  +---------------+
 
-    PERFETTO_DCHECK(
-        chunk_meta->num_fragments_read <= chunk_meta->num_fragments ||
-        chunk_meta->num_fragments_read == ChunkMeta::kMaxNumFragments);
+    PERFETTO_DCHECK(chunk_meta->num_fragments_read <=
+                    chunk_meta->num_fragments);
     while (chunk_meta->num_fragments_read < chunk_meta->num_fragments) {
       enum { kSkip = 0, kReadOnePacket, kTryReadAhead } action;
       if (chunk_meta->num_fragments_read == 0) {
@@ -642,8 +626,6 @@ bool TraceBuffer::ReadNextTracePacket(TracePacket* packet,
       // re-cache the |chunk_meta| pointer to point to the current chunk.
       chunk_meta = &*read_iter_;
     }  // while(...)  [iterate over packet fragments for the current chunk].
-
-    last_chunk_meta = chunk_meta;
   }    // for(;;MoveNext()) [iterate over chunks].
 }
 
@@ -709,7 +691,6 @@ TraceBuffer::ReadAheadResult TraceBuffer::ReadAhead(TracePacket* packet) {
       }
       if (read_iter_.cur == it.cur)
         break;
-      MarkChunkReadComplete(&read_iter_.cur->second);
       read_iter_.MoveNext();
     }  // for(;;)
     PERFETTO_DCHECK(read_iter_.cur == it.cur);
@@ -724,13 +705,6 @@ TraceBuffer::ReadAheadResult TraceBuffer::ReadAhead(TracePacket* packet) {
     return ReadAheadResult::kSucceededReturnSlices;
   }  // for(it...)  [readahead loop]
   return ReadAheadResult::kFailedMoveToNextSequence;
-}
-
-void TraceBuffer::MarkChunkReadComplete(ChunkMeta* chunk_meta) {
-  // Prevent reading from the completed chunk in the future to avoid an
-  // incorrectly ordered sequence of packets. CopyChunkUntrusted() will also
-  // prevent overriding of this chunk in the future.
-  chunk_meta->num_fragments_read = ChunkMeta::kMaxNumFragments;
 }
 
 bool TraceBuffer::ReadNextPacketInChunk(ChunkMeta* chunk_meta,

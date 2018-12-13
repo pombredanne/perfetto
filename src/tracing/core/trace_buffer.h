@@ -319,6 +319,8 @@ class TraceBuffer {
                std::tie(other.producer_id, other.writer_id, other.chunk_id);
       }
 
+      bool operator!=(const Key& other) const { return !(*this == other); }
+
       // These fields should match at all times the corresponding fields in
       // the |chunk_record|. They are copied here purely for efficiency to avoid
       // dereferencing the buffer all the time.
@@ -338,12 +340,9 @@ class TraceBuffer {
     // |chunk_record| while iterating over ChunkMeta) and to aid debugging in
     // case the buffer gets corrupted.
     uint8_t flags = 0;                 // See SharedMemoryABI::flags.
-    const uint16_t num_fragments = 0;  // Total number of packet fragments.
+    uint16_t num_fragments = 0;        // Total number of packet fragments.
 
     uint16_t num_fragments_read = 0;   // Number of fragments already read.
-
-    static constexpr size_t kMaxNumFragments =
-        std::numeric_limits<decltype(num_fragments)>::max();
 
     // The start offset of the next fragment (the |num_fragments_read|-th) to be
     // read. This is the offset in bytes from the beginning of the ChunkRecord's
@@ -445,12 +444,6 @@ class TraceBuffer {
   // kFailedStayOnSameSequence, telling the caller to continue looking for
   // packets.
   ReadAheadResult ReadAhead(TracePacket*);
-
-  // Marks the given chunk as fully read. Called when the read iterator
-  // progresses past |chunk_meta| to subsequent chunk. Future reads will skip
-  // this chunk, and CopyChunkUntrusted() will prevent the chunk from being
-  // overridden in the future.
-  void MarkChunkReadComplete(ChunkMeta* chunk_meta);
 
   // Deletes (by marking the record invalid and removing form the index) all
   // chunks from |wptr_| to |wptr_| + |bytes_to_clear|. Returns the size of the
