@@ -138,6 +138,7 @@ TEST(HeapprofdEndToEnd, Smoke) {
   const auto& packets = helper.trace();
   ASSERT_GT(packets.size(), 0u);
   size_t profile_packets = 0;
+  size_t samples = 0;
   for (const protos::TracePacket& packet : packets) {
     if (packet.has_profile_packet() &&
         packet.profile_packet().process_dumps().size() > 0) {
@@ -146,12 +147,14 @@ TEST(HeapprofdEndToEnd, Smoke) {
       const protos::ProfilePacket_ProcessHeapSamples& dump = dumps.Get(0);
       EXPECT_EQ(dump.pid(), pid);
       for (const auto& sample : dump.samples()) {
+        samples++;
         EXPECT_EQ(sample.cumulative_allocated() % 1024, 0);
       }
       profile_packets++;
     }
   }
   EXPECT_GT(profile_packets, 0);
+  EXPECT_GT(samples, 0);
 }
 
 }  // namespace
