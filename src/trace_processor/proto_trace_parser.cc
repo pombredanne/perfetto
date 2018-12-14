@@ -602,6 +602,7 @@ void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
         ParseOOMScoreAdjUpdate(timestamp, ftrace.slice(fld_off, fld.size()));
         break;
       }
+      default { break; }
     }
   }
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
