@@ -173,7 +173,10 @@ void SharedRingBuffer::Initialize(base::ScopedFile mem_fd) {
   mem_fd_ = std::move(mem_fd);
 }
 
-SharedRingBuffer::WriteBuffer SharedRingBuffer::PrepareWrite(size_t size) {
+SharedRingBuffer::WriteBuffer SharedRingBuffer::PrepareWrite(
+    const ScopedSpinlock& spinlock,
+    size_t size) {
+  PERFETTO_DCHECK(spinlock.locked());
   WriteBuffer result;
 
   if (IsCorrupt())
@@ -215,7 +218,7 @@ bool SharedRingBuffer::TryWrite(const void* src, size_t size) {
       meta_->num_writes_failed++;
       return false;
     }
-    buf = PrepareWrite(size);
+    buf = PrepareWrite(try_spinlock, size);
   }
   if (!buf)
     return false;
@@ -225,7 +228,7 @@ bool SharedRingBuffer::TryWrite(const void* src, size_t size) {
 }
 
 SharedRingBuffer::ReadBuffer SharedRingBuffer::Read() {
-  ScopedSpinlock try_spinlock(&meta_->spinlock, true);
+  ScopedSpinlock spinlock(&meta_->spinlock, true);
 
   if (IsCorrupt()) {
     meta_->num_reads_failed++;
@@ -255,7 +258,7 @@ SharedRingBuffer::ReadBuffer SharedRingBuffer::Read() {
 }
 
 void SharedRingBuffer::Return(const ReadBuffer& buf) {
-  ScopedSpinlock try_spinlock(&meta_->spinlock, true);
+  ScopedSpinlock spinlock(&meta_->spinlock, true);
   meta_->read_pos += buf.size_with_header_;
 }
 

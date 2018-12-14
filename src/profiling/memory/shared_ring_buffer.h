@@ -119,7 +119,7 @@ class SharedRingBuffer {
   size_t size() const { return size_; }
   int fd() const { return *mem_fd_; }
 
-  WriteBuffer PrepareWrite(size_t size);
+  WriteBuffer PrepareWrite(const ScopedSpinlock& spinlock, size_t size);
   void EndWrite(const WriteBuffer& buf);
 
   bool TryWrite(const void*, size_t) PERFETTO_WARN_UNUSED_RESULT;
