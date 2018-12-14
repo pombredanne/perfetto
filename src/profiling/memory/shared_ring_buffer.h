@@ -30,6 +30,19 @@
 namespace perfetto {
 namespace profiling {
 
+class ScopedSpinlock {
+ public:
+  ScopedSpinlock(std::atomic<bool>* lock, bool force);
+  ~ScopedSpinlock();
+
+  void Unlock();
+  bool locked() const;
+
+ private:
+  std::atomic<bool>* const lock_;
+  bool locked_ = false;
+};
+
 // A concurrent, multi-writer single-reader ring buffer FIFO, based on a
 // circular buffer over shared memory. It has similar semantics to a SEQ_PACKET
 // + O_NONBLOCK socket, specifically: - Writes are atomic, data is either
@@ -46,29 +59,44 @@ namespace profiling {
 // - Make the stats ifdef-able.
 class SharedRingBuffer {
  public:
-  class BufferAndSize {
+  class WriteBuffer {
    public:
     friend class SharedRingBuffer;
-    friend void swap(BufferAndSize&, BufferAndSize&);
+    uint8_t* buf();
+    size_t size() { return size_; }
 
-    BufferAndSize() = default;
-    ~BufferAndSize();
+    operator bool() { return wr_ptr_ != nullptr; }
 
-    BufferAndSize(const BufferAndSize&) = delete;
-    BufferAndSize& operator=(const BufferAndSize&) = delete;
+   private:
+    size_t size_;
+    uint8_t* wr_ptr_ = nullptr;
+    uint64_t write_pos_;
+    size_t size_with_header_;
+  };
 
-    BufferAndSize(BufferAndSize&&) noexcept;
-    BufferAndSize& operator=(BufferAndSize&&) noexcept;
+  class ReadBuffer {
+   public:
+    friend class SharedRingBuffer;
+    friend void swap(ReadBuffer&, ReadBuffer&);
+
+    ReadBuffer() = default;
+    ~ReadBuffer();
+
+    ReadBuffer(const ReadBuffer&) = delete;
+    ReadBuffer& operator=(const ReadBuffer&) = delete;
+
+    ReadBuffer(ReadBuffer&&) noexcept;
+    ReadBuffer& operator=(ReadBuffer&&) noexcept;
 
     uint8_t* payload() const { return data_; }
     size_t payload_size() const { return size_; }
     operator bool() const { return ring_buffer_ != nullptr; }
 
    private:
-    BufferAndSize(uint8_t* data,
-                  size_t size,
-                  size_t size_with_header,
-                  SharedRingBuffer* ring_buffer)
+    ReadBuffer(uint8_t* data,
+               size_t size,
+               size_t size_with_header,
+               SharedRingBuffer* ring_buffer)
         : data_(data),
           size_(size),
           size_with_header_(size_with_header),
@@ -90,8 +118,12 @@ class SharedRingBuffer {
   bool is_valid() const { return !!mem_; }
   size_t size() const { return size_; }
   int fd() const { return *mem_fd_; }
+
+  WriteBuffer PrepareWrite(size_t size);
+  void EndWrite(const WriteBuffer& buf);
+
   bool TryWrite(const void*, size_t) PERFETTO_WARN_UNUSED_RESULT;
-  BufferAndSize Read();
+  ReadBuffer Read();
 
  private:
   struct alignas(base::kPageSize) MetadataPage {
@@ -118,7 +150,7 @@ class SharedRingBuffer {
   SharedRingBuffer(AttachFlag, base::ScopedFile mem_fd);
   void Initialize(base::ScopedFile mem_fd);
   bool IsCorrupt();
-  void Return(const BufferAndSize&);
+  void Return(const ReadBuffer&);
 
   // Must be called holding the spinlock.
   inline size_t read_avail() {
@@ -146,7 +178,7 @@ class SharedRingBuffer {
   // Remember to update the move ctor when adding new fields.
 };
 
-void swap(SharedRingBuffer::BufferAndSize&, SharedRingBuffer::BufferAndSize&);
+void swap(SharedRingBuffer::ReadBuffer&, SharedRingBuffer::ReadBuffer&);
 
 }  // namespace profiling
 }  // namespace perfetto

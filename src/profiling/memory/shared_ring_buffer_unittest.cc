@@ -29,7 +29,7 @@ namespace perfetto {
 namespace profiling {
 namespace {
 
-std::string ToString(const SharedRingBuffer::BufferAndSize& buf_and_size) {
+std::string ToString(const SharedRingBuffer::ReadBuffer& buf_and_size) {
   return std::string(reinterpret_cast<const char*>(&buf_and_size.payload()[0]),
                      buf_and_size.payload_size());
 }

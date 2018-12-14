@@ -43,41 +43,42 @@ constexpr auto kAlignment = 8;  // 64 bits to use aligned memcpy().
 constexpr auto kHeaderSize = kAlignment;
 constexpr auto kGuardSize = base::kPageSize * 1024 * 16;  // 64 MB.
 
-class ScopedSpinlock {
- public:
-  ScopedSpinlock(std::atomic<bool>* lock, bool force) : lock_(lock) {
-    if (PERFETTO_LIKELY(!lock_->exchange(true, std::memory_order_acquire))) {
+}  // namespace
+
+ScopedSpinlock::ScopedSpinlock(std::atomic<bool>* lock, bool force)
+    : lock_(lock) {
+  if (PERFETTO_LIKELY(!lock_->exchange(true, std::memory_order_acquire))) {
+    locked_ = true;
+    return;
+  }
+
+  // Slowpath.
+  for (size_t attempt = 0; force || attempt < 1024 * 10; attempt++) {
+    if (!lock_->load(std::memory_order_relaxed) &&
+        PERFETTO_LIKELY(!lock_->exchange(true, std::memory_order_acquire))) {
       locked_ = true;
       return;
     }
-
-    // Slowpath.
-    for (size_t attempt = 0; force || attempt < 1024 * 10; attempt++) {
-      if (!lock_->load(std::memory_order_relaxed) &&
-          PERFETTO_LIKELY(!lock_->exchange(true, std::memory_order_acquire))) {
-        locked_ = true;
-        return;
-      }
-      if (attempt && attempt % 1024 == 0)
-        usleep(1000);
-    }
+    if (attempt && attempt % 1024 == 0)
+      usleep(1000);
   }
+}
 
-  ~ScopedSpinlock() {
-    if (locked_) {
-      PERFETTO_DCHECK((*lock_).load());
-      lock_->store(false, std::memory_order_release);
-    }
+ScopedSpinlock::~ScopedSpinlock() {
+  Unlock();
+}
+
+void ScopedSpinlock::Unlock() {
+  if (locked_) {
+    PERFETTO_DCHECK((*lock_).load());
+    lock_->store(false, std::memory_order_release);
   }
+  locked_ = false;
+}
 
-  bool locked() const { return locked_; }
-
- private:
-  std::atomic<bool>* const lock_;
-  bool locked_ = false;
-};
-
-}  // namespace
+bool ScopedSpinlock::locked() const {
+  return locked_;
+}
 
 SharedRingBuffer::SharedRingBuffer(CreateFlag, size_t size) {
   size_t size_with_meta = size + kMetaPageSize;
@@ -172,10 +173,43 @@ void SharedRingBuffer::Initialize(base::ScopedFile mem_fd) {
   mem_fd_ = std::move(mem_fd);
 }
 
+SharedRingBuffer::WriteBuffer SharedRingBuffer::PrepareWrite(size_t size) {
+  WriteBuffer result;
+
+  if (IsCorrupt())
+    return result;
+
+  result.size_with_header_ = base::AlignUp<kAlignment>(size + kHeaderSize);
+  if (result.size_with_header_ > write_avail()) {
+    meta_->num_writes_failed++;
+    return result;
+  }
+
+  result.size_ = size;
+  result.write_pos_ = meta_->write_pos;
+  result.wr_ptr_ = at(meta_->write_pos);
+  meta_->write_pos += result.size_with_header_;
+  meta_->bytes_written += size;
+  meta_->num_writes_succeeded++;
+  return result;
+}
+
+void SharedRingBuffer::EndWrite(const WriteBuffer& buf) {
+  reinterpret_cast<std::atomic<uint32_t>*>(buf.wr_ptr_)
+      ->store(static_cast<uint32_t>(buf.size_), std::memory_order_release);
+
+  for (;;) {
+    ScopedSpinlock try_spinlock(&meta_->spinlock, true);
+    if (meta_->written_pos == buf.write_pos_) {
+      meta_->written_pos += buf.size_with_header_;
+      break;
+    }
+  }
+  PERFETTO_DCHECK(!IsCorrupt());
+}
+
 bool SharedRingBuffer::TryWrite(const void* src, size_t size) {
-  uint8_t* wr_ptr;
-  uint64_t write_pos;
-  size_t size_with_header;
+  WriteBuffer buf;
   {
     ScopedSpinlock try_spinlock(&meta_->spinlock, false);
     if (!try_spinlock.locked()) {
@@ -185,49 +219,25 @@ bool SharedRingBuffer::TryWrite(const void* src, size_t size) {
       meta_->num_writes_failed++;
       return false;
     }
-
-    if (IsCorrupt())
-      return false;
-
-    size_with_header = base::AlignUp<kAlignment>(size + kHeaderSize);
-    if (size_with_header > write_avail()) {
-      meta_->num_writes_failed++;
-      return false;
-    }
-
-    write_pos = meta_->write_pos;
-    wr_ptr = at(meta_->write_pos);
-    meta_->write_pos += size_with_header;
-    meta_->bytes_written += size;
-    meta_->num_writes_succeeded++;
-  }  // spinlock
-
-  memcpy(wr_ptr + kHeaderSize, src, size);
-
-  reinterpret_cast<std::atomic<uint32_t>*>(wr_ptr)->store(
-      static_cast<uint32_t>(size), std::memory_order_release);
-
-  for (;;) {
-    ScopedSpinlock try_spinlock(&meta_->spinlock, true);
-    if (meta_->written_pos == write_pos) {
-      meta_->written_pos += size_with_header;
-      break;
-    }
+    buf = PrepareWrite(size);
   }
-  PERFETTO_DCHECK(!IsCorrupt());
+  if (!buf)
+    return false;
+  memcpy(buf.buf(), src, size);
+  EndWrite(buf);
   return true;
 }
 
-SharedRingBuffer::BufferAndSize SharedRingBuffer::Read() {
+SharedRingBuffer::ReadBuffer SharedRingBuffer::Read() {
   ScopedSpinlock try_spinlock(&meta_->spinlock, true);
 
   if (IsCorrupt()) {
     meta_->num_reads_failed++;
-    return BufferAndSize();
+    return ReadBuffer();
   }
 
   if (read_avail() < kHeaderSize)
-    return BufferAndSize();  // No data
+    return ReadBuffer();  // No data
 
   uint8_t* rd_ptr = at(meta_->read_pos);
   uint64_t size = reinterpret_cast<std::atomic<uint32_t>*>(rd_ptr)->load(
@@ -235,7 +245,7 @@ SharedRingBuffer::BufferAndSize SharedRingBuffer::Read() {
   const size_t size_with_header = base::AlignUp<kAlignment>(size + kHeaderSize);
 
   if (size == 0)
-    return BufferAndSize();
+    return ReadBuffer();
 
   if (size_with_header > read_avail()) {
     PERFETTO_ELOG("Corrupted header detected, size=%" PRIu64
@@ -244,14 +254,14 @@ SharedRingBuffer::BufferAndSize SharedRingBuffer::Read() {
                   size, read_avail(), meta_->read_pos, meta_->write_pos,
                   meta_->written_pos);
     meta_->num_reads_failed++;
-    return BufferAndSize();
+    return ReadBuffer();
   }
 
   rd_ptr += kHeaderSize;
-  return BufferAndSize(rd_ptr, size, size_with_header, this);
+  return ReadBuffer(rd_ptr, size, size_with_header, this);
 }
 
-void SharedRingBuffer::Return(const BufferAndSize& buf) {
+void SharedRingBuffer::Return(const ReadBuffer& buf) {
   ScopedSpinlock try_spinlock(&meta_->spinlock, true);
   meta_->read_pos += buf.size_with_header_;
 }
@@ -297,12 +307,12 @@ base::Optional<SharedRingBuffer> SharedRingBuffer::Attach(
   return base::make_optional(std::move(buf));
 }
 
-SharedRingBuffer::BufferAndSize::~BufferAndSize() {
+SharedRingBuffer::ReadBuffer::~ReadBuffer() {
   if (ring_buffer_)
     ring_buffer_->Return(*this);
 }
 
-SharedRingBuffer::BufferAndSize::BufferAndSize(BufferAndSize&& other) noexcept
+SharedRingBuffer::ReadBuffer::ReadBuffer(ReadBuffer&& other) noexcept
     : data_(other.data_),
       size_(other.size_),
       size_with_header_(other.size_with_header_),
@@ -310,16 +320,19 @@ SharedRingBuffer::BufferAndSize::BufferAndSize(BufferAndSize&& other) noexcept
   other.ring_buffer_ = nullptr;
 }
 
-SharedRingBuffer::BufferAndSize& SharedRingBuffer::BufferAndSize::operator=(
-    BufferAndSize&& other) noexcept {
-  BufferAndSize tmp(std::move(other));
+SharedRingBuffer::ReadBuffer& SharedRingBuffer::ReadBuffer::operator=(
+    ReadBuffer&& other) noexcept {
+  ReadBuffer tmp(std::move(other));
   using std::swap;
   swap(*this, tmp);
   return *this;
 }
 
-void swap(SharedRingBuffer::BufferAndSize& a,
-          SharedRingBuffer::BufferAndSize& b) {
+uint8_t* SharedRingBuffer::WriteBuffer::buf() {
+  return wr_ptr_ + kHeaderSize;
+}
+
+void swap(SharedRingBuffer::ReadBuffer& a, SharedRingBuffer::ReadBuffer& b) {
   using std::swap;
   swap(a.data_, b.data_);
   swap(a.size_, b.size_);
