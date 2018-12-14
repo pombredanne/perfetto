@@ -82,7 +82,7 @@ class PerfettoTest : public ::testing::Test {
 #define TreeHuggerOnly(x) DISABLED_##x
 #endif
 
-TEST_F(PerfettoTest, TreeHuggerOnly(TestFtraceProducer)) {
+TEST_F(PerfettoTest, DISABLED_TestFtraceProducer) {
   base::TestTaskRunner task_runner;
 
   TestHelper helper(&task_runner);
