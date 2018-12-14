@@ -204,8 +204,8 @@ bool SharedRingBuffer::TryWrite(const void* src, size_t size) {
 
   memcpy(wr_ptr + kHeaderSize, src, size);
 
-  reinterpret_cast<std::atomic<uint64_t>*>(wr_ptr)->store(
-      static_cast<uint64_t>(size), std::memory_order_release);
+  reinterpret_cast<std::atomic<uint32_t>*>(wr_ptr)->store(
+      static_cast<uint32_t>(size), std::memory_order_release);
 
   for (;;) {
     ScopedSpinlock try_spinlock(&meta_->spinlock, true);
@@ -230,7 +230,7 @@ SharedRingBuffer::BufferAndSize SharedRingBuffer::Read() {
     return BufferAndSize();  // No data
 
   uint8_t* rd_ptr = at(meta_->read_pos);
-  uint64_t size = reinterpret_cast<std::atomic<uint64_t>*>(rd_ptr)->load(
+  uint64_t size = reinterpret_cast<std::atomic<uint32_t>*>(rd_ptr)->load(
       std::memory_order_acquire);
   const size_t size_with_header = base::AlignUp<kAlignment>(size + kHeaderSize);
 
