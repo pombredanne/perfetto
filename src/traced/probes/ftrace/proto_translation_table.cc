@@ -104,7 +104,7 @@ bool MergeFieldInfo(const FtraceEvent::Field& ftrace_field,
         event_name_for_debug, field->ftrace_name, ToString(field->ftrace_type),
         protozero::proto_utils::ProtoSchemaToString(field->proto_field_type));
     // TODO(hjd): Uncomment DCHECK when proto generation is fixed.
-    // PERFETTO_DCHECK(false);
+    // PERFETTO_DFATAL("Failed to find translation strategy");
     return false;
   }
 
