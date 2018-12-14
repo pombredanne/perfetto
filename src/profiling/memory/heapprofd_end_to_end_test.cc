@@ -42,12 +42,13 @@ namespace perfetto {
 namespace profiling {
 namespace {
 
-void WaitForHeapprofd() {
+void WaitForHeapprofd(uint64_t timeout_ms) {
+  constexpr uint64_t kSleepMs = 10;
   std::vector<std::string> cmdlines{"heapprofd"};
   std::set<pid_t> pids;
-  while (pids.empty()) {
+  for (size_t i = 0; i < timeout_ms / kSleepMs && pids.empty(); ++i) {
     FindPidsForCmdlines(cmdlines, &pids);
-    usleep(10000);
+    usleep(kSleepMs * 1000);
   }
 }
 
@@ -76,6 +77,11 @@ int __attribute__((unused)) SetProperty(const char* value) {
 }
 
 TEST(HeapprofdEndToEnd, Smoke) {
+  // This is not needed for correctness, but works around a bug in init that
+  // makes this test take much longer. If persist.heapprofd.enable is set to 0
+  // and then set to 1 again too quickly, init decides that the service is
+  // "restarting" and waits before restarting it.
+  usleep(50000);
   base::TestTaskRunner task_runner;
 
   TestHelper helper(&task_runner);
@@ -101,7 +107,7 @@ TEST(HeapprofdEndToEnd, Smoke) {
   __system_property_set(kEnableHeapprofdProperty, "1");
   base::ScopedResource<const char*, SetProperty, nullptr> unset_property(
       prev_property_value.c_str());
-  WaitForHeapprofd();
+  WaitForHeapprofd(5000);
 #endif
 
   helper.ConnectConsumer();
@@ -172,6 +178,8 @@ TEST(HeapprofdEndToEnd, Smoke) {
 }
 
 TEST(HeapprofdEndToEnd, FinalFlush) {
+  // See HeapprofdEndToEnd::Smoke for rationale of this.
+  usleep(50000);
   base::TestTaskRunner task_runner;
 
   TestHelper helper(&task_runner);
@@ -197,7 +205,7 @@ TEST(HeapprofdEndToEnd, FinalFlush) {
   __system_property_set(kEnableHeapprofdProperty, "1");
   base::ScopedResource<const char*, SetProperty, nullptr> unset_property(
       prev_property_value.c_str());
-  WaitForHeapprofd();
+  WaitForHeapprofd(5000);
 #endif
 
   helper.ConnectConsumer();
