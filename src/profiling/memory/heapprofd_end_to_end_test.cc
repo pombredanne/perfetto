@@ -71,7 +71,6 @@ class HeapprofdDelegate : public ThreadDelegate {
 constexpr const char* kEnableHeapprofdProperty = "persist.heapprofd.enable";
 
 int __attribute__((unused)) SetProperty(const char* value) {
-  PERFETTO_LOG("Setting %s to %s", kEnableHeapprofdProperty, value);
   __system_property_set(kEnableHeapprofdProperty, value);
   return 0;
 }
@@ -103,7 +102,6 @@ TEST(HeapprofdEndToEnd, Smoke) {
         },
         &prev_property_value);
   }
-  PERFETTO_LOG("Setting %s to 1", kEnableHeapprofdProperty);
   __system_property_set(kEnableHeapprofdProperty, "1");
   base::ScopedResource<const char*, SetProperty, nullptr> unset_property(
       prev_property_value.c_str());
@@ -201,7 +199,6 @@ TEST(HeapprofdEndToEnd, FinalFlush) {
         },
         &prev_property_value);
   }
-  PERFETTO_LOG("Setting %s to 1", kEnableHeapprofdProperty);
   __system_property_set(kEnableHeapprofdProperty, "1");
   base::ScopedResource<const char*, SetProperty, nullptr> unset_property(
       prev_property_value.c_str());
