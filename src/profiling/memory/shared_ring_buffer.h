@@ -130,7 +130,6 @@ class SharedRingBuffer {
     std::atomic<bool> spinlock;
     uint64_t read_pos;
     uint64_t write_pos;
-    uint64_t written_pos;
 
     // stats, for debugging only.
     std::atomic<uint64_t> failed_spinlocks;
@@ -154,16 +153,14 @@ class SharedRingBuffer {
 
   // Must be called holding the spinlock.
   inline size_t read_avail() {
-    PERFETTO_DCHECK(meta_->written_pos >= meta_->read_pos);
-    auto res = static_cast<size_t>(meta_->written_pos - meta_->read_pos);
+    PERFETTO_DCHECK(meta_->write_pos >= meta_->read_pos);
+    auto res = static_cast<size_t>(meta_->write_pos - meta_->read_pos);
     PERFETTO_DCHECK(res <= size_);
     return res;
   }
 
   // Must be called holding the spinlock.
-  inline size_t write_avail() {
-    return size_ - (meta_->write_pos - meta_->read_pos);
-  }
+  inline size_t write_avail() { return size_ - read_avail(); }
 
   inline uint8_t* at(uint64_t pos) { return mem_ + (pos & (size_ - 1)); }
 

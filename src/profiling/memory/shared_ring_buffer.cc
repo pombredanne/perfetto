@@ -191,20 +191,14 @@ SharedRingBuffer::WriteBuffer SharedRingBuffer::PrepareWrite(size_t size) {
   meta_->write_pos += result.size_with_header_;
   meta_->bytes_written += size;
   meta_->num_writes_succeeded++;
+  reinterpret_cast<std::atomic<uint32_t>*>(result.wr_ptr_)
+      ->store(0, std::memory_order_release);
   return result;
 }
 
 void SharedRingBuffer::EndWrite(const WriteBuffer& buf) {
   reinterpret_cast<std::atomic<uint32_t>*>(buf.wr_ptr_)
       ->store(static_cast<uint32_t>(buf.size_), std::memory_order_release);
-
-  for (;;) {
-    ScopedSpinlock try_spinlock(&meta_->spinlock, true);
-    if (meta_->written_pos == buf.write_pos_) {
-      meta_->written_pos += buf.size_with_header_;
-      break;
-    }
-  }
   PERFETTO_DCHECK(!IsCorrupt());
 }
 
@@ -242,17 +236,14 @@ SharedRingBuffer::ReadBuffer SharedRingBuffer::Read() {
   uint8_t* rd_ptr = at(meta_->read_pos);
   uint64_t size = reinterpret_cast<std::atomic<uint32_t>*>(rd_ptr)->load(
       std::memory_order_acquire);
-  const size_t size_with_header = base::AlignUp<kAlignment>(size + kHeaderSize);
-
   if (size == 0)
     return ReadBuffer();
+  const size_t size_with_header = base::AlignUp<kAlignment>(size + kHeaderSize);
 
   if (size_with_header > read_avail()) {
     PERFETTO_ELOG("Corrupted header detected, size=%" PRIu64
-                  ", read_avail=%zu, rd=%" PRIu64 ", wr=%" PRIu64
-                  ", wrt=%" PRIu64,
-                  size, read_avail(), meta_->read_pos, meta_->write_pos,
-                  meta_->written_pos);
+                  ", read_avail=%zu, rd=%" PRIu64 ", wr=%" PRIu64,
+                  size, read_avail(), meta_->read_pos, meta_->write_pos);
     meta_->num_reads_failed++;
     return ReadBuffer();
   }
