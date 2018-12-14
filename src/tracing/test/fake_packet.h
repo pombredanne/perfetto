@@ -73,7 +73,7 @@ class FakeChunk {
   FakeChunk& PadTo(size_t chunk_size);
 
   // Returns the full size of the chunk including the ChunkRecord header.
-  size_t CopyIntoTraceBuffer();
+  size_t CopyIntoTraceBuffer(bool chunk_complete = true);
 
  private:
   TraceBuffer* trace_buffer_;

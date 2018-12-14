@@ -167,15 +167,21 @@ class TraceBuffer {
   // This method may be called multiple times for the same chunk. In this case,
   // the original chunk's payload will be overridden and its number of fragments
   // and flags adjusted to match |num_fragments| and |chunk_flags|. The service
-  // may use this to insert partial chunks before producer has committed them.
-  // Note that the service should exclude any potentially incompletely written
-  // fragments from |num_fragments| for such partial chunks.
+  // may use this to insert partial chunks (|chunk_complete = false|) before the
+  // producer has committed them.
+  //
+  // If |chunk_complete| is |false|, the TraceBuffer will only consider the
+  // first |num_fragments - 1| packets to be complete, since the producer may
+  // not have finished writing the latest packet. Reading from a sequence will
+  // also not progress past any incomplete chunks until they were rewritten with
+  // |chunk_complete = true|, e.g. after a producer's commit.
   void CopyChunkUntrusted(ProducerID producer_id_trusted,
                           uid_t producer_uid_trusted,
                           WriterID writer_id,
                           ChunkID chunk_id,
                           uint16_t num_fragments,
                           uint8_t chunk_flags,
+                          bool chunk_complete,
                           const uint8_t* src,
                           size_t size);
   // Applies a batch of |patches| to the given chunk, if the given chunk is
@@ -329,8 +335,12 @@ class TraceBuffer {
       ChunkID chunk_id;
     };
 
-    ChunkMeta(ChunkRecord* c, uint16_t p, uint8_t f, uid_t u)
-        : chunk_record{c}, trusted_uid{u}, flags{f}, num_fragments{p} {}
+    ChunkMeta(ChunkRecord* r, uint16_t p, uint8_t f, bool c, uid_t u)
+        : chunk_record{r},
+          trusted_uid{u},
+          flags{f},
+          num_fragments{p},
+          is_complete{c} {}
 
     ChunkRecord* const chunk_record;   // Addr of ChunkRecord within |data_|.
     const uid_t trusted_uid;           // uid of the producer.
@@ -341,6 +351,10 @@ class TraceBuffer {
     // case the buffer gets corrupted.
     uint8_t flags = 0;                 // See SharedMemoryABI::flags.
     uint16_t num_fragments = 0;        // Total number of packet fragments.
+
+    // Whether the producer released the chunk as complete. If |false|, reading
+    // from the chunk's sequence shouldn't progress past this chunk.
+    bool is_complete = false;
 
     uint16_t num_fragments_read = 0;   // Number of fragments already read.
 

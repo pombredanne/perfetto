@@ -107,6 +107,7 @@ void TraceBuffer::CopyChunkUntrusted(ProducerID producer_id_trusted,
                                      ChunkID chunk_id,
                                      uint16_t num_fragments,
                                      uint8_t chunk_flags,
+                                     bool chunk_complete,
                                      const uint8_t* src,
                                      size_t size) {
   // |record_size| = |size| + sizeof(ChunkRecord), rounded up to avoid to end
@@ -124,6 +125,12 @@ void TraceBuffer::CopyChunkUntrusted(ProducerID producer_id_trusted,
 #if PERFETTO_DCHECK_IS_ON()
   changed_since_last_read_ = true;
 #endif
+
+  // If the chunk hasn't been completed, we should only consider the first
+  // |num_fragments - 1| packets complete. For simplicity, we simply disregard
+  // the last one when we copy the chunk.
+  if (!chunk_complete)
+    num_fragments -= num_fragments > 0 ? 1 : 0;
 
   ChunkRecord record(record_size);
   record.producer_id = producer_id_trusted;
@@ -188,9 +195,10 @@ void TraceBuffer::CopyChunkUntrusted(ProducerID producer_id_trusted,
     TRACE_BUFFER_DLOG("  overriding chunk @ %lu, size=%zu", wptr - begin(),
                       record_size);
 
-    // Update num_fragments and chunk_flags stored in the index.
+    // Update chunk meta data stored in the index, as it may have changed.
     record_meta->num_fragments = num_fragments;
     record_meta->flags = chunk_flags;
+    record_meta->is_complete = chunk_complete;
 
     // Override the ChunkRecord contents at the original |wptr|.
     TRACE_BUFFER_DLOG("  copying @ [%lu - %lu] %zu", wptr - begin(),
@@ -239,9 +247,9 @@ void TraceBuffer::CopyChunkUntrusted(ProducerID producer_id_trusted,
   // Now first insert the new chunk. At the end, if necessary, add the padding.
   stats_.chunks_written++;
   stats_.bytes_written += size;
-  auto it_and_inserted =
-      index_.emplace(key, ChunkMeta(GetChunkRecordAt(wptr_), num_fragments,
-                                    chunk_flags, producer_uid_trusted));
+  auto it_and_inserted = index_.emplace(
+      key, ChunkMeta(GetChunkRecordAt(wptr_), num_fragments, chunk_flags,
+                     chunk_complete, producer_uid_trusted));
   PERFETTO_DCHECK(it_and_inserted.second);
   TRACE_BUFFER_DLOG("  copying @ [%lu - %lu] %zu", wptr_ - begin(),
                     wptr_ - begin() + record_size, record_size);
@@ -464,8 +472,16 @@ TraceBuffer::SequenceIterator TraceBuffer::GetReadIterForSequence(
 }
 
 void TraceBuffer::SequenceIterator::MoveNext() {
+  // Stop iterating when we reach the end of the sequence.
   // Note: |seq_begin| might be == |seq_end|.
   if (cur == seq_end || cur->first.chunk_id == wrapping_id) {
+    cur = seq_end;
+    return;
+  }
+
+  // If the current chunk wasn't completed yet, we shouldn't advance past it as
+  // it may be rewritten with additional packets.
+  if (!cur->second.is_complete) {
     cur = seq_end;
     return;
   }

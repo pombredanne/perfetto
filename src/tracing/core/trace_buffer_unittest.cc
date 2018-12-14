@@ -892,7 +892,7 @@ TEST_F(TraceBufferTest, Malicious_ZeroSizedChunk) {
   uint8_t valid_ptr = 0;
   trace_buffer()->CopyChunkUntrusted(
       ProducerID(1), uid_t(0), WriterID(1), ChunkID(1), 1 /* num packets */,
-      0 /* flags*/, &valid_ptr, sizeof(valid_ptr));
+      0 /* flags */, true /* chunk_complete */, &valid_ptr, sizeof(valid_ptr));
 
   CreateChunk(ProducerID(1), WriterID(1), ChunkID(2))
       .AddPacket(32, 'b')
@@ -995,9 +995,9 @@ TEST_F(TraceBufferTest, Malicious_VarintHeaderTooBig) {
   std::vector<uint8_t> chunk;
   chunk.insert(chunk.end(), 128 - sizeof(ChunkRecord), 0xff);
   chunk.back() = 0x7f;
-  trace_buffer()->CopyChunkUntrusted(ProducerID(4), uid_t(0), WriterID(1),
-                                     ChunkID(1), 1 /* num packets */,
-                                     0 /* flags*/, chunk.data(), chunk.size());
+  trace_buffer()->CopyChunkUntrusted(
+      ProducerID(4), uid_t(0), WriterID(1), ChunkID(1), 1 /* num packets */,
+      0 /* flags*/, true /* chunk_complete */, chunk.data(), chunk.size());
 
   // Add a valid chunk.
   CreateChunk(ProducerID(1), WriterID(1), ChunkID(1))
@@ -1022,7 +1022,7 @@ TEST_F(TraceBufferTest, Malicious_JumboVarint) {
   for (int i = 0; i < 3; i++) {
     trace_buffer()->CopyChunkUntrusted(
         ProducerID(1), uid_t(0), WriterID(1), ChunkID(1), 1 /* num packets */,
-        0 /* flags*/, chunk.data(), chunk.size());
+        0 /* flags */, true /* chunk_complete */, chunk.data(), chunk.size());
   }
 
   trace_buffer()->BeginRead();
@@ -1470,6 +1470,44 @@ TEST_F(TraceBufferTest, Overwrite_ReCommitSameAfterRead) {
 
   // The reader should keep reading from the new chunk.
   trace_buffer()->BeginRead();
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(40, 'c')));
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(50, 'd')));
+  ASSERT_THAT(ReadPacket(), IsEmpty());
+}
+
+TEST_F(TraceBufferTest, Overwrite_ReCommitIncompleteAfterReadOutOfOrder) {
+  ResetBuffer(4096);
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
+      .AddPacket(20, 'a')
+      .AddPacket(30, 'b')
+      .PadTo(512)
+      .CopyIntoTraceBuffer(/*chunk_complete=*/false);
+  trace_buffer()->BeginRead();
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(20, 'a')));
+  // The last packet in an incomplete chunk should be ignored as the producer
+  // may not have completed writing it.
+  ASSERT_THAT(ReadPacket(), IsEmpty());
+
+  // Then write some new content in a new chunk.
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(1))
+      .AddPacket(40, 'c')
+      .AddPacket(50, 'd')
+      .PadTo(512)
+      .CopyIntoTraceBuffer();
+  // The read still shouldn't be advancing past the incomplete chunk.
+  trace_buffer()->BeginRead();
+  ASSERT_THAT(ReadPacket(), IsEmpty());
+
+  // Recommit the original chunk with no changes but mark as complete.
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
+      .AddPacket(20, 'a')
+      .AddPacket(30, 'b')
+      .PadTo(512)
+      .CopyIntoTraceBuffer(/*chunk_complete=*/true);
+
+  // Reading should resume from the now completed chunk.
+  trace_buffer()->BeginRead();
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(30, 'b')));
   ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(40, 'c')));
   ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(50, 'd')));
   ASSERT_THAT(ReadPacket(), IsEmpty());
