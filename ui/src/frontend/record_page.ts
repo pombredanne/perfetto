@@ -411,7 +411,7 @@ const CONFIG_PRESETS = [
       atraceApps: [],
       atraceCategories: ['am', 'dalvik'],
       ftraceDrainPeriodMs: null,
-      ftraceBufferSizeKb: null,
+      ftraceBufferSizeKb: 4 * 1024,
 
       sysStats: true,
       meminfoPeriodMs: 50,
@@ -448,7 +448,7 @@ const CONFIG_PRESETS = [
       atraceApps: [],
       atraceCategories: [],
       ftraceDrainPeriodMs: null,
-      ftraceBufferSizeKb: null,
+      ftraceBufferSizeKb: 4 * 1024,
 
       sysStats: false,
       meminfoPeriodMs: null,
