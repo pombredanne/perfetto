@@ -26,6 +26,7 @@
 #include "perfetto/protozero/proto_decoder.h"
 #include "perfetto/traced/sys_stats_counters.h"
 #include "src/trace_processor/event_tracker.h"
+#include "src/trace_processor/ftrace_descriptors.h"
 #include "src/trace_processor/process_tracker.h"
 #include "src/trace_processor/slice_tracker.h"
 #include "src/trace_processor/trace_processor_context.h"
@@ -527,6 +528,15 @@ void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
   ProtoDecoder decoder(ftrace.data(), ftrace.length());
   uint32_t pid = 0;
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    // TODO(taylori): Parse generic event into raw table
+    if (!(fld.id == protos::FtraceEvent::kPidFieldNumber ||
+          fld.id == protos::FtraceEvent::kTimestampFieldNumber ||
+          fld.id == protos::FtraceEvent::kGenericFieldNumber)) {
+      PERFETTO_DCHECK(timestamp > 0);
+      const size_t fld_off = ftrace.offset_of(fld.data());
+      ParseUnknownFtrace(fld.id, timestamp, pid,
+                         ftrace.slice(fld_off, fld.size()));
+    }
     switch (fld.id) {
       case protos::FtraceEvent::kPidFieldNumber: {
         pid = fld.as_uint32();
@@ -592,8 +602,6 @@ void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
         ParseOOMScoreAdjUpdate(timestamp, ftrace.slice(fld_off, fld.size()));
         break;
       }
-      default:
-        break;
     }
   }
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
@@ -902,6 +910,66 @@ void ProtoTraceParser::ParseOOMScoreAdjUpdate(int64_t ts,
   UniquePid upid = context_->process_tracker->UpdateProcess(pid);
   context_->event_tracker->PushCounter(ts, oom_adj, oom_score_adj_id_, upid,
                                        RefType::kRefUpid);
+}
+
+void ProtoTraceParser::ParseUnknownFtrace(uint32_t ftrace_id,
+                                          int64_t timestamp,
+                                          uint32_t tid,
+                                          TraceBlobView view) {
+  ProtoDecoder decoder(view.data(), view.length());
+  if (ftrace_id >= GetDescriptorsSize()) {
+    PERFETTO_DLOG("Event with id: %d does not exist and cannot be parsed.",
+                  ftrace_id);
+    return;
+  }
+  MessageDescriptor* m = GetMessageDescriptorForId(ftrace_id);
+  UniqueTid utid = context_->process_tracker->UpdateThread(timestamp, tid, 0);
+  RowId raw_event_id = context_->storage->mutable_raw_events()->AddRawEvent(
+      timestamp, context_->storage->InternString(m->name), utid);
+  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    ProtoSchemaType type = m->fields[fld.id].type;
+    StringId name_id = context_->storage->InternString(m->fields[fld.id].name);
+    switch (type) {
+      case ProtoSchemaType::kUint32:
+      case ProtoSchemaType::kInt32:
+      case ProtoSchemaType::kUint64:
+      case ProtoSchemaType::kInt64:
+      case ProtoSchemaType::kFixed64:
+      case ProtoSchemaType::kFixed32:
+      case ProtoSchemaType::kSfixed32:
+      case ProtoSchemaType::kSfixed64:
+      case ProtoSchemaType::kSint32:
+      case ProtoSchemaType::kSint64:
+      case ProtoSchemaType::kBool:
+      case ProtoSchemaType::kEnum: {
+        context_->storage->mutable_args()->AddArg(
+            raw_event_id, name_id, name_id,
+            TraceStorage::Args::Variadic(fld.as_int()));
+        break;
+      }
+      case ProtoSchemaType::kString:
+      case ProtoSchemaType::kBytes: {
+        StringId value = context_->storage->InternString(fld.as_string());
+        context_->storage->mutable_args()->AddArg(
+            raw_event_id, name_id, name_id,
+            TraceStorage::Args::Variadic(value));
+        break;
+      }
+      case ProtoSchemaType::kDouble:
+      case ProtoSchemaType::kFloat: {
+        context_->storage->mutable_args()->AddArg(
+            raw_event_id, name_id, name_id,
+            TraceStorage::Args::Variadic(fld.as_real()));
+        break;
+      }
+      case ProtoSchemaType::kUnknown:
+      case ProtoSchemaType::kGroup:
+      case ProtoSchemaType::kMessage:
+        PERFETTO_DLOG("Could not store %s as a field in args table.",
+                      ProtoSchemaToString(type));
+        break;
+    }
+  }
 }
 
 }  // namespace trace_processor

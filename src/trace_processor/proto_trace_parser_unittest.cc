@@ -80,8 +80,8 @@ class MockTraceStorage : public TraceStorage {
 class ProtoTraceParserTest : public ::testing::Test {
  public:
   ProtoTraceParserTest() {
-    storage_ = new NiceMock<MockTraceStorage>();
-    context_.storage.reset(storage_);
+    nice_storage_ = new NiceMock<MockTraceStorage>();
+    context_.storage.reset(nice_storage_);
     event_ = new MockEventTracker(&context_);
     context_.event_tracker.reset(event_);
     process_ = new MockProcessTracker(&context_);
@@ -89,6 +89,11 @@ class ProtoTraceParserTest : public ::testing::Test {
     const auto optim = OptimizationMode::kMinLatency;
     context_.sorter.reset(new TraceSorter(&context_, optim, 0 /*window size*/));
     context_.proto_parser.reset(new ProtoTraceParser(&context_));
+  }
+
+  void InitStorage() {
+    storage_ = new MockTraceStorage();
+    context_.storage.reset(storage_);
   }
 
   void Tokenize(const protos::Trace& trace) {
@@ -103,7 +108,8 @@ class ProtoTraceParserTest : public ::testing::Test {
   TraceProcessorContext context_;
   MockEventTracker* event_;
   MockProcessTracker* process_;
-  NiceMock<MockTraceStorage>* storage_;
+  NiceMock<MockTraceStorage>* nice_storage_;
+  MockTraceStorage* storage_;
 };
 
 TEST_F(ProtoTraceParserTest, LoadSingleEvent) {
@@ -125,6 +131,67 @@ TEST_F(ProtoTraceParserTest, LoadSingleEvent) {
   EXPECT_CALL(*event_, PushSchedSwitch(10, 1000, 10, 32, 100,
                                        base::StringView(kProcName)));
   Tokenize(trace);
+}
+
+TEST_F(ProtoTraceParserTest, LoadEventsIntoRaw) {
+  InitStorage();
+  protos::Trace trace;
+
+  auto* bundle = trace.add_packet()->mutable_ftrace_events();
+  bundle->set_cpu(10);
+
+  // This event is unknown and will only appear in
+  // raw events table.
+  auto* event = bundle->add_event();
+  event->set_timestamp(1000);
+  auto* task = event->mutable_task_newtask();
+  task->set_pid(123);
+  static const char task_newtask[] = "task_newtask";
+  task->set_comm(task_newtask);
+  task->set_clone_flags(12);
+  task->set_oom_score_adj(15);
+
+  // This event has specific parsing logic, but will
+  // also appear in raw events table.
+  event = bundle->add_event();
+  event->set_timestamp(1001);
+  auto* print = event->mutable_print();
+  print->set_ip(20);
+  static const char buf_value[] = "This is a print event";
+  print->set_buf(buf_value);
+
+  static const char pid[] = "pid";
+  static const char comm[] = "comm";
+  static const char clone[] = "clone_flags";
+  static const char oom[] = "oom_score_adj";
+  static const char print_event[] = "print";
+  static const char ip[] = "ip";
+  static const char buf[] = "buf";
+
+  EXPECT_CALL(*storage_, InternString(base::StringView(task_newtask))).Times(2);
+  EXPECT_CALL(*storage_, InternString(base::StringView(pid)));
+  EXPECT_CALL(*storage_, InternString(base::StringView(comm)));
+  EXPECT_CALL(*storage_, InternString(base::StringView(clone)));
+  EXPECT_CALL(*storage_, InternString(base::StringView(oom)));
+  EXPECT_CALL(*storage_, InternString(base::StringView(print_event)));
+  EXPECT_CALL(*storage_, InternString(base::StringView(ip)));
+  EXPECT_CALL(*storage_, InternString(base::StringView(buf)));
+  EXPECT_CALL(*storage_, InternString(base::StringView(buf_value)));
+
+  Tokenize(trace);
+  const auto& raw = context_.storage->raw_events();
+  ASSERT_EQ(raw.raw_event_count(), 2);
+  const auto& args = context_.storage->args();
+  ASSERT_EQ(args.args_count(), 6);
+  ASSERT_EQ(args.arg_values()[0].int_value, 123);
+  ASSERT_EQ(args.arg_values()[1].string_value, 0);
+  ASSERT_EQ(args.arg_values()[2].int_value, 12);
+  ASSERT_EQ(args.arg_values()[3].int_value, 15);
+  ASSERT_EQ(args.arg_values()[4].int_value, 20);
+  ASSERT_EQ(args.arg_values()[5].string_value, 0);
+
+  // TODO(taylori): Add test ftrace event with all field types
+  // and test here.
 }
 
 TEST_F(ProtoTraceParserTest, LoadMultipleEvents) {
