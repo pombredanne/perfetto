@@ -70,27 +70,16 @@ class HeapprofdDelegate : public ThreadDelegate {
 
 constexpr const char* kEnableHeapprofdProperty = "persist.heapprofd.enable";
 
-int __attribute__((unused)) SetProperty(const char* value) {
-  __system_property_set(kEnableHeapprofdProperty, value);
+int __attribute__((unused)) SetProperty(std::string* value) {
+  if (value) {
+    __system_property_set(kEnableHeapprofdProperty, value->c_str());
+    delete value;
+  }
   return 0;
 }
 
-TEST(HeapprofdEndToEnd, Smoke) {
-  // This is not needed for correctness, but works around a bug in init that
-  // makes this test take much longer. If persist.heapprofd.enable is set to 0
-  // and then set to 1 again too quickly, init decides that the service is
-  // "restarting" and waits before restarting it.
-  usleep(50000);
-  base::TestTaskRunner task_runner;
-
-  TestHelper helper(&task_runner);
-  helper.StartServiceIfRequired();
-
-#if PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
-  TaskRunnerThread producer_thread("perfetto.prd");
-  producer_thread.Start(std::unique_ptr<HeapprofdDelegate>(
-      new HeapprofdDelegate(TEST_PRODUCER_SOCK_NAME)));
-#else
+base::ScopedResource<std::string*, SetProperty, nullptr>
+StartSystemHeapprofdIfRequired() {
   base::ignore_result(TEST_PRODUCER_SOCK_NAME);
   std::string prev_property_value = "0";
   const prop_info* pi = __system_property_find(kEnableHeapprofdProperty);
@@ -103,20 +92,12 @@ TEST(HeapprofdEndToEnd, Smoke) {
         &prev_property_value);
   }
   __system_property_set(kEnableHeapprofdProperty, "1");
-  base::ScopedResource<const char*, SetProperty, nullptr> unset_property(
-      prev_property_value.c_str());
   WaitForHeapprofd(5000);
-#endif
+  return base::ScopedResource<std::string*, SetProperty, nullptr>(
+      new std::string(prev_property_value));
+}
 
-  helper.ConnectConsumer();
-  helper.WaitForConsumerConnect();
-
-  TraceConfig trace_config;
-  trace_config.add_buffers()->set_size_kb(10 * 1024);
-  trace_config.set_duration_ms(1000);
-
-  constexpr size_t kAllocSize = 1024;
-
+pid_t ForkContinousMalloc(size_t bytes) {
   pid_t pid = fork();
   switch (pid) {
     case -1:
@@ -125,7 +106,7 @@ TEST(HeapprofdEndToEnd, Smoke) {
       for (;;) {
         // This volatile is needed to prevent the compiler from trying to be
         // helpful and compiling a "useless" malloc + free into a noop.
-        volatile char* x = static_cast<char*>(malloc(kAllocSize));
+        volatile char* x = static_cast<char*>(malloc(bytes));
         if (x) {
           x[1] = 'x';
           free(const_cast<char*>(x));
@@ -134,6 +115,46 @@ TEST(HeapprofdEndToEnd, Smoke) {
     default:
       break;
   }
+  return pid;
+}
+
+class HeapprofdEndToEnd : public ::testing::Test {
+ public:
+  HeapprofdEndToEnd() {
+    // This is not needed for correctness, but works around a init behavior that
+    // makes this test take much longer. If persist.heapprofd.enable is set to 0
+    // and then set to 1 again too quickly, init decides that the service is
+    // "restarting" and waits before restarting it.
+    usleep(50000);
+    helper.StartServiceIfRequired();
+    unset_property = StartSystemHeapprofdIfRequired();
+
+    helper.ConnectConsumer();
+    helper.WaitForConsumerConnect();
+  }
+
+ protected:
+  base::TestTaskRunner task_runner;
+  TestHelper helper{&task_runner};
+
+#if PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
+  TaskRunnerThread producer_thread("perfetto.prd");
+  producer_thread.Start(std::unique_ptr<HeapprofdDelegate>(
+      new HeapprofdDelegate(TEST_PRODUCER_SOCK_NAME)));
+#else
+  base::ScopedResource<std::string*, SetProperty, nullptr> unset_property;
+#endif
+};
+
+TEST_F(HeapprofdEndToEnd, Smoke) {
+  TraceConfig trace_config;
+  trace_config.add_buffers()->set_size_kb(10 * 1024);
+  trace_config.set_duration_ms(1000);
+
+  constexpr size_t kAllocSize = 1024;
+
+  pid_t pid = ForkContinousMalloc(kAllocSize);
+
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
   ds_config->set_name("android.heapprofd");
   ds_config->set_target_buffer(0);
@@ -175,62 +196,15 @@ TEST(HeapprofdEndToEnd, Smoke) {
   EXPECT_GT(samples, 0);
 }
 
-TEST(HeapprofdEndToEnd, FinalFlush) {
-  // See HeapprofdEndToEnd::Smoke for rationale of this.
-  usleep(50000);
-  base::TestTaskRunner task_runner;
-
-  TestHelper helper(&task_runner);
-  helper.StartServiceIfRequired();
-
-#if PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
-  TaskRunnerThread producer_thread("perfetto.prd");
-  producer_thread.Start(std::unique_ptr<HeapprofdDelegate>(
-      new HeapprofdDelegate(TEST_PRODUCER_SOCK_NAME)));
-#else
-  base::ignore_result(TEST_PRODUCER_SOCK_NAME);
-  std::string prev_property_value = "0";
-  const prop_info* pi = __system_property_find(kEnableHeapprofdProperty);
-  if (pi) {
-    __system_property_read_callback(
-        pi,
-        [](void* cookie, const char*, const char* value, uint32_t) {
-          *reinterpret_cast<std::string*>(cookie) = value;
-        },
-        &prev_property_value);
-  }
-  __system_property_set(kEnableHeapprofdProperty, "1");
-  base::ScopedResource<const char*, SetProperty, nullptr> unset_property(
-      prev_property_value.c_str());
-  WaitForHeapprofd(5000);
-#endif
-
-  helper.ConnectConsumer();
-  helper.WaitForConsumerConnect();
-
+TEST_F(HeapprofdEndToEnd, FinalFlush) {
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(10 * 1024);
   trace_config.set_duration_ms(1000);
 
   constexpr size_t kAllocSize = 1024;
 
-  pid_t pid = fork();
-  switch (pid) {
-    case -1:
-      PERFETTO_FATAL("Failed to fork.");
-    case 0:
-      for (;;) {
-        // This volatile is needed to prevent the compiler from trying to be
-        // helpful and compiling a "useless" malloc + free into a noop.
-        volatile char* x = static_cast<char*>(malloc(kAllocSize));
-        if (x) {
-          x[1] = 'x';
-          free(const_cast<char*>(x));
-        }
-      }
-    default:
-      break;
-  }
+  pid_t pid = ForkContinousMalloc(kAllocSize);
+
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
   ds_config->set_name("android.heapprofd");
   ds_config->set_target_buffer(0);
