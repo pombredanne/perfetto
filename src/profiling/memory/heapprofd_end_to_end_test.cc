@@ -42,6 +42,15 @@ namespace perfetto {
 namespace profiling {
 namespace {
 
+void WaitForHeapprofd() {
+  std::vector<std::string> cmdlines{"heapprofd"};
+  std::set<pid_t> pids;
+  while (pids.empty()) {
+    FindPidsForCmdlines(cmdlines, &pids);
+    usleep(10000);
+  }
+}
+
 class HeapprofdDelegate : public ThreadDelegate {
  public:
   HeapprofdDelegate(const std::string& producer_socket)
@@ -92,6 +101,7 @@ TEST(HeapprofdEndToEnd, Smoke) {
   __system_property_set(kEnableHeapprofdProperty, "1");
   base::ScopedResource<const char*, SetProperty, nullptr> unset_property(
       prev_property_value.c_str());
+  WaitForHeapprofd();
 #endif
 
   helper.ConnectConsumer();
@@ -187,6 +197,7 @@ TEST(HeapprofdEndToEnd, FinalFlush) {
   __system_property_set(kEnableHeapprofdProperty, "1");
   base::ScopedResource<const char*, SetProperty, nullptr> unset_property(
       prev_property_value.c_str());
+  WaitForHeapprofd();
 #endif
 
   helper.ConnectConsumer();
