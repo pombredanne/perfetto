@@ -191,6 +191,8 @@ SharedRingBuffer::WriteBuffer SharedRingBuffer::PrepareWrite(size_t size) {
   meta_->write_pos += result.size_with_header_;
   meta_->bytes_written += size;
   meta_->num_writes_succeeded++;
+  // By making this an release store, we can save grabbing the spinlock in
+  // EndWrite.
   reinterpret_cast<std::atomic<uint32_t>*>(result.wr_ptr_)
       ->store(0, std::memory_order_release);
   return result;
