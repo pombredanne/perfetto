@@ -141,6 +141,13 @@ TEST(HeapprofdEndToEnd, Smoke) {
   for (const protos::TracePacket& packet : packets) {
     if (packet.has_profile_packet() &&
         packet.profile_packet().process_dumps().size() > 0) {
+      const auto& dumps = packet.profile_packet().process_dumps();
+      ASSERT_EQ(dumps.size(), 1);
+      const protos::ProfilePacket_ProcessHeapSamples& dump = dumps.Get(0);
+      EXPECT_EQ(dump.pid(), pid);
+      for (const auto& sample : dump.samples()) {
+        EXPECT_EQ(sample.cumulative_allocated() % 1024, 0);
+      }
       profile_packets++;
     }
   }
