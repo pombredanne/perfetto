@@ -39,6 +39,19 @@ message ChromeStringTableEntry {
   optional int32 index = 2;
 }
 
+message TypedEventArgs {
+  enum ArgsType { TASK_EVENT = 0; }
+
+  // For TASK_EVENT type:
+  message TaskEvent {
+    optional string source_function = 1;
+    optional string source_file = 2;
+  }
+
+  optional ArgsType args_type = 1;
+  oneof value { TaskEvent for_task_event = 2; }
+}
+
 message ChromeTraceEvent {
   message Arg {
     optional string name = 1;
@@ -82,6 +95,10 @@ message ChromeTraceEvent {
   // and are indices into |string_table|.
   optional uint32 name_index = 15;
   optional uint32 category_group_name_index = 16;
+
+  // Specific arguments for the event which has values depending on the type of
+  // event.
+  optional TypedEventArgs typed_args = 17;
 }
 
 message ChromeMetadata {
