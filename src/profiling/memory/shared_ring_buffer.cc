@@ -70,7 +70,7 @@ ScopedSpinlock::~ScopedSpinlock() {
 
 void ScopedSpinlock::Unlock() {
   if (locked_) {
-    PERFETTO_DCHECK((*lock_).load());
+    PERFETTO_DCHECK(lock_->load());
     lock_->store(false, std::memory_order_release);
   }
   locked_ = false;
