@@ -18,7 +18,6 @@ service heapprofd /system/bin/heapprofd
     user nobody
     group nobody readproc
     writepid /dev/cpuset/system-background/tasks
-    onrestart exec_background - nobody shell -- /system/bin/heapprofd --cleanup-after-crash
     capabilities KILL
 
 on property:persist.heapprofd.enable=1

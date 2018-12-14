@@ -39,23 +39,8 @@ namespace {
 
 base::Event* g_dump_evt = nullptr;
 
-int HeapprofdMain(int argc, char** argv) {
-  static struct option long_options[] = {
-      {"cleanup-after-crash", no_argument, nullptr, 'd'},
-      {nullptr, 0, nullptr, 0}};
-  int option_index;
-  int c;
-  while ((c = getopt_long(argc, argv, "", long_options, &option_index)) != -1) {
-    switch (c) {
-      case 'd':
-        SystemProperties::ResetProperties();
-        return 0;
-      default:
-        PERFETTO_ELOG("Usage: %s [--cleanup-after-crash]", argv[0]);
-        return 1;
-    }
-  }
-
+int HeapprofdMain(int, char**) {
+  SystemProperties::ResetProperties();
   // We set this up before launching any threads, so we do not have to use a
   // std::atomic for g_dump_evt.
   g_dump_evt = new base::Event();
