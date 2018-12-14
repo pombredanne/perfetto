@@ -29,11 +29,6 @@ QueryConstraints::~QueryConstraints() = default;
 QueryConstraints::QueryConstraints(QueryConstraints&&) noexcept = default;
 QueryConstraints& QueryConstraints::operator=(QueryConstraints&&) = default;
 
-int QueryConstraints::FreeSqliteString(char* resource) {
-  sqlite3_free(resource);
-  return 0;
-}
-
 bool QueryConstraints::operator==(const QueryConstraints& other) const {
   if ((other.constraints().size() != constraints().size()) ||
       (other.order_by().size() != order_by().size())) {
@@ -71,7 +66,7 @@ void QueryConstraints::AddOrderBy(int column, unsigned char desc) {
   order_by_.emplace_back(ob);
 }
 
-QueryConstraints::SqliteString QueryConstraints::ToNewSqlite3String() const {
+SqliteString QueryConstraints::ToNewSqlite3String() const {
   std::string str_result;
   str_result.reserve(512);
   str_result.append("C");

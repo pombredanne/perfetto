@@ -24,16 +24,23 @@ struct sqlite3;
 struct sqlite3_stmt;
 extern int sqlite3_close(sqlite3*);
 extern int sqlite3_finalize(sqlite3_stmt* pStmt);
+extern void sqlite3_free(void*);
 }
 
 namespace perfetto {
 namespace trace_processor {
+
+inline int FreeSqliteString(char* resource) {
+  sqlite3_free(resource);
+  return 0;
+}
 
 using ScopedDb = base::ScopedResource<sqlite3*, sqlite3_close, nullptr>;
 using ScopedStmt = base::ScopedResource<sqlite3_stmt*,
                                         sqlite3_finalize,
                                         nullptr,
                                         /*CheckClose=*/false>;
+using SqliteString = base::ScopedResource<char*, FreeSqliteString, nullptr>;
 
 }  // namespace trace_processor
 }  // namespace perfetto

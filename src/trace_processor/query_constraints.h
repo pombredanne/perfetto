@@ -22,6 +22,7 @@
 #include <vector>
 
 #include "perfetto/base/scoped_file.h"
+#include "src/trace_processor/scoped_db.h"
 
 namespace perfetto {
 namespace trace_processor {
@@ -40,10 +41,6 @@ class QueryConstraints {
  public:
   using Constraint = sqlite3_index_info::sqlite3_index_constraint;
   using OrderBy = sqlite3_index_info::sqlite3_index_orderby;
-
-  static int FreeSqliteString(char* resource);
-
-  using SqliteString = base::ScopedResource<char*, FreeSqliteString, nullptr>;
 
   QueryConstraints();
   ~QueryConstraints();

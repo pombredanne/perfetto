@@ -33,7 +33,7 @@ TEST(QueryConstraintsTest, ConvertToAndFromSqlString) {
   QueryConstraints qc;
   qc.AddConstraint(12, 0);
 
-  QueryConstraints::SqliteString only_constraint = qc.ToNewSqlite3String();
+  SqliteString only_constraint = qc.ToNewSqlite3String();
   ASSERT_TRUE(strcmp(only_constraint.get(), "C1,12,0,O0") == 0);
 
   QueryConstraints qc_constraint =
@@ -43,7 +43,7 @@ TEST(QueryConstraintsTest, ConvertToAndFromSqlString) {
   qc.AddOrderBy(1, false);
   qc.AddOrderBy(21, true);
 
-  QueryConstraints::SqliteString result = qc.ToNewSqlite3String();
+  SqliteString result = qc.ToNewSqlite3String();
   ASSERT_TRUE(strcmp(result.get(), "C1,12,0,O2,1,0,21,1") == 0);
 
   QueryConstraints qc_result = QueryConstraints::FromString(result.get());
@@ -53,7 +53,7 @@ TEST(QueryConstraintsTest, ConvertToAndFromSqlString) {
 TEST(QueryConstraintsTest, CheckEmptyConstraints) {
   QueryConstraints qc;
 
-  QueryConstraints::SqliteString string_result = qc.ToNewSqlite3String();
+  SqliteString string_result = qc.ToNewSqlite3String();
   ASSERT_TRUE(strcmp(string_result.get(), "C0,O0") == 0);
 
   QueryConstraints qc_result =
@@ -66,7 +66,7 @@ TEST(QueryConstraintsTest, OnlyOrderBy) {
   QueryConstraints qc;
   qc.AddOrderBy(3, true);
 
-  QueryConstraints::SqliteString string_result = qc.ToNewSqlite3String();
+  SqliteString string_result = qc.ToNewSqlite3String();
   ASSERT_TRUE(strcmp(string_result.get(), "C0,O1,3,1") == 0);
 
   QueryConstraints qc_result =

@@ -31,6 +31,7 @@
 #include "src/trace_processor/proto_trace_parser.h"
 #include "src/trace_processor/proto_trace_tokenizer.h"
 #include "src/trace_processor/sched_slice_table.h"
+#include "src/trace_processor/scoped_db.h"
 #include "src/trace_processor/slice_table.h"
 #include "src/trace_processor/slice_tracker.h"
 #include "src/trace_processor/span_join_operator_table.h"
@@ -50,6 +51,7 @@ extern "C" int sqlite3_percentile_init(sqlite3* db,
                                        const sqlite3_api_routines* api);
 
 namespace {
+
 void InitializeSqliteModules(sqlite3* db) {
   char* error = nullptr;
   sqlite3_percentile_init(db, &error, nullptr);
@@ -67,6 +69,7 @@ void CreateBuiltinTables(sqlite3* db) {
     sqlite3_free(error);
   }
 }
+
 }  // namespace
 
 namespace perfetto {
@@ -81,6 +84,64 @@ std::string RemoveWhitespace(const std::string& input) {
   std::string str(input);
   str.erase(std::remove_if(str.begin(), str.end(), ::isspace), str.end());
   return str;
+}
+
+SqliteString CreateDerivedViewAndReturnErr(sqlite3* db,
+                                           const std::string& sql) {
+  char* error = nullptr;
+  sqlite3_exec(db, sql.c_str(), nullptr, nullptr, &error);
+  return SqliteString(error);
+}
+
+SqliteString CreateDerivedViewsAndReturnErr(sqlite3* db) {
+  auto error = CreateDerivedViewAndReturnErr(
+      db,
+      "CREATE VIEW mem_rss_file AS "
+      "SELECT"
+      "  ts, "
+      "  IFNULL(LEAD(ts) OVER(PARTITION BY ref ORDER BY ts), ts) - ts AS dur, "
+      "  ref AS upid, "
+      "  value AS rss_file_val"
+      "FROM counters "
+      "WHERE ref_type = 'upid' "
+      "AND counters.name IN ('mem.rss.file', 'rss_stat.mm_filepages')");
+  if (error)
+    return error;
+
+  error = CreateDerivedViewAndReturnErr(
+      db,
+      "CREATE VIEW mem_rss_anon AS "
+      "SELECT"
+      "  ts, "
+      "  IFNULL(LEAD(ts) OVER(PARTITION BY ref ORDER BY ts), ts) - ts AS dur, "
+      "  ref AS upid, "
+      "  value AS rss_anon_val"
+      "FROM counters "
+      "WHERE ref_type = 'upid' "
+      "AND counters.name IN ('mem.rss.anon', 'rss_stat.mm_anonages')");
+  if (error)
+    return error;
+
+  error = CreateDerivedViewAndReturnErr(
+      db,
+      "CREATE VIEW mem_swap AS "
+      "SELECT"
+      "  ts, "
+      "  IFNULL(LEAD(ts) OVER(PARTITION BY ref ORDER BY ts), ts) - ts AS dur, "
+      "  ref AS upid, "
+      "  value AS swap_val"
+      "FROM counters "
+      "WHERE ref_type = 'upid' "
+      "AND counters.name IN ('mem.swap', 'rss_stat.mm_swapents')");
+  if (error)
+    return error;
+  return SqliteString();
+}
+
+void CreateDerivedViews(sqlite3* db) {
+  auto error = CreateDerivedViewsAndReturnErr(db);
+  if (error)
+    PERFETTO_ELOG("Error creating derived views: %s", error.get());
 }
 
 }  // namespace
@@ -103,7 +164,7 @@ TraceProcessorImpl::TraceProcessorImpl(const Config& cfg) {
   PERFETTO_CHECK(sqlite3_open(":memory:", &db) == SQLITE_OK);
   InitializeSqliteModules(db);
   CreateBuiltinTables(db);
-  db_.reset(std::move(db));
+  db_.reset(db);
 
   context_.storage.reset(new TraceStorage());
   context_.slice_tracker.reset(new SliceTracker(&context_));
@@ -126,6 +187,8 @@ TraceProcessorImpl::TraceProcessorImpl(const Config& cfg) {
   WindowOperatorTable::RegisterTable(*db_, context_.storage.get());
   InstantsTable::RegisterTable(*db_, context_.storage.get());
   StatsTable::RegisterTable(*db_, context_.storage.get());
+
+  CreateDerivedViews(*db_);
 }
 
 TraceProcessorImpl::~TraceProcessorImpl() = default;
