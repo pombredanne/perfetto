@@ -373,7 +373,7 @@ const CONFIG_PRESETS = [
       atraceApps: [],
       atraceCategories: ['sched', 'freq', 'idle'],
       ftraceDrainPeriodMs: null,
-      ftraceBufferSizeKb: null,
+      ftraceBufferSizeKb: 4 * 1024,
 
       sysStats: false,
       meminfoPeriodMs: null,
