@@ -490,6 +490,10 @@ class TraceStorage {
   // e.g. signal events
   Instants instants_;
 
+  // Raw events are every ftrace event in the trace. The raw event includes
+  // the timestamp and the pid. The args for the raw event will be in the
+  // args table. This table can be used to generate a text version of the
+  // trace.
   RawEvents raw_events_;
 };
 

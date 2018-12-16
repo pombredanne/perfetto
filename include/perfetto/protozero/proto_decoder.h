@@ -74,7 +74,7 @@ class ProtoDecoder {
 
     // A relaxed version for when we are storing any int as an int64
     // in the raw events table.
-    inline int64_t as_int() const {
+    inline int64_t as_integer() const {
       PERFETTO_DCHECK(type == proto_utils::ProtoWireType::kVarInt ||
                       type == proto_utils::ProtoWireType::kFixed64 ||
                       type == proto_utils::ProtoWireType::kFixed32);

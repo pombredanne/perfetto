@@ -120,6 +120,7 @@ TEST_F(ProtoTraceParserTest, LoadSingleEvent) {
 
   auto* event = bundle->add_event();
   event->set_timestamp(1000);
+  event->set_pid(12);
 
   static const char kProcName[] = "proc1";
   auto* sched_switch = event->mutable_sched_switch();
@@ -144,6 +145,7 @@ TEST_F(ProtoTraceParserTest, LoadEventsIntoRaw) {
   // raw events table.
   auto* event = bundle->add_event();
   event->set_timestamp(1000);
+  event->set_pid(12);
   auto* task = event->mutable_task_newtask();
   task->set_pid(123);
   static const char task_newtask[] = "task_newtask";
@@ -155,6 +157,7 @@ TEST_F(ProtoTraceParserTest, LoadEventsIntoRaw) {
   // also appear in raw events table.
   event = bundle->add_event();
   event->set_timestamp(1001);
+  event->set_pid(12);
   auto* print = event->mutable_print();
   print->set_ip(20);
   static const char buf_value[] = "This is a print event";
@@ -202,6 +205,7 @@ TEST_F(ProtoTraceParserTest, LoadMultipleEvents) {
 
   auto* event = bundle->add_event();
   event->set_timestamp(1000);
+  event->set_pid(12);
 
   static const char kProcName1[] = "proc1";
   auto* sched_switch = event->mutable_sched_switch();
@@ -212,6 +216,7 @@ TEST_F(ProtoTraceParserTest, LoadMultipleEvents) {
 
   event = bundle->add_event();
   event->set_timestamp(1001);
+  event->set_pid(12);
 
   static const char kProcName2[] = "proc2";
   sched_switch = event->mutable_sched_switch();
@@ -237,6 +242,7 @@ TEST_F(ProtoTraceParserTest, LoadMultiplePackets) {
 
   auto* event = bundle->add_event();
   event->set_timestamp(1000);
+  event->set_pid(12);
 
   static const char kProcName1[] = "proc1";
   auto* sched_switch = event->mutable_sched_switch();
@@ -250,6 +256,7 @@ TEST_F(ProtoTraceParserTest, LoadMultiplePackets) {
 
   event = bundle->add_event();
   event->set_timestamp(1001);
+  event->set_pid(12);
 
   static const char kProcName2[] = "proc2";
   sched_switch = event->mutable_sched_switch();
@@ -272,6 +279,7 @@ TEST_F(ProtoTraceParserTest, RepeatedLoadSinglePacket) {
   bundle->set_cpu(10);
   auto* event = bundle->add_event();
   event->set_timestamp(1000);
+  event->set_pid(12);
   static const char kProcName1[] = "proc1";
   auto* sched_switch = event->mutable_sched_switch();
   sched_switch->set_prev_pid(10);
@@ -284,6 +292,7 @@ TEST_F(ProtoTraceParserTest, RepeatedLoadSinglePacket) {
   bundle->set_cpu(10);
   event = bundle->add_event();
   event->set_timestamp(1001);
+  event->set_pid(12);
   static const char kProcName2[] = "proc2";
   sched_switch = event->mutable_sched_switch();
   sched_switch->set_prev_pid(100);
@@ -338,6 +347,7 @@ TEST_F(ProtoTraceParserTest, LoadCpuFreq) {
   bundle->set_cpu(12);
   auto* event = bundle->add_event();
   event->set_timestamp(1000);
+  event->set_pid(12);
   auto* cpu_freq = event->mutable_cpu_frequency();
   cpu_freq->set_cpu_id(10);
   cpu_freq->set_state(2000);

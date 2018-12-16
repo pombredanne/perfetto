@@ -526,7 +526,15 @@ void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
                                          int64_t timestamp,
                                          TraceBlobView ftrace) {
   ProtoDecoder decoder(ftrace.data(), ftrace.length());
-  uint32_t pid = 0;
+  uint64_t raw_pid = 0;
+  if (!PERFETTO_LIKELY(
+          (decoder.FindIntField<protos::FtraceEvent::kPidFieldNumber>(
+              &raw_pid)))) {
+    PERFETTO_ELOG("Pid field not found in ftrace packet");
+    return;
+  }
+  uint32_t pid = static_cast<uint32_t>(raw_pid);
+
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     // TODO(taylori): Parse generic event into raw table
     if (!(fld.id == protos::FtraceEvent::kPidFieldNumber ||
@@ -538,10 +546,6 @@ void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
                          ftrace.slice(fld_off, fld.size()));
     }
     switch (fld.id) {
-      case protos::FtraceEvent::kPidFieldNumber: {
-        pid = fld.as_uint32();
-        break;
-      }
       case protos::FtraceEvent::kSchedSwitchFieldNumber: {
         PERFETTO_DCHECK(timestamp > 0);
         const size_t fld_off = ftrace.offset_of(fld.data());
@@ -602,7 +606,7 @@ void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
         ParseOOMScoreAdjUpdate(timestamp, ftrace.slice(fld_off, fld.size()));
         break;
       }
-      default { break; }
+      default: { break; }
     }
   }
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
@@ -945,7 +949,7 @@ void ProtoTraceParser::ParseUnknownFtrace(uint32_t ftrace_id,
       case ProtoSchemaType::kEnum: {
         context_->storage->mutable_args()->AddArg(
             raw_event_id, name_id, name_id,
-            TraceStorage::Args::Variadic(fld.as_int()));
+            TraceStorage::Args::Variadic(fld.as_integer()));
         break;
       }
       case ProtoSchemaType::kString:

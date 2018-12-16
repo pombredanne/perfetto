@@ -75,7 +75,7 @@ class ArgsTable : public StorageTable {
         case VariadicType::kString:
           return Table::ColumnType::kString;
       }
-      PERFETTO_CHECK(false);
+      PERFETTO_FATAL("Not reached");  // For gcc
     }
 
    private:
