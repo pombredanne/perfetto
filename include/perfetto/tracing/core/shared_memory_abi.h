@@ -469,6 +469,11 @@ class SharedMemoryABI {
   // partitioned it returns 0 (as if the page had no free chunks).
   uint32_t GetFreeChunks(size_t page_idx);
 
+  // Returns a bitmap in which each bit is set if the corresponding Chunk exists
+  // in the page (according to the page layout) and is not free. If the page is
+  // not partitioned it returns 0 (as if the page had no used chunks).
+  uint32_t GetUsedChunks(size_t page_idx);
+
   // Tries to atomically partition a page with the given |layout|. Returns true
   // if the page was free and has been partitioned with the given |layout|,
   // false if the page wasn't free anymore by the time we got there.
@@ -498,6 +503,9 @@ class SharedMemoryABI {
   // the chunks individually.
   bool TryAcquireAllChunksForReading(size_t page_idx);
   void ReleaseAllChunksAsFree(size_t page_idx);
+
+  std::pair<Chunk, ChunkState> GetChunkAndStateUnsafe(size_t page_idx,
+                                                      size_t chunk_idx);
 
   // The caller must have successfully TryAcquireAllChunksForReading().
   Chunk GetChunkUnchecked(size_t page_idx,

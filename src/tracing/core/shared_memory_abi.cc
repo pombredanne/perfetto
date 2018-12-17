@@ -61,6 +61,12 @@ std::array<uint16_t, SharedMemoryABI::kNumPageLayouts> InitChunkSizes(
   return res;
 }
 
+inline void ClearChunkHeader(SharedMemoryABI::ChunkHeader* header) {
+  header->writer_id.store(0u, std::memory_order_relaxed);
+  header->chunk_id.store(0u, std::memory_order_relaxed);
+  header->packets.store({}, std::memory_order_release);
+}
+
 }  // namespace
 
 // static
@@ -133,6 +139,19 @@ void SharedMemoryABI::Initialize(uint8_t* start,
   PERFETTO_CHECK(size % page_size == 0);
 }
 
+std::pair<SharedMemoryABI::Chunk, SharedMemoryABI::ChunkState>
+SharedMemoryABI::GetChunkAndStateUnsafe(size_t page_idx, size_t chunk_idx) {
+  uint32_t layout =
+      page_header(page_idx)->layout.load(std::memory_order_relaxed);
+  const size_t num_chunks = GetNumChunksForLayout(layout);
+  // The page layout has changed (or the page is free).
+  if (chunk_idx >= num_chunks)
+    return std::make_pair(Chunk(), ChunkState::kChunkFree);
+  auto state = static_cast<ChunkState>((layout >> (chunk_idx * kChunkShift)) &
+                                       kChunkMask);
+  return std::make_pair(GetChunkUnchecked(page_idx, layout, chunk_idx), state);
+}
+
 SharedMemoryABI::Chunk SharedMemoryABI::GetChunkUnchecked(size_t page_idx,
                                                           uint32_t page_layout,
                                                           size_t chunk_idx) {
@@ -184,10 +203,10 @@ SharedMemoryABI::Chunk SharedMemoryABI::TryAcquireChunk(
       if (desired_chunk_state == kChunkBeingWritten) {
         PERFETTO_DCHECK(header);
         ChunkHeader* new_header = chunk.header();
-        new_header->packets.store(header->packets, std::memory_order_relaxed);
         new_header->writer_id.store(header->writer_id,
                                     std::memory_order_relaxed);
-        new_header->chunk_id.store(header->chunk_id, std::memory_order_release);
+        new_header->chunk_id.store(header->chunk_id, std::memory_order_relaxed);
+        new_header->packets.store(header->packets, std::memory_order_release);
       }
       return chunk;
     }
@@ -220,6 +239,18 @@ uint32_t SharedMemoryABI::GetFreeChunks(size_t page_idx) {
   return res;
 }
 
+uint32_t SharedMemoryABI::GetUsedChunks(size_t page_idx) {
+  uint32_t layout =
+      page_header(page_idx)->layout.load(std::memory_order_relaxed);
+  const uint32_t num_chunks = GetNumChunksForLayout(layout);
+  uint32_t res = 0;
+  for (uint32_t i = 0; i < num_chunks; i++) {
+    res |= ((layout & kChunkMask) != kChunkFree) ? (1 << i) : 0;
+    layout >>= kChunkShift;
+  }
+  return res;
+}
+
 size_t SharedMemoryABI::ReleaseChunk(Chunk chunk,
                                      ChunkState desired_chunk_state) {
   PERFETTO_DCHECK(desired_chunk_state == kChunkComplete ||
@@ -228,6 +259,11 @@ size_t SharedMemoryABI::ReleaseChunk(Chunk chunk,
   size_t page_idx;
   size_t chunk_idx;
   std::tie(page_idx, chunk_idx) = GetPageAndChunkIndex(chunk);
+
+  // Reset header fields, so that the service can identify when the chunk's
+  // header has been initialized by the producer.
+  if (desired_chunk_state == kChunkFree)
+    ClearChunkHeader(chunk.header());
 
   for (int attempt = 0; attempt < kRetryAttempts; attempt++) {
     PageHeader* phdr = page_header(page_idx);
@@ -302,7 +338,15 @@ bool SharedMemoryABI::TryAcquireAllChunksForReading(size_t page_idx) {
 }
 
 void SharedMemoryABI::ReleaseAllChunksAsFree(size_t page_idx) {
+  // Clear all chunk headers.
   PageHeader* phdr = page_header(page_idx);
+  uint32_t layout = phdr->layout.load(std::memory_order_relaxed);
+  const uint32_t num_chunks = GetNumChunksForLayout(layout);
+  for (size_t chunk_idx = 0; chunk_idx < num_chunks; chunk_idx++) {
+    Chunk chunk = GetChunkUnchecked(page_idx, layout, chunk_idx);
+    ClearChunkHeader(chunk.header());
+  }
+
   phdr->layout.store(0, std::memory_order_release);
 #if !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
   uint8_t* page_start = start_ + page_idx * page_size_;

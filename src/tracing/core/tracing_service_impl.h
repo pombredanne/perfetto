@@ -350,6 +350,11 @@ class TracingServiceImpl : public TracingService {
   void OnDisableTracingTimeout(TracingSessionID);
   void DisableTracingNotifyConsumerAndFlushFile(TracingSession*);
   void PeriodicFlushTask(TracingSessionID, bool post_next_only);
+  void CompleteFlush(TracingSessionID tsid,
+                     ConsumerEndpoint::FlushCallback callback,
+                     bool success);
+  void ScrapeSharedMemoryBuffers(TracingSession* tracing_session,
+                                 ProducerEndpointImpl* producer);
   TraceBuffer* GetBufferByID(BufferID);
 
   base::TaskRunner* const task_runner_;

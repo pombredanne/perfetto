@@ -165,6 +165,12 @@ void TracingServiceImpl::DisconnectProducer(ProducerID id) {
   PERFETTO_DLOG("Producer %" PRIu16 " disconnected", id);
   PERFETTO_DCHECK(producers_.count(id));
 
+  // Scrape remaining chunks for this producer to ensure we don't lose data.
+  if (auto* producer = GetProducer(id)) {
+    for (auto& session_id_and_session : tracing_sessions_)
+      ScrapeSharedMemoryBuffers(&session_id_and_session.second, producer);
+  }
+
   for (auto it = data_sources_.begin(); it != data_sources_.end();) {
     auto next = it;
     next++;
@@ -565,6 +571,10 @@ void TracingServiceImpl::DisableTracingNotifyConsumerAndFlushFile(
   tracing_session->pending_stop_acks.clear();
   tracing_session->state = TracingSession::DISABLED;
 
+  // Scrape any remaining chunks that weren't flushed by the producers.
+  for (auto& producer_id_and_producer : producers_)
+    ScrapeSharedMemoryBuffers(tracing_session, producer_id_and_producer.second);
+
   if (tracing_session->write_into_file) {
     tracing_session->write_period_ms = 0;
     ReadBuffers(tracing_session->id, nullptr);
@@ -635,8 +645,15 @@ void TracingServiceImpl::NotifyFlushDoneForProducer(
       PendingFlush& pending_flush = it->second;
       pending_flush.producers.erase(producer_id);
       if (pending_flush.producers.empty()) {
-        task_runner_->PostTask(
-            std::bind(std::move(pending_flush.callback), /*success=*/true));
+        auto weak_this = weak_ptr_factory_.GetWeakPtr();
+        TracingSessionID tsid = kv.first;
+        task_runner_->PostTask(std::bind(
+            [weak_this, tsid](ConsumerEndpoint::FlushCallback callback) {
+              if (weak_this)
+                weak_this->CompleteFlush(tsid, std::move(callback),
+                                         /*success=*/true);
+            },
+            std::move(pending_flush.callback)));
         it = pending_flushes.erase(it);
       } else {
         it++;
@@ -655,7 +672,119 @@ void TracingServiceImpl::OnFlushTimeout(TracingSessionID tsid,
     return;  // Nominal case: flush was completed and acked on time.
   auto callback = std::move(it->second.callback);
   tracing_session->pending_flushes.erase(it);
-  callback(/*success=*/false);
+  CompleteFlush(tsid, std::move(callback), /*success=*/false);
+}
+
+void TracingServiceImpl::CompleteFlush(TracingSessionID tsid,
+                                       ConsumerEndpoint::FlushCallback callback,
+                                       bool success) {
+  TracingSession* tracing_session = GetTracingSession(tsid);
+  if (!tracing_session)
+    return;
+  // Producers may not have been able to flush all their data, even if they
+  // indicated flush completion. If possible, also collect uncommitted chunks to
+  // make sure we have everything they wrote so far.
+  for (auto& producer_id_and_producer : producers_)
+    ScrapeSharedMemoryBuffers(tracing_session, producer_id_and_producer.second);
+  callback(success);
+}
+
+void TracingServiceImpl::ScrapeSharedMemoryBuffers(
+    TracingSession* tracing_session,
+    ProducerEndpointImpl* producer) {
+  // Can't copy chunks if we don't know about any trace writers.
+  if (producer->writers_.empty())
+    return;
+
+  // If the producer isn't allowed to write into the session's log buffers, it
+  // doesn't participate in this session.
+  const auto& session_buffers = tracing_session->buffers_index;
+  bool producer_in_session =
+      std::any_of(session_buffers.begin(), session_buffers.end(),
+                  [producer](BufferID buffer_id) {
+                    return producer->allowed_target_buffers_.count(buffer_id);
+                  });
+  if (!producer_in_session)
+    return;
+
+  PERFETTO_DLOG("Scraping SMB for producer %" PRIu16, producer->id_);
+
+  // Find and copy any uncommitted chunks from the SMB.
+  SharedMemoryABI* abi = &producer->shmem_abi_;
+  for (size_t page_idx = 0; page_idx < abi->num_pages(); page_idx++) {
+    if (abi->is_page_free(page_idx))
+      continue;
+
+    // Scrape the chunks that are currently used. These should be either in
+    // state kChunkBeingWritten or kChunkComplete.
+    uint32_t used_chunks = abi->GetUsedChunks(page_idx);
+    for (uint32_t chunk_idx = 0; used_chunks; chunk_idx++, used_chunks >>= 1) {
+      if (!(used_chunks & 1))
+        continue;
+
+      SharedMemoryABI::Chunk chunk;
+      SharedMemoryABI::ChunkState state;
+      std::tie(chunk, state) = abi->GetChunkAndStateUnsafe(page_idx, chunk_idx);
+
+      // Misbehaving producer: This should only happen if the producer
+      // modifies the chunking layout of the page after allocating it, which
+      // it shouldn't. In that case, skip the rest of the page.
+      if (!chunk.is_valid()) {
+        PERFETTO_DCHECK(false);
+        break;
+      }
+
+      // Misbehaving producer: This should only happen if the producer marks
+      // the chunk as free or being read concurrently, which it shouldn't. In
+      // that case, skip the chunk.
+      if (state != SharedMemoryABI::kChunkBeingWritten &&
+          state != SharedMemoryABI::kChunkComplete) {
+        PERFETTO_DCHECK(false);
+        continue;
+      }
+      bool chunk_complete = state == SharedMemoryABI::kChunkComplete;
+
+      uint16_t packet_count;
+      uint8_t flags;
+      std::tie(packet_count, flags) = chunk.GetPacketCountAndFlags();
+
+      // It only makes sense to copy an incomplte chunk if there's at least
+      // one full packet available. (The producer may not have completed the
+      // last packet in it yet, so we need at least 2.)
+      if (!chunk_complete && packet_count < 2)
+        continue;
+
+      // At this point, it is safe to access the remaining header fields of
+      // the chunk. Even if the chunk was only just transferred from
+      // kChunkFree into kChunkBeingWritten state, the header should be
+      // written completely once the packet count increased above 1 (it was
+      // reset to 0 by the service when the chunk was freed).
+
+      WriterID writer_id = chunk.writer_id();
+      base::Optional<BufferID> target_buffer_id =
+          producer->buffer_id_for_writer(writer_id);
+
+      // We can only scrape this chunk if we know which log buffer to copy it
+      // into.
+      if (!target_buffer_id)
+        continue;
+
+      // Skip chunks that don't belong to the requested tracing session.
+      bool target_buffer_belongs_to_session =
+          std::find(session_buffers.begin(), session_buffers.end(),
+                    *target_buffer_id) != session_buffers.end();
+      if (!target_buffer_belongs_to_session)
+        continue;
+
+      uint32_t chunk_id =
+          chunk.header()->chunk_id.load(std::memory_order_relaxed);
+
+      CopyProducerPageIntoLogBuffer(
+          producer->id_, producer->uid_, writer_id, chunk_id, *target_buffer_id,
+          packet_count, flags, chunk_complete, chunk.payload_begin(),
+          chunk.payload_size());
+    }
+  }
 }
 
 void TracingServiceImpl::FlushAndDisableTracing(TracingSessionID tsid) {
