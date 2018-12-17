@@ -335,15 +335,20 @@ class TraceBuffer {
       ChunkID chunk_id;
     };
 
-    ChunkMeta(ChunkRecord* r, uint16_t p, uint8_t f, bool c, uid_t u)
+    ChunkMeta(ChunkRecord* r, uint16_t p, bool c, uint8_t f, uid_t u)
         : chunk_record{r},
           trusted_uid{u},
+          is_complete{c},
           flags{f},
-          num_fragments{p},
-          is_complete{c} {}
+          num_fragments{p} {}
 
     ChunkRecord* const chunk_record;   // Addr of ChunkRecord within |data_|.
     const uid_t trusted_uid;           // uid of the producer.
+
+    // If true, the chunk state was kChunkComplete at the time it was copied. If
+    // false, the chunk was still kChunkBeingWritten while copied. |is_complete|
+    // == false prevents the sequence to read past this chunk.
+    bool is_complete = false;
 
     // Correspond to |chunk_record->flags| and |chunk_record->num_fragments|.
     // Copied here for performance reasons (avoids having to dereference
@@ -351,10 +356,6 @@ class TraceBuffer {
     // case the buffer gets corrupted.
     uint8_t flags = 0;                 // See SharedMemoryABI::flags.
     uint16_t num_fragments = 0;        // Total number of packet fragments.
-
-    // Whether the producer released the chunk as complete. If |false|, reading
-    // from the chunk's sequence shouldn't progress past this chunk.
-    bool is_complete = false;
 
     uint16_t num_fragments_read = 0;   // Number of fragments already read.
 

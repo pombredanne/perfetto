@@ -129,8 +129,12 @@ void TraceBuffer::CopyChunkUntrusted(ProducerID producer_id_trusted,
   // If the chunk hasn't been completed, we should only consider the first
   // |num_fragments - 1| packets complete. For simplicity, we simply disregard
   // the last one when we copy the chunk.
-  if (!chunk_complete)
-    num_fragments -= num_fragments > 0 ? 1 : 0;
+  if (PERFETTO_UNLIKELY(!chunk_complete)) {
+    if (num_fragments > 0) {
+      num_fragments--;
+      chunk_flags &= ~kLastPacketContinuesOnNextChunk;
+    }
+  }
 
   ChunkRecord record(record_size);
   record.producer_id = producer_id_trusted;
@@ -152,10 +156,12 @@ void TraceBuffer::CopyChunkUntrusted(ProducerID producer_id_trusted,
 
     // Verify that the old chunk's metadata corresponds to the new one.
     // Overridden chunks should never change size, since the page layout is
-    // fixed per writer. The number of fragments should also never decrease.
+    // fixed per writer. The number of fragments should also never decrease and
+    // flags should not be removed.
     if (PERFETTO_UNLIKELY(ChunkMeta::Key(*prev) != key ||
                           prev->size != record_size ||
-                          prev->num_fragments > num_fragments)) {
+                          prev->num_fragments > num_fragments ||
+                          (prev->flags & chunk_flags) != prev->flags)) {
       stats_.abi_violations++;
       PERFETTO_DCHECK(suppress_sanity_dchecks_for_testing_);
       return;
@@ -167,6 +173,8 @@ void TraceBuffer::CopyChunkUntrusted(ProducerID producer_id_trusted,
     // read of packets. This shouldn't happen if the producer is well-behaved,
     // because it shouldn't start chunk N+1 before completing chunk N.
     ChunkMeta::Key subsequent_key = key;
+    static_assert(std::numeric_limits<ChunkID>::max() == kMaxChunkID,
+                  "ChunkID wraps");
     subsequent_key.chunk_id++;
     const auto subsequent_it = index_.find(subsequent_key);
     if (subsequent_it != index_.end() &&
@@ -177,7 +185,11 @@ void TraceBuffer::CopyChunkUntrusted(ProducerID producer_id_trusted,
     }
 
     // If this chunk was previously copied with the same number of fragments and
-    // the number didn't change, there's no need to copy it again.
+    // the number didn't change, there's no need to copy it again. If the
+    // previous chunk was complete already, this should always be the case.
+    PERFETTO_DCHECK(suppress_sanity_dchecks_for_testing_ ||
+                    !record_meta->is_complete ||
+                    (chunk_complete && prev->num_fragments == num_fragments));
     if (prev->num_fragments == num_fragments) {
       TRACE_BUFFER_DLOG("  skipping recommit of identical chunk");
       return;
@@ -248,8 +260,8 @@ void TraceBuffer::CopyChunkUntrusted(ProducerID producer_id_trusted,
   stats_.chunks_written++;
   stats_.bytes_written += size;
   auto it_and_inserted = index_.emplace(
-      key, ChunkMeta(GetChunkRecordAt(wptr_), num_fragments, chunk_flags,
-                     chunk_complete, producer_uid_trusted));
+      key, ChunkMeta(GetChunkRecordAt(wptr_), num_fragments, chunk_complete,
+                     chunk_flags, producer_uid_trusted));
   PERFETTO_DCHECK(it_and_inserted.second);
   TRACE_BUFFER_DLOG("  copying @ [%lu - %lu] %zu", wptr_ - begin(),
                     wptr_ - begin() + record_size, record_size);
