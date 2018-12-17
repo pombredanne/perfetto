@@ -129,7 +129,7 @@ bool CreateConfigFromOptions(const ConfigOptions& options,
   for (const auto& app : atrace_apps)
     ds_config->mutable_ftrace_config()->add_atrace_apps(app);
 
-  ds_config->mutable_ftrace_config()->set_buffer_size_kb(4 * 1024);
+  ds_config->mutable_ftrace_config()->set_buffer_size_kb(2 * 1024);
 
   auto* ps_config = config->add_data_sources()->mutable_config();
   ps_config->set_name("linux.process_stats");
