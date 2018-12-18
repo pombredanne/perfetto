@@ -34,7 +34,12 @@ TempFile TempFile::Create(int flags) {
   TempFile temp_file;
   temp_file.path_.assign(kSysTmpPath);
   temp_file.path_.append("/perfetto-XXXXXXXX");
+// mkostemp() is only supported from API level 23 upwards.
+#if !PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID) || __ANDROID_API__ >= 23
   temp_file.fd_.reset(mkostemp(&temp_file.path_[0], flags));
+#else
+  temp_file.fd_.reset(mkstemp(&temp_file.path_[0]));
+#endif
   PERFETTO_CHECK(temp_file.fd_);
   return temp_file;
 }
