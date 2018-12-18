@@ -41,13 +41,14 @@ LazyProducers::Handle::~Handle() {
     lazy_producers_->DecrementPropertyRefCount(property_name_);
 }
 
-LazyProducers::Handle::Handle(Handle&& other) {
+LazyProducers::Handle::Handle(Handle&& other) noexcept {
   Handle tmp(std::move(other));
   using std::swap;
   swap(*this, tmp);
 }
 
-LazyProducers::Handle& LazyProducers::Handle::operator=(Handle&& other) {
+LazyProducers::Handle& LazyProducers::Handle::operator=(
+    Handle&& other) noexcept {
   Handle tmp(std::move(other));
   using std::swap;
   swap(*this, tmp);
