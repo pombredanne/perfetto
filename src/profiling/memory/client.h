@@ -44,8 +44,8 @@ class SocketPool {
   bool shutdown_ = false;
 
   void Return(base::ScopedFile fd);
-  std::mutex mutex_;
-  std::condition_variable cv_;
+  std::timed_mutex mutex_;
+  std::condition_variable_any cv_;
   std::vector<base::ScopedFile> sockets_;
   size_t available_sockets_;
   size_t dead_sockets_ = 0;
@@ -97,7 +97,7 @@ class FreePage {
   void FlushLocked(SocketPool* pool);
 
   FreeMetadata free_page_;
-  std::mutex mutex_;
+  std::timed_mutex mutex_;
   size_t offset_ = 0;
 };
 
