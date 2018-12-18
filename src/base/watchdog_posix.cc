@@ -96,9 +96,8 @@ void Watchdog::Start() {
   } else {
     PERFETTO_DCHECK(!enabled_);
 
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) ||   \
-    PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID) || \
-    PERFETTO_BUILDFLAG(PERFETTO_OS_FUCHSIA)
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
+    PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
     // Kick the thread to start running but only on Android or Linux.
     enabled_ = true;
     thread_ = std::thread(&Watchdog::ThreadMain, this);

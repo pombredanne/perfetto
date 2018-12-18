@@ -35,9 +35,8 @@ namespace {
 using testing::Contains;
 using testing::Pair;
 
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) ||   \
-    PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID) || \
-    PERFETTO_BUILDFLAG(PERFETTO_OS_FUCHSIA)
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
+    PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
 TEST(FsMountTest, ParseRealMounts) {
   std::multimap<BlockDeviceID, std::string> mounts = ParseMounts();
   struct stat buf = {};

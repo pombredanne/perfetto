@@ -20,8 +20,7 @@
 #include "perfetto/base/build_config.h"
 
 #if (PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) ||    \
-     PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID) ||  \
-     PERFETTO_BUILDFLAG(PERFETTO_OS_FUCHSIA)) && \
+     PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)) && \
     !PERFETTO_BUILDFLAG(PERFETTO_CHROMIUM_BUILD)
 #include "perfetto/base/watchdog_posix.h"
 #else

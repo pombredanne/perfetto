@@ -550,7 +550,7 @@ source_set("benchmark") {
 }
 
 # On Linux/Android use libbacktrace in debug builds for better stacktraces.
-if (is_linux || is_fuchsia || is_android) {
+if (is_linux || is_android) {
   config("libbacktrace_config") {
     include_dirs = [
       "libbacktrace_config",

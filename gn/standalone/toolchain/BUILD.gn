@@ -21,7 +21,7 @@ declare_args() {
     if (is_system_compiler) {
       cc = "\$CC "
       cxx = "\$CXX "
-    } else if (is_linux || is_fuchsia) {
+    } else if (is_linux) {
       cc = linux_clang_bin
       cxx = linux_clangxx_bin
     } else {

@@ -45,9 +45,8 @@
 #error This translation unit should not be used in non-standalone builds
 #endif
 
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) ||   \
-    PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID) || \
-    PERFETTO_BUILDFLAG(PERFETTO_OS_FUCHSIA)
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
+    PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
 #include <backtrace.h>
 #endif
 
@@ -148,9 +147,8 @@ void SignalHandler(int sig_num, siginfo_t* info, void* /*ucontext*/) {
   StackCrawlState unwind_state(frames, kMaxFrames);
   _Unwind_Backtrace(&TraceStackFrame, &unwind_state);
 
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) ||   \
-    PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID) || \
-    PERFETTO_BUILDFLAG(PERFETTO_OS_FUCHSIA)
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
+    PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
   auto bt_error = [](void*, const char* msg, int) { Print(msg); };
   struct backtrace_state* bt_state =
       backtrace_create_state(nullptr, 0, bt_error, nullptr);
@@ -163,9 +161,8 @@ void SignalHandler(int sig_num, siginfo_t* info, void* /*ucontext*/) {
     };
     SymbolInfo sym{{}, {}};
 
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) ||   \
-    PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID) || \
-    PERFETTO_BUILDFLAG(PERFETTO_OS_FUCHSIA)
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
+    PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
     auto symbolize_callback = [](void* data, uintptr_t /*pc*/,
                                  const char* filename, int lineno,
                                  const char* function) -> int {
