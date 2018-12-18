@@ -1012,7 +1012,7 @@ export const RecordPage = createPage({
                 m(CodeSample, {text: data.commandline}),
                 'Then click "Open trace file" in the menu to the left and',
                 ' select "/tmp/trace".',
-                m('p', 'On some devices you may need to first enable Perfetto',
+                m('p', 'On non-Pixel devices you may need to first enable Perfetto',
                  ' with:'),
                 m(CodeSample, {text: SET_PROP_CMD}),
               ),
