@@ -30,7 +30,11 @@ constexpr char kSysTmpPath[] = "/tmp";
 }  // namespace
 
 // static
+#if !PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID) || __ANDROID_API__ >= 23
 TempFile TempFile::Create(int flags) {
+#else
+TempFile TempFile::Create(int /*flags*/) {
+#endif
   TempFile temp_file;
   temp_file.path_.assign(kSysTmpPath);
   temp_file.path_.append("/perfetto-XXXXXXXX");
