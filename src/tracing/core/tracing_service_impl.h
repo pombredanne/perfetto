@@ -173,6 +173,7 @@ class TracingServiceImpl : public TracingService {
     Consumer* const consumer_;
     uid_t const uid_;
     TracingSessionID tracing_session_id_ = 0;
+    bool detached_ = false;
     PERFETTO_THREAD_CHECKER(thread_checker_)
     base::WeakPtrFactory<ConsumerEndpointImpl> weak_ptr_factory_;  // Keep last.
   };
@@ -192,6 +193,7 @@ class TracingServiceImpl : public TracingService {
                                      BufferID,
                                      uint16_t num_fragments,
                                      uint8_t chunk_flags,
+                                     bool chunk_complete,
                                      const uint8_t* src,
                                      size_t size);
   void ApplyChunkPatches(ProducerID,
@@ -329,7 +331,7 @@ class TracingServiceImpl : public TracingService {
 
     // If the consumer detached the session, this variable defines the key used
     // for identifying the session later when reattaching.
-    std::string attach_key;
+    std::string detach_key;
 
     // This is set when the Consumer calls sets |write_into_file| == true in the
     // TraceConfig. In this case this represents the file we should stream the
@@ -357,7 +359,7 @@ class TracingServiceImpl : public TracingService {
   TracingSession* GetTracingSession(TracingSessionID);
 
   // Returns a pointer to the |tracing_sessions_| entry, matching the given
-  // uid and attach key.
+  // uid and detach key, or nullptr if no such session exists.
   TracingSession* GetDetachedSession(uid_t, const std::string& key);
 
   // Update the memory guard rail by using the latest information from the

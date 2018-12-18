@@ -137,7 +137,7 @@ void ConsumerIPCService::Detach(const protos::DetachRequest& req,
 // Called by the IPC layer.
 void ConsumerIPCService::Attach(const protos::AttachRequest& req,
                                 DeferredAttachResponse resp) {
-  // OnAttach() will resolve the |detach_response|.
+  // OnAttach() will resolve the |attach_response|.
   RemoteConsumer* remote_consumer = GetConsumerForCurrentRequest();
   remote_consumer->attach_response = std::move(resp);
   remote_consumer->service_endpoint->Attach(req.key());
@@ -181,7 +181,7 @@ void ConsumerIPCService::RemoteConsumer::OnTracingDisabled() {
 
   if (observe_state_response.IsBound()) {
     auto result = ipc::AsyncResult<protos::ObserveStateResponse>::Create();
-    result->set_new_state(protos::ObserveStateResponse_State_DISABLED);
+    result->set_new_state(protos::ObserveStateResponse::DISABLED);
     observe_state_response.Resolve(std::move(result));
   }
 }

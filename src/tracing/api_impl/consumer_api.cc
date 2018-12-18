@@ -232,7 +232,7 @@ void TracingSession::OnDetach(bool) {
 }
 
 void TracingSession::OnAttach(bool, const TraceConfig&) {
-  PERFETTO_DCHECK(false);  // Should never be called, Detach() is not used here.
+  PERFETTO_DCHECK(false);  // Should never be called, Attach() is not used here.
 }
 
 void TracingSession::DestroyConnection() {

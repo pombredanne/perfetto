@@ -238,8 +238,9 @@ bool TracingServiceImpl::DetachConsumer(ConsumerEndpointImpl* consumer,
 
   PERFETTO_DCHECK(tracing_session->consumer_maybe_null == consumer);
   tracing_session->consumer_maybe_null = nullptr;
-  tracing_session->attach_key = key;
+  tracing_session->detach_key = key;
   consumer->tracing_session_id_ = 0;
+  consumer->detached_ = true;
   return true;
 }
 
@@ -264,7 +265,7 @@ bool TracingServiceImpl::AttachConsumer(ConsumerEndpointImpl* consumer,
 
   consumer->tracing_session_id_ = tracing_session->id;
   tracing_session->consumer_maybe_null = consumer;
-  tracing_session->attach_key.clear();
+  tracing_session->detach_key.clear();
   return true;
 }
 
@@ -714,8 +715,20 @@ void TracingServiceImpl::FlushAndDisableTracing(TracingSessionID tsid) {
   Flush(tsid, kFlushTimeoutMs, [weak_this, tsid](bool success) {
     PERFETTO_DLOG("Flush done (success: %d), disabling trace session %" PRIu64,
                   success, tsid);
-    if (weak_this)
+    if (!weak_this)
+      return;
+    TracingSession* session = weak_this->GetTracingSession(tsid);
+    if (session->consumer_maybe_null) {
+      // If the consumer is still attached, just disable the session but give it
+      // a chance to read the contents.
       weak_this->DisableTracing(tsid);
+    } else {
+      // If the consumer detached, destroy the session. If the consumer did
+      // start the session in long-tracing mode, the service will have saved
+      // the contents to the passed file. If not, the contents will be
+      // destroyed.
+      weak_this->FreeBuffers(tsid);
+    }
   });
 }
 
@@ -1168,6 +1181,7 @@ void TracingServiceImpl::CopyProducerPageIntoLogBuffer(
     BufferID buffer_id,
     uint16_t num_fragments,
     uint8_t chunk_flags,
+    bool chunk_complete,
     const uint8_t* src,
     size_t size) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
@@ -1213,7 +1227,8 @@ void TracingServiceImpl::CopyProducerPageIntoLogBuffer(
   }
 
   buf->CopyChunkUntrusted(producer_id_trusted, producer_uid_trusted, writer_id,
-                          chunk_id, num_fragments, chunk_flags, src, size);
+                          chunk_id, num_fragments, chunk_flags, chunk_complete,
+                          src, size);
 }
 
 void TracingServiceImpl::ApplyChunkPatches(
@@ -1268,7 +1283,7 @@ TracingServiceImpl::TracingSession* TracingServiceImpl::GetDetachedSession(
   PERFETTO_DCHECK_THREAD(thread_checker_);
   for (auto& kv : tracing_sessions_) {
     TracingSession* session = &kv.second;
-    if (session->consumer_uid == uid && session->attach_key == key) {
+    if (session->consumer_uid == uid && session->detach_key == key) {
       PERFETTO_DCHECK(session->consumer_maybe_null == nullptr);
       return session;
     }
@@ -1492,6 +1507,10 @@ void TracingServiceImpl::ConsumerEndpointImpl::EnableTracing(
     const TraceConfig& cfg,
     base::ScopedFile fd) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
+  if (detached_) {
+    PERFETTO_LOG("Invalid Consumer call to EnableTracing() after detaching");
+    return;
+  }
   if (!service_->EnableTracing(this, cfg, std::move(fd)))
     NotifyOnTracingDisabled();
 }
@@ -1564,12 +1583,10 @@ void TracingServiceImpl::ConsumerEndpointImpl::Attach(const std::string& key) {
     TracingSession* session =
         weak_this->service_->GetTracingSession(weak_this->tracing_session_id_);
     if (!session) {
-      consumer->OnAttach(success, TraceConfig());
+      consumer->OnAttach(false, TraceConfig());
       return;
     }
     consumer->OnAttach(success, session->config);
-    if (session->state == TracingSession::State::DISABLED)
-      consumer->OnTracingDisabled();
   });
 }
 
@@ -1675,7 +1692,7 @@ void TracingServiceImpl::ProducerEndpointImpl::CommitData(
 
     service_->CopyProducerPageIntoLogBuffer(
         id_, uid_, writer_id, chunk_id, buffer_id, num_fragments, chunk_flags,
-        chunk.payload_begin(), chunk.payload_size());
+        /*chunk_complete=*/true, chunk.payload_begin(), chunk.payload_size());
 
     // This one has release-store semantics.
     shmem_abi_.ReleaseChunkAsFree(std::move(chunk));

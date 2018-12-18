@@ -120,7 +120,8 @@ bool ParseTraceConfigPbtxt(const std::string& file_name,
   return true;
 }
 
-bool IsValidDetachKey(const std::string& key) {
+// For --attach=key / --detach=key .
+bool IsValidSessionKey(const std::string& key) {
   if (key.empty())
     return false;
   for (char c : key) {
@@ -140,6 +141,8 @@ using protozero::proto_utils::WriteVarInt;
 using protozero::proto_utils::MakeTagLengthDelimited;
 
 int PerfettoCmd::PrintUsage(const char* argv0) {
+  // Note: --attach and --detach are deliberately not listed because they can be
+  // misused too easily.
   PERFETTO_ELOG(R"(
 Usage: %s
   --background     -d     : Exits immediately and continues tracing in background
@@ -149,8 +152,6 @@ Usage: %s
   --no-guardrails         : Ignore guardrails triggered when using --dropbox (for testing).
   --txt                   : Parse config as pbtxt. Not a stable API. Not for production use.
   --reset-guardrails      : Resets the state of the guardails and exits (for testing).
-  --detach=KEY            : Detaches from the tracing session.
-  --attach=KEY            : Re-attaches to a previously detached session using the same key.
   --help           -h
 
 
@@ -329,13 +330,19 @@ int PerfettoCmd::Main(int argc, char** argv) {
 
     if (option == OPT_DETACH) {
       detach_key_ = std::string(optarg);
-      PERFETTO_CHECK(IsValidDetachKey(detach_key_));
+      if (!IsValidSessionKey(detach_key_)) {
+        PERFETTO_ELOG("Invalid key for --detach: '%s'", detach_key_.c_str());
+        return 1;
+      }
       continue;
     }
 
     if (option == OPT_ATTACH) {
       attach_key_ = std::string(optarg);
-      PERFETTO_CHECK(IsValidDetachKey(attach_key_));
+      if (!IsValidSessionKey(attach_key_)) {
+        PERFETTO_ELOG("Invalid key for --attach: '%s'", attach_key_.c_str());
+        return 1;
+      }
       continue;
     }
 
