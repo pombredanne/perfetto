@@ -42,8 +42,6 @@ source_set("tracing") {
     "core/id_allocator.cc",
     "core/id_allocator.h",
     "core/inode_file_config.cc",
-    "core/lazy_producers.cc",
-    "core/lazy_producers.h",
     "core/null_trace_writer.cc",
     "core/null_trace_writer.h",
     "core/packet_stream_validator.cc",
@@ -84,7 +82,6 @@ source_set("unittests") {
   ]
   sources = [
     "core/id_allocator_unittest.cc",
-    "core/lazy_producers_unittest.cc",
     "core/null_trace_writer_unittest.cc",
     "core/packet_stream_validator_unittest.cc",
     "core/patch_list_unittest.cc",
