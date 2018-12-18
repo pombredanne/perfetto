@@ -197,6 +197,65 @@ TEST_F(ProtoTraceParserTest, LoadEventsIntoRaw) {
   // and test here.
 }
 
+TEST_F(ProtoTraceParserTest, LoadGenericFtrace) {
+  InitStorage();
+  protos::Trace trace;
+
+  auto* packet = trace.add_packet();
+  packet->set_timestamp(100);
+
+  auto* bundle = packet->mutable_ftrace_events();
+  bundle->set_cpu(4);
+
+  auto* ftrace = bundle->add_event();
+  ftrace->set_timestamp(100);
+  ftrace->set_pid(10);
+
+  auto* generic = ftrace->mutable_generic();
+  generic->set_event_name("Test");
+
+  auto* field = generic->add_field();
+  field->set_name("meta1");
+  field->set_str_value("value1");
+
+  field = generic->add_field();
+  field->set_name("meta2");
+  field->set_int_value(-2);
+
+  field = generic->add_field();
+  field->set_name("meta3");
+  field->set_uint_value(3);
+
+  EXPECT_CALL(*storage_, InternString(base::StringView("Test")));
+  EXPECT_CALL(*storage_, InternString(base::StringView("meta1")));
+  EXPECT_CALL(*storage_, InternString(base::StringView("value1")));
+  EXPECT_CALL(*storage_, InternString(base::StringView("meta2")));
+  EXPECT_CALL(*storage_, InternString(base::StringView("meta3")));
+
+  Tokenize(trace);
+
+  const auto& events = storage_->raw_events();
+  const auto& args = storage_->args();
+
+  ASSERT_EQ(events.raw_event_count(), 1);
+  ASSERT_EQ(events.timestamps().back(), 100);
+  ASSERT_EQ(storage_->GetThread(events.utids().back()).tid, 10);
+
+  auto row_id = TraceStorage::CreateRowId(TableId::kRawEvents, 0);
+  auto id_it = args.args_for_id().equal_range(row_id);
+
+  // Ignore string calls as they are handled by checking InternString calls
+  // above.
+
+  auto it = ++id_it.first;
+  auto row = it->second;
+  ASSERT_EQ(args.arg_values()[row].int_value, -2);
+
+  ++it;
+  row = it->second;
+  ASSERT_EQ(args.arg_values()[row].int_value, 3);
+}
+
 TEST_F(ProtoTraceParserTest, LoadMultipleEvents) {
   protos::Trace trace;
 

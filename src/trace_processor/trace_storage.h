@@ -342,7 +342,7 @@ class TraceStorage {
    public:
     inline RowId AddRawEvent(int64_t timestamp,
                              StringId name_id,
-                             int64_t utid) {
+                             UniqueTid utid) {
       timestamps_.emplace_back(timestamp);
       name_ids_.emplace_back(name_id);
       utids_.emplace_back(utid);
@@ -356,12 +356,12 @@ class TraceStorage {
 
     const std::deque<StringId>& name_ids() const { return name_ids_; }
 
-    const std::deque<int64_t>& utids() const { return utids_; }
+    const std::deque<UniqueTid>& utids() const { return utids_; }
 
    private:
     std::deque<int64_t> timestamps_;
     std::deque<StringId> name_ids_;
-    std::deque<int64_t> utids_;
+    std::deque<UniqueTid> utids_;
   };
 
   void ResetStorage();

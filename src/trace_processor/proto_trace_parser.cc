@@ -536,73 +536,59 @@ void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
   uint32_t pid = static_cast<uint32_t>(raw_pid);
 
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
-    // TODO(taylori): Parse generic event into raw table
-    if (!(fld.id == protos::FtraceEvent::kPidFieldNumber ||
-          fld.id == protos::FtraceEvent::kTimestampFieldNumber ||
-          fld.id == protos::FtraceEvent::kGenericFieldNumber)) {
-      PERFETTO_DCHECK(timestamp > 0);
-      const size_t fld_off = ftrace.offset_of(fld.data());
-      ParseUnknownFtrace(fld.id, timestamp, pid,
-                         ftrace.slice(fld_off, fld.size()));
+    PERFETTO_DCHECK(timestamp > 0);
+    const size_t fld_off = ftrace.offset_of(fld.data());
+
+    bool is_metadata_field =
+        fld.id == protos::FtraceEvent::kPidFieldNumber ||
+        fld.id == protos::FtraceEvent::kTimestampFieldNumber;
+    if (!is_metadata_field) {
+      if (fld.id == protos::FtraceEvent::kGenericFieldNumber) {
+        ParseGenericFtrace(timestamp, pid, ftrace.slice(fld_off, fld.size()));
+      } else {
+        ParseTypedFtraceToRaw(fld.id, timestamp, pid,
+                              ftrace.slice(fld_off, fld.size()));
+      }
     }
+
     switch (fld.id) {
       case protos::FtraceEvent::kSchedSwitchFieldNumber: {
-        PERFETTO_DCHECK(timestamp > 0);
-        const size_t fld_off = ftrace.offset_of(fld.data());
         ParseSchedSwitch(cpu, timestamp, ftrace.slice(fld_off, fld.size()));
         break;
       }
       case protos::FtraceEvent::kCpuFrequency: {
-        PERFETTO_DCHECK(timestamp > 0);
-        const size_t fld_off = ftrace.offset_of(fld.data());
         ParseCpuFreq(timestamp, ftrace.slice(fld_off, fld.size()));
         break;
       }
       case protos::FtraceEvent::kCpuIdle: {
-        PERFETTO_DCHECK(timestamp > 0);
-        const size_t fld_off = ftrace.offset_of(fld.data());
         ParseCpuIdle(timestamp, ftrace.slice(fld_off, fld.size()));
         break;
       }
       case protos::FtraceEvent::kPrintFieldNumber: {
-        PERFETTO_DCHECK(timestamp > 0);
-        const size_t fld_off = ftrace.offset_of(fld.data());
         ParsePrint(cpu, timestamp, pid, ftrace.slice(fld_off, fld.size()));
         break;
       }
       case protos::FtraceEvent::kRssStatFieldNumber: {
-        PERFETTO_DCHECK(timestamp > 0);
-        const size_t fld_off = ftrace.offset_of(fld.data());
         ParseRssStat(timestamp, pid, ftrace.slice(fld_off, fld.size()));
         break;
       }
       case protos::FtraceEvent::kIonHeapGrow: {
-        PERFETTO_DCHECK(timestamp > 0);
-        const size_t fld_off = ftrace.offset_of(fld.data());
         ParseIonHeapGrow(timestamp, pid, ftrace.slice(fld_off, fld.size()));
         break;
       }
       case protos::FtraceEvent::kIonHeapShrink: {
-        PERFETTO_DCHECK(timestamp > 0);
-        const size_t fld_off = ftrace.offset_of(fld.data());
         ParseIonHeapShrink(timestamp, pid, ftrace.slice(fld_off, fld.size()));
         break;
       }
       case protos::FtraceEvent::kSignalGenerate: {
-        PERFETTO_DCHECK(timestamp > 0);
-        const size_t fld_off = ftrace.offset_of(fld.data());
         ParseSignalGenerate(timestamp, ftrace.slice(fld_off, fld.size()));
         break;
       }
       case protos::FtraceEvent::kSignalDeliver: {
-        PERFETTO_DCHECK(timestamp > 0);
-        const size_t fld_off = ftrace.offset_of(fld.data());
         ParseSignalDeliver(timestamp, pid, ftrace.slice(fld_off, fld.size()));
         break;
       }
       case protos::FtraceEvent::kOomScoreAdjUpdate: {
-        PERFETTO_DCHECK(timestamp > 0);
-        const size_t fld_off = ftrace.offset_of(fld.data());
         ParseOOMScoreAdjUpdate(timestamp, ftrace.slice(fld_off, fld.size()));
         break;
       }
@@ -917,10 +903,69 @@ void ProtoTraceParser::ParseOOMScoreAdjUpdate(int64_t ts,
                                        RefType::kRefUpid);
 }
 
-void ProtoTraceParser::ParseUnknownFtrace(uint32_t ftrace_id,
-                                          int64_t timestamp,
+void ProtoTraceParser::ParseGenericFtrace(int64_t timestamp,
                                           uint32_t tid,
                                           TraceBlobView view) {
+  ProtoDecoder decoder(view.data(), view.length());
+
+  base::StringView event_name;
+  if (!PERFETTO_LIKELY((decoder.FindStringField<
+                        protos::GenericFtraceEvent::kEventNameFieldNumber>(
+          &event_name)))) {
+    PERFETTO_ELOG("Event name not found in generic ftrace packet");
+    return;
+  }
+
+  UniqueTid utid = context_->process_tracker->UpdateThread(timestamp, tid, 0);
+  StringId event_id = context_->storage->InternString(std::move(event_name));
+  RowId row_id = context_->storage->mutable_raw_events()->AddRawEvent(
+      timestamp, event_id, utid);
+
+  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    switch (fld.id) {
+      case protos::GenericFtraceEvent::kFieldFieldNumber:
+        const size_t fld_off = view.offset_of(fld.data());
+        ParseGenericFtraceField(row_id, view.slice(fld_off, fld.size()));
+        break;
+    }
+  }
+}
+
+void ProtoTraceParser::ParseGenericFtraceField(RowId generic_row_id,
+                                               TraceBlobView view) {
+  ProtoDecoder decoder(view.data(), view.length());
+
+  base::StringView field_name;
+  if (!PERFETTO_LIKELY((decoder.FindStringField<
+                        protos::GenericFtraceEvent::Field::kNameFieldNumber>(
+          &field_name)))) {
+    PERFETTO_ELOG("Event name not found in generic ftrace packet");
+    return;
+  }
+  auto field_name_id = context_->storage->InternString(std::move(field_name));
+  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    switch (fld.id) {
+      case protos::GenericFtraceEvent::Field::kIntValue:
+      case protos::GenericFtraceEvent::Field::kUintValue: {
+        context_->storage->mutable_args()->AddArg(
+            generic_row_id, field_name_id, field_name_id,
+            TraceStorage::Args::Variadic(fld.as_integer()));
+        break;
+      }
+      case protos::GenericFtraceEvent::Field::kStrValue: {
+        StringId value = context_->storage->InternString(fld.as_string());
+        context_->storage->mutable_args()->AddArg(
+            generic_row_id, field_name_id, field_name_id,
+            TraceStorage::Args::Variadic(value));
+      }
+    }
+  }
+}
+
+void ProtoTraceParser::ParseTypedFtraceToRaw(uint32_t ftrace_id,
+                                             int64_t timestamp,
+                                             uint32_t tid,
+                                             TraceBlobView view) {
   ProtoDecoder decoder(view.data(), view.length());
   if (ftrace_id >= GetDescriptorsSize()) {
     PERFETTO_DLOG("Event with id: %d does not exist and cannot be parsed.",
