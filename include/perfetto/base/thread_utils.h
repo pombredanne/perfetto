@@ -23,6 +23,9 @@
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 #include <processthreadsapi.h>
+#elif PERFETTO_BUILDFLAG(PERFETTO_OS_FUCHSIA)
+#include <zircon/process.h>
+#include <zircon/types.h>
 #else
 #include <pthread.h>
 #include <sys/syscall.h>
