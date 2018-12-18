@@ -89,8 +89,8 @@ class TracingSession : public Consumer {
   void OnDisconnect() override;
   void OnTracingDisabled() override;
   void OnTraceData(std::vector<TracePacket>, bool has_more) override;
-  void OnDetach(TracingSessionID) override;
-  void OnAttach(bool) override;
+  void OnDetach(bool) override;
+  void OnAttach(bool, const TraceConfig&) override;
 
  private:
   TracingSession(const TracingSession&) = delete;
@@ -227,11 +227,11 @@ void TracingSession::OnDisconnect() {
   NotifyCallback();
 }
 
-void TracingSession::OnDetach(TracingSessionID) {
+void TracingSession::OnDetach(bool) {
   PERFETTO_DCHECK(false);  // Should never be called, Detach() is not used here.
 }
 
-void TracingSession::OnAttach(bool) {
+void TracingSession::OnAttach(bool, const TraceConfig&) {
   PERFETTO_DCHECK(false);  // Should never be called, Detach() is not used here.
 }
 

@@ -120,6 +120,16 @@ bool ParseTraceConfigPbtxt(const std::string& file_name,
   return true;
 }
 
+bool IsValidDetachKey(const std::string& key) {
+  if (key.empty())
+    return false;
+  for (char c : key) {
+    if (!isprint(c))
+      return false;
+  }
+  return true;
+}
+
 }  // namespace
 
 // Temporary directory for DropBox traces. Note that this is automatically
@@ -139,6 +149,8 @@ Usage: %s
   --no-guardrails         : Ignore guardrails triggered when using --dropbox (for testing).
   --txt                   : Parse config as pbtxt. Not a stable API. Not for production use.
   --reset-guardrails      : Resets the state of the guardails and exits (for testing).
+  --detach=KEY            : Detaches from the tracing session.
+  --attach=KEY            : Re-attaches to a previously detached session using the same key.
   --help           -h
 
 
@@ -189,7 +201,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
       {"config-id", required_argument, nullptr, OPT_CONFIG_ID},
       {"config-uid", required_argument, nullptr, OPT_CONFIG_UID},
       {"reset-guardrails", no_argument, nullptr, OPT_RESET_GUARDRAILS},
-      {"detach", no_argument, nullptr, OPT_DETACH},
+      {"detach", required_argument, nullptr, OPT_DETACH},
       {"attach", required_argument, nullptr, OPT_ATTACH},
       {"app", required_argument, nullptr, OPT_ATRACE_APP},
       {nullptr, 0, nullptr, 0}};
@@ -316,12 +328,14 @@ int PerfettoCmd::Main(int argc, char** argv) {
     }
 
     if (option == OPT_DETACH) {
-      detach_ = true;
+      detach_key_ = std::string(optarg);
+      PERFETTO_CHECK(IsValidDetachKey(detach_key_));
       continue;
     }
 
     if (option == OPT_ATTACH) {
-      attach_tsid_ = static_cast<TracingSessionID>(atoll(optarg));
+      attach_key_ = std::string(optarg);
+      PERFETTO_CHECK(IsValidDetachKey(attach_key_));
       continue;
     }
 
@@ -333,38 +347,19 @@ int PerfettoCmd::Main(int argc, char** argv) {
     config_options.categories.push_back(argv[i]);
   }
 
-  if ((detach_ ? 1 : 0) + (attach_tsid_ ? 1 : 0) + (background ? 1 : 0) > 1) {
-    PERFETTO_ELOG("--attach, --detach and --background are mutually exclusive");
+  if (is_detach() && is_attach()) {
+    PERFETTO_ELOG("--attach and --detach are mutually exclusive");
     return 1;
-  }
-
-  if (attach_tsid_) {
-    if (has_config_options || !trace_config_raw.empty()) {
-      PERFETTO_ELOG("Cannot pass a config when using --attach");
-      return 1;
-    }
-    consumer_endpoint_ =
-      ConsumerIPCClient::Connect(GetConsumerSocket(), this, &task_runner_);
-    SetupCtrlCSignalHandler();
-    task_runner_.Run();
-    exit(0);
-  }
-
-  if (!trace_out_path_.empty() && !dropbox_tag_.empty()) {
-    PERFETTO_ELOG(
-        "Can't log to a file (--out) and DropBox (--dropbox) at the same "
-        "time");
-    return 1;
-  }
-
-  if (trace_out_path_.empty() && dropbox_tag_.empty()) {
-    return PrintUsage(argv[0]);
   }
 
   perfetto::protos::TraceConfig trace_config_proto;
-
-  bool parsed;
-  if (has_config_options) {
+  bool parsed = false;
+  if (is_attach()) {
+    if ((!trace_config_raw.empty() || has_config_options)) {
+      PERFETTO_ELOG("Cannot specify a trace config with --attach");
+      return 1;
+    }
+  } else if (has_config_options) {
     if (!trace_config_raw.empty()) {
       PERFETTO_ELOG(
           "Cannot specify both -c/--config and any of --time, --size, "
@@ -387,20 +382,42 @@ int PerfettoCmd::Main(int argc, char** argv) {
     }
   }
 
-  if (!parsed) {
+  if (parsed) {
+    *trace_config_proto.mutable_statsd_metadata() = std::move(statsd_metadata);
+    trace_config_.reset(new TraceConfig());
+    trace_config_->FromProto(trace_config_proto);
+    trace_config_raw.clear();
+  } else if (!is_attach()) {
     PERFETTO_ELOG("The trace config is invalid, bailing out.");
     return 1;
   }
 
-  *trace_config_proto.mutable_statsd_metadata() = std::move(statsd_metadata);
-  trace_config_.reset(new TraceConfig());
-  trace_config_->FromProto(trace_config_proto);
-  trace_config_raw.clear();
+  if (!trace_out_path_.empty() && !dropbox_tag_.empty()) {
+    PERFETTO_ELOG(
+        "Can't log to a file (--out) and DropBox (--dropbox) at the same "
+        "time");
+    return 1;
+  }
 
-  if (!OpenOutputFile())
+  bool open_out_file = true;
+  if (trace_out_path_.empty() && dropbox_tag_.empty()) {
+    // The only case where it is okay to not pass an output file is when
+    // detaching in ring-buffer mode (i.e. write_into_file = false).
+    if (is_detach() && !trace_config_->write_into_file()) {
+      open_out_file = false;
+    } else {
+      PERFETTO_ELOG("Either --out or --dropbox is required");
+      return 1;
+    }
+  }
+  if (open_out_file && !OpenOutputFile())
     return 1;
 
   if (background) {
+    if (is_detach()) {
+      PERFETTO_ELOG("--detach and --background are mutually exclusive");
+      return 1;
+    }
     pid_t pid;
     switch (pid = fork()) {
       case -1:
@@ -445,10 +462,11 @@ int PerfettoCmd::Main(int argc, char** argv) {
 }
 
 void PerfettoCmd::OnConnect() {
-  if (attach_tsid_) {
-    consumer_endpoint_->Attach(attach_tsid_);
+  if (is_attach()) {
+    consumer_endpoint_->Attach(attach_key_);
     return;
   }
+
   PERFETTO_LOG(
       "Connected to the Perfetto traced service, starting tracing for %d ms",
       trace_config_->duration_ms());
@@ -461,8 +479,8 @@ void PerfettoCmd::OnConnect() {
 
   consumer_endpoint_->EnableTracing(*trace_config_, std::move(optional_fd));
 
-  if (detach_) {
-    consumer_endpoint_->Detach();  // Will invoke OnDetach() soon.
+  if (is_detach()) {
+    consumer_endpoint_->Detach(detach_key_);  // Will invoke OnDetach() soon.
     return;
   }
 
@@ -608,14 +626,28 @@ void PerfettoCmd::SetupCtrlCSignalHandler() {
   });
 }
 
-void PerfettoCmd::OnDetach(TracingSessionID tsid) {
-  printf("%" PRIu64 "\n", tsid);
+void PerfettoCmd::OnDetach(bool success) {
+  if (!success) {
+    PERFETTO_ELOG("Session detach failed");
+    exit(1);
+  }
   exit(0);
 }
 
-void PerfettoCmd::OnAttach(bool success) {
-  if (!success)
-    PERFETTO_ELOG("Session re-attach failed");
+void PerfettoCmd::OnAttach(bool success, const TraceConfig& trace_config) {
+  if (!success) {
+    PERFETTO_ELOG("Session re-attach failed. Check service logs for details");
+    exit(1);
+  }
+
+  if (!trace_config.write_into_file() && !trace_out_stream_) {
+    PERFETTO_ELOG(
+        "Neither long-trace mode was enabled before detaching nor --out file "
+        "was specified when reattaching");
+    exit(1);
+  }
+
+  trace_config_.reset(new TraceConfig(trace_config));
 }
 
 int __attribute__((visibility("default")))

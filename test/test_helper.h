@@ -38,8 +38,8 @@ class TestHelper : public Consumer {
   void OnDisconnect() override;
   void OnTracingDisabled() override;
   void OnTraceData(std::vector<TracePacket> packets, bool has_more) override;
-  void OnDetach(TracingSessionID) override;
-  void OnAttach(bool) override;
+  void OnDetach(bool) override;
+  void OnAttach(bool, const TraceConfig&) override;
 
   void StartServiceIfRequired();
   FakeProducer* ConnectFakeProducer();

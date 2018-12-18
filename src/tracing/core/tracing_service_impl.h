@@ -24,6 +24,7 @@
 
 #include "perfetto/base/gtest_prod_util.h"
 #include "perfetto/base/logging.h"
+#include "perfetto/base/optional.h"
 #include "perfetto/base/time.h"
 #include "perfetto/base/weak_ptr.h"
 #include "perfetto/tracing/core/basic_types.h"
@@ -95,6 +96,13 @@ class TracingServiceImpl : public TracingService {
       return allowed_target_buffers_.count(buffer_id);
     }
 
+    base::Optional<BufferID> buffer_id_for_writer(WriterID writer_id) const {
+      const auto it = writers_.find(writer_id);
+      if (it != writers_.end())
+        return it->second;
+      return base::nullopt;
+    }
+
    private:
     friend class TracingServiceImpl;
     friend class TracingServiceImplTest;
@@ -116,6 +124,16 @@ class TracingServiceImpl : public TracingService {
     // Set of the global target_buffer IDs that the producer is configured to
     // write into in any active tracing session.
     std::set<BufferID> allowed_target_buffers_;
+
+    // Maps registered TraceWriter IDs to their target buffers as registered by
+    // the producer. Note that producers aren't required to register their
+    // writers, so we may see commits of chunks with WriterIDs that aren't
+    // contained in this map. However, if a producer does register a writer, the
+    // service will prevent the writer from writing into any other buffer than
+    // the one associated with it here. The BufferIDs stored in this map are
+    // untrusted, so need to be verified against |allowed_target_buffers_|
+    // before use.
+    std::map<WriterID, BufferID> writers_;
 
     // This is used only in in-process configurations (mostly tests).
     std::unique_ptr<SharedMemoryArbiterImpl> inproc_shmem_arbiter_;
@@ -142,8 +160,8 @@ class TracingServiceImpl : public TracingService {
     void ReadBuffers() override;
     void FreeBuffers() override;
     void Flush(uint32_t timeout_ms, FlushCallback) override;
-    void Detach() override;
-    void Attach(TracingSessionID) override;
+    void Detach(const std::string& key) override;
+    void Attach(const std::string& key) override;
 
    private:
     friend class TracingServiceImpl;
@@ -182,8 +200,8 @@ class TracingServiceImpl : public TracingService {
   void NotifyDataSourceStopped(ProducerID, const DataSourceInstanceID);
 
   // Called by ConsumerEndpointImpl.
-  TracingSessionID DetachConsumer(ConsumerEndpointImpl*);
-  bool AttachConsumer(ConsumerEndpointImpl*, TracingSessionID);
+  bool DetachConsumer(ConsumerEndpointImpl*, const std::string& key);
+  bool AttachConsumer(ConsumerEndpointImpl*, const std::string& key);
   void DisconnectConsumer(ConsumerEndpointImpl*);
   bool EnableTracing(ConsumerEndpointImpl*,
                      const TraceConfig&,
@@ -309,6 +327,10 @@ class TracingServiceImpl : public TracingService {
 
     State state = DISABLED;
 
+    // If the consumer detached the session, this variable defines the key used
+    // for identifying the session later when reattaching.
+    std::string attach_key;
+
     // This is set when the Consumer calls sets |write_into_file| == true in the
     // TraceConfig. In this case this represents the file we should stream the
     // trace packets into, rather than returning it to the consumer via
@@ -333,6 +355,10 @@ class TracingServiceImpl : public TracingService {
   // Returns a pointer to the |tracing_sessions_| entry or nullptr if the
   // session doesn't exists.
   TracingSession* GetTracingSession(TracingSessionID);
+
+  // Returns a pointer to the |tracing_sessions_| entry, matching the given
+  // uid and attach key.
+  TracingSession* GetDetachedSession(uid_t, const std::string& key);
 
   // Update the memory guard rail by using the latest information from the
   // shared memory and trace buffers.

@@ -160,11 +160,11 @@ class PERFETTO_EXPORT TracingService {
 
     virtual void FreeBuffers() = 0;
 
-    // Will call OnDetach(TracingSessionID).
-    virtual void Detach() = 0;
+    // Will call OnDetach().
+    virtual void Detach(const std::string& key) = 0;
 
     // Will call OnAttach().
-    virtual void Attach(TracingSessionID) = 0;
+    virtual void Attach(const std::string& key) = 0;
   };  // class ConsumerEndpoint.
 
   // Implemented in src/core/tracing_service_impl.cc .

@@ -142,7 +142,7 @@ std::function<void()> TestHelper::WrapTask(
   return [this, function] { task_runner_->PostTask(function); };
 }
 
-void TestHelper::OnDetach(TracingSessionID) {}
-void TestHelper::OnAttach(bool) {}
+void TestHelper::OnDetach(bool) {}
+void TestHelper::OnAttach(bool, const TraceConfig&) {}
 
 }  // namespace perfetto

@@ -219,8 +219,8 @@ void TracingServiceImpl::DisconnectConsumer(ConsumerEndpointImpl* consumer) {
 #endif
 }
 
-TracingSessionID TracingServiceImpl::DetachConsumer(
-    ConsumerEndpointImpl* consumer) {
+bool TracingServiceImpl::DetachConsumer(ConsumerEndpointImpl* consumer,
+                                        const std::string& key) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   PERFETTO_DLOG("Consumer %p detached", reinterpret_cast<void*>(consumer));
   PERFETTO_DCHECK(consumers_.count(consumer));
@@ -228,43 +228,43 @@ TracingSessionID TracingServiceImpl::DetachConsumer(
   TracingSessionID tsid = consumer->tracing_session_id_;
   TracingSession* tracing_session;
   if (!tsid || !(tracing_session = GetTracingSession(tsid)))
-    return 0;
+    return false;
+
+  if (GetDetachedSession(consumer->uid_, key)) {
+    PERFETTO_ELOG("Another session has been detached with the same key \"%s\"",
+                  key.c_str());
+    return false;
+  }
 
   PERFETTO_DCHECK(tracing_session->consumer_maybe_null == consumer);
   tracing_session->consumer_maybe_null = nullptr;
+  tracing_session->attach_key = key;
   consumer->tracing_session_id_ = 0;
-  return tsid;
+  return true;
 }
 
 bool TracingServiceImpl::AttachConsumer(ConsumerEndpointImpl* consumer,
-                                        TracingSessionID tsid) {
+                                        const std::string& key) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  PERFETTO_DLOG("Consumer %p attaching to session %" PRIu64,
-                reinterpret_cast<void*>(consumer), tsid);
+  PERFETTO_DLOG("Consumer %p attaching to session %s",
+                reinterpret_cast<void*>(consumer), key.c_str());
   PERFETTO_DCHECK(consumers_.count(consumer));
 
   if (consumer->tracing_session_id_) {
-    PERFETTO_ELOG("Cannot reattach consumer to session %" PRIu64
-                  " while it already owns tracing session %" PRIu64,
-                  tsid, consumer->tracing_session_id_);
+    PERFETTO_ELOG(
+        "Cannot reattach consumer to session %s"
+        " while it already attached tracing session ID %" PRIu64,
+        key.c_str(), consumer->tracing_session_id_);
     return false;
   }
 
-  auto* tracing_session = GetTracingSession(tsid);
+  auto* tracing_session = GetDetachedSession(consumer->uid_, key);
   if (!tracing_session)
     return false;
 
-  if (tracing_session->consumer_uid != consumer->uid_) {
-    PERFETTO_ELOG(
-        "Consumer is trying to reattach to a session with a different UID "
-        "(session uid: %d, consumer uid: %d)",
-        static_cast<int>(tracing_session->consumer_uid),
-        static_cast<int>(consumer->uid_));
-    return false;
-  }
-
+  consumer->tracing_session_id_ = tracing_session->id;
   tracing_session->consumer_maybe_null = consumer;
-  consumer->tracing_session_id_ = tsid;
+  tracing_session->attach_key.clear();
   return true;
 }
 
@@ -1194,6 +1194,20 @@ void TracingServiceImpl::CopyProducerPageIntoLogBuffer(
     PERFETTO_ELOG("Producer %" PRIu16
                   " tried to write into forbidden target buffer %" PRIu16,
                   producer_id_trusted, buffer_id);
+    PERFETTO_DFATAL("Forbidden target buffer");
+    return;
+  }
+
+  // If the writer was registered by the producer, it should only write into the
+  // buffer it was registered with.
+  base::Optional<BufferID> associated_buffer =
+      producer->buffer_id_for_writer(writer_id);
+  if (associated_buffer && *associated_buffer != buffer_id) {
+    PERFETTO_ELOG("Writer %" PRIu16 " of producer %" PRIu16
+                  " was registered to write into target buffer %" PRIu16
+                  ", but tried to write into buffer %" PRIu16,
+                  writer_id, producer_id_trusted, *associated_buffer,
+                  buffer_id);
     PERFETTO_DCHECK(false);
     return;
   }
@@ -1246,6 +1260,20 @@ void TracingServiceImpl::ApplyChunkPatches(
     buf->TryPatchChunkContents(producer_id_trusted, writer_id, chunk_id,
                                &patches[0], i, chunk.has_more_patches());
   }
+}
+
+TracingServiceImpl::TracingSession* TracingServiceImpl::GetDetachedSession(
+    uid_t uid,
+    const std::string& key) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  for (auto& kv : tracing_sessions_) {
+    TracingSession* session = &kv.second;
+    if (session->consumer_uid == uid && session->attach_key == key) {
+      PERFETTO_DCHECK(session->consumer_maybe_null == nullptr);
+      return session;
+    }
+  }
+  return nullptr;
 }
 
 TracingServiceImpl::TracingSession* TracingServiceImpl::GetTracingSession(
@@ -1515,23 +1543,33 @@ void TracingServiceImpl::ConsumerEndpointImpl::Flush(uint32_t timeout_ms,
   service_->Flush(tracing_session_id_, timeout_ms, callback);
 }
 
-void TracingServiceImpl::ConsumerEndpointImpl::Detach() {
+void TracingServiceImpl::ConsumerEndpointImpl::Detach(const std::string& key) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  TracingSessionID tsid = service_->DetachConsumer(this);
-  auto weak_this = GetWeakPtr();
-  task_runner_->PostTask([weak_this, tsid] {
-    if (weak_this)
-      weak_this->consumer_->OnDetach(tsid);
-  });
-}
-
-void TracingServiceImpl::ConsumerEndpointImpl::Attach(TracingSessionID tsid) {
-  PERFETTO_DCHECK_THREAD(thread_checker_);
-  bool success = service_->AttachConsumer(this, tsid);
+  bool success = service_->DetachConsumer(this, key);
   auto weak_this = GetWeakPtr();
   task_runner_->PostTask([weak_this, success] {
     if (weak_this)
-      weak_this->consumer_->OnAttach(success);
+      weak_this->consumer_->OnDetach(success);
+  });
+}
+
+void TracingServiceImpl::ConsumerEndpointImpl::Attach(const std::string& key) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  bool success = service_->AttachConsumer(this, key);
+  auto weak_this = GetWeakPtr();
+  task_runner_->PostTask([weak_this, success] {
+    if (!weak_this)
+      return;
+    Consumer* consumer = weak_this->consumer_;
+    TracingSession* session =
+        weak_this->service_->GetTracingSession(weak_this->tracing_session_id_);
+    if (!session) {
+      consumer->OnAttach(success, TraceConfig());
+      return;
+    }
+    consumer->OnAttach(success, session->config);
+    if (session->state == TracingSession::State::DISABLED)
+      consumer->OnTracingDisabled();
   });
 }
 
@@ -1583,17 +1621,19 @@ void TracingServiceImpl::ProducerEndpointImpl::UnregisterDataSource(
 }
 
 void TracingServiceImpl::ProducerEndpointImpl::RegisterTraceWriter(
-    uint32_t /*writer_id*/,
-    uint32_t /*target_buffer*/) {
+    uint32_t writer_id,
+    uint32_t target_buffer) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  // TODO(eseckler): Store association into a map. Make sure to verify that the
-  // target buffer is "allowed" when using this association later.
+  PERFETTO_DCHECK(!buffer_id_for_writer(static_cast<WriterID>(writer_id)));
+  writers_[static_cast<WriterID>(writer_id)] =
+      static_cast<BufferID>(target_buffer);
 }
 
 void TracingServiceImpl::ProducerEndpointImpl::UnregisterTraceWriter(
-    uint32_t /*writer_id*/) {
+    uint32_t writer_id) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  // TODO(eseckler): Remove association from the map.
+  PERFETTO_DCHECK(buffer_id_for_writer(static_cast<WriterID>(writer_id)));
+  writers_.erase(static_cast<WriterID>(writer_id));
 }
 
 void TracingServiceImpl::ProducerEndpointImpl::CommitData(

@@ -54,6 +54,18 @@ ConsumerIPCClientImpl::~ConsumerIPCClientImpl() = default;
 // Called by the IPC layer if the BindService() succeeds.
 void ConsumerIPCClientImpl::OnConnect() {
   connected_ = true;
+
+  // Bind the ObserveState response to receive updates on the tracing session
+  ipc::Deferred<protos::ObserveStateResponse> async_response;
+  auto weak_this = weak_ptr_factory_.GetWeakPtr();
+  async_response.Bind(
+      [weak_this](ipc::AsyncResult<protos::ObserveStateResponse> response) {
+        if (weak_this)
+          weak_this->OnObserveStateResponse(std::move(response));
+      });
+  protos::ObserveStateRequest req;
+  consumer_port_.ObserveState(req, std::move(async_response));
+
   consumer_->OnConnect();
 }
 
@@ -61,6 +73,17 @@ void ConsumerIPCClientImpl::OnDisconnect() {
   PERFETTO_DLOG("Tracing service connection failure");
   connected_ = false;
   consumer_->OnDisconnect();
+}
+
+void ConsumerIPCClientImpl::OnObserveStateResponse(
+    ipc::AsyncResult<protos::ObserveStateResponse> resp) {
+  if (!resp)
+    return;
+  switch (resp->new_state()) {
+    case protos::ObserveStateResponse_State_DISABLED:
+      consumer_->OnTracingDisabled();
+      break;
+  }
 }
 
 void ConsumerIPCClientImpl::EnableTracing(const TraceConfig& trace_config,
@@ -188,39 +211,47 @@ void ConsumerIPCClientImpl::Flush(uint32_t timeout_ms, FlushCallback callback) {
   consumer_port_.Flush(req, std::move(async_response));
 }
 
-void ConsumerIPCClientImpl::Detach() {
+void ConsumerIPCClientImpl::Detach(const std::string& key) {
   if (!connected_) {
     PERFETTO_DLOG("Cannot Detach(), not connected to tracing service");
     return;
   }
 
   protos::DetachRequest req;
+  req.set_key(key);
   ipc::Deferred<protos::DetachResponse> async_response;
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
 
   async_response.Bind(
       [weak_this](ipc::AsyncResult<protos::DetachResponse> response) {
         if (weak_this)
-          weak_this->consumer_->OnDetach(response ? response->session_id() : 0);
+          weak_this->consumer_->OnDetach(!!response);
       });
   consumer_port_.Detach(req, std::move(async_response));
 }
 
-void ConsumerIPCClientImpl::Attach(TracingSessionID tsid) {
+void ConsumerIPCClientImpl::Attach(const std::string& key) {
   if (!connected_) {
     PERFETTO_DLOG("Cannot Attach(), not connected to tracing service");
     return;
   }
 
   protos::AttachRequest req;
-  req.set_session_id(tsid);
+  req.set_key(key);
   ipc::Deferred<protos::AttachResponse> async_response;
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
 
   async_response.Bind(
       [weak_this](ipc::AsyncResult<protos::AttachResponse> response) {
-        if (weak_this)
-          weak_this->consumer_->OnAttach(!!response);
+        if (!weak_this)
+          return;
+        TraceConfig trace_config;
+        if (!response) {
+          weak_this->consumer_->OnAttach(/*success=*/false, trace_config);
+          return;
+        }
+        trace_config.FromProto(response->trace_config());
+        weak_this->consumer_->OnAttach(/*success=*/true, trace_config);
       });
   consumer_port_.Attach(req, std::move(async_response));
 }
