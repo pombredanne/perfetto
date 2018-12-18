@@ -44,7 +44,9 @@ TEST(PagedMemoryTest, Basic) {
     for (size_t i = 0; i < kSize / sizeof(uint64_t); i++)
       ASSERT_EQ(0u, *(reinterpret_cast<uint64_t*>(mem.Get()) + i));
 
+#if !PERFETTO_BUILDFLAG(PERFETTO_OS_FUCHSIA)
     ASSERT_TRUE(vm_test_utils::IsMapped(ptr_raw, kSize));
+#endif
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
     PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
@@ -90,7 +92,12 @@ TEST(PagedMemoryTest, Uncommitted) {
          i < kSize / sizeof(uint64_t); i++) {
       ASSERT_EQ(0u, *(reinterpret_cast<uint64_t*>(mem.Get()) + i));
     }
-#elif !PERFETTO_BUILDFLAG(PERFETTO_OS_FUCHSIA)
+#elif PERFETTO_BUILDFLAG(PERFETTO_OS_FUCHSIA)
+    // Fuchsia doesn't yet support paging. So this should be a no-op.
+    mem.EnsureCommitted(kSize);
+    for (size_t i = 0; i < kSize / sizeof(uint64_t); i++)
+      ASSERT_EQ(0u, *(reinterpret_cast<uint64_t*>(mem.Get()) + i));
+#else
     // Linux only maps on access.
     ASSERT_FALSE(vm_test_utils::IsMapped(ptr_raw, kSize));
 
@@ -100,8 +107,8 @@ TEST(PagedMemoryTest, Uncommitted) {
 
     for (size_t i = 0; i < kSize / sizeof(uint64_t); i++)
       ASSERT_EQ(0u, *(reinterpret_cast<uint64_t*>(mem.Get()) + i));
-#endif
     ASSERT_TRUE(vm_test_utils::IsMapped(ptr_raw, kSize));
+#endif
   }
 
 #if !PERFETTO_BUILDFLAG(PERFETTO_OS_FUCHSIA)
@@ -140,6 +147,7 @@ TEST(PagedMemoryTest, GuardRegions) {
 
 // Disable this on:
 // MacOS: because it doesn't seem to have an equivalent rlimit to bound mmap().
+// Fuchsia: doesn't support rlimit.
 // Sanitizers: they seem to try to shadow mmaped memory and fail due to OOMs.
 #if !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX) &&                                 \
     !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN) &&                                    \

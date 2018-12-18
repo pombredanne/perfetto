@@ -28,8 +28,7 @@ namespace base {
 class TempFile {
  public:
   static TempFile CreateUnlinked();
-  // |flags| are not supported on Android < API 23.
-  static TempFile Create(int flags = O_EXCL);
+  static TempFile Create();
 
   TempFile(TempFile&&) noexcept;
   TempFile& operator=(TempFile&&);

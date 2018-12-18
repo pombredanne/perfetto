@@ -341,7 +341,7 @@ TEST_F(TracingServiceImplTest, WriteIntoFileAndStopOnMaxSize) {
   trace_config.set_file_write_period_ms(100000);  // 100s
   const uint64_t kMaxFileSize = 1024;
   trace_config.set_max_file_size_bytes(kMaxFileSize);
-  base::TempFile tmp_file = base::TempFile::Create(O_SYNC | O_EXCL);
+  base::TempFile tmp_file = base::TempFile::Create();
   consumer->EnableTracing(trace_config, base::ScopedFile(dup(tmp_file.fd())));
 
   producer->WaitForTracingSetup();
@@ -377,6 +377,13 @@ TEST_F(TracingServiceImplTest, WriteIntoFileAndStopOnMaxSize) {
   consumer->DisableTracing();
   producer->WaitForDataSourceStop("data_source");
   consumer->WaitForTracingDisabled();
+
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_FUCHSIA)
+  // On Fuchsia, writing to the file seems to happen concurrently to the read
+  // below, which can cause flakiness. Flush forcefully to ensure all data was
+  // written.
+  fsync(*tmp_file);
+#endif  // PERFETTO_BUILDFLAG(PERFETTO_OS_FUCHSIA)
 
   // Verify the contents of the file.
   std::string trace_raw;

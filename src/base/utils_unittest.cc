@@ -102,7 +102,7 @@ TEST(UtilsTest, EintrWrapper) {
   // Restore the old handler.
   sigaction(SIGUSR2, &old_sa, nullptr);
 }
-#endif
+#endif  // !PERFETTO_BUILDFLAG(PERFETTO_OS_FUCHSIA)
 
 TEST(UtilsTest, Align) {
   EXPECT_EQ(0u, AlignUp<4>(0));
