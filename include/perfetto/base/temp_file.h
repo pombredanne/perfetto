@@ -17,7 +17,6 @@
 #ifndef INCLUDE_PERFETTO_BASE_TEMP_FILE_H_
 #define INCLUDE_PERFETTO_BASE_TEMP_FILE_H_
 
-#include <stdlib.h>
 #include <string>
 
 #include "perfetto/base/scoped_file.h"
