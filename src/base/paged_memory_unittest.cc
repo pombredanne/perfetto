@@ -23,7 +23,8 @@
 #include "src/base/test/vm_test_utils.h"
 
 #if !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX) && \
-    !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+    !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN) &&    \
+    !PERFETTO_BUILDFLAG(PERFETTO_OS_FUCHSIA)
 #include <sys/resource.h>
 #endif
 
@@ -54,8 +55,10 @@ TEST(PagedMemoryTest, Basic) {
 #endif
   }
 
+#if !PERFETTO_BUILDFLAG(PERFETTO_OS_FUCHSIA)
   // Freed memory is necessarily not mapped in to the process.
   ASSERT_FALSE(vm_test_utils::IsMapped(ptr_raw, kSize));
+#endif
 }
 
 TEST(PagedMemoryTest, Uncommitted) {
@@ -87,9 +90,7 @@ TEST(PagedMemoryTest, Uncommitted) {
          i < kSize / sizeof(uint64_t); i++) {
       ASSERT_EQ(0u, *(reinterpret_cast<uint64_t*>(mem.Get()) + i));
     }
-
-    ASSERT_TRUE(vm_test_utils::IsMapped(ptr_raw, kSize));
-#else
+#elif !PERFETTO_BUILDFLAG(PERFETTO_OS_FUCHSIA)
     // Linux only maps on access.
     ASSERT_FALSE(vm_test_utils::IsMapped(ptr_raw, kSize));
 
@@ -99,12 +100,14 @@ TEST(PagedMemoryTest, Uncommitted) {
 
     for (size_t i = 0; i < kSize / sizeof(uint64_t); i++)
       ASSERT_EQ(0u, *(reinterpret_cast<uint64_t*>(mem.Get()) + i));
-    ASSERT_TRUE(vm_test_utils::IsMapped(ptr_raw, kSize));
 #endif
+    ASSERT_TRUE(vm_test_utils::IsMapped(ptr_raw, kSize));
   }
 
+#if !PERFETTO_BUILDFLAG(PERFETTO_OS_FUCHSIA)
   // Freed memory is necessarily not mapped in to the process.
   ASSERT_FALSE(vm_test_utils::IsMapped(ptr_raw, kSize));
+#endif
 }
 
 #if defined(ADDRESS_SANITIZER)
@@ -138,9 +141,10 @@ TEST(PagedMemoryTest, GuardRegions) {
 // Disable this on:
 // MacOS: because it doesn't seem to have an equivalent rlimit to bound mmap().
 // Sanitizers: they seem to try to shadow mmaped memory and fail due to OOMs.
-#if !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX) &&                             \
-    !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN) && !defined(ADDRESS_SANITIZER) && \
-    !defined(LEAK_SANITIZER) && !defined(THREAD_SANITIZER) &&              \
+#if !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX) &&                                 \
+    !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN) &&                                    \
+    !PERFETTO_BUILDFLAG(PERFETTO_OS_FUCHSIA) && !defined(ADDRESS_SANITIZER) && \
+    !defined(LEAK_SANITIZER) && !defined(THREAD_SANITIZER) &&                  \
     !defined(MEMORY_SANITIZER)
 // Glibc headers hit this on RLIMIT_ macros.
 #pragma GCC diagnostic push

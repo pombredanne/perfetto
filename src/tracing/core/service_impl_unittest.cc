@@ -341,7 +341,7 @@ TEST_F(TracingServiceImplTest, WriteIntoFileAndStopOnMaxSize) {
   trace_config.set_file_write_period_ms(100000);  // 100s
   const uint64_t kMaxFileSize = 1024;
   trace_config.set_max_file_size_bytes(kMaxFileSize);
-  base::TempFile tmp_file = base::TempFile::Create();
+  base::TempFile tmp_file = base::TempFile::Create(O_SYNC | O_EXCL);
   consumer->EnableTracing(trace_config, base::ScopedFile(dup(tmp_file.fd())));
 
   producer->WaitForTracingSetup();

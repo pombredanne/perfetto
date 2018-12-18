@@ -30,11 +30,11 @@ constexpr char kSysTmpPath[] = "/tmp";
 }  // namespace
 
 // static
-TempFile TempFile::Create() {
+TempFile TempFile::Create(int flags) {
   TempFile temp_file;
   temp_file.path_.assign(kSysTmpPath);
   temp_file.path_.append("/perfetto-XXXXXXXX");
-  temp_file.fd_.reset(mkstemp(&temp_file.path_[0]));
+  temp_file.fd_.reset(mkostemp(&temp_file.path_[0], flags));
   PERFETTO_CHECK(temp_file.fd_);
   return temp_file;
 }

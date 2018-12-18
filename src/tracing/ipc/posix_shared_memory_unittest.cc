@@ -52,7 +52,9 @@ TEST(PosixSharedMemoryTest, DestructorUnmapsMemory) {
   ASSERT_TRUE(base::vm_test_utils::IsMapped(shm_start, shm_size));
 
   shm.reset();
+#if !PERFETTO_BUILDFLAG(PERFETTO_OS_FUCHSIA)
   ASSERT_FALSE(base::vm_test_utils::IsMapped(shm_start, shm_size));
+#endif
 }
 
 TEST(PosixSharedMemoryTest, DestructorClosesFD) {
@@ -84,7 +86,9 @@ TEST(PosixSharedMemoryTest, AttachToFd) {
 
   shm.reset();
   ASSERT_TRUE(IsFileDescriptorClosed(fd_num));
+#if !PERFETTO_BUILDFLAG(PERFETTO_OS_FUCHSIA)
   ASSERT_FALSE(base::vm_test_utils::IsMapped(shm_start, shm_size));
+#endif
 }
 
 }  // namespace

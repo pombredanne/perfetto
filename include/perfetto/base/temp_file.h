@@ -17,6 +17,7 @@
 #ifndef INCLUDE_PERFETTO_BASE_TEMP_FILE_H_
 #define INCLUDE_PERFETTO_BASE_TEMP_FILE_H_
 
+#include <stdlib.h>
 #include <string>
 
 #include "perfetto/base/scoped_file.h"
@@ -27,7 +28,7 @@ namespace base {
 class TempFile {
  public:
   static TempFile CreateUnlinked();
-  static TempFile Create();
+  static TempFile Create(int flags = O_EXCL);
 
   TempFile(TempFile&&) noexcept;
   TempFile& operator=(TempFile&&);

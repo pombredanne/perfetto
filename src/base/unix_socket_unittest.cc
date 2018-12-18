@@ -418,8 +418,9 @@ TEST_F(UnixSocketTest, PeerCredentialsRetainedAfterDisconnect) {
           [&srv_client_conn, srv_connected](UnixSocket*, UnixSocket* srv_conn) {
             srv_client_conn = srv_conn;
             EXPECT_EQ(geteuid(), static_cast<uint32_t>(srv_conn->peer_uid()));
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
-    PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) ||   \
+    PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID) || \
+    PERFETTO_BUILDFLAG(PERFETTO_OS_FUCHSIA)
             EXPECT_EQ(getpid(), static_cast<uint32_t>(srv_conn->peer_pid()));
 #endif
             srv_connected();
@@ -448,8 +449,9 @@ TEST_F(UnixSocketTest, PeerCredentialsRetainedAfterDisconnect) {
   task_runner_.RunUntilCheckpoint("cli_disconnected");
   ASSERT_FALSE(srv_client_conn->is_connected());
   EXPECT_EQ(geteuid(), static_cast<uint32_t>(srv_client_conn->peer_uid()));
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
-    PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) ||   \
+    PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID) || \
+    PERFETTO_BUILDFLAG(PERFETTO_OS_FUCHSIA)
   EXPECT_EQ(getpid(), static_cast<uint32_t>(srv_client_conn->peer_pid()));
 #endif
 }

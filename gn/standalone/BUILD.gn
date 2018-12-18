@@ -13,8 +13,8 @@
 # limitations under the License.
 
 import("//gn/standalone/android.gni")
-import("//gn/standalone/wasm.gni")
 import("//gn/standalone/sanitizers/sanitizers.gni")
+import("//gn/standalone/wasm.gni")
 
 config("extra_warnings") {
   cflags = [
@@ -110,7 +110,7 @@ config("default") {
     cflags += [ "-fno-omit-frame-pointer" ]
   }
 
-  if (is_linux) {
+  if (is_linux || is_fuchsia) {
     libs += [
       "pthread",
       "rt",
@@ -179,7 +179,7 @@ config("default") {
 
 config("debug_symbols") {
   cflags = [ "-O0" ]
-  if (is_android || is_linux) {
+  if (is_android || is_linux || is_fuchsia) {
     cflags += [ "-funwind-tables" ]
   }
 }
@@ -210,7 +210,7 @@ config("release") {
 }
 
 config("shared_library") {
-  if (is_android || is_linux) {
+  if (is_android || is_linux || is_fuchsia) {
     ldflags = [ "-fPIC" ]
   }
 }

@@ -37,7 +37,8 @@ namespace base {
 inline pid_t GetThreadId() {
   return gettid();
 }
-#elif PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX)
+#elif PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
+    PERFETTO_BUILDFLAG(PERFETTO_OS_FUCHSIA)
 inline pid_t GetThreadId() {
   return static_cast<pid_t>(syscall(__NR_gettid));
 }

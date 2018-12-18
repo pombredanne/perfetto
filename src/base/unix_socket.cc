@@ -388,8 +388,9 @@ void UnixSocket::DoConnect(const std::string& socket_name) {
 }
 
 void UnixSocket::ReadPeerCredentials() {
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
-    PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) ||   \
+    PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID) || \
+    PERFETTO_BUILDFLAG(PERFETTO_OS_FUCHSIA)
   struct ucred user_cred;
   socklen_t len = sizeof(user_cred);
   int res = getsockopt(*fd_, SOL_SOCKET, SO_PEERCRED, &user_cred, &len);

@@ -223,8 +223,9 @@ void CpuReader::RunWorkerThread(size_t cpu,
 // Before attempting any changes to this function, think twice. The kernel
 // ftrace pipe code is full of caveats and bugs. This code carefully works
 // around those bugs. See b/120188810 and b/119805587 for the full narrative.
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
-    PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) ||   \
+    PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID) || \
+    PERFETTO_BUILDFLAG(PERFETTO_OS_FUCHSIA)
   char thread_name[16];
   snprintf(thread_name, sizeof(thread_name), "traced_probes%zu", cpu);
   pthread_setname_np(pthread_self(), thread_name);
