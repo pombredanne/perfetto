@@ -25,6 +25,7 @@
 #include <unistd.h>
 #else
 #include <corecrt_io.h>
+#include <io.h>
 #endif
 
 namespace perfetto {
