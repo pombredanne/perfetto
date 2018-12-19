@@ -108,7 +108,7 @@ bool LazyProducers::SetAndroidProperty(const std::string& name,
 std::string LazyProducers::GetAndroidProperty(const std::string& name) {
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
   std::string value;
-  const prop_info* pi = __system_property_find(name);
+  const prop_info* pi = __system_property_find(name.c_str());
   if (pi) {
     __system_property_read_callback(
         pi,
