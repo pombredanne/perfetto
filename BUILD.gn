@@ -141,6 +141,7 @@ if (perfetto_build_standalone || perfetto_build_with_android) {
     testonly = true
     deps = [
       ":perfetto_unittests_sources",
+      "gn:default_deps",
     ]
   }
 
