@@ -38,6 +38,7 @@ bool ReadFile(const std::string& path, std::string* out);
 //   succeeds, and returns the number of bytes written.
 ssize_t WriteAll(int fd, const void* buf, size_t count);
 
+// Not supported on Windows.
 bool FlushFile(int fd);
 
 }  // namespace base

@@ -84,6 +84,9 @@ bool FlushFile(int fd) {
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
     PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
   return !PERFETTO_EINTR(fdatasync(fd));
+#elif PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+  // TODO(eseckler): Support file flushing on win.
+  return false;
 #else
   return !PERFETTO_EINTR(fsync(fd));
 #endif
