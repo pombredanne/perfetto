@@ -14,29 +14,22 @@
  * limitations under the License.
  */
 
-#include "src/trace_processor/storage_cursor.h"
+#ifndef TOOLS_FTRACE_PROTO_GEN_FTRACE_DESCRIPTOR_GEN_H_
+#define TOOLS_FTRACE_PROTO_GEN_FTRACE_DESCRIPTOR_GEN_H_
+
+#include <google/protobuf/descriptor.h>
+#include <google/protobuf/descriptor.pb.h>
+
+#include "perfetto/base/logging.h"
+#include "tools/ftrace_proto_gen/ftrace_proto_gen.h"
 
 namespace perfetto {
-namespace trace_processor {
 
-StorageCursor::StorageCursor(std::unique_ptr<RowIterator> iterator,
-                             std::vector<std::unique_ptr<StorageColumn>>* cols)
-    : iterator_(std::move(iterator)), columns_(std::move(cols)) {}
+// Uses the ftrace event descriptor file to generate a
+// file with just the names and field types for each ftrace event.
+void GenerateFtraceDescriptors(
+    const google::protobuf::DescriptorPool& descriptor_pool,
+    std::ostream* fout);
 
-int StorageCursor::Next() {
-  iterator_->NextRow();
-  return SQLITE_OK;
-}
-
-int StorageCursor::Eof() {
-  return iterator_->IsEnd();
-}
-
-int StorageCursor::Column(sqlite3_context* context, int raw_col) {
-  size_t column = static_cast<size_t>(raw_col);
-  (*columns_)[column]->ReportResult(context, iterator_->Row());
-  return SQLITE_OK;
-}
-
-}  // namespace trace_processor
 }  // namespace perfetto
+#endif  // TOOLS_FTRACE_PROTO_GEN_FTRACE_DESCRIPTOR_GEN_H_

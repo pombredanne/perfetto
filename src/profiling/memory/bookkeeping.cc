@@ -200,7 +200,7 @@ void GlobalCallstackTrie::DecrementNode(Node* node) {
 Interner<Frame>::Interned GlobalCallstackTrie::InternCodeLocation(
     const unwindstack::FrameData& loc) {
   Mapping map{};
-  map.offset = loc.map_offset;
+  map.offset = loc.map_elf_start_offset;
   map.start = loc.map_start;
   map.end = loc.map_end;
   map.load_bias = loc.map_load_bias;
@@ -330,6 +330,7 @@ void BookkeepingThread::HandleBookkeepingRecord(BookkeepingRecord* rec) {
         it = bookkeeping_data_.erase(it);
       }
     }
+    trace_packet->Finalize();
     dump_rec.callback();
   } else if (rec->record_type == BookkeepingRecord::Type::Free) {
     FreeRecord& free_rec = rec->free_record;

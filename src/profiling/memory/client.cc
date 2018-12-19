@@ -36,6 +36,7 @@
 
 #include "perfetto/base/logging.h"
 #include "perfetto/base/scoped_file.h"
+#include "perfetto/base/thread_utils.h"
 #include "perfetto/base/unix_socket.h"
 #include "perfetto/base/utils.h"
 #include "src/profiling/memory/sampler.h"
@@ -46,13 +47,7 @@ namespace profiling {
 namespace {
 
 constexpr struct timeval kSendTimeout = {1 /* s */, 0 /* us */};
-
-#if !PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
-// glibc does not define a wrapper around gettid, bionic does.
-pid_t gettid() {
-  return static_cast<pid_t>(syscall(__NR_gettid));
-}
-#endif
+constexpr std::chrono::seconds kLockTimeout{1};
 
 std::vector<base::ScopedFile> ConnectPool(const std::string& sock_name,
                                           size_t n) {
@@ -81,7 +76,7 @@ std::vector<base::ScopedFile> ConnectPool(const std::string& sock_name,
 }
 
 inline bool IsMainThread() {
-  return getpid() == gettid();
+  return getpid() == base::GetThreadId();
 }
 
 // TODO(b/117203899): Remove this after making bionic implementation safe to
@@ -107,38 +102,46 @@ char* FindMainThreadStack() {
 
 }  // namespace
 
-void FreePage::Add(const uint64_t addr,
+bool FreePage::Add(const uint64_t addr,
                    const uint64_t sequence_number,
                    SocketPool* pool) {
-  std::lock_guard<std::mutex> l(mutex_);
+  std::unique_lock<std::timed_mutex> l(mutex_, kLockTimeout);
+  if (!l.owns_lock())
+    return false;
   if (offset_ == kFreePageSize) {
-    FlushLocked(pool);
+    bool success = FlushLocked(pool);
     // Now that we have flushed, reset to after the header.
     offset_ = 0;
+    return success;
   }
   FreePageEntry& current_entry = free_page_.entries[offset_++];
   current_entry.sequence_number = sequence_number;
   current_entry.addr = addr;
+  return true;
 }
 
-void FreePage::FlushLocked(SocketPool* pool) {
+bool FreePage::FlushLocked(SocketPool* pool) {
   WireMessage msg = {};
   msg.record_type = RecordType::Free;
   free_page_.num_entries = offset_;
   msg.free_header = &free_page_;
   BorrowedSocket fd(pool->Borrow());
   if (!fd || !SendWireMessage(*fd, msg)) {
-    PERFETTO_DFATAL("Failed to send wire message");
+    PERFETTO_ELOG("Failed to send wire message");
     fd.Close();
+    return false;
   }
+  return true;
 }
 
 SocketPool::SocketPool(std::vector<base::ScopedFile> sockets)
     : sockets_(std::move(sockets)), available_sockets_(sockets_.size()) {}
 
 BorrowedSocket SocketPool::Borrow() {
-  std::unique_lock<std::mutex> lck_(mutex_);
-  cv_.wait(lck_, [this] {
+  std::unique_lock<std::timed_mutex> l(mutex_, kLockTimeout);
+  if (!l.owns_lock())
+    return {base::ScopedFile(), nullptr};
+  cv_.wait(l, [this] {
     return available_sockets_ > 0 || dead_sockets_ == sockets_.size() ||
            shutdown_;
   });
@@ -152,17 +155,19 @@ BorrowedSocket SocketPool::Borrow() {
 }
 
 void SocketPool::Return(base::ScopedFile sock) {
-  std::unique_lock<std::mutex> lck_(mutex_);
+  std::unique_lock<std::timed_mutex> l(mutex_, kLockTimeout);
+  if (!l.owns_lock())
+    return;
   PERFETTO_CHECK(dead_sockets_ + available_sockets_ < sockets_.size());
   if (sock && !shutdown_) {
     PERFETTO_CHECK(available_sockets_ < sockets_.size());
     sockets_[available_sockets_++] = std::move(sock);
-    lck_.unlock();
+    l.unlock();
     cv_.notify_one();
   } else {
     dead_sockets_++;
     if (dead_sockets_ == sockets_.size()) {
-      lck_.unlock();
+      l.unlock();
       cv_.notify_all();
     }
   }
@@ -170,7 +175,9 @@ void SocketPool::Return(base::ScopedFile sock) {
 
 void SocketPool::Shutdown() {
   {
-    std::lock_guard<std::mutex> l(mutex_);
+    std::unique_lock<std::timed_mutex> l(mutex_, kLockTimeout);
+    if (!l.owns_lock())
+      return;
     for (size_t i = 0; i < available_sockets_; ++i)
       sockets_[i].reset();
     dead_sockets_ += available_sockets_;
@@ -291,15 +298,18 @@ void Client::RecordMalloc(uint64_t alloc_size,
   if (!fd || !SendWireMessage(*fd, msg)) {
     PERFETTO_DFATAL("Failed to send wire message.");
     fd.Close();
+    Shutdown();
   }
 }
 
 void Client::RecordFree(uint64_t alloc_address) {
   if (!inited_.load(std::memory_order_acquire))
     return;
-  free_page_.Add(alloc_address,
-                 1 + sequence_number_.fetch_add(1, std::memory_order_acq_rel),
-                 &socket_pool_);
+  if (!free_page_.Add(
+          alloc_address,
+          1 + sequence_number_.fetch_add(1, std::memory_order_acq_rel),
+          &socket_pool_))
+    Shutdown();
 }
 
 size_t Client::ShouldSampleAlloc(uint64_t alloc_size,

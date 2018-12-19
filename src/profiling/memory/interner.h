@@ -18,6 +18,7 @@
 #define SRC_PROFILING_MEMORY_INTERNER_H_
 
 #include <stddef.h>
+#include <stdint.h>
 #include <set>
 
 #include "perfetto/base/logging.h"
@@ -101,7 +102,7 @@ class Interner {
     if (--entry->ref_count == 0)
       entries_.erase(*entry);
   }
-  uint64_t next_id = 0;
+  uint64_t next_id = 1;
   std::set<Entry> entries_;
   static_assert(sizeof(Interned) == sizeof(void*),
                 "interned things should be small");
