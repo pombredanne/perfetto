@@ -25,7 +25,6 @@
 #include <unistd.h>
 #else
 #include <corecrt_io.h>
-#include <windows.h>
 #endif
 
 namespace perfetto {
@@ -85,8 +84,6 @@ bool FlushFile(int fd) {
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
     PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
   return !PERFETTO_EINTR(fdatasync(fd));
-#elif PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
-  return ::FlushFileBuffers(fd) != FALSE;
 #else
   return !PERFETTO_EINTR(fsync(fd));
 #endif
