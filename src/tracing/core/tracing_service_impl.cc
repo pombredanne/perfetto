@@ -260,8 +260,12 @@ bool TracingServiceImpl::AttachConsumer(ConsumerEndpointImpl* consumer,
   }
 
   auto* tracing_session = GetDetachedSession(consumer->uid_, key);
-  if (!tracing_session)
+  if (!tracing_session) {
+    PERFETTO_ELOG(
+        "Failed to attach consumer, session '%s' not found for uid %d",
+        key.c_str(), static_cast<int>(consumer->uid_));
     return false;
+  }
 
   consumer->tracing_session_id_ = tracing_session->id;
   tracing_session->consumer_maybe_null = consumer;
@@ -335,6 +339,7 @@ bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
     if (!fd) {
       PERFETTO_ELOG(
           "The TraceConfig had write_into_file==true but no fd was passed");
+      tracing_sessions_.erase(tsid);
       return false;
     }
     tracing_session->write_into_file = std::move(fd);
