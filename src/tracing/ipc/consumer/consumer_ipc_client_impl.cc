@@ -81,6 +81,9 @@ void ConsumerIPCClientImpl::OnObserveStateResponse(
     return;
   switch (resp->new_state()) {
     case protos::ObserveStateResponse_State_DISABLED:
+      if (on_disable_notified_)
+        break;
+      on_disable_notified_ = true;
       consumer_->OnTracingDisabled();
       break;
   }
@@ -97,12 +100,15 @@ void ConsumerIPCClientImpl::EnableTracing(const TraceConfig& trace_config,
   trace_config.ToProto(req.mutable_trace_config());
   ipc::Deferred<protos::EnableTracingResponse> async_response;
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
+  on_disable_notified_ = false;
   async_response.Bind(
       [weak_this](ipc::AsyncResult<protos::EnableTracingResponse> response) {
-        if (!weak_this)
+        if (!weak_this || weak_this->on_disable_notified_)
           return;
-        if (!response || response->disabled())
+        if (!response || response->disabled()) {
+          weak_this->on_disable_notified_ = true;
           weak_this->consumer_->OnTracingDisabled();
+        }
       });
 
   // |fd| will be closed when this function returns, but it's fine because the

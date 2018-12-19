@@ -90,6 +90,10 @@ class ConsumerIPCClientImpl : public TracingService::ConsumerEndpoint,
 
   bool connected_ = false;
 
+  // Used to prevent a double OnTracingDisabled() call coming both from the
+  // ObserveState() and EnableTracing() response.
+  bool on_disable_notified_ = false;
+
   // When a packet is too big to fit into a ReadBuffersResponse IPC, the service
   // will chunk it into several IPCs, each containing few slices of the packet
   // (a packet's slice is always guaranteed to be << kIPCBufferSize). When
