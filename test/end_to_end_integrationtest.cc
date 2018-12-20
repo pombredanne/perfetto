@@ -46,7 +46,7 @@ namespace perfetto {
 
 namespace {
 
-using ::testing::MatchesRegex;
+using ::testing::ContainsRegex;
 using ::testing::HasSubstr;
 
 class PerfettoTest : public ::testing::Test {
@@ -539,10 +539,10 @@ TEST_F(PerfettoCmdlineTest, InvalidCases) {
   EXPECT_THAT(stderr_, HasSubstr("trace config with --attach"));
 
   EXPECT_EQ(1, Exec({"--attach"}, cfg));
-  EXPECT_THAT(stderr_, HasSubstr("option `--attach' requires an argument"));
+  EXPECT_THAT(stderr_, ContainsRegex("option.*--attach.*requires an argument"));
 
   EXPECT_EQ(1, Exec({"-t", "2s", "-o", "-", "--detach"}, cfg));
-  EXPECT_THAT(stderr_, HasSubstr("option `--detach' requires an argument"));
+  EXPECT_THAT(stderr_, ContainsRegex("option.*--detach.*requires an argument"));
 
   EXPECT_EQ(1, Exec({"-t", "2s", "--detach=foo"}, cfg));
   EXPECT_THAT(stderr_, HasSubstr("--out or --dropbox is required"));
