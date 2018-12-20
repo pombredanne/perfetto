@@ -77,7 +77,7 @@ void LazyProducers::DecrementPropertyRefCount(
     const std::string& property_name) {
   auto it = system_property_refcounts_.find(property_name);
   if (it == system_property_refcounts_.end()) {
-    PERFETTO_DCHECK("This should not happen");
+    PERFETTO_DFATAL("This should not happen");
     return;
   }
 
