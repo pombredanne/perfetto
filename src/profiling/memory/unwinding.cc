@@ -148,6 +148,8 @@ bool DoUnwind(WireMessage* msg, UnwindingMetadata* metadata, AllocRecord* out) {
   std::shared_ptr<unwindstack::Memory> mems = std::make_shared<StackMemory>(
       *metadata->mem_fd, alloc_metadata->stack_pointer, stack,
       msg->payload_size);
+  static std::vector<std::string>* kSkipMaps =
+      new std::vector<std::string>({"heapprofd_client.so"});
   unwindstack::Unwinder unwinder(kMaxFrames, &metadata->maps, regs.get(), mems);
   // Surpress incorrect "variable may be uninitialized" error for if condition
   // after this loop. error_code = LastErrorCode gets run at least once.
@@ -157,7 +159,7 @@ bool DoUnwind(WireMessage* msg, UnwindingMetadata* metadata, AllocRecord* out) {
       metadata->maps.Reset();
       metadata->maps.Parse();
     }
-    unwinder.Unwind();
+    unwinder.Unwind(kSkipMaps, nullptr);
     error_code = unwinder.LastErrorCode();
     if (error_code != unwindstack::ERROR_INVALID_MAP)
       break;
