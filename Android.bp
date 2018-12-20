@@ -621,7 +621,9 @@ cc_test {
     "liblog",
     "libprocinfo",
     "libprotobuf-cpp-lite",
+    "libservices",
     "libunwindstack",
+    "libutils",
   ],
   static_libs: [
     "libgmock",

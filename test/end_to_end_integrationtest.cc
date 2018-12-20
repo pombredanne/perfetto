@@ -136,7 +136,7 @@ class PerfettoCmdlineTest : public ::testing::Test {
 
     ssize_t rsize = 0;
     size_t stderr_pos = 0;
-    for (;;) {
+    while (stderr_pos < stderr_.size()) {
       rsize = PERFETTO_EINTR(read(*err_pipe.rd, &stderr_[stderr_pos],
                                   stderr_.size() - stderr_pos - 1));
       if (rsize <= 0)
