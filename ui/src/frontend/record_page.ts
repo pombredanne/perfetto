@@ -411,6 +411,8 @@ const CONFIG_PRESETS = [
         'kmem/ion_heap_shrink',
         'kmem/ion_heap_grow',
         'oom/oom_score_adj_update',
+        'sched/sched_switch',
+        'sched/sched_process_exit',
         'task/task_rename',
         'task/task_newtask',
       ],
