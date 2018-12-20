@@ -130,8 +130,6 @@ using protozero::proto_utils::WriteVarInt;
 using protozero::proto_utils::MakeTagLengthDelimited;
 
 int PerfettoCmd::PrintUsage(const char* argv0) {
-  // Note: --attach and --detach (and --stop) are deliberately not listed
-  // because they can be misused too easily. The should be used only by Traceur.
   PERFETTO_ELOG(R"(
 Usage: %s
   --background     -d     : Exits immediately and continues tracing in background
@@ -157,6 +155,10 @@ statsd-specific flags:
   --alert-id           : ID of the alert that triggered this trace.
   --config-id          : ID of the triggering config.
   --config-uid         : UID of app which registered the config.
+
+Detach mode. DISOURAGED, read https://docs.perfetto.dev/#/detached-mode :
+  --detach=key          : Detach from the tracing session with the given key.
+  --attach=key [--stop] : Re-attach to the session (optionally stop tracing once reattached).
 )",
                 argv0);
   return 1;
@@ -411,26 +413,22 @@ int PerfettoCmd::Main(int argc, char** argv) {
   }
 
   bool open_out_file = true;
-  if (is_detach()) {
-    if (!trace_config_->write_into_file()) {
-      // In detached mode we must pass the file descriptor to the service and
-      // let that one write the trace. We cannot use the IPC readback code path
-      // because the client process is about to exit soon after detaching.
-      PERFETTO_ELOG(
-          "TraceConfig's write_into_file must be true when using --detach");
-      return 1;
-    }
-  } else if (is_attach()) {
+  if (is_attach()) {
     open_out_file = false;
     if (!trace_out_path_.empty() || !dropbox_tag_.empty()) {
       PERFETTO_ELOG("Can't pass an --out file (or --dropbox) to --attach");
       return 1;
     }
-  } else {
-    if (trace_out_path_.empty() && dropbox_tag_.empty()) {
-      PERFETTO_ELOG("Either --out or --dropbox is required");
-      return 1;
-    }
+  } else if (trace_out_path_.empty() && dropbox_tag_.empty()) {
+    PERFETTO_ELOG("Either --out or --dropbox is required");
+    return 1;
+  } else if (is_detach() && !trace_config_->write_into_file()) {
+    // In detached mode we must pass the file descriptor to the service and
+    // let that one write the trace. We cannot use the IPC readback code path
+    // because the client process is about to exit soon after detaching.
+    PERFETTO_ELOG(
+        "TraceConfig's write_into_file must be true when using --detach");
+    return 1;
   }
   if (open_out_file && !OpenOutputFile())
     return 1;
