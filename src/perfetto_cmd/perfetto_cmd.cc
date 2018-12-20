@@ -156,7 +156,7 @@ statsd-specific flags:
   --config-id          : ID of the triggering config.
   --config-uid         : UID of app which registered the config.
 
-Detach mode. DISOURAGED, read https://docs.perfetto.dev/#/detached-mode :
+Detach mode. DISCOURAGED, read https://docs.perfetto.dev/#/detached-mode :
   --detach=key          : Detach from the tracing session with the given key.
   --attach=key [--stop] : Re-attach to the session (optionally stop tracing once reattached).
 )",
@@ -351,6 +351,11 @@ int PerfettoCmd::Main(int argc, char** argv) {
     return 1;
   }
 
+  if (is_detach() && background) {
+    PERFETTO_ELOG("--detach and --background are mutually exclusive");
+    return 1;
+  }
+
   if (stop_trace_once_attached_ && !is_attach()) {
     PERFETTO_ELOG("--stop is supported only in combination with --attach");
     return 1;
@@ -434,10 +439,6 @@ int PerfettoCmd::Main(int argc, char** argv) {
     return 1;
 
   if (background) {
-    if (is_detach()) {
-      PERFETTO_ELOG("--detach and --background are mutually exclusive");
-      return 1;
-    }
     pid_t pid;
     switch (pid = fork()) {
       case -1:

@@ -69,7 +69,7 @@ When re-attaching it is possible to also specify a further `--stop` argument.
 re-attaching (This is to avoid a race where SIGKILL is sent too early, before
 the client gets a chance to attach or even register the signal handler).
 
-No other cmdline arugments other than `--stop` can be passed when using
+No other cmdline argument other than `--stop` can be passed when using
 `--attach`.
 
 Examples
