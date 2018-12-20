@@ -244,6 +244,67 @@ TEST_F(HeapprofdEndToEnd, FinalFlush) {
   EXPECT_GT(samples, 0);
 }
 
+TEST_F(HeapprofdEndToEnd, NativeStartup) {
+  TraceConfig trace_config;
+  trace_config.add_buffers()->set_size_kb(10 * 1024);
+  trace_config.set_duration_ms(5000);
+
+  auto* ds_config = trace_config.add_data_sources()->mutable_config();
+  ds_config->set_name("android.heapprofd");
+  ds_config->set_target_buffer(0);
+
+  auto* heapprofd_config = ds_config->mutable_heapprofd_config();
+  heapprofd_config->set_sampling_interval_bytes(1);
+  *heapprofd_config->add_process_cmdline() = "find";
+  heapprofd_config->set_all(false);
+
+  helper.StartTracing(trace_config);
+
+  // Wait long enough to prevent the signal being delivered.
+  usleep(1000000);
+
+  pid_t pid = fork();
+  switch (pid) {
+    case -1:
+      PERFETTO_FATAL("Failed to fork.");
+    case 0: {
+      int null = open("/dev/null", O_RDWR);
+      dup2(null, STDIN_FILENO);
+      dup2(null, STDOUT_FILENO);
+      dup2(null, STDERR_FILENO);
+      PERFETTO_CHECK(execl("/system/bin/find", "find", "/", nullptr) == 0);
+      break;
+    }
+    default:
+      break;
+  }
+
+  helper.WaitForTracingDisabled(7000);
+
+  helper.ReadData();
+  helper.WaitForReadData();
+
+  PERFETTO_CHECK(kill(pid, SIGKILL) == 0);
+
+  const auto& packets = helper.trace();
+  ASSERT_GT(packets.size(), 0u);
+  size_t profile_packets = 0;
+  size_t samples = 0;
+  for (const protos::TracePacket& packet : packets) {
+    if (packet.has_profile_packet() &&
+        packet.profile_packet().process_dumps().size() > 0) {
+      const auto& dumps = packet.profile_packet().process_dumps();
+      ASSERT_EQ(dumps.size(), 1);
+      const protos::ProfilePacket_ProcessHeapSamples& dump = dumps.Get(0);
+      EXPECT_EQ(dump.pid(), pid);
+      samples += static_cast<size_t>(dump.samples().size());
+      profile_packets++;
+    }
+  }
+  EXPECT_EQ(profile_packets, 1);
+  EXPECT_GT(samples, 0);
+}
+
 }  // namespace
 }  // namespace profiling
 }  // namespace perfetto
