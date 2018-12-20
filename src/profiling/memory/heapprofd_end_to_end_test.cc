@@ -272,6 +272,8 @@ TEST_F(HeapprofdEndToEnd, NativeStartup) {
       dup2(null, STDIN_FILENO);
       dup2(null, STDOUT_FILENO);
       dup2(null, STDERR_FILENO);
+      // TODO(fmayer): Use a dedicated test binary rather than relying on find
+      // doing allocations.
       PERFETTO_CHECK(execl("/system/bin/find", "find", "/", nullptr) == 0);
       break;
     }
