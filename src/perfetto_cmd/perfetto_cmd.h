@@ -84,6 +84,7 @@ class PerfettoCmd : public Consumer {
   uint64_t bytes_written_ = 0;
   std::string detach_key_;
   std::string attach_key_;
+  bool stop_trace_once_attached_ = false;
 };
 
 }  // namespace perfetto

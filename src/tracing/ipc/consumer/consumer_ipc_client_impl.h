@@ -76,7 +76,7 @@ class ConsumerIPCClientImpl : public TracingService::ConsumerEndpoint,
 
  private:
   void OnReadBuffersResponse(ipc::AsyncResult<protos::ReadBuffersResponse>);
-  void OnObserveStateResponse(ipc::AsyncResult<protos::ObserveStateResponse>);
+  void OnEnableTracingResponse(ipc::AsyncResult<protos::EnableTracingResponse>);
 
   // TODO(primiano): think to dtor order, do we rely on any specific sequence?
   Consumer* const consumer_;
@@ -89,10 +89,6 @@ class ConsumerIPCClientImpl : public TracingService::ConsumerEndpoint,
   protos::ConsumerPortProxy consumer_port_;
 
   bool connected_ = false;
-
-  // Used to prevent a double OnTracingDisabled() call coming both from the
-  // ObserveState() and EnableTracing() response.
-  bool on_disable_notified_ = false;
 
   // When a packet is too big to fit into a ReadBuffersResponse IPC, the service
   // will chunk it into several IPCs, each containing few slices of the packet

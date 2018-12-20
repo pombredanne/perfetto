@@ -74,14 +74,6 @@ service ConsumerPort {
   // deferred_start = true in the TraceConfig passed to EnableTracing().
   rpc StartTracing(StartTracingRequest) returns (StartTracingResponse) {}
 
-  // Used to receive async updates about the state of the tracing session.
-  // Until Android P the only way to know when the tracing session did end was
-  // to wait for the reply to the EnableTracing IPC. This turned out to be
-  // problematic for the Detach/Attach case, because a new consumer that
-  // re-attaches wants to know when the session ends without having to re-start
-  // it.
-  rpc ObserveState(ObserveStateRequest) returns (stream ObserveStateResponse) {}
-
   // Allows the consumer to detach from the session. The session will keep
   // running even if the consumer disconnects and the consumer will not receive
   // any further IPC until reattached.
@@ -99,6 +91,12 @@ service ConsumerPort {
 // Arguments for rpc EnableTracing().
 message EnableTracingRequest {
   optional protos.TraceConfig trace_config = 1;
+
+  // Introduced in Android Q. This is used for re-attaching to the end-of-trace
+  // EnableTracingResponse notification after a Detach+Attach request.
+  // When this flag is set the |trace_config| is ignored and no method is called
+  // on the tracing service.
+  optional bool attach_notification_only = 2;
 }
 
 message EnableTracingResponse {
@@ -171,11 +169,4 @@ message AttachRequest {
 }
 message AttachResponse {
   optional protos.TraceConfig trace_config = 1;
-}
-
-// Arguments for rpc ObserveState.
-message ObserveStateRequest {}
-message ObserveStateResponse {
-  enum State { DISABLED = 1; }
-  optional State new_state = 1;
 }

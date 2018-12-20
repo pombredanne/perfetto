@@ -240,7 +240,6 @@ bool TracingServiceImpl::DetachConsumer(ConsumerEndpointImpl* consumer,
   tracing_session->consumer_maybe_null = nullptr;
   tracing_session->detach_key = key;
   consumer->tracing_session_id_ = 0;
-  consumer->detached_ = true;
   return true;
 }
 
@@ -457,7 +456,9 @@ bool TracingServiceImpl::StartTracing(TracingSessionID tsid) {
     auto weak_this = weak_ptr_factory_.GetWeakPtr();
     task_runner_->PostDelayedTask(
         [weak_this, tsid] {
-          if (weak_this)
+          // Skip entirely the flush if the trace session doesn't exist anymore.
+          // This is to prevent misleading error messages to be logged.
+          if (weak_this && weak_this->GetTracingSession(tsid))
             weak_this->FlushAndDisableTracing(tsid);
         },
         trace_duration_ms);
@@ -1512,10 +1513,6 @@ void TracingServiceImpl::ConsumerEndpointImpl::EnableTracing(
     const TraceConfig& cfg,
     base::ScopedFile fd) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  if (detached_) {
-    PERFETTO_LOG("Invalid Consumer call to EnableTracing() after detaching");
-    return;
-  }
   if (!service_->EnableTracing(this, cfg, std::move(fd)))
     NotifyOnTracingDisabled();
 }

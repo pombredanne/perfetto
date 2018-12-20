@@ -55,8 +55,6 @@ class ConsumerIPCService : public protos::ConsumerPort {
   void FreeBuffers(const protos::FreeBuffersRequest&,
                    DeferredFreeBuffersResponse) override;
   void Flush(const protos::FlushRequest&, DeferredFlushResponse) override;
-  void ObserveState(const protos::ObserveStateRequest&,
-                    DeferredObserveStateResponse) override;
   void Detach(const protos::DetachRequest&, DeferredDetachResponse) override;
   void Attach(const protos::AttachRequest&, DeferredAttachResponse) override;
   void OnClientDisconnected() override;
@@ -91,10 +89,6 @@ class ConsumerIPCService : public protos::ConsumerPort {
     // After EnableTracing() is invoked, this binds the async callback that
     // allows to send the OnTracingDisabled notification.
     DeferredEnableTracingResponse enable_tracing_response;
-
-    // After ObserveState() is invoked, this binds the async callback that
-    // allows to receive updates on the evolution of the tracing session state.
-    DeferredObserveStateResponse observe_state_response;
 
     // After Detach() is invoked, this binds the async callback that allows to
     // send the session id to the consumer.

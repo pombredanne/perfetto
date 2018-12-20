@@ -61,9 +61,13 @@ void ConsumerIPCService::OnClientDisconnected() {
 // Called by the IPC layer.
 void ConsumerIPCService::EnableTracing(const protos::EnableTracingRequest& req,
                                        DeferredEnableTracingResponse resp) {
+  RemoteConsumer* remote_consumer = GetConsumerForCurrentRequest();
+  if (req.attach_notification_only()) {
+    remote_consumer->enable_tracing_response = std::move(resp);
+    return;
+  }
   TraceConfig trace_config;
   trace_config.FromProto(req.trace_config());
-  RemoteConsumer* remote_consumer = GetConsumerForCurrentRequest();
   base::ScopedFile fd;
   if (trace_config.write_into_file())
     fd = ipc::Service::TakeReceivedFD();
@@ -113,16 +117,6 @@ void ConsumerIPCService::Flush(const protos::FlushRequest& req,
   };
   GetConsumerForCurrentRequest()->service_endpoint->Flush(req.timeout_ms(),
                                                           std::move(callback));
-}
-
-// Called by the IPC layer.
-void ConsumerIPCService::ObserveState(const protos::ObserveStateRequest&,
-                                      DeferredObserveStateResponse resp) {
-  RemoteConsumer* remote_consumer = GetConsumerForCurrentRequest();
-  remote_consumer->observe_state_response = std::move(resp);
-  // This doesn't invoke any method on the core service class. It just keeps
-  // around the response object and invokes it when the various OnXXX() methods
-  // are called.
 }
 
 // Called by the IPC layer.
@@ -177,12 +171,6 @@ void ConsumerIPCService::RemoteConsumer::OnTracingDisabled() {
     auto result = ipc::AsyncResult<protos::EnableTracingResponse>::Create();
     result->set_disabled(true);
     enable_tracing_response.Resolve(std::move(result));
-  }
-
-  if (observe_state_response.IsBound()) {
-    auto result = ipc::AsyncResult<protos::ObserveStateResponse>::Create();
-    result->set_new_state(protos::ObserveStateResponse::DISABLED);
-    observe_state_response.Resolve(std::move(result));
   }
 }
 

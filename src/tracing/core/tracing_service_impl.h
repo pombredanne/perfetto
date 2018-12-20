@@ -173,7 +173,6 @@ class TracingServiceImpl : public TracingService {
     Consumer* const consumer_;
     uid_t const uid_;
     TracingSessionID tracing_session_id_ = 0;
-    bool detached_ = false;
     PERFETTO_THREAD_CHECKER(thread_checker_)
     base::WeakPtrFactory<ConsumerEndpointImpl> weak_ptr_factory_;  // Keep last.
   };

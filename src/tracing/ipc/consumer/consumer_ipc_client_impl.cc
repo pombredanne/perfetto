@@ -54,18 +54,6 @@ ConsumerIPCClientImpl::~ConsumerIPCClientImpl() = default;
 // Called by the IPC layer if the BindService() succeeds.
 void ConsumerIPCClientImpl::OnConnect() {
   connected_ = true;
-
-  // Bind the ObserveState response to receive updates on the tracing session
-  ipc::Deferred<protos::ObserveStateResponse> async_response;
-  auto weak_this = weak_ptr_factory_.GetWeakPtr();
-  async_response.Bind(
-      [weak_this](ipc::AsyncResult<protos::ObserveStateResponse> response) {
-        if (weak_this)
-          weak_this->OnObserveStateResponse(std::move(response));
-      });
-  protos::ObserveStateRequest req;
-  consumer_port_.ObserveState(req, std::move(async_response));
-
   consumer_->OnConnect();
 }
 
@@ -73,20 +61,6 @@ void ConsumerIPCClientImpl::OnDisconnect() {
   PERFETTO_DLOG("Tracing service connection failure");
   connected_ = false;
   consumer_->OnDisconnect();
-}
-
-void ConsumerIPCClientImpl::OnObserveStateResponse(
-    ipc::AsyncResult<protos::ObserveStateResponse> resp) {
-  if (!resp)
-    return;
-  switch (resp->new_state()) {
-    case protos::ObserveStateResponse_State_DISABLED:
-      if (on_disable_notified_)
-        break;
-      on_disable_notified_ = true;
-      consumer_->OnTracingDisabled();
-      break;
-  }
 }
 
 void ConsumerIPCClientImpl::EnableTracing(const TraceConfig& trace_config,
@@ -100,15 +74,10 @@ void ConsumerIPCClientImpl::EnableTracing(const TraceConfig& trace_config,
   trace_config.ToProto(req.mutable_trace_config());
   ipc::Deferred<protos::EnableTracingResponse> async_response;
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
-  on_disable_notified_ = false;
   async_response.Bind(
       [weak_this](ipc::AsyncResult<protos::EnableTracingResponse> response) {
-        if (!weak_this || weak_this->on_disable_notified_)
-          return;
-        if (!response || response->disabled()) {
-          weak_this->on_disable_notified_ = true;
-          weak_this->consumer_->OnTracingDisabled();
-        }
+        if (weak_this)
+          weak_this->OnEnableTracingResponse(std::move(response));
       });
 
   // |fd| will be closed when this function returns, but it's fine because the
@@ -185,6 +154,12 @@ void ConsumerIPCClientImpl::OnReadBuffersResponse(
     consumer_->OnTraceData(std::move(trace_packets), response.has_more());
 }
 
+void ConsumerIPCClientImpl::OnEnableTracingResponse(
+    ipc::AsyncResult<protos::EnableTracingResponse> response) {
+  if (!response || response->disabled())
+    consumer_->OnTracingDisabled();
+}
+
 void ConsumerIPCClientImpl::FreeBuffers() {
   if (!connected_) {
     PERFETTO_DLOG("Cannot FreeBuffers(), not connected to tracing service");
@@ -242,24 +217,40 @@ void ConsumerIPCClientImpl::Attach(const std::string& key) {
     return;
   }
 
-  protos::AttachRequest req;
-  req.set_key(key);
-  ipc::Deferred<protos::AttachResponse> async_response;
-  auto weak_this = weak_ptr_factory_.GetWeakPtr();
+  {
+    protos::AttachRequest req;
+    req.set_key(key);
+    ipc::Deferred<protos::AttachResponse> async_response;
+    auto weak_this = weak_ptr_factory_.GetWeakPtr();
 
-  async_response.Bind(
-      [weak_this](ipc::AsyncResult<protos::AttachResponse> response) {
-        if (!weak_this)
-          return;
-        TraceConfig trace_config;
-        if (!response) {
-          weak_this->consumer_->OnAttach(/*success=*/false, trace_config);
-          return;
-        }
-        trace_config.FromProto(response->trace_config());
-        weak_this->consumer_->OnAttach(/*success=*/true, trace_config);
-      });
-  consumer_port_.Attach(req, std::move(async_response));
+    async_response.Bind([weak_this](
+                            ipc::AsyncResult<protos::AttachResponse> response) {
+      if (!weak_this)
+        return;
+      TraceConfig trace_config;
+      if (!response) {
+        weak_this->consumer_->OnAttach(/*success=*/false, trace_config);
+        return;
+      }
+      trace_config.FromProto(response->trace_config());
+
+      // If attached succesfully, also attach to the end-of-trace
+      // notificaton callback, via EnableTracing(attach_notification_only).
+      protos::EnableTracingRequest enable_req;
+      enable_req.set_attach_notification_only(true);
+      ipc::Deferred<protos::EnableTracingResponse> enable_resp;
+      enable_resp.Bind(
+          [weak_this](ipc::AsyncResult<protos::EnableTracingResponse> resp) {
+            if (weak_this)
+              weak_this->OnEnableTracingResponse(std::move(resp));
+          });
+      weak_this->consumer_port_.EnableTracing(enable_req,
+                                              std::move(enable_resp));
+
+      weak_this->consumer_->OnAttach(/*success=*/true, trace_config);
+    });
+    consumer_port_.Attach(req, std::move(async_response));
+  }
 }
 
 }  // namespace perfetto

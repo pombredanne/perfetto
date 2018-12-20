@@ -66,7 +66,7 @@ class PERFETTO_EXPORT Consumer {
   virtual void OnDetach(bool success) = 0;
 
   // Called back by the Service (or transport layer) after invoking
-  // TracingService::ConsumerEndpoint::Detach().
+  // TracingService::ConsumerEndpoint::Attach().
   virtual void OnAttach(bool success, const TraceConfig&) = 0;
 };
 
