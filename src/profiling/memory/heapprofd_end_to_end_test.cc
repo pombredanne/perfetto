@@ -260,7 +260,7 @@ TEST_F(HeapprofdEndToEnd, NativeStartup) {
 
   helper.StartTracing(trace_config);
 
-  // Wait long enough to prevent the signal being delivered.
+  // Wait long enough to prevent the signal triggering the profiling.
   usleep(1000000);
 
   pid_t pid = fork();
