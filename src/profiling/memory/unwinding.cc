@@ -51,6 +51,13 @@ namespace {
 
 size_t kMaxFrames = 1000;
 
+#pragma GCC diagnostic push
+// We do not care about deterministic destructor order.
+#pragma GCC diagnostic ignored "-Wglobal-constructors"
+#pragma GCC diagnostic ignored "-Wexit-time-destructors"
+static std::vector<std::string> kSkipMaps{"heapprofd_client.so"};
+#pragma GCC diagnostic pop
+
 std::unique_ptr<unwindstack::Regs> CreateFromRawData(unwindstack::ArchEnum arch,
                                                      void* raw_data) {
   std::unique_ptr<unwindstack::Regs> ret;
@@ -148,8 +155,6 @@ bool DoUnwind(WireMessage* msg, UnwindingMetadata* metadata, AllocRecord* out) {
   std::shared_ptr<unwindstack::Memory> mems = std::make_shared<StackMemory>(
       *metadata->mem_fd, alloc_metadata->stack_pointer, stack,
       msg->payload_size);
-  static std::vector<std::string>* kSkipMaps =
-      new std::vector<std::string>({"heapprofd_client.so"});
   unwindstack::Unwinder unwinder(kMaxFrames, &metadata->maps, regs.get(), mems);
   // Surpress incorrect "variable may be uninitialized" error for if condition
   // after this loop. error_code = LastErrorCode gets run at least once.
@@ -159,7 +164,7 @@ bool DoUnwind(WireMessage* msg, UnwindingMetadata* metadata, AllocRecord* out) {
       metadata->maps.Reset();
       metadata->maps.Parse();
     }
-    unwinder.Unwind(kSkipMaps, nullptr);
+    unwinder.Unwind(&kSkipMaps, nullptr);
     error_code = unwinder.LastErrorCode();
     if (error_code != unwindstack::ERROR_INVALID_MAP)
       break;
