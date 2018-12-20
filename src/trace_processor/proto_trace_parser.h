@@ -75,8 +75,10 @@ class ProtoTraceParser {
   void ParseCpuTimes(int64_t ts, TraceBlobView);
   void ParseIrqCount(int64_t ts, TraceBlobView, bool is_soft);
   void ParseRssStat(int64_t ts, uint32_t pid, TraceBlobView);
-  void ParseIonHeapGrow(int64_t ts, uint32_t pid, TraceBlobView);
-  void ParseIonHeapShrink(int64_t ts, uint32_t pid, TraceBlobView);
+  void ParseIonHeapGrowOrShrink(int64_t ts,
+                                uint32_t pid,
+                                TraceBlobView,
+                                bool grow);
   void ParseSignalDeliver(int64_t ts, uint32_t pid, TraceBlobView);
   void ParseSignalGenerate(int64_t ts, TraceBlobView);
   void ParseLowmemoryKill(int64_t ts, TraceBlobView);
@@ -109,6 +111,7 @@ class ProtoTraceParser {
   const StringId batt_current_id_;
   const StringId batt_current_avg_id_;
   const StringId oom_score_adj_id_;
+  const StringId ion_heap_unknown_id_;
   std::vector<StringId> meminfo_strs_id_;
   std::vector<StringId> vmstat_strs_id_;
   std::vector<StringId> rss_members_;

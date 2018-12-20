@@ -135,7 +135,8 @@ ProtoTraceParser::ProtoTraceParser(TraceProcessorContext* context)
       batt_current_id_(context->storage->InternString("batt.current_ua")),
       batt_current_avg_id_(
           context->storage->InternString("batt.current.avg_ua")),
-      oom_score_adj_id_(context->storage->InternString("oom_score_adj")) {
+      oom_score_adj_id_(context->storage->InternString("oom_score_adj")),
+      ion_heap_unknown_id_(context->storage->InternString("mem.ion.unknown")) {
   for (const auto& name : BuildMeminfoCounterNames()) {
     meminfo_strs_id_.emplace_back(context->storage->InternString(name));
   }
@@ -565,13 +566,15 @@ void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
       case protos::FtraceEvent::kIonHeapGrow: {
         PERFETTO_DCHECK(timestamp > 0);
         const size_t fld_off = ftrace.offset_of(fld.data());
-        ParseIonHeapGrow(timestamp, pid, ftrace.slice(fld_off, fld.size()));
+        ParseIonHeapGrowOrShrink(timestamp, pid,
+                                 ftrace.slice(fld_off, fld.size()), true);
         break;
       }
       case protos::FtraceEvent::kIonHeapShrink: {
         PERFETTO_DCHECK(timestamp > 0);
         const size_t fld_off = ftrace.offset_of(fld.data());
-        ParseIonHeapShrink(timestamp, pid, ftrace.slice(fld_off, fld.size()));
+        ParseIonHeapGrowOrShrink(timestamp, pid,
+                                 ftrace.slice(fld_off, fld.size()), false);
         break;
       }
       case protos::FtraceEvent::kSignalGenerate: {
@@ -694,44 +697,64 @@ void ProtoTraceParser::ParseRssStat(int64_t timestamp,
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 
-void ProtoTraceParser::ParseIonHeapGrow(int64_t timestamp,
-                                        uint32_t pid,
-                                        TraceBlobView view) {
+void ProtoTraceParser::ParseIonHeapGrowOrShrink(int64_t timestamp,
+                                                uint32_t pid,
+                                                TraceBlobView view,
+                                                bool grow) {
   ProtoDecoder decoder(view.data(), view.length());
-  int64_t value = 0;
-  // TODO(b/118300811): The heap name pointer cannot be read. Read once it
-  // has been fixed.
+  int64_t total_bytes = 0;
+  int64_t delta_bytes = 0;
+  StringId global_name_id = ion_heap_unknown_id_;
+  StringId delta_name_id = ion_heap_unknown_id_;
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
       case protos::IonHeapGrowFtraceEvent::kTotalAllocatedFieldNumber:
-        value = fld.as_int64();
+        total_bytes = fld.as_int64();
         break;
-    }
-  }
-  UniqueTid utid = context_->process_tracker->UpdateThread(timestamp, pid, 0);
-  context_->event_tracker->PushCounter(timestamp, value, ion_heap_grow_id_,
-                                       utid, RefType::kRefUtid);
-  PERFETTO_DCHECK(decoder.IsEndOfBuffer());
-}
+      case protos::IonHeapGrowFtraceEvent::kLenFieldNumber:
+        delta_bytes = fld.as_int64() * (grow ? 1 : -1);
+        break;
+      case protos::IonHeapGrowFtraceEvent::kHeapNameFieldNumber: {
+        char counter_name[255];
+        base::StringView heap_name = fld.as_string();
+        snprintf(counter_name, sizeof(counter_name), "mem.ion.%.*s",
+                 int(heap_name.size()), heap_name.data());
+        global_name_id = context_->storage->InternString(counter_name);
 
-void ProtoTraceParser::ParseIonHeapShrink(int64_t timestamp,
-                                          uint32_t pid,
-                                          TraceBlobView view) {
-  ProtoDecoder decoder(view.data(), view.length());
-  int64_t value = 0;
-  // TODO(b/118300811): The heap name pointer cannot be read. Read once it
-  // has been fixed.
-  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
-    switch (fld.id) {
-      case protos::IonHeapShrinkFtraceEvent::kTotalAllocatedFieldNumber:
-        value = fld.as_int64();
+        snprintf(counter_name, sizeof(counter_name), "mem.ion.delta.%.*s",
+                 int(heap_name.size()), heap_name.data());
+        delta_name_id = context_->storage->InternString(counter_name);
         break;
+      }
     }
   }
+  // Push the global counter.
+  context_->event_tracker->PushCounter(timestamp, total_bytes, global_name_id,
+                                       0, RefType::kRefNoRef);
+
+  // Push the delta counter.
+  // TODO(b/121331269): these should really be instant events. For now we
+  // manually reset them to 0 after 1us.
   UniqueTid utid = context_->process_tracker->UpdateThread(timestamp, pid, 0);
-  context_->event_tracker->PushCounter(timestamp, value, ion_heap_shrink_id_,
+  context_->event_tracker->PushCounter(timestamp, delta_bytes, delta_name_id,
                                        utid, RefType::kRefUtid);
+  context_->event_tracker->PushCounter(timestamp + 1000, 0, delta_name_id, utid,
+                                       RefType::kRefUtid);
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
+
+  // We are reusing the same function for ion_heap_grow and ion_heap_shrink.
+  // It is fine as the arguments are the same, but we need to be sure that the
+  // protobuf field id for both are the same.
+  static_assert(
+      protos::IonHeapGrowFtraceEvent::kTotalAllocatedFieldNumber ==
+          protos::IonHeapShrinkFtraceEvent::kTotalAllocatedFieldNumber,
+      "field mismatch");
+  static_assert(protos::IonHeapGrowFtraceEvent::kLenFieldNumber ==
+                    protos::IonHeapShrinkFtraceEvent::kLenFieldNumber,
+                "field mismatch");
+  static_assert(protos::IonHeapGrowFtraceEvent::kHeapNameFieldNumber ==
+                    protos::IonHeapShrinkFtraceEvent::kHeapNameFieldNumber,
+                "field mismatch");
 }
 
 void ProtoTraceParser::ParseCpuFreq(int64_t timestamp, TraceBlobView view) {
@@ -885,8 +908,8 @@ void ProtoTraceParser::ParseOOMScoreAdjUpdate(int64_t ts,
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
       case protos::OomScoreAdjUpdateFtraceEvent::kOomScoreAdjFieldNumber:
-        // TODO(b/120618641): The int16_t static cast is required because of the
-        // linked negative varint encoding bug.
+        // TODO(b/120618641): The int16_t static cast is required because of
+        // the linked negative varint encoding bug.
         oom_adj = static_cast<int16_t>(fld.as_int32());
         break;
       case protos::OomScoreAdjUpdateFtraceEvent::kPidFieldNumber:
