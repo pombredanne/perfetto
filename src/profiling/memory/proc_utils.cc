@@ -84,6 +84,10 @@ bool GetCmdlineForPID(pid_t pid, std::string* name) {
     PERFETTO_DLOG("Failed to read %s", filename.c_str());
     return false;
   }
+  if (rd == sizeof(cmdline) - 1) {
+    PERFETTO_DLOG("Overflow reading cmdline");
+    return false;
+  }
   cmdline[rd] = '\0';
   return NormalizeCmdLine(cmdline, static_cast<size_t>(rd), name);
 }
