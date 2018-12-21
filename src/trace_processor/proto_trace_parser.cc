@@ -703,16 +703,16 @@ void ProtoTraceParser::ParseIonHeapGrowOrShrink(int64_t timestamp,
                                                 bool grow) {
   ProtoDecoder decoder(view.data(), view.length());
   int64_t total_bytes = 0;
-  int64_t delta_bytes = 0;
+  int64_t change_bytes = 0;
   StringId global_name_id = ion_total_unknown_id_;
-  StringId delta_name_id = ion_change_unknown_id_;
+  StringId change_name_id = ion_change_unknown_id_;
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
       case protos::IonHeapGrowFtraceEvent::kTotalAllocatedFieldNumber:
         total_bytes = fld.as_int64();
         break;
       case protos::IonHeapGrowFtraceEvent::kLenFieldNumber:
-        delta_bytes = fld.as_int64() * (grow ? 1 : -1);
+        change_bytes = fld.as_int64() * (grow ? 1 : -1);
         break;
       case protos::IonHeapGrowFtraceEvent::kHeapNameFieldNumber: {
         char counter_name[255];
@@ -723,7 +723,7 @@ void ProtoTraceParser::ParseIonHeapGrowOrShrink(int64_t timestamp,
 
         snprintf(counter_name, sizeof(counter_name), "mem.ion_change.%.*s",
                  int(heap_name.size()), heap_name.data());
-        delta_name_id = context_->storage->InternString(counter_name);
+        change_name_id = context_->storage->InternString(counter_name);
         break;
       }
     }
@@ -732,14 +732,14 @@ void ProtoTraceParser::ParseIonHeapGrowOrShrink(int64_t timestamp,
   context_->event_tracker->PushCounter(timestamp, total_bytes, global_name_id,
                                        0, RefType::kRefNoRef);
 
-  // Push the delta counter.
+  // Push the change counter.
   // TODO(b/121331269): these should really be instant events. For now we
   // manually reset them to 0 after 1us.
   UniqueTid utid = context_->process_tracker->UpdateThread(timestamp, pid, 0);
-  context_->event_tracker->PushCounter(timestamp, delta_bytes, delta_name_id,
+  context_->event_tracker->PushCounter(timestamp, change_bytes, change_name_id,
                                        utid, RefType::kRefUtid);
-  context_->event_tracker->PushCounter(timestamp + 1000, 0, delta_name_id, utid,
-                                       RefType::kRefUtid);
+  context_->event_tracker->PushCounter(timestamp + 1000, 0, change_name_id,
+                                       utid, RefType::kRefUtid);
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 
   // We are reusing the same function for ion_heap_grow and ion_heap_shrink.
@@ -747,14 +747,12 @@ void ProtoTraceParser::ParseIonHeapGrowOrShrink(int64_t timestamp,
   // protobuf field id for both are the same.
   static_assert(
       protos::IonHeapGrowFtraceEvent::kTotalAllocatedFieldNumber ==
-          protos::IonHeapShrinkFtraceEvent::kTotalAllocatedFieldNumber,
+              protos::IonHeapShrinkFtraceEvent::kTotalAllocatedFieldNumber &&
+          protos::IonHeapGrowFtraceEvent::kLenFieldNumber ==
+              protos::IonHeapShrinkFtraceEvent::kLenFieldNumber &&
+          protos::IonHeapGrowFtraceEvent::kHeapNameFieldNumber ==
+              protos::IonHeapShrinkFtraceEvent::kHeapNameFieldNumber,
       "field mismatch");
-  static_assert(protos::IonHeapGrowFtraceEvent::kLenFieldNumber ==
-                    protos::IonHeapShrinkFtraceEvent::kLenFieldNumber,
-                "field mismatch");
-  static_assert(protos::IonHeapGrowFtraceEvent::kHeapNameFieldNumber ==
-                    protos::IonHeapShrinkFtraceEvent::kHeapNameFieldNumber,
-                "field mismatch");
 }
 
 void ProtoTraceParser::ParseCpuFreq(int64_t timestamp, TraceBlobView view) {
