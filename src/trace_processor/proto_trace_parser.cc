@@ -126,8 +126,6 @@ ProtoTraceParser::ProtoTraceParser(TraceProcessorContext* context)
       cpu_times_irq_ns_id_(context->storage->InternString("cpu.times.irq_ns")),
       cpu_times_softirq_ns_id_(
           context->storage->InternString("cpu.times.softirq_ns")),
-      ion_heap_grow_id_(context->storage->InternString("ion_heap_grow")),
-      ion_heap_shrink_id_(context->storage->InternString("ion_heap_shrink")),
       signal_deliver_id_(context->storage->InternString("signal_deliver")),
       signal_generate_id_(context->storage->InternString("signal_generate")),
       batt_charge_id_(context->storage->InternString("batt.charge_uah")),
@@ -136,7 +134,9 @@ ProtoTraceParser::ProtoTraceParser(TraceProcessorContext* context)
       batt_current_avg_id_(
           context->storage->InternString("batt.current.avg_ua")),
       oom_score_adj_id_(context->storage->InternString("oom_score_adj")),
-      ion_heap_unknown_id_(context->storage->InternString("mem.ion.unknown")) {
+      ion_total_unknown_id_(context->storage->InternString("mem.ion.unknown")),
+      ion_change_unknown_id_(
+          context->storage->InternString("mem.ion_change.unknown")) {
   for (const auto& name : BuildMeminfoCounterNames()) {
     meminfo_strs_id_.emplace_back(context->storage->InternString(name));
   }
@@ -704,8 +704,8 @@ void ProtoTraceParser::ParseIonHeapGrowOrShrink(int64_t timestamp,
   ProtoDecoder decoder(view.data(), view.length());
   int64_t total_bytes = 0;
   int64_t delta_bytes = 0;
-  StringId global_name_id = ion_heap_unknown_id_;
-  StringId delta_name_id = ion_heap_unknown_id_;
+  StringId global_name_id = ion_total_unknown_id_;
+  StringId delta_name_id = ion_change_unknown_id_;
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
       case protos::IonHeapGrowFtraceEvent::kTotalAllocatedFieldNumber:
@@ -721,7 +721,7 @@ void ProtoTraceParser::ParseIonHeapGrowOrShrink(int64_t timestamp,
                  int(heap_name.size()), heap_name.data());
         global_name_id = context_->storage->InternString(counter_name);
 
-        snprintf(counter_name, sizeof(counter_name), "mem.ion.delta.%.*s",
+        snprintf(counter_name, sizeof(counter_name), "mem.ion_change.%.*s",
                  int(heap_name.size()), heap_name.data());
         delta_name_id = context_->storage->InternString(counter_name);
         break;

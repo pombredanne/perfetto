@@ -102,8 +102,6 @@ class ProtoTraceParser {
   const StringId cpu_times_io_wait_ns_id_;
   const StringId cpu_times_irq_ns_id_;
   const StringId cpu_times_softirq_ns_id_;
-  const StringId ion_heap_grow_id_;
-  const StringId ion_heap_shrink_id_;
   const StringId signal_deliver_id_;
   const StringId signal_generate_id_;
   const StringId batt_charge_id_;
@@ -111,7 +109,8 @@ class ProtoTraceParser {
   const StringId batt_current_id_;
   const StringId batt_current_avg_id_;
   const StringId oom_score_adj_id_;
-  const StringId ion_heap_unknown_id_;
+  const StringId ion_total_unknown_id_;
+  const StringId ion_change_unknown_id_;
   std::vector<StringId> meminfo_strs_id_;
   std::vector<StringId> vmstat_strs_id_;
   std::vector<StringId> rss_members_;
