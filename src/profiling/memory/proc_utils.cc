@@ -39,6 +39,35 @@ bool GetProcFile(pid_t pid, const char* file, char* filename_buf, size_t size) {
 
 }  // namespace
 
+bool NormalizeCmdLine(char* cmdline, size_t size, std::string* name) {
+  char* first_arg = static_cast<char*>(memchr(cmdline, '\0', size));
+  if (first_arg == nullptr) {
+    PERFETTO_LOG("Overflow reading cmdline");
+    return false;
+  }
+  // For consistency with what we do with Java app cmdlines, trim everything
+  // after the @ sign of the first arg.
+  char* first_at = static_cast<char*>(memchr(cmdline, '@', size));
+  if (first_at != nullptr && first_at < first_arg) {
+    *first_at = '\0';
+    first_arg = first_at;
+  }
+  char* start = static_cast<char*>(
+      memrchr(cmdline, '/', static_cast<size_t>(first_arg - cmdline)));
+  if (start == first_arg) {
+    // The first argument ended in a slash.
+    PERFETTO_LOG("cmdline ends in /");
+    return false;
+  } else if (start == nullptr) {
+    start = cmdline;
+  } else {
+    // Skip the /.
+    start++;
+  }
+  size_t name_size = static_cast<size_t>(first_arg - start);
+  name->assign(start, name_size);
+  return true;
+}
 // This is mostly the same as GetHeapprofdProgramProperty in
 // https://android.googlesource.com/platform/bionic/+/master/libc/bionic/malloc_common.cpp
 // This should give the same result as GetHeapprofdProgramProperty.
@@ -56,35 +85,7 @@ bool GetCmdlineForPID(pid_t pid, std::string* name) {
     return false;
   }
   cmdline[rd] = '\0';
-  char* first_arg =
-      static_cast<char*>(memchr(cmdline, '\0', static_cast<size_t>(rd)));
-  if (first_arg == nullptr || first_arg == cmdline + sizeof(cmdline) - 1) {
-    PERFETTO_DLOG("Overflow reading cmdline");
-    return false;
-  }
-  // For consistency with what we do with Java app cmdlines, trim everything
-  // after the @ sign of the first arg.
-  char* first_at =
-      static_cast<char*>(memchr(cmdline, '@', static_cast<size_t>(rd)));
-  if (first_at != nullptr && first_at < first_arg) {
-    *first_at = '\0';
-    first_arg = first_at;
-  }
-  char* start = static_cast<char*>(
-      memrchr(cmdline, '/', static_cast<size_t>(first_arg - cmdline)));
-  if (start == first_arg) {
-    // The first argument ended in a slash.
-    PERFETTO_DLOG("cmdline ends in /");
-    return false;
-  } else if (start == nullptr) {
-    start = cmdline;
-  } else {
-    // Skip the /.
-    start++;
-  }
-  size_t name_size = static_cast<size_t>(first_arg - start);
-  name->assign(start, name_size);
-  return true;
+  return NormalizeCmdLine(cmdline, static_cast<size_t>(rd), name);
 }
 
 void FindAllProfilablePids(std::set<pid_t>* pids) {
