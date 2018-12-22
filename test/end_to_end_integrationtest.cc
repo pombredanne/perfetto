@@ -348,6 +348,7 @@ TEST_F(PerfettoTest, DetachAndReattach) {
   helper.DetachConsumer("key");
 
   // Write data while detached.
+  helper.WaitForProducerEnabled();
   auto on_data_written = task_runner.CreateCheckpoint("data_written");
   fake_producer->ProduceEventBatch(helper.WrapTask(on_data_written));
   task_runner.RunUntilCheckpoint("data_written");
