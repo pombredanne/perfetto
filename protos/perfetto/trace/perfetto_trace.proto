@@ -11,6 +11,33 @@ syntax = "proto2";
 
 package perfetto.protos;
 
+// Begin of protos/perfetto/common/android_logcat_constants.proto
+
+// Values from NDK's android/log.h.
+enum AndroidLogcatLogId {
+  DEFAULT = 0;  // MAIN.
+  RADIO = 1;
+  EVENTS = 2;
+  SYSTEM = 3;
+  CRASH = 4;
+  STATS = 5;
+  SECURITY = 6;
+  KERNEL = 7;
+}
+
+enum AndroidLogcatPriority {
+  UNSPECIFIED = 0;
+  UNUSED = 1;  // _DEFAULT, but should never be seen in logs.
+  VERBOSE = 2;
+  DEBUG = 3;
+  INFO = 4;
+  WARN = 5;
+  ERROR = 6;
+  FATAL = 7;
+}
+
+// End of protos/perfetto/common/android_logcat_constants.proto
+
 // Begin of protos/perfetto/common/sys_stats_counters.proto
 
 // When editing entries here remember also to update "sys_stats_counters.h" with
@@ -151,6 +178,38 @@ enum VmstatCounters {
   VMSTAT_UNEVICTABLE_PGS_STRANDED = 92;
 }
 // End of protos/perfetto/common/sys_stats_counters.proto
+
+// Begin of protos/perfetto/trace/android/android_logcat.proto
+
+message AndroidLogcatPacket {
+  message LogMessage {
+    optional AndroidLogcatLogId log_id = 1;
+    optional int32 pid = 2;
+    optional uint32 tid = 3;
+    optional uint64 timestamp = 4;
+    optional AndroidLogcatPriority prio = 5;
+    optional string tag = 6;
+    optional string message = 7;
+  }
+  repeated LogMessage messages = 1;
+
+  // Stats are emitted only upon Flush() and are monotonic (i.e. they are
+  // absolute counters since the beginning of the lifetime of the tracing
+  // session and NOT relative to the previous Stats snapshot).
+  message Stats {
+    // Total number of entries seen, including parse errors and skipped entries.
+    optional uint64 num_total = 1;
+
+    // Parser failures.
+    optional uint64 num_parse_failures = 2;
+
+    // Messages skipped due to filters.
+    optional uint64 num_skipped = 3;
+  }
+  optional Stats stats = 2;
+}
+
+// End of protos/perfetto/trace/android/android_logcat.proto
 
 // Begin of protos/perfetto/trace/clock_snapshot.proto
 
@@ -2356,7 +2415,7 @@ message Trace {
 // The root object emitted by Perfetto. A perfetto trace is just a stream of
 // TracePacket(s).
 //
-// Next id: 39.
+// Next id: 40.
 message TracePacket {
   // TODO(primiano): in future we should add a timestamp_clock_domain field to
   // allow mixing timestamps from different clock domains.
@@ -2379,6 +2438,7 @@ message TracePacket {
     // removed field with id 35
     // removed field with id 37
     BatteryCounters battery = 38;
+    AndroidLogcatPacket logcat = 39;
 
     // This field is emitted at periodic intervals (~10s) and
     // contains always the binary representation of the UUID

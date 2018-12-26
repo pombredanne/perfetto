@@ -11,6 +11,33 @@ syntax = "proto2";
 
 package perfetto.protos;
 
+// Begin of protos/perfetto/common/android_logcat_constants.proto
+
+// Values from NDK's android/log.h.
+enum AndroidLogcatLogId {
+  DEFAULT = 0;  // MAIN.
+  RADIO = 1;
+  EVENTS = 2;
+  SYSTEM = 3;
+  CRASH = 4;
+  STATS = 5;
+  SECURITY = 6;
+  KERNEL = 7;
+}
+
+enum AndroidLogcatPriority {
+  UNSPECIFIED = 0;
+  UNUSED = 1;  // _DEFAULT, but should never be seen in logs.
+  VERBOSE = 2;
+  DEBUG = 3;
+  INFO = 4;
+  WARN = 5;
+  ERROR = 6;
+  FATAL = 7;
+}
+
+// End of protos/perfetto/common/android_logcat_constants.proto
+
 // Begin of protos/perfetto/common/sys_stats_counters.proto
 
 // When editing entries here remember also to update "sys_stats_counters.h" with
@@ -152,6 +179,26 @@ enum VmstatCounters {
 }
 // End of protos/perfetto/common/sys_stats_counters.proto
 
+// Begin of protos/perfetto/config/android/android_logcat_config.proto
+
+message AndroidLogcatConfig {
+  repeated AndroidLogcatLogId log_ids = 1;
+
+  // How frequently the logr socket should be polled. We avoid using poll()
+  // to avoid waking up perfetto daemons too frequently and interfering with
+  // system activity too much.
+  optional uint32 poll_ms = 2;
+
+  // If set ignores all log messages which prio is < the given value.
+  optional AndroidLogcatPriority min_prio = 3;
+
+  // If non-empty ignores all log messages which tag doesn't match one of the
+  // specified values.
+  repeated string filter_tags = 4;
+}
+
+// End of protos/perfetto/config/android/android_logcat_config.proto
+
 // Begin of protos/perfetto/config/chrome/chrome_config.proto
 
 // When editing this file run ./tools/gen_tracing_cpp_headers_from_protos.py
@@ -205,6 +252,7 @@ message DataSourceConfig {
   optional SysStatsConfig sys_stats_config = 104;
   optional HeapprofdConfig heapprofd_config = 105;
   optional AndroidPowerConfig android_power_config = 106;
+  optional AndroidLogcatConfig android_logcat_config = 107;
 
   // This is a fallback mechanism to send a free-form text config to the
   // producer. In theory this should never be needed. All the code that

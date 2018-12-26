@@ -75,8 +75,8 @@ class UnixSocketRaw {
 
   ssize_t Send(const void* msg,
                size_t len,
-               const int* send_fds,
-               size_t num_fds);
+               const int* send_fds = nullptr,
+               size_t num_fds = 0);
 
   // Re-enter sendmsg until all the data has been sent or an error occurs.
   // TODO(fmayer): Figure out how to do timeouts here for heapprofd.
