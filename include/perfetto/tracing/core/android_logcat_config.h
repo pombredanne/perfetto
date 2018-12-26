@@ -49,24 +49,24 @@ namespace perfetto {
 class PERFETTO_EXPORT AndroidLogcatConfig {
  public:
   enum AndroidLogcatLogId {
-    DEFAULT = 0,
-    RADIO = 1,
-    EVENTS = 2,
-    SYSTEM = 3,
-    CRASH = 4,
-    STATS = 5,
-    SECURITY = 6,
-    KERNEL = 7,
+    LID_DEFAULT = 0,
+    LID_RADIO = 1,
+    LID_EVENTS = 2,
+    LID_SYSTEM = 3,
+    LID_CRASH = 4,
+    LID_STATS = 5,
+    LID_SECURITY = 6,
+    LID_KERNEL = 7,
   };
   enum AndroidLogcatPriority {
-    UNSPECIFIED = 0,
-    UNUSED = 1,
-    VERBOSE = 2,
-    DEBUG = 3,
-    INFO = 4,
-    WARN = 5,
-    ERROR = 6,
-    FATAL = 7,
+    PRIO_UNSPECIFIED = 0,
+    PRIO_UNUSED = 1,
+    PRIO_VERBOSE = 2,
+    PRIO_DEBUG = 3,
+    PRIO_INFO = 4,
+    PRIO_WARN = 5,
+    PRIO_ERROR = 6,
+    PRIO_FATAL = 7,
   };
   AndroidLogcatConfig();
   ~AndroidLogcatConfig();

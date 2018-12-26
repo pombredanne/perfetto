@@ -71,6 +71,7 @@ source_set("unittests") {
     "../../../gn:gtest_deps",
     "../../tracing:test_support",
     "filesystem:unittests",
+    "logcat:unittests",
     "ps:unittests",
     "sys_stats:unittests",
   ]

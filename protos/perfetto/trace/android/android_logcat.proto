@@ -21,6 +21,14 @@ import "perfetto/common/android_logcat_constants.proto";
 
 message AndroidLogcatPacket {
   message LogMessage {
+    message BinaryArg {
+      optional string name = 1;
+      oneof value {
+       int64 int_value = 2;
+       double real_value = 3;
+       string string_value = 4;
+      }
+    }
     optional AndroidLogcatLogId log_id = 1;
     optional int32 pid = 2;
     optional uint32 tid = 3;
@@ -28,6 +36,9 @@ message AndroidLogcatPacket {
     optional AndroidLogcatPriority prio = 5;
     optional string tag = 6;
     optional string message = 7;
+
+    // Only for the EVENTS log.
+    repeated BinaryArg args = 8;
   }
   repeated LogMessage messages = 1;
 

@@ -17,6 +17,7 @@
 #ifndef SRC_TRACED_PROBES_LOGCAT_LOGCAT_DATA_SOURCE_H_
 #define SRC_TRACED_PROBES_LOGCAT_LOGCAT_DATA_SOURCE_H_
 
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -36,12 +37,29 @@ namespace base {
 class TaskRunner;
 }
 
+namespace protos {
+namespace pbzero {
+class AndroidLogcatPacket_LogMessage;
+}
+}
+
 class LogcatDataSource : public ProbesDataSource {
  public:
   struct Stats {
     uint64_t num_total = 0;           // Total number of log entries received.
     uint64_t num_parse_failures = 0;  // Parser failures.
     uint64_t num_skipped = 0;         // Messages skipped due to filters.
+  };
+
+  // 1 EventFormat == 1 line of "/system/etc/event-log-tags".
+  struct EventFormat {
+    struct Field {
+      std::string name;
+      int8_t type;
+      int8_t unit;
+    };
+    std::string name;
+    std::vector<Field> fields;
   };
   static constexpr int kTypeId = 6;
 
@@ -51,6 +69,11 @@ class LogcatDataSource : public ProbesDataSource {
                    std::unique_ptr<TraceWriter> writer);
 
   ~LogcatDataSource() override;
+
+  virtual std::string ReadEventLogTagsFile();  // Virtual for testing.
+  void ParseLogTags();
+  const EventFormat* GetEventFormat(int id) const;
+  const char* ParseBinaryEvent(const char* start, const char* end, protos::pbzero::AndroidLogcatPacket_LogMessage*);
 
   base::WeakPtr<LogcatDataSource> GetWeakPtr() const;
 
@@ -63,6 +86,7 @@ class LogcatDataSource : public ProbesDataSource {
   struct DynamicLibLoader;
 
   void Tick(bool post_next_task);
+  bool ParseLogTagLine(char*, size_t);
 
   base::TaskRunner* const task_runner_;
   std::unique_ptr<TraceWriter> writer_;
@@ -70,6 +94,7 @@ class LogcatDataSource : public ProbesDataSource {
   uint32_t poll_rate_ms_ = 0;
   int min_prio_ = 0;
   std::unordered_set<base::StringView> filter_tags_;
+  std::unordered_map<int, EventFormat> event_formats_;
   std::vector<char> filter_tags_strbuf_;
   std::string mode_;
   base::PagedMemory buf_;  // Safer than stack, has red zones around the buffer.

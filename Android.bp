@@ -2617,6 +2617,7 @@ cc_test {
     "src/traced/probes/ftrace/proto_translation_table_unittest.cc",
     "src/traced/probes/ftrace/test/cpu_reader_support.cc",
     "src/traced/probes/logcat/logcat_data_source.cc",
+    "src/traced/probes/logcat/logcat_data_source_unittest.cc",
     "src/traced/probes/power/android_power_data_source.cc",
     "src/traced/probes/probes_data_source.cc",
     "src/traced/probes/probes_producer.cc",

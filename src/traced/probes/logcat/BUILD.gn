@@ -20,9 +20,7 @@ source_set("logcat") {
     "..:data_source",
     "../../../../gn:default_deps",
     "../../../../include/perfetto/traced",
-
-    # "../../../../protos/perfetto/trace/power:zero",
-    # "../../../android_internal:headers",
+    "../../../../protos/perfetto/trace/android:zero",
     "../../../base",
   ]
   sources = [
@@ -30,20 +28,18 @@ source_set("logcat") {
     "logcat_data_source.h",
   ]
 }
-# executable("lolcat") {
-#   public_deps = [
-#     # "../../../tracing",
-#   ]
-#   deps = [
-#     # "..:data_source",
-#     "../../../../gn:default_deps",
-#     # "../../../../include/perfetto/traced",
-#     # "../../../../protos/perfetto/trace/power:zero",
-#     # "../../../android_internal:headers",
-#     # "../../../base",
-#   ]
-#   sources = [
-#     "logcat_data_source.cc",
-#     "logcat_data_source.h",
-#   ]
-# }
+
+source_set("unittests") {
+  testonly = true
+  deps = [
+    ":logcat",
+    "../../../../gn:default_deps",
+    "../../../../gn:gtest_deps",
+    "../../../../protos/perfetto/trace:lite",
+    "../../../../src/base:test_support",
+    "../../../../src/tracing:test_support",
+  ]
+  sources = [
+    "logcat_data_source_unittest.cc",
+  ]
+}
