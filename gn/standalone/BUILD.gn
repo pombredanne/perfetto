@@ -24,7 +24,7 @@ config("extra_warnings") {
 
   # Disable Weverything on fuzzers to avoid breakages when new versions of clang
   # are rolled into OSS-fuzz.
-  if (is_clang && !is_fuzzer && !is_system_compiler) {
+  if (is_clang && !is_fuzzer) {
     cflags += [
       "-Weverything",
       "-Wno-c++98-compat-pedantic",
