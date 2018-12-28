@@ -182,37 +182,53 @@ enum VmstatCounters {
 // Begin of protos/perfetto/trace/android/android_logcat.proto
 
 message AndroidLogcatPacket {
-  message LogMessage {
-    message BinaryArg {
-      optional string name = 1;
-      oneof value {
-       int64 int_value = 2;
-       double real_value = 3;
-       string string_value = 4;
-      }
-    }
+  message LogEvent {
+    // The log buffer (e.g. MAIN, SYSTEM, RADIO) the event comes from.
     optional AndroidLogcatLogId log_id = 1;
+
+    // PID (TGID) and TID of the task that emitted the event.
     optional int32 pid = 2;
     optional uint32 tid = 3;
+
+    // Timestamp. The clock source is CLOCK_REALTIME, unlike many other Perfetto
+    // trace events that use instead CLOCK_BOOTTIME. The trace processor will
+    // take care of realigning clocks unsing the ClockSnapshot packet.
     optional uint64 timestamp = 4;
-    optional AndroidLogcatPriority prio = 5;
-    optional string tag = 6;
+
+    // When log_id == LID_EVENTS, |tag| corresponds to the event name defined in
+    // the second column of /system/etc/event-log-tags. For all other events,
+    // |tag| is the app-specified argument passed to __android_log_write().
+    optional string tag = 5;
+
+    // Empty when log_id == LID_EVENTS.
+    optional AndroidLogcatPriority prio = 6;
+
+    // Empty when log_id == LID_EVENTS.
     optional string message = 7;
 
-    // Only for the EVENTS log.
-    repeated BinaryArg args = 8;
+    // Only populated when log_id == LID_EVENTS.
+    message Arg {
+      optional string name = 1;
+      oneof value {
+        int64 int_value = 2;
+        double real_value = 3;
+        string string_value = 4;
+      }
+    }
+    repeated Arg args = 8;
   }
-  repeated LogMessage messages = 1;
+  repeated LogEvent events = 1;
 
   // Stats are emitted only upon Flush() and are monotonic (i.e. they are
   // absolute counters since the beginning of the lifetime of the tracing
   // session and NOT relative to the previous Stats snapshot).
   message Stats {
-    // Total number of entries seen, including parse errors and skipped entries.
+    // Total number of log events seen, including errors and skipped entries
+    // (num of events stored in the trace = total - failed - skipped).
     optional uint64 num_total = 1;
 
     // Parser failures.
-    optional uint64 num_parse_failures = 2;
+    optional uint64 num_failed = 2;
 
     // Messages skipped due to filters.
     optional uint64 num_skipped = 3;

@@ -41,7 +41,7 @@ class TestLogcatDataSource : public LogcatDataSource {
                        std::unique_ptr<TraceWriter> writer)
       : LogcatDataSource(config, task_runner, id, std::move(writer)) {}
 
-  MOCK_METHOD0(ReadEventLogTagsFile, std::string());
+  MOCK_METHOD0(ReadEventLogDefinitions, std::string());
 };
 
 class LogcatDataSourceTest : public ::testing::Test {
@@ -75,15 +75,14 @@ invalid_line (
 9999 invalid_line2 (
 1937006964 stats_log (atom_id|1|5),(data|4)
 )";
-  EXPECT_CALL(*ds, ReadEventLogTagsFile()).WillOnce(Return(kContents));
-  ds->ParseLogTags();
+  EXPECT_CALL(*ds, ReadEventLogDefinitions()).WillOnce(Return(kContents));
+  ds->ParseEventLogDefinitions();
 
   auto* fmt = ds->GetEventFormat(42);
   ASSERT_NE(fmt, nullptr);
   ASSERT_EQ(fmt->name, "answer");
   ASSERT_EQ(fmt->fields.size(), 1);
-  ASSERT_EQ(fmt->fields[0].name, "to life the universe etc");
-  ASSERT_EQ(fmt->fields[0].type, 3);
+  ASSERT_EQ(fmt->fields[0], "to life the universe etc");
 
   fmt = ds->GetEventFormat(314);
   ASSERT_NE(fmt, nullptr);
@@ -94,22 +93,16 @@ invalid_line (
   ASSERT_NE(fmt, nullptr);
   ASSERT_EQ(fmt->name, "tag_def");
   ASSERT_EQ(fmt->fields.size(), 3);
-  ASSERT_EQ(fmt->fields[0].name, "tag");
-  ASSERT_EQ(fmt->fields[0].type, 1);
-  ASSERT_EQ(fmt->fields[1].name, "name");
-  ASSERT_EQ(fmt->fields[1].type, 3);
-  ASSERT_EQ(fmt->fields[2].name, "format");
-  ASSERT_EQ(fmt->fields[2].type, 3);
+  ASSERT_EQ(fmt->fields[0], "tag");
+  ASSERT_EQ(fmt->fields[1], "name");
+  ASSERT_EQ(fmt->fields[2], "format");
 
   fmt = ds->GetEventFormat(1937006964);
   ASSERT_NE(fmt, nullptr);
   ASSERT_EQ(fmt->name, "stats_log");
   ASSERT_EQ(fmt->fields.size(), 2);
-  ASSERT_EQ(fmt->fields[0].name, "atom_id");
-  ASSERT_EQ(fmt->fields[0].type, 1);
-  ASSERT_EQ(fmt->fields[0].unit, 5);
-  ASSERT_EQ(fmt->fields[1].name, "data");
-  ASSERT_EQ(fmt->fields[1].type, 4);
+  ASSERT_EQ(fmt->fields[0], "atom_id");
+  ASSERT_EQ(fmt->fields[1], "data");
 }
 
 }  // namespace
