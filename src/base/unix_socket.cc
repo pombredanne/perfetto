@@ -315,9 +315,10 @@ ssize_t UnixSocketRaw::Receive(void* msg,
 bool UnixSocketRaw::SetTxTimeout(uint32_t timeout_ms) {
   PERFETTO_DCHECK(fd_);
   struct timeval timeout {};
-  timeout.tv_sec = static_cast<decltype(timeout.tv_sec)>(timeout_ms / 1000);
+  uint32_t timeout_sec = timeout_ms / 1000;
+  timeout.tv_sec = static_cast<decltype(timeout.tv_sec)>(timeout_sec);
   timeout.tv_usec = static_cast<decltype(timeout.tv_usec)>(
-      (timeout_ms - (timeout.tv_sec * 1000)) * 1000);
+      (timeout_ms - (timeout_sec * 1000)) * 1000);
 
   return setsockopt(*fd_, SOL_SOCKET, SO_SNDTIMEO,
                     reinterpret_cast<const char*>(&timeout),
