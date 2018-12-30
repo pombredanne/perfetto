@@ -55,6 +55,8 @@ source_set("lib") {
     "ftrace_descriptors.h",
     "instants_table.cc",
     "instants_table.h",
+    "logcat_table.cc",
+    "logcat_table.h",
     "process_table.cc",
     "process_table.h",
     "process_tracker.cc",
