@@ -67,10 +67,10 @@ inline int GetUnixSockType(SockType type) {
   switch (type) {
     case SockType::kStream:
       return SOCK_STREAM;
-    case SockType::kSeqPacket:
-      return SOCK_SEQPACKET;
     case SockType::kDgram:
       return SOCK_DGRAM;
+    case SockType::kSeqPacket:
+      return SOCK_SEQPACKET;
   }
   PERFETTO_CHECK(false);
 }

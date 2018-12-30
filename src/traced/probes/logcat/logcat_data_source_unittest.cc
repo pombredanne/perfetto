@@ -25,8 +25,6 @@
 #include "perfetto/trace/trace_packet.pb.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 
-using ::testing::_;
-using ::testing::ElementsAreArray;
 using ::testing::Invoke;
 using ::testing::Return;
 
@@ -125,6 +123,39 @@ class LogcatDataSourceTest : public ::testing::Test {
        0x64, 0x20, 0x64, 0x75, 0x65, 0x20, 0x74, 0x6f, 0x20, 0x73, 0x69,
        0x67, 0x6e, 0x61, 0x6c, 0x20, 0x28, 0x39, 0x29, 0x00},
   };
+
+  const std::vector<std::vector<uint8_t>> kValidBinaryEvents{
+      // 12-30 10:22:08.914 29981 30962 I am_kill :
+      // [0,31730,android.process.acore,985,empty #17]
+      {0x3d, 0x00, 0x1c, 0x00, 0x1d, 0x75, 0x00, 0x00, 0xf2, 0x78, 0x00, 0x00,
+       0x50, 0x9c, 0x28, 0x5c, 0xdb, 0x77, 0x7e, 0x36, 0x02, 0x00, 0x00, 0x00,
+       0xe8, 0x03, 0x00, 0x00, 0x47, 0x75, 0x00, 0x00, 0x03, 0x05, 0x00, 0x00,
+       0x00, 0x00, 0x00, 0x00, 0xf2, 0x7b, 0x00, 0x00, 0x02, 0x15, 0x00, 0x00,
+       0x00, 0x61, 0x6e, 0x64, 0x72, 0x6f, 0x69, 0x64, 0x2e, 0x70, 0x72, 0x6f,
+       0x63, 0x65, 0x73, 0x73, 0x2e, 0x61, 0x63, 0x6f, 0x72, 0x65, 0x00, 0xd9,
+       0x03, 0x00, 0x00, 0x02, 0x09, 0x00, 0x00, 0x00, 0x65, 0x6d, 0x70, 0x74,
+       0x79, 0x20, 0x23, 0x31, 0x37},
+
+      // 12-30 10:22:08.946 29981 30962 I am_uid_stopped: 10018
+      {0x09, 0x00, 0x1c, 0x00, 0x1d, 0x75, 0x00, 0x00, 0xf2, 0x78,
+       0x00, 0x00, 0x50, 0x9c, 0x28, 0x5c, 0x24, 0x5a, 0x66, 0x38,
+       0x02, 0x00, 0x00, 0x00, 0xe8, 0x03, 0x00, 0x00, 0x65, 0x75,
+       0x00, 0x00, 0x00, 0x22, 0x27, 0x00, 0x00},
+
+      // 12-30 10:22:08.960 29981 29998 I am_pss  :
+      // [1417,10098,com.google.android.connectivitymonitor,4831232,3723264,0,56053760,0,9,39]
+      {0x72, 0x00, 0x1c, 0x00, 0x1d, 0x75, 0x00, 0x00, 0x2e, 0x75, 0x00, 0x00,
+       0x50, 0x9c, 0x28, 0x5c, 0xf4, 0xd7, 0x44, 0x39, 0x02, 0x00, 0x00, 0x00,
+       0xe8, 0x03, 0x00, 0x00, 0x5f, 0x75, 0x00, 0x00, 0x03, 0x0a, 0x00, 0x89,
+       0x05, 0x00, 0x00, 0x00, 0x72, 0x27, 0x00, 0x00, 0x02, 0x26, 0x00, 0x00,
+       0x00, 0x63, 0x6f, 0x6d, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e,
+       0x61, 0x6e, 0x64, 0x72, 0x6f, 0x69, 0x64, 0x2e, 0x63, 0x6f, 0x6e, 0x6e,
+       0x65, 0x63, 0x74, 0x69, 0x76, 0x69, 0x74, 0x79, 0x6d, 0x6f, 0x6e, 0x69,
+       0x74, 0x6f, 0x72, 0x01, 0x00, 0xb8, 0x49, 0x00, 0x00, 0x00, 0x00, 0x00,
+       0x01, 0x00, 0xd0, 0x38, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
+       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x50, 0x57, 0x03, 0x00,
+       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00,
+       0x00, 0x01, 0x27, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}};
 };  // namespace
 
 TEST_F(LogcatDataSourceTest, ParseEventLogDefinitions) {
@@ -182,7 +213,7 @@ TEST_F(LogcatDataSourceTest, TextEvents) {
 
   auto packet = writer_raw_->ParseProto();
   ASSERT_TRUE(packet);
-  EXPECT_TRUE(packet->has_logcat());
+  ASSERT_TRUE(packet->has_logcat());
   EXPECT_EQ(packet->logcat().events_size(), 3);
 
   const auto& decoded = packet->logcat().events();
@@ -215,7 +246,7 @@ TEST_F(LogcatDataSourceTest, TextEvents) {
   EXPECT_EQ(decoded.Get(2).message(), "Process 11660 exited due to signal (9)");
 }
 
-TEST_F(LogcatDataSourceTest, TextEventsFilterTag) {
+TEST_F(LogcatDataSourceTest, TextEventsWithTagFiltering) {
   DataSourceConfig cfg;
   *cfg.mutable_android_logcat_config()->add_filter_tags() = "Zygote";
   *cfg.mutable_android_logcat_config()->add_filter_tags() = "ActivityManager";
@@ -228,7 +259,7 @@ TEST_F(LogcatDataSourceTest, TextEventsFilterTag) {
 
   auto packet = writer_raw_->ParseProto();
   ASSERT_TRUE(packet);
-  EXPECT_TRUE(packet->has_logcat());
+  ASSERT_TRUE(packet->has_logcat());
   EXPECT_EQ(packet->logcat().events_size(), 2);
 
   const auto& decoded = packet->logcat().events();
@@ -236,7 +267,7 @@ TEST_F(LogcatDataSourceTest, TextEventsFilterTag) {
   EXPECT_EQ(decoded.Get(1).tag(), "Zygote");
 }
 
-TEST_F(LogcatDataSourceTest, TextEventsFilterPrio) {
+TEST_F(LogcatDataSourceTest, TextEventsWithPrioFiltering) {
   DataSourceConfig cfg;
   cfg.mutable_android_logcat_config()->set_min_prio(
       AndroidLogcatConfig::AndroidLogcatPriority::PRIO_WARN);
@@ -247,11 +278,111 @@ TEST_F(LogcatDataSourceTest, TextEventsFilterPrio) {
 
   auto packet = writer_raw_->ParseProto();
   ASSERT_TRUE(packet);
-  EXPECT_TRUE(packet->has_logcat());
+  ASSERT_TRUE(packet->has_logcat());
   EXPECT_EQ(packet->logcat().events_size(), 1);
 
   const auto& decoded = packet->logcat().events();
   EXPECT_EQ(decoded.Get(0).tag(), "libprocessgroup");
+}
+
+TEST_F(LogcatDataSourceTest, BinaryEvents) {
+  DataSourceConfig cfg;
+  CreateInstance(cfg);
+  static const char kDefs[] = R"(
+30023 am_kill (User|1|5),(PID|1|5),(Process Name|3),(OomAdj|1|5),(Reason|3)
+30053 am_uid_stopped (UID|1|5)
+30047 am_pss (Pid|1|5),(UID|1|5),(Process Name|3),(Pss|2|2),(Uss|2|2),(SwapPss|2|2),(Rss|2|2),(StatType|1|5),(ProcState|1|5),(TimeToCollect|2|2)
+)";
+  EXPECT_CALL(*data_source_, ReadEventLogDefinitions()).WillOnce(Return(kDefs));
+  StartAndSimulateLogd(kValidBinaryEvents);
+
+  // Read back the data that would have been written into the trace.
+
+  auto packet = writer_raw_->ParseProto();
+  ASSERT_TRUE(packet);
+  ASSERT_TRUE(packet->has_logcat());
+  EXPECT_EQ(packet->logcat().events_size(), 3);
+
+  const auto& decoded = packet->logcat().events();
+
+  EXPECT_EQ(decoded.Get(0).log_id(), protos::AndroidLogcatLogId::LID_EVENTS);
+  EXPECT_EQ(decoded.Get(0).pid(), 29981);
+  EXPECT_EQ(decoded.Get(0).tid(), 30962);
+  EXPECT_EQ(decoded.Get(0).timestamp(), 1546165328914257883LL);
+  EXPECT_EQ(decoded.Get(0).tag(), "am_kill");
+  ASSERT_EQ(decoded.Get(0).args_size(), 5);
+  EXPECT_EQ(decoded.Get(0).args(0).name(), "User");
+  EXPECT_EQ(decoded.Get(0).args(0).int_value(), 0);
+  EXPECT_EQ(decoded.Get(0).args(1).name(), "PID");
+  EXPECT_EQ(decoded.Get(0).args(1).int_value(), 31730);
+  EXPECT_EQ(decoded.Get(0).args(2).name(), "Process Name");
+  EXPECT_EQ(decoded.Get(0).args(2).string_value(), "android.process.acore");
+  EXPECT_EQ(decoded.Get(0).args(3).name(), "OomAdj");
+  EXPECT_EQ(decoded.Get(0).args(3).int_value(), 985);
+  EXPECT_EQ(decoded.Get(0).args(4).name(), "Reason");
+  EXPECT_EQ(decoded.Get(0).args(4).string_value(), "empty #17");
+
+  EXPECT_EQ(decoded.Get(1).log_id(), protos::AndroidLogcatLogId::LID_EVENTS);
+  EXPECT_EQ(decoded.Get(1).pid(), 29981);
+  EXPECT_EQ(decoded.Get(1).tid(), 30962);
+  EXPECT_EQ(decoded.Get(1).timestamp(), 1546165328946231844LL);
+  EXPECT_EQ(decoded.Get(1).tag(), "am_uid_stopped");
+  ASSERT_EQ(decoded.Get(1).args_size(), 1);
+  EXPECT_EQ(decoded.Get(1).args(0).name(), "UID");
+  EXPECT_EQ(decoded.Get(1).args(0).int_value(), 10018);
+
+  EXPECT_EQ(decoded.Get(2).log_id(), protos::AndroidLogcatLogId::LID_EVENTS);
+  EXPECT_EQ(decoded.Get(2).pid(), 29981);
+  EXPECT_EQ(decoded.Get(2).tid(), 29998);
+  EXPECT_EQ(decoded.Get(2).timestamp(), 1546165328960813044LL);
+  EXPECT_EQ(decoded.Get(2).tag(), "am_pss");
+  ASSERT_EQ(decoded.Get(2).args_size(), 10);
+  EXPECT_EQ(decoded.Get(2).args(0).name(), "Pid");
+  EXPECT_EQ(decoded.Get(2).args(0).int_value(), 1417);
+  EXPECT_EQ(decoded.Get(2).args(1).name(), "UID");
+  EXPECT_EQ(decoded.Get(2).args(1).int_value(), 10098);
+  EXPECT_EQ(decoded.Get(2).args(2).name(), "Process Name");
+  EXPECT_EQ(decoded.Get(2).args(2).string_value(),
+            "com.google.android.connectivitymonitor");
+  EXPECT_EQ(decoded.Get(2).args(3).name(), "Pss");
+  EXPECT_EQ(decoded.Get(2).args(3).int_value(), 4831232);
+  EXPECT_EQ(decoded.Get(2).args(4).name(), "Uss");
+  EXPECT_EQ(decoded.Get(2).args(4).int_value(), 3723264);
+  EXPECT_EQ(decoded.Get(2).args(5).name(), "SwapPss");
+  EXPECT_EQ(decoded.Get(2).args(5).int_value(), 0);
+  EXPECT_EQ(decoded.Get(2).args(6).name(), "Rss");
+  EXPECT_EQ(decoded.Get(2).args(6).int_value(), 56053760);
+  EXPECT_EQ(decoded.Get(2).args(7).name(), "StatType");
+  EXPECT_EQ(decoded.Get(2).args(7).int_value(), 0);
+  EXPECT_EQ(decoded.Get(2).args(8).name(), "ProcState");
+  EXPECT_EQ(decoded.Get(2).args(8).int_value(), 9);
+  EXPECT_EQ(decoded.Get(2).args(9).name(), "TimeToCollect");
+  EXPECT_EQ(decoded.Get(2).args(9).int_value(), 39);
+}
+
+TEST_F(LogcatDataSourceTest, BinaryEventsWithTagFiltering) {
+  DataSourceConfig cfg;
+  *cfg.mutable_android_logcat_config()->add_filter_tags() = "not mached";
+  *cfg.mutable_android_logcat_config()->add_filter_tags() = "am_uid_stopped";
+  CreateInstance(cfg);
+  static const char kDefs[] = R"(
+30023 am_kill (User|1|5),(PID|1|5),(Process Name|3),(OomAdj|1|5),(Reason|3)
+30053 am_uid_stopped (UID|1|5)
+30047 am_pss (Pid|1|5),(UID|1|5),(Process Name|3),(Pss|2|2),(Uss|2|2),(SwapPss|2|2),(Rss|2|2),(StatType|1|5),(ProcState|1|5),(TimeToCollect|2|2)
+)";
+  EXPECT_CALL(*data_source_, ReadEventLogDefinitions()).WillOnce(Return(kDefs));
+  StartAndSimulateLogd(kValidBinaryEvents);
+
+  // Read back the data that would have been written into the trace.
+
+  auto packet = writer_raw_->ParseProto();
+  ASSERT_TRUE(packet);
+  ASSERT_TRUE(packet->has_logcat());
+  EXPECT_EQ(packet->logcat().events_size(), 1);
+
+  const auto& decoded = packet->logcat().events();
+  EXPECT_EQ(decoded.Get(0).timestamp(), 1546165328946231844LL);
+  EXPECT_EQ(decoded.Get(0).tag(), "am_uid_stopped");
 }
 
 }  // namespace

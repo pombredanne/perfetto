@@ -35,7 +35,10 @@ namespace base {
 
 class TaskRunner;
 
-enum class SockType { kStream, kSeqPacket, kDgram };
+// Use arbitrarily high values to avoid that some code accidentally ends up
+// assuming that these enum values match the sysroot's SOCK_xxx defines rather
+// than using GetUnixSockType().
+enum class SockType { kStream = 100, kDgram, kSeqPacket };
 
 // UnixSocketRaw is a basiv wrapper around UNIX sockets. It exposes wrapper
 // methods tha take care of most common pitfalls (e.g., marking fd as O_CLOEXEC,
