@@ -75,7 +75,7 @@ class LogcatDataSourceTest : public ::testing::Test {
 
     char cmd[64]{};
     EXPECT_GT(send_sock.Receive(cmd, sizeof(cmd) - 1), 0);
-    EXPECT_STREQ("stream lids=0,3", cmd);
+    EXPECT_STREQ("stream lids=0,2,3,4,7", cmd);
 
     // Send back logcat messages emulating the logdr socket.
     for (const auto& buf : fake_events)
@@ -174,10 +174,6 @@ invalid_line (
 
 TEST_F(LogcatDataSourceTest, TextEvents) {
   DataSourceConfig cfg;
-  *cfg.mutable_android_logcat_config()->add_log_ids() =
-      AndroidLogcatConfig::AndroidLogcatLogId::LID_DEFAULT;
-  *cfg.mutable_android_logcat_config()->add_log_ids() =
-      AndroidLogcatConfig::AndroidLogcatLogId::LID_SYSTEM;
   CreateInstance(cfg);
   EXPECT_CALL(*data_source_, ReadEventLogDefinitions()).WillOnce(Return(""));
   StartAndSimulateLogd(kValidTextEvents);
@@ -221,10 +217,6 @@ TEST_F(LogcatDataSourceTest, TextEvents) {
 
 TEST_F(LogcatDataSourceTest, TextEventsFilterTag) {
   DataSourceConfig cfg;
-  *cfg.mutable_android_logcat_config()->add_log_ids() =
-      AndroidLogcatConfig::AndroidLogcatLogId::LID_DEFAULT;
-  *cfg.mutable_android_logcat_config()->add_log_ids() =
-      AndroidLogcatConfig::AndroidLogcatLogId::LID_SYSTEM;
   *cfg.mutable_android_logcat_config()->add_filter_tags() = "Zygote";
   *cfg.mutable_android_logcat_config()->add_filter_tags() = "ActivityManager";
   *cfg.mutable_android_logcat_config()->add_filter_tags() = "Unmatched";
@@ -242,6 +234,24 @@ TEST_F(LogcatDataSourceTest, TextEventsFilterTag) {
   const auto& decoded = packet->logcat().events();
   EXPECT_EQ(decoded.Get(0).tag(), "ActivityManager");
   EXPECT_EQ(decoded.Get(1).tag(), "Zygote");
+}
+
+TEST_F(LogcatDataSourceTest, TextEventsFilterPrio) {
+  DataSourceConfig cfg;
+  cfg.mutable_android_logcat_config()->set_min_prio(
+      AndroidLogcatConfig::AndroidLogcatPriority::PRIO_WARN);
+
+  CreateInstance(cfg);
+  EXPECT_CALL(*data_source_, ReadEventLogDefinitions()).WillOnce(Return(""));
+  StartAndSimulateLogd(kValidTextEvents);
+
+  auto packet = writer_raw_->ParseProto();
+  ASSERT_TRUE(packet);
+  EXPECT_TRUE(packet->has_logcat());
+  EXPECT_EQ(packet->logcat().events_size(), 1);
+
+  const auto& decoded = packet->logcat().events();
+  EXPECT_EQ(decoded.Get(0).tag(), "libprocessgroup");
 }
 
 }  // namespace
