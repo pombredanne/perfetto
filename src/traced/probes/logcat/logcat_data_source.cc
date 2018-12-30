@@ -34,12 +34,14 @@
 namespace perfetto {
 
 namespace {
+
 constexpr uint32_t kMinPollRateMs = 100;
 constexpr uint32_t kDefaultPollRateMs = 1000;
 constexpr size_t kBufSize = base::kPageSize;
 const char kLogTagsPath[] = "/system/etc/event-log-tags";
+const char kLogcatSocket[] = "/dev/socket/logdr";
 
-// From Android's liblog/include/log/log_read.h .
+// From AOSP's liblog/include/log/log_read.h .
 struct logger_entry_v4 {
   uint16_t len;       // length of the payload.
   uint16_t hdr_size;  // sizeof(struct logger_entry_v4).
@@ -52,10 +54,9 @@ struct logger_entry_v4 {
 };
 
 // Event types definition in the binary encoded format, from
-// //system/core/liblog/include/log/log.h.
-// Obviously these values don't match the values of the textual dictionary
-// definition of the event format in //system/core/logcat/event.logtags , the
-// latter are off by one (INT = 1 and so on)
+// liblog/include/log/log.h .
+// These values don't match the textual definitions of
+// system/core/logcat/event.logtags, the latter are off by one (INT = 1).
 enum AndroidEventLogType {
   EVENT_TYPE_INT = 0,
   EVENT_TYPE_LONG = 1,
@@ -63,6 +64,15 @@ enum AndroidEventLogType {
   EVENT_TYPE_LIST = 3,
   EVENT_TYPE_FLOAT = 4,
 };
+
+template <typename T>
+inline bool ReadAndAdvance(const char** ptr, const char* end, T* out) {
+  if (*ptr > end - sizeof(T))
+    return false;
+  memcpy(reinterpret_cast<void*>(out), *ptr, sizeof(T));
+  *ptr += sizeof(T);
+  return true;
+}
 
 }  // namespace
 
@@ -73,23 +83,27 @@ LogcatDataSource::LogcatDataSource(DataSourceConfig ds_config,
     : ProbesDataSource(session_id, kTypeId),
       task_runner_(task_runner),
       writer_(std::move(writer)),
-      logcat_sock_(base::UnixSocketRaw::CreateInvalid()),
       weak_factory_(this) {
   const auto& cfg = ds_config.android_logcat_config();
   poll_rate_ms_ = cfg.poll_ms() ? cfg.poll_ms() : kDefaultPollRateMs;
   poll_rate_ms_ = std::max(kMinPollRateMs, poll_rate_ms_);
 
   std::vector<uint32_t> log_ids;
-  if (cfg.log_ids_size() == 0) {
+  for (uint32_t id : cfg.log_ids())
+    log_ids.push_back(id);
+  if (log_ids.empty()) {
     // If no log id is specified, add the most popular ones.
     log_ids.push_back(AndroidLogcatConfig::AndroidLogcatLogId::LID_DEFAULT);
-    log_ids.push_back(AndroidLogcatConfig::AndroidLogcatLogId::LID_SYSTEM);
     log_ids.push_back(AndroidLogcatConfig::AndroidLogcatLogId::LID_EVENTS);
+    log_ids.push_back(AndroidLogcatConfig::AndroidLogcatLogId::LID_SYSTEM);
     log_ids.push_back(AndroidLogcatConfig::AndroidLogcatLogId::LID_CRASH);
     log_ids.push_back(AndroidLogcatConfig::AndroidLogcatLogId::LID_KERNEL);
-  } else {
-    for (uint32_t id : cfg.log_ids())
-      log_ids.push_back(id);
+  }
+  // Build the command string that will be sent to the logdr socket on Start().
+  mode_ = "stream lids";
+  for (auto it = log_ids.begin(); it != log_ids.end(); it++) {
+    mode_ += it == log_ids.begin() ? "=" : ",";
+    mode_ += std::to_string(*it);
   }
 
   // Build a linear vector out of the tag filters and keep track of the string
@@ -103,19 +117,10 @@ LogcatDataSource::LogcatDataSource(DataSourceConfig ds_config,
     const size_t end = filter_tags_strbuf_.size();
     tag_boundaries.emplace_back(begin, end - begin);
   }
-
   filter_tags_strbuf_.shrink_to_fit();
   // At this point pointers to |filter_tags_strbuf_| are stable.
-
   for (const auto& it : tag_boundaries)
     filter_tags_.emplace(&filter_tags_strbuf_[it.first], it.second);
-
-  // Build the command string that will be sent to the logdr socket on Start().
-  mode_ = "stream lids";
-  for (auto it = log_ids.begin(); it != log_ids.end(); it++) {
-    mode_ += it == log_ids.begin() ? "=" : ",";
-    mode_ += std::to_string(*it);
-  }
 
   min_prio_ = cfg.min_prio();
   buf_ = base::PagedMemory::Allocate(kBufSize);
@@ -123,15 +128,21 @@ LogcatDataSource::LogcatDataSource(DataSourceConfig ds_config,
 
 LogcatDataSource::~LogcatDataSource() = default;
 
+base::UnixSocketRaw LogcatDataSource::ConnectLogdrSocket() {
+  auto socket = base::UnixSocketRaw::CreateMayFail(base::SockType::kSeqPacket);
+  if (!socket || !socket.Connect(kLogcatSocket)) {
+    PERFETTO_PLOG("Failed to connect to %s", kLogcatSocket);
+    return base::UnixSocketRaw();
+  }
+  return socket;
+}
+
 void LogcatDataSource::Start() {
   ParseEventLogDefinitions();
 
-  static const char kLogcatSocket[] = "/dev/socket/logdr";
-  logcat_sock_ = base::UnixSocketRaw::CreateMayFail(base::SockType::kSeqPacket);
-  if (!logcat_sock_ || !logcat_sock_.Connect(kLogcatSocket)) {
-    PERFETTO_PLOG("Could not connecto to %s", kLogcatSocket);
+  if (!(logcat_sock_ = ConnectLogdrSocket()))
     return;
-  }
+
   PERFETTO_DLOG("Starting logcat stream: %s", mode_.c_str());
   if (logcat_sock_.Send(mode_.data(), mode_.size()) <= 0) {
     PERFETTO_PLOG("send() failed on logcat socket %s", kLogcatSocket);
@@ -139,10 +150,11 @@ void LogcatDataSource::Start() {
   }
   logcat_sock_.SetBlocking(false);
 
-  // // TODO: we can't reliably get this sync depending on the buffer usage.
-  // DNS. PERFETTO_LOG("perfetto_logcat_clock_sync CLOCK_BOOTTIME=%lld",
-  //              base::GetWallTimeNs().count());
-  Tick(/*post_next_task=*/true);  // DNS
+  auto weak_this = weak_factory_.GetWeakPtr();
+  task_runner_->PostTask([weak_this] {
+    if (weak_this)
+      weak_this->Tick(/*post_next_task=*/true);
+  });
 }
 
 void LogcatDataSource::Tick(bool post_next_task) {
@@ -157,11 +169,11 @@ void LogcatDataSource::Tick(bool post_next_task) {
         poll_rate_ms_ - (now_ms % poll_rate_ms_));
   }
 
-  ssize_t rsize;
   TraceWriter::TracePacketHandle packet;
   protos::pbzero::AndroidLogcatPacket* logcat_packet = nullptr;
   size_t num_events = 0;
   bool stop = false;
+  ssize_t rsize;
   while (!stop && (rsize = logcat_sock_.Receive(buf_.Get(), kBufSize)) > 0) {
     num_events++;
     stats_.num_total++;
@@ -177,39 +189,32 @@ void LogcatDataSource::Tick(bool post_next_task) {
     }
     char* buf = reinterpret_cast<char*>(buf_.Get());
     PERFETTO_DCHECK(reinterpret_cast<uintptr_t>(buf) % 16 == 0);
+    size_t payload_size = reinterpret_cast<logger_entry_v4*>(buf)->len;
     size_t hdr_size = reinterpret_cast<logger_entry_v4*>(buf)->hdr_size;
-    if (hdr_size >= static_cast<size_t>(rsize)) {
-      PERFETTO_DLOG("Invalid hdr_size in logcat message (%zu <= %zd)", hdr_size,
-                    rsize);
+    if (payload_size + hdr_size > static_cast<size_t>(rsize)) {
+      PERFETTO_DLOG("Invalid logcat frame (hdr: %zu, payload: %zu, rsize: %zd)",
+                    hdr_size, payload_size, rsize);
       stats_.num_failed++;
       continue;
     }
+    char* const end = buf + hdr_size + payload_size;
 
     // In older versions of Android the logger_entry struct can contain less
-    // entried. Copy that in a temporary struct, so that unset fields are
+    // fields. Copy that in a temporary struct, so that unset fields are
     // always zero-initialized.
     logger_entry_v4 entry{};
     memcpy(&entry, buf, hdr_size);
     buf += hdr_size;
-    if (static_cast<ssize_t>(entry.len) > rsize) {
-      PERFETTO_DLOG("Invalid len in logcat message (%hu <= %zd)", entry.len,
-                    rsize);
-      stats_.num_failed++;
-      continue;
-    }
-    char* end = buf + entry.len;
 
     if (!packet) {
-      // Lazily add the packet on the first message received.
+      // Lazily add the packet on the first event. This is to avoid creating
+      // empty packets if there are no events in a poll task.
       packet = writer_->NewTracePacket();
       packet->set_timestamp(
           static_cast<uint64_t>(base::GetBootTimeNs().count()));
       logcat_packet = packet->set_logcat();
     }
 
-    int prio = 0;
-    base::StringView tag;
-    base::StringView msg;
     protos::pbzero::AndroidLogcatPacket::LogEvent* evt = nullptr;
 
     if (entry.lid == AndroidLogcatConfig::AndroidLogcatLogId::LID_EVENTS) {
@@ -219,67 +224,78 @@ void LogcatDataSource::Tick(bool post_next_task) {
         PERFETTO_DLOG("Failed to parse logcat binary event");
         stats_.num_failed++;
       }
-      if (!evt) {
-        // Parsing succeeded but the events was skipped due to filters.
-        continue;
-      }
     } else {
-      // Format:
-      // [Priority 1 byte] [ tag ] [ NUL ] [ message ]
-      prio = *(buf++);
-
-      // Skip if the user specified a min-priority filter in the config.
-      if (prio < min_prio_) {
-        stats_.num_skipped++;
-        continue;
-      }
-      if (prio > 10) {
-        PERFETTO_DLOG(
-            "Skipping logcat event with suspiciously high priority %d", prio);
+      if (!ParseTextEvent(buf, end, logcat_packet, &evt)) {
+        PERFETTO_DLOG("Failed to parse logcat text event");
         stats_.num_failed++;
-        continue;
-      }
-
-      // Find the NUL terminator that separates |tag| from |message|.
-      char* str_end;
-      for (str_end = buf; str_end < end && *str_end; str_end++) {
-      }
-      if (str_end >= end - 2) {
-        // Looks like there is a tag-less message.
-        msg = base::StringView(buf, static_cast<size_t>(str_end - buf));
-      } else {
-        tag = base::StringView(buf, static_cast<size_t>(str_end - buf));
-        buf = str_end + 1;  // Move |buf| to the start of the message.
-        size_t msg_len = static_cast<size_t>(end - buf);
-
-        // Protobuf strings don't need the nul terminator. If the string is
-        // null terminator, omit the terminator from the length.
-        if (msg_len > 0 && *(end - 1) == '\0')
-          msg_len--;
-        msg = base::StringView(buf, msg_len);
-      }
-      buf = str_end;
-
-      if (!filter_tags_.empty() && filter_tags_.count(tag) == 0) {
-        stats_.num_skipped++;
-        continue;
       }
     }
+    if (!evt) {
+      // Parsing succeeded but the event was skipped due to filters.
+      stats_.num_skipped++;
+      // TODO remove the ++ in the impl. DNS.
+      continue;
+    }
 
-    evt = evt ? evt : logcat_packet->add_events();
+    // Add the common fields to the event.
     uint64_t ts = entry.sec * 1000000000ULL + entry.nsec;
     evt->set_timestamp(ts);
     evt->set_log_id(static_cast<protos::pbzero::AndroidLogcatLogId>(entry.lid));
     evt->set_pid(entry.pid);
     evt->set_tid(entry.tid);
-    if (prio && prio < 16)  // TODO remove this. DNS.
-      evt->set_prio(static_cast<protos::pbzero::AndroidLogcatPriority>(prio));
-    if (!tag.empty())
-      evt->set_tag(tag.data(), tag.size());
-    if (!msg.empty())
-      evt->set_message(msg.data(), msg.size());
   }  // while(logcat_sock_.Receive())
   PERFETTO_DLOG("Seen %zu logcat events", num_events);
+}
+
+bool LogcatDataSource::ParseTextEvent(
+    const char* start,
+    const char* end,
+    protos::pbzero::AndroidLogcatPacket* packet,
+    protos::pbzero::AndroidLogcatPacket::LogEvent** out_evt) {
+  // Format: [Priority 1 byte] [ tag ] [ NUL ] [ message ]
+  const char* buf = start;
+  int8_t prio;
+  if (!ReadAndAdvance(&buf, end, &prio))
+    return false;
+
+  if (prio > 10) {
+    PERFETTO_DLOG("Skipping logcat event with suspiciously high priority %d",
+                  prio);
+    return false;
+  }
+
+  // Skip if the user specified a min-priority filter in the config.
+  if (prio < min_prio_)
+    return true;
+
+  // Find the NUL terminator that separates |tag| from |message|.
+  const char* str_end;
+  for (str_end = buf; str_end < end && *str_end; str_end++) {
+  }
+  if (str_end >= end - 2) {
+    // Looks like there is a tag-less message.
+    return false;
+  }
+
+  auto tag = base::StringView(buf, static_cast<size_t>(str_end - buf));
+  if (!filter_tags_.empty() && filter_tags_.count(tag) == 0)
+    return true;
+
+  auto* evt = packet->add_events();
+  *out_evt = evt;
+  evt->set_prio(static_cast<protos::pbzero::AndroidLogcatPriority>(prio));
+  evt->set_tag(tag.data(), tag.size());
+
+  buf = str_end + 1;  // Move |buf| to the start of the message.
+  size_t msg_len = static_cast<size_t>(end - buf);
+
+  // Protobuf strings don't need the nul terminator. If the string is
+  // null terminator, omit the terminator from the length.
+  if (msg_len > 0 && *(end - 1) == '\0')
+    msg_len--;
+
+  evt->set_message(buf, msg_len);
+  return true;
 }
 
 bool LogcatDataSource::ParseBinaryEvent(
@@ -289,10 +305,8 @@ bool LogcatDataSource::ParseBinaryEvent(
     protos::pbzero::AndroidLogcatPacket::LogEvent** out_evt) {
   const char* buf = start;
   int32_t eid;
-  if (end - start < static_cast<ptrdiff_t>(sizeof(eid)))
+  if (!ReadAndAdvance(&buf, end, &eid))
     return false;
-  memcpy(&eid, buf, sizeof(eid));
-  buf += sizeof(eid);
 
   // TODO test events with 0 arguments. DNS.
 
@@ -306,66 +320,63 @@ bool LogcatDataSource::ParseBinaryEvent(
 
   if (!filter_tags_.empty() &&
       filter_tags_.count(base::StringView(fmt->name)) == 0) {
-    stats_.num_skipped++;
     return true;
   }
 
   auto* evt = packet->add_events();
   *out_evt = evt;
   evt->set_tag(fmt->name.c_str());
-  size_t field_id = 0;
-
-  // TODO make this safer. // DNS.
+  size_t field_num = 0;
   while (buf < end) {
     char type = *(buf++);
-    if (field_id >= fmt->fields.size())
-      return evt;
-    const char* field_name = fmt->fields[field_id].c_str();
+    if (field_num >= fmt->fields.size())
+      return true;
+    const char* field_name = fmt->fields[field_num].c_str();
     switch (type) {
       case EVENT_TYPE_INT: {
         int32_t value;
-        memcpy(&value, buf, sizeof(value));
+        if (!ReadAndAdvance(&buf, end, &value))
+          return false;
         auto* arg = evt->add_args();
         arg->set_name(field_name);
         arg->set_int_value(value);
-        buf += sizeof(value);
-        field_id++;
+        field_num++;
         break;
       }
       case EVENT_TYPE_LONG: {
         int64_t value;
-        memcpy(&value, buf, sizeof(value));
+        if (!ReadAndAdvance(&buf, end, &value))
+          return false;
         auto* arg = evt->add_args();
         arg->set_name(field_name);
         arg->set_int_value(value);
-        buf += sizeof(value);
-        field_id++;
+        field_num++;
         break;
       }
       case EVENT_TYPE_FLOAT: {
         double value;
-        memcpy(&value, buf, sizeof(value));
+        if (!ReadAndAdvance(&buf, end, &value))
+          return false;
         auto* arg = evt->add_args();
         arg->set_name(field_name);
         arg->set_real_value(value);
-        buf += sizeof(value);
-        field_id++;
+        field_num++;
         break;
       }
       case EVENT_TYPE_STRING: {
         uint32_t len;
-        memcpy(&len, buf, 4);
-        buf += sizeof(len);
+        if (!ReadAndAdvance(&buf, end, &len) || buf + len > end)
+          return false;
         auto* arg = evt->add_args();
         arg->set_name(field_name);
         arg->set_string_value(buf, len);
         buf += len;
-        field_id++;
+        field_num++;
         break;
       }
       case EVENT_TYPE_LIST: {
-        buf++;
-        if (field_id > 0) {
+        buf++;  // EVENT_TYPE_LIST has one byte payload containing the list len.
+        if (field_num > 0) {
           // Lists are supported only as a top-level node. We stop parsing when
           // encountering a list as an inner field. The very few of them are not
           // interesting.
@@ -377,7 +388,7 @@ bool LogcatDataSource::ParseBinaryEvent(
         PERFETTO_DLOG(
             "Skipping unklonwn logcat binary event of type %d for %s at pos "
             "%zd after parsing %zu fields",
-            static_cast<int>(type), fmt->name.c_str(), buf - start, field_id);
+            static_cast<int>(type), fmt->name.c_str(), buf - start, field_num);
         return true;
     }  // switch(type)
   }    // while(buf < end)

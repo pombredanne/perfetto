@@ -69,6 +69,8 @@ inline int GetUnixSockType(SockType type) {
       return SOCK_STREAM;
     case SockType::kSeqPacket:
       return SOCK_SEQPACKET;
+    case SockType::kDgram:
+      return SOCK_DGRAM;
   }
   PERFETTO_CHECK(false);
 }
@@ -117,6 +119,16 @@ void UnixSocketRaw::ShiftMsgHdr(size_t n, struct msghdr* msg) {
   PERFETTO_CHECK(n == 0);
   msg->msg_iovlen = 0;
   msg->msg_iov = nullptr;
+}
+
+// static
+std::pair<UnixSocketRaw, UnixSocketRaw> UnixSocketRaw::CreatePair(SockType t) {
+  int fds[2];
+  if (socketpair(AF_UNIX, GetUnixSockType(t), 0, fds) != 0)
+    return std::make_pair(UnixSocketRaw(), UnixSocketRaw());
+
+  return std::make_pair(UnixSocketRaw(ScopedFile(fds[0]), t),
+                        UnixSocketRaw(ScopedFile(fds[1]), t));
 }
 
 UnixSocketRaw::UnixSocketRaw() = default;
@@ -381,8 +393,7 @@ UnixSocket::UnixSocket(EventListener* event_listener,
                        ScopedFile adopt_fd,
                        State adopt_state,
                        SockType sock_type)
-    : sock_raw_(UnixSocketRaw::CreateInvalid()),
-      event_listener_(event_listener),
+    : event_listener_(event_listener),
       task_runner_(task_runner),
       weak_ptr_factory_(this) {
   state_ = State::kDisconnected;

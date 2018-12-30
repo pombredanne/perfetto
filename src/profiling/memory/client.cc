@@ -131,14 +131,14 @@ SocketPool::SocketPool(std::vector<base::UnixSocketRaw> sockets)
 BorrowedSocket SocketPool::Borrow() {
   std::unique_lock<std::timed_mutex> l(mutex_, kLockTimeout);
   if (!l.owns_lock())
-    return {base::UnixSocketRaw::CreateInvalid(), nullptr};
+    return {base::UnixSocketRaw(), nullptr};
   cv_.wait(l, [this] {
     return available_sockets_ > 0 || dead_sockets_ == sockets_.size() ||
            shutdown_;
   });
 
   if (dead_sockets_ == sockets_.size() || shutdown_) {
-    return {base::UnixSocketRaw::CreateInvalid(), nullptr};
+    return {base::UnixSocketRaw(), nullptr};
   }
 
   PERFETTO_CHECK(available_sockets_ > 0);

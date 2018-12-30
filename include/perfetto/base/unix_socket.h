@@ -35,7 +35,7 @@ namespace base {
 
 class TaskRunner;
 
-enum class SockType { kStream, kSeqPacket };
+enum class SockType { kStream, kSeqPacket, kDgram };
 
 // UnixSocketRaw is a basiv wrapper around UNIX sockets. It exposes wrapper
 // methods tha take care of most common pitfalls (e.g., marking fd as O_CLOEXEC,
@@ -43,11 +43,14 @@ enum class SockType { kStream, kSeqPacket };
 // It is used as a building block for the more sophisticated UnixSocket class.
 class UnixSocketRaw {
  public:
-  // Creates an non-initialized unix socket (mostly for tests).
-  static UnixSocketRaw CreateInvalid() { return UnixSocketRaw(); }
-
   // Creates a new unconnected unix socket.
   static UnixSocketRaw CreateMayFail(SockType t) { return UnixSocketRaw(t); }
+
+  // Crates a pair of connected sockets.
+  static std::pair<UnixSocketRaw, UnixSocketRaw> CreatePair(SockType);
+
+  // Creates an non-initialized unix socket.
+  UnixSocketRaw();
 
   // Creates a unix socket adopting an existing file descriptor. This is
   // typically used to inherit fds from init via environment variables.
@@ -93,7 +96,6 @@ class UnixSocketRaw {
   static void ShiftMsgHdr(size_t n, struct msghdr* msg);
 
  private:
-  UnixSocketRaw();
   explicit UnixSocketRaw(SockType);
 
   UnixSocketRaw(const UnixSocketRaw&) = delete;

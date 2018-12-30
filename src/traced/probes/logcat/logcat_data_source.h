@@ -70,8 +70,11 @@ class LogcatDataSource : public ProbesDataSource {
   void Start() override;
   void Flush(FlushRequestID, std::function<void()> callback) override;
 
-  // Reads the contents of /system/etc/event-log-tags (mocked for testing).
+  // Reads the contents of /system/etc/event-log-tags. Virtual for testing.
   virtual std::string ReadEventLogDefinitions();
+
+  // Connects to the /dev/socket/logdr socket. Virtual for testing.
+  virtual base::UnixSocketRaw ConnectLogdrSocket();
 
   // Parses the contents of ReadEventLogDefinitions().
   void ParseEventLogDefinitions();
@@ -97,6 +100,11 @@ class LogcatDataSource : public ProbesDataSource {
                         const char* end,
                         protos::pbzero::AndroidLogcatPacket* packet,
                         protos::pbzero::AndroidLogcatPacket_LogEvent** out_evt);
+
+  bool ParseTextEvent(const char* start,
+                      const char* end,
+                      protos::pbzero::AndroidLogcatPacket* packet,
+                      protos::pbzero::AndroidLogcatPacket_LogEvent** out_evt);
 
   base::TaskRunner* const task_runner_;
   std::unique_ptr<TraceWriter> writer_;

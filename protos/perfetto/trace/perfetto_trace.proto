@@ -206,7 +206,6 @@ message AndroidLogcatPacket {
     // Empty when log_id == LID_EVENTS.
     optional string message = 7;
 
-    // Only populated when log_id == LID_EVENTS.
     message Arg {
       optional string name = 1;
       oneof value {
@@ -215,8 +214,10 @@ message AndroidLogcatPacket {
         string string_value = 4;
       }
     }
+    // Only populated when log_id == LID_EVENTS.
     repeated Arg args = 8;
   }
+
   repeated LogEvent events = 1;
 
   // Stats are emitted only upon Flush() and are monotonic (i.e. they are
