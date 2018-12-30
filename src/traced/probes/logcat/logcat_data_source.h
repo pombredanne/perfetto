@@ -26,7 +26,6 @@
 #include "perfetto/base/string_view.h"
 #include "perfetto/base/unix_socket.h"
 #include "perfetto/base/weak_ptr.h"
-#include "perfetto/tracing/core/data_source_config.h"
 #include "src/traced/probes/probes_data_source.h"
 
 namespace perfetto {
@@ -84,12 +83,18 @@ class LogcatDataSource : public ProbesDataSource {
   base::WeakPtr<LogcatDataSource> GetWeakPtr() const;
 
  private:
-  struct DynamicLibLoader;
-
+  // Periodic polling task.
   void Tick(bool post_next_task);
 
   // Parses one line of /system/etc/event-log-tags.
   bool ParseEventLogDefinitionLine(char* line, size_t len);
+
+  // Parses a textual (i.e. tag + message) event. All buffers but the "events"
+  // one contain text events.
+  bool ParseTextEvent(const char* start,
+                      const char* end,
+                      protos::pbzero::AndroidLogcatPacket* packet,
+                      protos::pbzero::AndroidLogcatPacket_LogEvent** out_evt);
 
   // Parses a binary event from the "events" buffer.
   // If parsing fails returns false and leaves the |out_evt| field unset.
@@ -101,11 +106,6 @@ class LogcatDataSource : public ProbesDataSource {
                         protos::pbzero::AndroidLogcatPacket* packet,
                         protos::pbzero::AndroidLogcatPacket_LogEvent** out_evt);
 
-  bool ParseTextEvent(const char* start,
-                      const char* end,
-                      protos::pbzero::AndroidLogcatPacket* packet,
-                      protos::pbzero::AndroidLogcatPacket_LogEvent** out_evt);
-
   base::TaskRunner* const task_runner_;
   std::unique_ptr<TraceWriter> writer_;
   base::UnixSocketRaw logcat_sock_;
@@ -113,6 +113,7 @@ class LogcatDataSource : public ProbesDataSource {
   // Config parameters coming from the data source section in the trace config.
   uint32_t poll_rate_ms_ = 0;
   int min_prio_ = 0;
+  std::string mode_;
 
   // For filtering events based on tags.
   std::unordered_set<base::StringView> filter_tags_;
@@ -123,7 +124,6 @@ class LogcatDataSource : public ProbesDataSource {
   // /system/etc/event-log-tags when starting.
   std::unordered_map<int, EventFormat> event_formats_;
 
-  std::string mode_;
   base::PagedMemory buf_;  // Safer than stack, has red zones around the buffer.
   Stats stats_;
 

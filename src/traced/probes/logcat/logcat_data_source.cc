@@ -268,14 +268,12 @@ bool LogcatDataSource::ParseTextEvent(
   if (prio < min_prio_)
     return true;
 
-  // Find the NUL terminator that separates |tag| from |message|.
+  // Find the null terminator that separates |tag| from |message|.
   const char* str_end;
   for (str_end = buf; str_end < end && *str_end; str_end++) {
   }
-  if (str_end >= end - 2) {
-    // Looks like there is a tag-less message.
+  if (str_end >= end - 2)
     return false;
-  }
 
   auto tag = base::StringView(buf, static_cast<size_t>(str_end - buf));
   if (!filter_tags_.empty() && filter_tags_.count(tag) == 0)
@@ -289,8 +287,8 @@ bool LogcatDataSource::ParseTextEvent(
   buf = str_end + 1;  // Move |buf| to the start of the message.
   size_t msg_len = static_cast<size_t>(end - buf);
 
-  // Protobuf strings don't need the nul terminator. If the string is
-  // null terminator, omit the terminator from the length.
+  // Protobuf strings don't need the null terminator. If the string is
+  // null terminated, omit the terminator.
   if (msg_len > 0 && *(end - 1) == '\0')
     msg_len--;
 
@@ -379,7 +377,7 @@ bool LogcatDataSource::ParseBinaryEvent(
         if (field_num > 0) {
           // Lists are supported only as a top-level node. We stop parsing when
           // encountering a list as an inner field. The very few of them are not
-          // interesting.
+          // interesting enough to warrant the extra complexity.
           return evt;
         }
         break;
