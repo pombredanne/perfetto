@@ -39,6 +39,7 @@ source_set("probes_src") {
     "../../tracing:ipc",
     "../../tracing:tracing",
     "filesystem",
+    "logcat",
     "power",
     "ps",
     "sys_stats",
@@ -70,6 +71,7 @@ source_set("unittests") {
     "../../../gn:gtest_deps",
     "../../tracing:test_support",
     "filesystem:unittests",
+    "logcat:unittests",
     "ps:unittests",
     "sys_stats:unittests",
   ]
