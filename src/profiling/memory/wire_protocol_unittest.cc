@@ -94,12 +94,12 @@ TEST(WireProtocolTest, AllocMessage) {
   msg.payload = payload;
   msg.payload_size = sizeof(payload);
 
-  int sv[2];
-  ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, sv), 0);
-  base::UnixSocketRaw send_sock(base::ScopedFile(sv[0]),
-                                base::SockType::kStream);
-  base::UnixSocketRaw recv_sock(base::ScopedFile(sv[1]),
-                                base::SockType::kStream);
+  base::UnixSocketRaw send_sock;
+  base::UnixSocketRaw recv_sock;
+  std::tie(send_sock, recv_sock) =
+      base::UnixSocketRaw::CreatePair(base::SockType::kStream);
+  ASSERT_TRUE(send_sock);
+  ASSERT_TRUE(recv_sock);
   ASSERT_TRUE(SendWireMessage(&send_sock, msg));
 
   RecordReader::Record record = ReceiveAll(&recv_sock);

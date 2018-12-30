@@ -643,17 +643,18 @@ int RollbackSigaction(const struct sigaction* act) {
 }
 
 TEST_F(UnixSocketTest, PartialSendMsgAll) {
-  int sv[2];
-  ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, sv), 0);
-  UnixSocketRaw send_socket(ScopedFile(sv[0]), SockType::kStream);
-  UnixSocketRaw recv_socket(ScopedFile(sv[1]), SockType::kStream);
+  UnixSocketRaw send_sock;
+  UnixSocketRaw recv_sock;
+  std::tie(send_sock, recv_sock) = UnixSocketRaw::CreatePair(SockType::kStream);
+  ASSERT_TRUE(send_sock);
+  ASSERT_TRUE(recv_sock);
 
   // Set bufsize to minimum.
   int bufsize = 1024;
-  ASSERT_EQ(setsockopt(send_socket.fd(), SOL_SOCKET, SO_SNDBUF, &bufsize,
+  ASSERT_EQ(setsockopt(send_sock.fd(), SOL_SOCKET, SO_SNDBUF, &bufsize,
                        sizeof(bufsize)),
             0);
-  ASSERT_EQ(setsockopt(recv_socket.fd(), SOL_SOCKET, SO_RCVBUF, &bufsize,
+  ASSERT_EQ(setsockopt(recv_sock.fd(), SOL_SOCKET, SO_RCVBUF, &bufsize,
                        sizeof(bufsize)),
             0);
 
@@ -679,8 +680,8 @@ TEST_F(UnixSocketTest, PartialSendMsgAll) {
       rollback(&oldact);
 
   auto blocked_thread = pthread_self();
-  std::thread th([blocked_thread, &recv_socket, &recv_buf] {
-    ssize_t rd = PERFETTO_EINTR(read(recv_socket.fd(), recv_buf, 1));
+  std::thread th([blocked_thread, &recv_sock, &recv_buf] {
+    ssize_t rd = PERFETTO_EINTR(read(recv_sock.fd(), recv_buf, 1));
     ASSERT_EQ(rd, 1);
     // We are now sure the other thread is in sendmsg, interrupt send.
     ASSERT_EQ(pthread_kill(blocked_thread, SIGWINCH), 0);
@@ -688,7 +689,7 @@ TEST_F(UnixSocketTest, PartialSendMsgAll) {
     size_t offset = 1;
     while (offset < sizeof(recv_buf)) {
       rd = PERFETTO_EINTR(
-          read(recv_socket.fd(), recv_buf + offset, sizeof(recv_buf) - offset));
+          read(recv_sock.fd(), recv_buf + offset, sizeof(recv_buf) - offset));
       ASSERT_GE(rd, 0);
       offset += static_cast<size_t>(rd);
     }
@@ -708,8 +709,8 @@ TEST_F(UnixSocketTest, PartialSendMsgAll) {
   hdr.msg_iov = iov;
   hdr.msg_iovlen = base::ArraySize(iov);
 
-  ASSERT_EQ(send_socket.SendMsgAll(&hdr), sizeof(send_buf));
-  send_socket.Shutdown();
+  ASSERT_EQ(send_sock.SendMsgAll(&hdr), sizeof(send_buf));
+  send_sock.Shutdown();
   th.join();
   // Make sure the re-entry logic was actually triggered.
   ASSERT_EQ(hdr.msg_iov, nullptr);

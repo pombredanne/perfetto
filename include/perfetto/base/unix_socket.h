@@ -35,7 +35,10 @@ namespace base {
 
 class TaskRunner;
 
-enum class SockType { kStream, kSeqPacket };
+// Use arbitrarily high values to avoid that some code accidentally ends up
+// assuming that these enum values match the sysroot's SOCK_xxx defines rather
+// than using GetUnixSockType().
+enum class SockType { kStream = 100, kDgram, kSeqPacket };
 
 // UnixSocketRaw is a basiv wrapper around UNIX sockets. It exposes wrapper
 // methods tha take care of most common pitfalls (e.g., marking fd as O_CLOEXEC,
@@ -43,11 +46,14 @@ enum class SockType { kStream, kSeqPacket };
 // It is used as a building block for the more sophisticated UnixSocket class.
 class UnixSocketRaw {
  public:
-  // Creates an non-initialized unix socket (mostly for tests).
-  static UnixSocketRaw CreateInvalid() { return UnixSocketRaw(); }
-
   // Creates a new unconnected unix socket.
   static UnixSocketRaw CreateMayFail(SockType t) { return UnixSocketRaw(t); }
+
+  // Crates a pair of connected sockets.
+  static std::pair<UnixSocketRaw, UnixSocketRaw> CreatePair(SockType);
+
+  // Creates an non-initialized unix socket.
+  UnixSocketRaw();
 
   // Creates a unix socket adopting an existing file descriptor. This is
   // typically used to inherit fds from init via environment variables.
@@ -75,8 +81,8 @@ class UnixSocketRaw {
 
   ssize_t Send(const void* msg,
                size_t len,
-               const int* send_fds,
-               size_t num_fds);
+               const int* send_fds = nullptr,
+               size_t num_fds = 0);
 
   // Re-enter sendmsg until all the data has been sent or an error occurs.
   // TODO(fmayer): Figure out how to do timeouts here for heapprofd.
@@ -93,7 +99,6 @@ class UnixSocketRaw {
   static void ShiftMsgHdr(size_t n, struct msghdr* msg);
 
  private:
-  UnixSocketRaw();
   explicit UnixSocketRaw(SockType);
 
   UnixSocketRaw(const UnixSocketRaw&) = delete;
