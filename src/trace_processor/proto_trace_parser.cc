@@ -1025,8 +1025,8 @@ void ProtoTraceParser::ParseLogcatPacket(TraceBlobView packet) {
 }
 
 void ProtoTraceParser::ParseLogcatEvent(TraceBlobView event) {
-  // TODO raw table.
-  // TODO deal with stats.
+  // TODO(primiano): Add events and non-stringified fields to the "raw" table.
+  // TODO(primiano): Add failure stats to the stats table.
   ProtoDecoder decoder(event.data(), event.length());
   int64_t ts = 0;
   uint32_t pid = 0;
@@ -1034,8 +1034,12 @@ void ProtoTraceParser::ParseLogcatEvent(TraceBlobView event) {
   uint8_t prio = 0;
   StringId tag_id = 0;
   StringId msg_id = 0;
-  char arg_msg[4096]{};
+  char arg_msg[4096];
   char* arg_str = &arg_msg[0];
+  *arg_str = '\0';
+  auto arg_avail = [&arg_msg, &arg_str]() {
+    return sizeof(arg_msg) - static_cast<size_t>(arg_str - arg_msg);
+  };
 
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
@@ -1067,25 +1071,26 @@ void ProtoTraceParser::ParseLogcatEvent(TraceBlobView event) {
           switch (arg.id) {
             case protos::AndroidLogcatPacket::LogEvent::Arg::kNameFieldNumber: {
               base::StringView name = arg.as_string();
-              arg_str +=
-                  sprintf(arg_str, " %.*s=", static_cast<int>(name.size()),
-                          name.data());
+              arg_str += snprintf(arg_str, arg_avail(),
+                                  " %.*s=", static_cast<int>(name.size()),
+                                  name.data());
               break;
             }
             case protos::AndroidLogcatPacket::LogEvent::Arg::
                 kStringValueFieldNumber: {
               base::StringView val = arg.as_string();
-              arg_str += sprintf(arg_str, "\"%.*s\"",
-                                 static_cast<int>(val.size()), val.data());
+              arg_str += snprintf(arg_str, arg_avail(), "\"%.*s\"",
+                                  static_cast<int>(val.size()), val.data());
               break;
             }
             case protos::AndroidLogcatPacket::LogEvent::Arg::
                 kIntValueFieldNumber:
-              arg_str += sprintf(arg_str, "%" PRId64, arg.as_int64());
+              arg_str +=
+                  snprintf(arg_str, arg_avail(), "%" PRId64, arg.as_int64());
               break;
             case protos::AndroidLogcatPacket::LogEvent::Arg::
                 kRealValueFieldNumber:
-              arg_str += sprintf(arg_str, "%f", arg.as_double());
+              arg_str += snprintf(arg_str, arg_avail(), "%f", arg.as_double());
               break;
           }  // switch(arg.id)
         }    // for(arg)
