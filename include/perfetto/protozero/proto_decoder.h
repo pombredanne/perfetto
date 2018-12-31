@@ -80,6 +80,13 @@ class ProtoDecoder {
       return res;
     }
 
+    inline double as_double() const {
+      PERFETTO_DCHECK(type == proto_utils::ProtoWireType::kFixed64);
+      double res;
+      memcpy(&res, &int_value, sizeof(res));
+      return res;
+    }
+
     inline StringView as_string() const {
       PERFETTO_DCHECK(type == proto_utils::ProtoWireType::kLengthDelimited);
       return StringView(reinterpret_cast<const char*>(length_limited.data),
