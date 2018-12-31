@@ -1102,7 +1102,9 @@ void ProtoTraceParser::ParseLogcatEvent(TraceBlobView event) {
   }
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 
-  prio = prio ? prio : protos::AndroidLogcatPriority::PRIO_INFO;
+  if (prio == 0)
+    prio = protos::AndroidLogcatPriority::PRIO_INFO;
+
   if (arg_str != &arg_msg[0]) {
     PERFETTO_DCHECK(!msg_id);
     // Skip the first space char (" foo=1 bar=2" -> "foo=1 bar=2").
