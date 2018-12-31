@@ -84,6 +84,7 @@ class ProtoTraceParser {
   void ParseLowmemoryKill(int64_t ts, TraceBlobView);
   void ParseBatteryCounters(int64_t ts, TraceBlobView);
   void ParseOOMScoreAdjUpdate(int64_t ts, TraceBlobView);
+  void ParseClockSnapshot(TraceBlobView);
   void ParseLogcatPacket(TraceBlobView);
   void ParseLogcatEvent(TraceBlobView);
 
