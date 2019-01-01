@@ -27,6 +27,7 @@ import {TimeSpan} from '../common/time';
 import {QuantizedLoad, ThreadDesc} from '../frontend/globals';
 import {SLICE_TRACK_KIND} from '../tracks/chrome_slices/common';
 import {CPU_SLICE_TRACK_KIND} from '../tracks/cpu_slices/common';
+import {LOGCAT_TRACK_KIND} from '../tracks/logcat/common';
 import {PROCESS_SUMMARY_TRACK} from '../tracks/process_summary/common';
 
 import {Child, Children, Controller} from './controller';
@@ -382,6 +383,15 @@ export class TraceController extends Controller<States> {
         }));
       }
     }
+
+    addTrackGroupActions.push(Actions.addTrack({
+      engineId: this.engineId,
+      kind: LOGCAT_TRACK_KIND,
+      name: 'logcat',
+      trackGroup: SCROLLING_TRACK_GROUP,
+      config: {}
+    }));
+
     const allActions =
         addSummaryTrackActions.concat(addTrackGroupActions, addToTrackActions);
     globals.dispatchMultiple(allActions);

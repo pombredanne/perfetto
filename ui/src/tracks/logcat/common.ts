@@ -12,11 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Import all currently implemented tracks. After implemeting a new track, an
-// import statement for it needs to be added here.
-import './cpu_slices/controller';
-import './chrome_slices/controller';
-import './vsync/controller';
-import './process_summary/controller';
-import './counter/controller';
-import './logcat/controller';
+export const LOGCAT_TRACK_KIND = 'LogcatTrack';
+
+export interface Data {
+  start: number;
+  end: number;
+  resolution: number;
+  timestamps: Float64Array;
+
+  // Each Uint8 value has the i-th bit is set if there is at least one logcat
+  // event at the i-th priority level at the corresponding time in |timestamps|.
+  severities: Uint8Array;
+}
+
+export interface Config {}
