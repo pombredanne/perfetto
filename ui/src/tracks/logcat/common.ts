@@ -17,6 +17,7 @@ export const LOGCAT_TRACK_KIND = 'LogcatTrack';
 export interface Data {
   start: number;
   end: number;
+
   resolution: number;
   timestamps: Float64Array;
 

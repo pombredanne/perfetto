@@ -12,37 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import * as m from 'mithril';
 import {Actions} from '../../common/actions';
 import {TrackState} from '../../common/state';
 import {checkerboardExcept} from '../../frontend/checkerboard';
 import {globals} from '../../frontend/globals';
 import {Track} from '../../frontend/track';
 import {trackRegistry} from '../../frontend/track_registry';
-
 import {Config, Data, LOGCAT_TRACK_KIND} from './common';
+import {Panel} from '../../frontend/panel';
+import { QueryResponse } from '../../common/queries';
+import { timeToString } from '../../common/time';
+
+interface LevelCfg {
+  color: string;
+  prios: number[];
+}
+
+const LEVELS: LevelCfg[] = [
+  {color: 'hsl(122, 39%, 49%)', prios: [0, 1, 2, 3]},  // Up to DEBUG: Green.
+  {color: 'hsl(0, 0%, 70%)', prios: [4]},              // 4 (INFO) -> Gray.
+  {color: 'hsl(45, 100%, 51%)', prios: [5]},           // 5 (WARN) -> Amber.
+  {color: 'hsl(4, 90%, 58%)', prios: [6]},             // 6 (ERROR) -> Red.
+  {color: 'hsl(291, 64%, 42%)', prios: [7]},           // 7 (FATAL) -> Purple
+];
 
 const MARGIN_TOP = 2;
 const RECT_HEIGHT = 35;
-const EVT_PX = 2;  // Width of an event in pixels.
-
-const COLORS = [
-  'hsl(122, 39%, 49%)',  // Green.
-  'hsl(0, 0%, 70%)',     // Gray.
-  'hsl(45, 100%, 51%)',  // Amber.
-  'hsl(4, 90%, 58%)',    // Red.
-  'hsl(291, 64%, 42%)',  // Purple.
-];
-
-const PRIO_TO_COLOR = [
-  0,
-  0,
-  0,
-  0,  // 0-3 (UNSPECIFIED, VERBOSE, DEBUG) -> Green.
-  1,  // 4 (INFO) -> Gray.
-  2,  // 5 (WARN) -> Amber.
-  3,  // 6 (ERROR) -> Red.
-  4,  // 7 (FATAL) -> Purple
-];
+const EVT_PX = 2;  // Width of an event tick in pixels.
 
 function getCurResolution() {
   // Truncate the resolution to the closest power of 10.
@@ -103,17 +100,61 @@ class LogcatTrack extends Track<Config, Data> {
 
     const quantWidth =
         Math.max(EVT_PX, timeScale.deltaTimeToPx(data.resolution));
-    const BLOCK_H = RECT_HEIGHT / COLORS.length;
+    const BLOCK_H = RECT_HEIGHT / LEVELS.length;
     for (let i = 0; i < data.timestamps.length; i++) {
-      for (let prio = 0; prio < 8; prio++) {
-        if ((data.severities[i] & (1 << prio)) === 0) continue;
-        const lev = PRIO_TO_COLOR[prio];
-        ctx.fillStyle = COLORS[lev];
+      for (let lev = 0; lev < LEVELS.length; lev++) {
+        let hasEventsForCurColor = false;
+        for (const prio of LEVELS[lev].prios) {
+          if (data.severities[i] & (1 << prio)) hasEventsForCurColor = true;
+        }
+        if (!hasEventsForCurColor) continue;
+        ctx.fillStyle = LEVELS[lev].color;
         const px = Math.floor(timeScale.timeToPx(data.timestamps[i]));
         ctx.fillRect(px, MARGIN_TOP + BLOCK_H * lev, quantWidth, BLOCK_H);
-      }
-    }
+      }  // for(lev)
+    }    // for (timestamps)
   }
 }
 
 trackRegistry.register(LogcatTrack);
+
+interface LogcatPanelAttrs {
+  // title: string;
+}
+
+const QUERY_ID = 'logcat';
+const PRIO_TO_LETTER = ['-', '-', 'V', 'D', 'I', 'W', 'E', 'F'];
+
+export class LogcatPanel extends Panel<LogcatPanelAttrs> {
+  private hasData = false;
+  renderCanvas() {}
+
+  reqData() {
+    const vizTime = globals.frontendLocalState.visibleWindowTime;
+    const startNs = Math.floor(vizTime.start * 1e9);
+    const endNs = Math.ceil(vizTime.end * 1e9);
+    const query = `select ts, prio, tag, msg from logcat
+    where ts >= ${startNs} and ts <= ${endNs} limit 100`;
+    console.log('Requesting logcat');  // DNS.
+    globals.dispatch(
+      Actions.executeQuery({engineId: '0', queryId: QUERY_ID, query}));
+    this.hasData = true;
+  }
+
+  view({/*attrs*/}: m.CVnode<LogcatPanelAttrs>) {
+    if (!this.hasData) this.reqData();
+    const queryResp = globals.queryResults.get(QUERY_ID) as QueryResponse;
+    const rows : m.Children = [];
+    if (queryResp !== undefined) {
+      for(const row of queryResp.rows) {
+        rows.push(m('tr',
+          m('td', timeToString(+row['ts'] / 1e9)),
+          m('td', PRIO_TO_LETTER[+row['prio']] || '?'),
+          m('td', row['tag']),
+          m('td', row['msg']),
+        ));
+      }
+    }
+    return [m('header', 'Logcat events'), m('table.logcat', m('tbody', rows))];
+  }
+}

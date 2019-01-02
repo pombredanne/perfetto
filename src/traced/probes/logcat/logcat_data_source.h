@@ -89,8 +89,12 @@ class LogcatDataSource : public ProbesDataSource {
   // Parses one line of /system/etc/event-log-tags.
   bool ParseEventLogDefinitionLine(char* line, size_t len);
 
-  // Parses a textual (i.e. tag + message) event. All buffers but the "events"
-  // one contain text events.
+  // Parses a textual (i.e. tag + message) event, which is the majority of
+  // log events. All buffers but the LID_EVENTS contain text events.
+  // If parsing fails returns false and leaves the |out_evt| field unset.
+  // If parsing succeeds returns true and:
+  // - If the event is skipped due to filters, |out_evt| is left unset.
+  // - If a new event is aded to the packet, |out_evt| is set to that.
   bool ParseTextEvent(const char* start,
                       const char* end,
                       protos::pbzero::AndroidLogcatPacket* packet,
@@ -124,7 +128,9 @@ class LogcatDataSource : public ProbesDataSource {
   // /system/etc/event-log-tags when starting.
   std::unordered_map<int, EventFormat> event_formats_;
 
-  base::PagedMemory buf_;  // Safer than stack, has red zones around the buffer.
+  // Buffer used for parsing. It's safer (read: fails sooner) than using the
+  // stack, due to red zones around the boundaries.
+  base::PagedMemory buf_;
   Stats stats_;
 
   base::WeakPtrFactory<LogcatDataSource> weak_factory_;  // Keep last.

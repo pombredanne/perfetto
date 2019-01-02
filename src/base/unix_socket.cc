@@ -457,15 +457,19 @@ void UnixSocket::DoConnect(const std::string& socket_name) {
     return NotifyConnectionState(false);
   }
 
-  // At this point either |res| == 0 (the connect() succeeded) or started
-  // asynchronously (EINPROGRESS).
+  // At this point either connect() succeeded or started asynchronously
+  // (errno = EINPROGRESS).
   last_error_ = 0;
   state_ = State::kConnecting;
 
   // Even if the socket is non-blocking, connecting to a UNIX socket can be
-  // acknowledged straight away rather than returning EINPROGRESS. In this case
-  // just trigger an OnEvent without waiting for the FD watch. That will poll
-  // the SO_ERROR and evolve the state into either kConnected or kDisconnected.
+  // acknowledged straight away rather than returning EINPROGRESS.
+  // The decision here is to deal with the two cases uniformly, at the cost of
+  // delaying the straight-away-connect() case by one task, to avoid depending
+  // on implementation details of UNIX socket on the various OSes.
+  // Posting the OnEvent() below emulates a wakeup of the FD watch. OnEvent(),
+  // which knows how to deal with spurious wakeups, will poll the SO_ERROR and
+  // evolve, if necessary, the state into either kConnected or kDisconnected.
   WeakPtr<UnixSocket> weak_ptr = weak_ptr_factory_.GetWeakPtr();
   task_runner_->PostTask([weak_ptr] {
     if (weak_ptr)
@@ -615,7 +619,6 @@ size_t UnixSocket::Receive(void* msg,
     return 0;
   }
 
-  // TODO EINTR? // DNS.
   const ssize_t sz = sock_raw_.Receive(msg, len, fd_vec, max_files);
   if (sz < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
     last_error_ = EAGAIN;

@@ -30,6 +30,7 @@ import {TimeAxisPanel} from './time_axis_panel';
 import {TrackGroupPanel} from './track_group_panel';
 import {TRACK_SHELL_WIDTH} from './track_panel';
 import {TrackPanel} from './track_panel';
+import { LogcatPanel } from '../tracks/logcat/frontend';
 
 const MAX_ZOOM_SPAN_SEC = 1e-4;  // 0.1 ms.
 const DRAG_HANDLE_HEIGHT_PX = 12;
@@ -225,6 +226,7 @@ class TraceViewer implements m.ClassComponent {
       }
     }
     scrollingPanels.unshift(m(QueryTable));
+    scrollingPanels.push(m(LogcatPanel, {}));
 
     return m(
         '.page',
