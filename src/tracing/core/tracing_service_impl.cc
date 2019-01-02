@@ -624,6 +624,10 @@ void TracingServiceImpl::DisableTracingNotifyConsumerAndFlushFile(
   if (tracing_session->write_into_file) {
     tracing_session->write_period_ms = 0;
     ReadBuffers(tracing_session->id, nullptr);
+
+    // Ensure all data was written to the file before we notify the consumer.
+    int fd = *tracing_session->write_into_file;
+    base::FlushFile(fd);
   }
 
   if (tracing_session->consumer_maybe_null)
