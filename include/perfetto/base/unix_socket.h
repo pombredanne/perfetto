@@ -296,7 +296,6 @@ class UnixSocket {
   // Called once by the corresponding public static factory methods.
   void DoConnect(const std::string& socket_name);
   void ReadPeerCredentials();
-  void SetBlockingIO(bool is_blocking);
 
   void OnEvent();
   void NotifyConnectionState(bool success);

@@ -42,6 +42,10 @@ const char kLogTagsPath[] = "/system/etc/event-log-tags";
 const char kLogcatSocket[] = "/dev/socket/logdr";
 
 // From AOSP's liblog/include/log/log_read.h .
+// Logcat is supposed to be an ABI as it's exposed also by logcat -b (and in
+// practice never changed in backwards-incompatible ways in the past).
+// Note: the casing doesn't match the style guide and instead matches the
+// original name in liblog for the sake of code-searcheability.
 struct logger_entry_v4 {
   uint16_t len;       // length of the payload.
   uint16_t hdr_size;  // sizeof(struct logger_entry_v4).
@@ -55,8 +59,9 @@ struct logger_entry_v4 {
 
 // Event types definition in the binary encoded format, from
 // liblog/include/log/log.h .
-// These values don't match the textual definitions of
-// system/core/logcat/event.logtags, the latter are off by one (INT = 1).
+// Note that these values don't match the textual definitions of
+// system/core/logcat/event.logtags (which are not used by perfetto).
+// The latter are off by one (INT = 1, LONG=2 and so on).
 enum AndroidEventLogType {
   EVENT_TYPE_INT = 0,
   EVENT_TYPE_LONG = 1,
@@ -99,7 +104,8 @@ LogcatDataSource::LogcatDataSource(DataSourceConfig ds_config,
     log_ids.push_back(AndroidLogcatConfig::AndroidLogcatLogId::LID_CRASH);
     log_ids.push_back(AndroidLogcatConfig::AndroidLogcatLogId::LID_KERNEL);
   }
-  // Build the command string that will be sent to the logdr socket on Start().
+  // Build the command string that will be sent to the logdr socket on Start(),
+  // which looks like "stream lids=1,2,3,4" (lids == log buffer id(s)).
   mode_ = "stream lids";
   for (auto it = log_ids.begin(); it != log_ids.end(); it++) {
     mode_ += it == log_ids.begin() ? "=" : ",";
@@ -108,7 +114,8 @@ LogcatDataSource::LogcatDataSource(DataSourceConfig ds_config,
 
   // Build a linear vector out of the tag filters and keep track of the string
   // boundaries. Once done, derive StringView(s) out of the vector. This is
-  // to create a set<StringView> which is backed by contiguous chars.
+  // to create a set<StringView> which is backed by contiguous chars that can be
+  // used to lookup StringView(s) from the parsed buffer.
   std::vector<std::pair<size_t, size_t>> tag_boundaries;
   for (const std::string& tag : cfg.filter_tags()) {
     const size_t begin = filter_tags_strbuf_.size();
@@ -143,7 +150,7 @@ void LogcatDataSource::Start() {
   if (!(logcat_sock_ = ConnectLogdrSocket()))
     return;
 
-  PERFETTO_DLOG("Starting logcat stream: %s", mode_.c_str());
+  PERFETTO_DLOG("Starting logcat data source: %s", mode_.c_str());
   if (logcat_sock_.Send(mode_.data(), mode_.size()) <= 0) {
     PERFETTO_PLOG("send() failed on logcat socket %s", kLogcatSocket);
     return;
@@ -233,7 +240,6 @@ void LogcatDataSource::Tick(bool post_next_task) {
     if (!evt) {
       // Parsing succeeded but the event was skipped due to filters.
       stats_.num_skipped++;
-      // TODO remove the ++ in the impl. DNS.
       continue;
     }
 
