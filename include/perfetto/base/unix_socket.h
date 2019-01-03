@@ -40,10 +40,10 @@ class TaskRunner;
 // than using GetUnixSockType().
 enum class SockType { kStream = 100, kDgram, kSeqPacket };
 
-// UnixSocketRaw is a basiv wrapper around UNIX sockets. It exposes wrapper
-// methods tha take care of most common pitfalls (e.g., marking fd as O_CLOEXEC,
-// avoding SIGPIPE, properly handling partial writes).
-// It is used as a building block for the more sophisticated UnixSocket class.
+// UnixSocketRaw is a basic wrapper around UNIX sockets. It exposes wrapper
+// methods that take care of most common pitfalls (e.g., marking fd as
+// O_CLOEXEC, avoiding SIGPIPE, properly handling partial writes). It is used as
+// a building block for the more sophisticated UnixSocket class.
 class UnixSocketRaw {
  public:
   // Creates a new unconnected unix socket.
@@ -52,7 +52,7 @@ class UnixSocketRaw {
   // Crates a pair of connected sockets.
   static std::pair<UnixSocketRaw, UnixSocketRaw> CreatePair(SockType);
 
-  // Creates an non-initialized unix socket.
+  // Creates an uninitialized unix socket.
   UnixSocketRaw();
 
   // Creates a unix socket adopting an existing file descriptor. This is
@@ -74,10 +74,7 @@ class UnixSocketRaw {
   int fd() const { return *fd_; }
   explicit operator bool() const { return !!fd_; }
 
-  ScopedFile ReleaseFd() {
-    return std::move(fd_);
-    PERFETTO_DCHECK(!(*this));
-  }
+  ScopedFile ReleaseFd() { return std::move(fd_); }
 
   ssize_t Send(const void* msg,
                size_t len,

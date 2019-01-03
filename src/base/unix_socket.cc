@@ -401,6 +401,10 @@ UnixSocket::UnixSocket(EventListener* event_listener,
     // We get here from the default ctor().
     PERFETTO_DCHECK(!adopt_fd);
     sock_raw_ = UnixSocketRaw::CreateMayFail(sock_type);
+    if (!sock_raw_) {
+      last_error_ = errno;
+      return;
+    }
   } else if (adopt_state == State::kConnected) {
     // We get here from OnNewIncomingConnection().
     PERFETTO_DCHECK(adopt_fd);
