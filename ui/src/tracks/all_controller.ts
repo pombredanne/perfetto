@@ -19,4 +19,4 @@ import './chrome_slices/controller';
 import './vsync/controller';
 import './process_summary/controller';
 import './counter/controller';
-import './logcat/controller';
+import './android_log/controller';

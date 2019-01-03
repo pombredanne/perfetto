@@ -16,7 +16,7 @@ import * as m from 'mithril';
 
 import {QueryResponse} from '../common/queries';
 import {TimeSpan} from '../common/time';
-import {LogcatPanel} from '../tracks/logcat/frontend';
+import {AndroidLogPanel} from '../tracks/android_log/frontend';
 
 import {copyToClipboard} from './clipboard';
 import {DragGestureHandler} from './drag_gesture_handler';
@@ -226,7 +226,7 @@ class TraceViewer implements m.ClassComponent {
       }
     }
     scrollingPanels.unshift(m(QueryTable));
-    scrollingPanels.push(m(LogcatPanel, {}));
+    scrollingPanels.push(m(AndroidLogPanel, {}));
 
     return m(
         '.page',

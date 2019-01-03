@@ -81,13 +81,13 @@ export abstract class Engine {
       select max(ts) as ts from sched
       union all select max(ts) as ts from slices
       union all select max(ts) as ts from counters
-      union all select max(ts) as ts from logcat
+      union all select max(ts) as ts from android_logs
     )`;
     const minQuery = `select min(ts) from (
       select min(ts) as ts from sched
       union all select min(ts) as ts from slices
       union all select min(ts) as ts from counters
-      union all select min(ts) as ts from logcat
+      union all select min(ts) as ts from android_logs
     )`;
     const start = (await this.queryOneRow(minQuery))[0];
     const end = (await this.queryOneRow(maxQuery))[0];

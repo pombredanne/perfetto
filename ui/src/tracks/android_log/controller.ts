@@ -18,10 +18,10 @@ import {
   trackControllerRegistry
 } from '../../controller/track_controller';
 
-import {Config, Data, LOGCAT_TRACK_KIND} from './common';
+import {Config, Data, ANDROID_LOGS_TRACK_KIND} from './common';
 
-class LogcatTrackController extends TrackController<Config, Data> {
-  static readonly kind = LOGCAT_TRACK_KIND;
+class AndroidLogTrackController extends TrackController<Config, Data> {
+  static readonly kind = ANDROID_LOGS_TRACK_KIND;
   private busy = false;
 
   onBoundsChange(start: number, end: number, resolution: number) {
@@ -44,7 +44,7 @@ class LogcatTrackController extends TrackController<Config, Data> {
         cast(ts / ${quantNs} as integer) * ${quantNs} as ts_quant,
         prio,
         count(prio)
-      from logcat
+      from android_logs
       where ts >= ${startNs} and ts <= ${endNs}
       group by ts_quant, prio
       order by ts_quant, prio;`);
@@ -70,4 +70,4 @@ class LogcatTrackController extends TrackController<Config, Data> {
   }
 }
 
-trackControllerRegistry.register(LogcatTrackController);
+trackControllerRegistry.register(AndroidLogTrackController);

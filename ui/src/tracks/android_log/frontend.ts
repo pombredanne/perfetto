@@ -25,7 +25,7 @@ import {Panel} from '../../frontend/panel';
 import {Track} from '../../frontend/track';
 import {trackRegistry} from '../../frontend/track_registry';
 
-import {Config, Data, LOGCAT_TRACK_KIND} from './common';
+import {Config, Data, ANDROID_LOGS_TRACK_KIND} from './common';
 
 interface LevelCfg {
   color: string;
@@ -51,10 +51,10 @@ function getCurResolution() {
   return Math.pow(10, Math.floor(Math.log10(resolution)));
 }
 
-class LogcatTrack extends Track<Config, Data> {
-  static readonly kind = LOGCAT_TRACK_KIND;
-  static create(trackState: TrackState): LogcatTrack {
-    return new LogcatTrack(trackState);
+class AndroidLogTrack extends Track<Config, Data> {
+  static readonly kind = ANDROID_LOGS_TRACK_KIND;
+  static create(trackState: TrackState): AndroidLogTrack {
+    return new AndroidLogTrack(trackState);
   }
 
   private reqPending = false;
@@ -119,28 +119,28 @@ class LogcatTrack extends Track<Config, Data> {
   }
 }
 
-trackRegistry.register(LogcatTrack);
+trackRegistry.register(AndroidLogTrack);
 
-interface LogcatPanelAttrs {
+interface AndroidLogPanelAttrs {
   // title: string;
 }
 
-const QUERY_ID = 'logcat_table';
+const QUERY_ID = 'android_logs_table';
 const PRIO_TO_LETTER = ['-', '-', 'V', 'D', 'I', 'W', 'E', 'F'];
 
-interface CachedLogcatEntry {
+interface CachedLogEntry {
   ts: number;
   prio: number;
   tag: string;
   msg: string;
 }
 
-export class LogcatPanel extends Panel<LogcatPanelAttrs> {
+export class AndroidLogPanel extends Panel<AndroidLogPanelAttrs> {
   private state: 'idle'|'updateBounds'|'fetchRows' = 'idle';
   private req = new TimeSpan(0, 0);
   private reqOffset = 0;
-  private cache = new Map<number, CachedLogcatEntry>();
-  private staleCache = new Map<number, CachedLogcatEntry>();
+  private cache = new Map<number, CachedLogEntry>();
+  private staleCache = new Map<number, CachedLogEntry>();
   private totRows = 0;
   private tbody?: HTMLElement;
 
@@ -164,13 +164,13 @@ export class LogcatPanel extends Panel<LogcatPanelAttrs> {
         // First of all check if the visible time window has changed. If that's
         // the case fetch the new event count for the new time bounds.
         if (!vizTime.equals(this.req)) {
-          console.log('Logcat time window change, brand new request');  // DNS.
+          console.log('Log time-window change, brand new request');  // DNS.
           this.state = 'updateBounds';
           this.req = vizTime.clone();
           globals.dispatch(Actions.executeQuery({
             engineId: '0',
             queryId: QUERY_ID,
-            query: `select count(*) as num_rows from logcat
+            query: `select count(*) as num_rows from android_logs
                     where ${vizSqlBounds}`
           }));
           return;
@@ -192,7 +192,7 @@ export class LogcatPanel extends Panel<LogcatPanelAttrs> {
         globals.dispatch(Actions.executeQuery({
           engineId: '0',
           queryId: QUERY_ID,
-          query: `select ts, prio, tag, msg from logcat
+          query: `select ts, prio, tag, msg from android_logs
                       where ${vizSqlBounds}
                       limit ${this.vizRowStart},
                             ${this.vizRowEnd - this.vizRowStart + 1}`
@@ -207,7 +207,7 @@ export class LogcatPanel extends Panel<LogcatPanelAttrs> {
           this.totRows = +queryResp.rows[0]['num_rows'];
           globals.queryResults.delete(QUERY_ID);
           if (this.cache.size > 0) this.staleCache = this.cache;
-          this.cache = new Map<number, CachedLogcatEntry>();
+          this.cache = new Map<number, CachedLogEntry>();
         }
         break;
 
@@ -249,8 +249,17 @@ export class LogcatPanel extends Panel<LogcatPanelAttrs> {
     }
     this.maybeUpdate();
     if (this.vizRowStart !== prevStart || this.vizRowStart !== prevEnd) {
-      globals.rafScheduler.scheduleFullRedraw();
+        globals.rafScheduler.scheduleFullRedraw();
+      }
+  }
+
+  onupdate({dom}: m.CVnodeDOM) {
+    if (this.tbody === undefined) {
+      this.tbody = assertExists(dom.querySelector('tbody'));
+      this.tbody.addEventListener(
+          'scroll', this.onScroll.bind(this), {passive: true});
     }
+    this.recomputeVisibleRowsAndUpdate();
   }
 
   onScroll() {
@@ -258,13 +267,7 @@ export class LogcatPanel extends Panel<LogcatPanelAttrs> {
     this.recomputeVisibleRowsAndUpdate();
   }
 
-  onupdate({dom}: m.CVnodeDOM) {
-    this.tbody = this.tbody || assertExists(dom.querySelector('tbody'));
-    this.recomputeVisibleRowsAndUpdate();
-  }
-
-
-  view(_: m.CVnode<LogcatPanelAttrs>) {
+  view(_: m.CVnode<AndroidLogPanelAttrs>) {
     this.maybeUpdate();
     const rows: m.Children = [];
     for (let rowNum = 0; rowNum < (this.totRows || 0); rowNum++) {
@@ -288,10 +291,9 @@ export class LogcatPanel extends Panel<LogcatPanelAttrs> {
     return m(
         'div',
         m('header',
-          `Logcat events. Rows [${
+          `Android log. Rows [${
                                   this.vizRowStart
                                 }, ${this.vizRowEnd}] / ${this.totRows || 0}`),
-        m('table.logcat',
-          m('tbody', {onscroll: this.onScroll.bind(this)}, rows)));
+        m('table.android_log', m('tbody', rows)));
   }
 }

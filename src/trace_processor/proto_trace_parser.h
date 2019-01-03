@@ -85,8 +85,8 @@ class ProtoTraceParser {
   void ParseBatteryCounters(int64_t ts, TraceBlobView);
   void ParseOOMScoreAdjUpdate(int64_t ts, TraceBlobView);
   void ParseClockSnapshot(TraceBlobView);
-  void ParseLogcatPacket(TraceBlobView);
-  void ParseLogcatEvent(TraceBlobView);
+  void ParseAndroidLogPacket(TraceBlobView);
+  void ParseAndroidLogEvent(TraceBlobView);
 
  private:
   TraceProcessorContext* context_;

@@ -20,7 +20,7 @@ option optimize_for = LITE_RUNTIME;
 package perfetto.protos;
 
 // Values from NDK's android/log.h.
-enum AndroidLogcatLogId {
+enum AndroidLogId {
   LID_DEFAULT = 0;  // MAIN.
   LID_RADIO = 1;
   LID_EVENTS = 2;
@@ -31,7 +31,7 @@ enum AndroidLogcatLogId {
   LID_KERNEL = 7;
 }
 
-enum AndroidLogcatPriority {
+enum AndroidLogPriority {
   PRIO_UNSPECIFIED = 0;
   PRIO_UNUSED = 1;  // _DEFAULT, but should never be seen in logs.
   PRIO_VERBOSE = 2;

@@ -14,27 +14,30 @@
  * limitations under the License.
  */
 
-#include "src/trace_processor/logcat_table.h"
+#include "src/trace_processor/android_logs_table.h"
 
 namespace perfetto {
 namespace trace_processor {
 
-LogcatTable::LogcatTable(sqlite3*, const TraceStorage* storage)
+AndroidLogsTableTable::AndroidLogsTableTable(sqlite3*,
+                                             const TraceStorage* storage)
     : storage_(storage) {}
 
-void LogcatTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
-  Table::Register<LogcatTable>(db, storage, "logcat");
+void AndroidLogsTableTable::RegisterTable(sqlite3* db,
+                                          const TraceStorage* storage) {
+  Table::Register<AndroidLogsTableTable>(db, storage, "android_logs");
 }
 
-base::Optional<Table::Schema> LogcatTable::Init(int, const char* const*) {
-  const auto& logcat = storage_->logcat();
+base::Optional<Table::Schema> AndroidLogsTableTable::Init(int,
+                                                          const char* const*) {
+  const auto& alog = storage_->android_logs();
   std::unique_ptr<StorageColumn> cols[] = {
-      NumericColumnPtr("ts", &logcat.timestamps(), false /* hidden */,
+      NumericColumnPtr("ts", &alog.timestamps(), false /* hidden */,
                        true /* ordered */),
-      NumericColumnPtr("utid", &logcat.utids(), false, true),
-      NumericColumnPtr("prio", &logcat.prios(), false, true),
-      StringColumnPtr("tag", &logcat.tag_ids(), &storage_->string_pool()),
-      StringColumnPtr("msg", &logcat.msg_ids(), &storage_->string_pool())};
+      NumericColumnPtr("utid", &alog.utids()),
+      NumericColumnPtr("prio", &alog.prios()),
+      StringColumnPtr("tag", &alog.tag_ids(), &storage_->string_pool()),
+      StringColumnPtr("msg", &alog.msg_ids(), &storage_->string_pool())};
   schema_ = StorageSchema({
       std::make_move_iterator(std::begin(cols)),
       std::make_move_iterator(std::end(cols)),
@@ -42,16 +45,17 @@ base::Optional<Table::Schema> LogcatTable::Init(int, const char* const*) {
   return schema_.ToTableSchema({"ts", "utid", "msg"});
 }
 
-std::unique_ptr<Table::Cursor> LogcatTable::CreateCursor(
+std::unique_ptr<Table::Cursor> AndroidLogsTableTable::CreateCursor(
     const QueryConstraints& qc,
     sqlite3_value** argv) {
-  uint32_t count = static_cast<uint32_t>(storage_->logcat().size());
+  uint32_t count = static_cast<uint32_t>(storage_->android_logs().size());
   auto it = CreateBestRowIteratorForGenericSchema(count, qc, argv);
   return std::unique_ptr<Table::Cursor>(
       new Cursor(std::move(it), schema_.mutable_columns()));
 }
 
-int LogcatTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
+int AndroidLogsTableTable::BestIndex(const QueryConstraints& qc,
+                                     BestIndexInfo* info) {
   info->estimated_cost =
       static_cast<uint32_t>(storage_->counters().counter_count());
 

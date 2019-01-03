@@ -63,27 +63,21 @@ class ProbesProducer : public Producer, public FtraceController::Observer {
                           base::TaskRunner* task_runner);
   std::unique_ptr<ProbesDataSource> CreateFtraceDataSource(
       TracingSessionID session_id,
-      DataSourceInstanceID id,
       const DataSourceConfig& config);
   std::unique_ptr<ProbesDataSource> CreateProcessStatsDataSource(
       TracingSessionID session_id,
-      DataSourceInstanceID id,
       const DataSourceConfig& config);
   std::unique_ptr<ProbesDataSource> CreateInodeFileDataSource(
       TracingSessionID session_id,
-      DataSourceInstanceID id,
       DataSourceConfig config);
   std::unique_ptr<ProbesDataSource> CreateSysStatsDataSource(
       TracingSessionID session_id,
-      DataSourceInstanceID id,
       const DataSourceConfig& config);
   std::unique_ptr<ProbesDataSource> CreateAndroidPowerDataSource(
       TracingSessionID session_id,
-      DataSourceInstanceID id,
       const DataSourceConfig& config);
-  std::unique_ptr<ProbesDataSource> CreateLogcatDataSource(
+  std::unique_ptr<ProbesDataSource> CreateAndroidLogDataSource(
       TracingSessionID session_id,
-      DataSourceInstanceID id,
       const DataSourceConfig& config);
 
  private:
