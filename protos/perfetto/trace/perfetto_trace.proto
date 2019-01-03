@@ -11,10 +11,10 @@ syntax = "proto2";
 
 package perfetto.protos;
 
-// Begin of protos/perfetto/common/android_logcat_constants.proto
+// Begin of protos/perfetto/common/android_log_constants.proto
 
 // Values from NDK's android/log.h.
-enum AndroidLogcatLogId {
+enum AndroidLogId {
   LID_DEFAULT = 0;  // MAIN.
   LID_RADIO = 1;
   LID_EVENTS = 2;
@@ -25,7 +25,7 @@ enum AndroidLogcatLogId {
   LID_KERNEL = 7;
 }
 
-enum AndroidLogcatPriority {
+enum AndroidLogPriority {
   PRIO_UNSPECIFIED = 0;
   PRIO_UNUSED = 1;  // _DEFAULT, but should never be seen in logs.
   PRIO_VERBOSE = 2;
@@ -36,7 +36,7 @@ enum AndroidLogcatPriority {
   PRIO_FATAL = 7;
 }
 
-// End of protos/perfetto/common/android_logcat_constants.proto
+// End of protos/perfetto/common/android_log_constants.proto
 
 // Begin of protos/perfetto/common/sys_stats_counters.proto
 
@@ -179,43 +179,44 @@ enum VmstatCounters {
 }
 // End of protos/perfetto/common/sys_stats_counters.proto
 
-// Begin of protos/perfetto/trace/android/android_logcat.proto
+// Begin of protos/perfetto/trace/android/android_log.proto
 
-message AndroidLogcatPacket {
+message AndroidLogPacket {
   message LogEvent {
     // The log buffer (e.g. MAIN, SYSTEM, RADIO) the event comes from.
-    optional AndroidLogcatLogId log_id = 1;
+    optional AndroidLogId log_id = 1;
 
-    // PID (TGID) and TID of the task that emitted the event.
+    // PID (TGID), TID and UID of the task that emitted the event.
     optional int32 pid = 2;
-    optional uint32 tid = 3;
+    optional int32 tid = 3;
+    optional int32 uid = 4;
 
-    // Timestamp. The clock source is CLOCK_REALTIME, unlike many other Perfetto
-    // trace events that use instead CLOCK_BOOTTIME. The trace processor will
-    // take care of realigning clocks unsing the ClockSnapshot packet.
-    optional uint64 timestamp = 4;
+    // Timestamp [ns]. The clock source is CLOCK_REALTIME, unlike many other
+    // Perfetto trace events that instead use CLOCK_BOOTTIME. The trace
+    // processor will take care of realigning clocks using the ClockSnapshot(s).
+    optional uint64 timestamp = 5;
 
     // When log_id == LID_EVENTS, |tag| corresponds to the event name defined in
     // the second column of /system/etc/event-log-tags. For all other events,
     // |tag| is the app-specified argument passed to __android_log_write().
-    optional string tag = 5;
+    optional string tag = 6;
 
     // Empty when log_id == LID_EVENTS.
-    optional AndroidLogcatPriority prio = 6;
+    optional AndroidLogPriority prio = 7;
 
     // Empty when log_id == LID_EVENTS.
-    optional string message = 7;
+    optional string message = 8;
 
     message Arg {
       optional string name = 1;
       oneof value {
         int64 int_value = 2;
-        double real_value = 3;
+        float float_value = 3;
         string string_value = 4;
       }
     }
     // Only populated when log_id == LID_EVENTS.
-    repeated Arg args = 8;
+    repeated Arg args = 9;
   }
 
   repeated LogEvent events = 1;
@@ -237,7 +238,7 @@ message AndroidLogcatPacket {
   optional Stats stats = 2;
 }
 
-// End of protos/perfetto/trace/android/android_logcat.proto
+// End of protos/perfetto/trace/android/android_log.proto
 
 // Begin of protos/perfetto/trace/clock_snapshot.proto
 
@@ -2466,7 +2467,7 @@ message TracePacket {
     // removed field with id 35
     // removed field with id 37
     BatteryCounters battery = 38;
-    AndroidLogcatPacket logcat = 39;
+    AndroidLogPacket android_log = 39;
 
     // This field is emitted at periodic intervals (~10s) and
     // contains always the binary representation of the UUID

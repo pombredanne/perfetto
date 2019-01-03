@@ -24,11 +24,11 @@ if (perfetto_build_standalone) {
     ]
 
     sources = [
+      "android_log.cfg",
       "atrace.cfg",
       "ftrace.cfg",
       "ftrace_largebuffer.cfg",
       "heapprofd.cfg",
-      "logcat.cfg",
       "long_trace.cfg",
       "processes.cfg",
       "summary.cfg",
