@@ -1118,6 +1118,9 @@ void ProtoTraceParser::ParseAndroidLogEvent(TraceBlobView event) {
   UniquePid utid = tid ? context_->process_tracker->UpdateThread(tid, pid) : 0;
   int64_t trace_time =
       context_->time_tracker->ToTraceTime(ClockDomain::kRealTime, ts);
+
+  // Log events are NOT required to be sorted by trace_time. The virtual table
+  // will take care of sorting on-demand.
   context_->storage->mutable_android_log()->AddLogEvent(trace_time, utid, prio,
                                                         tag_id, msg_id);
 }

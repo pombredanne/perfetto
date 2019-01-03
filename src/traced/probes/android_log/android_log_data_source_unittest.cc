@@ -74,7 +74,7 @@ class AndroidLogDataSourceTest : public ::testing::Test {
 
     char cmd[64]{};
     EXPECT_GT(send_sock.Receive(cmd, sizeof(cmd) - 1), 0);
-    EXPECT_STREQ("stream lids=0,2,3,4,7", cmd);
+    EXPECT_STREQ("stream tail=1 lids=0,2,3,4,7", cmd);
 
     // Send back log messages emulating Android's logdr socket.
     for (const auto& buf : fake_events)

@@ -32,8 +32,10 @@ base::Optional<Table::Schema> AndroidLogsTableTable::Init(int,
                                                           const char* const*) {
   const auto& alog = storage_->android_logs();
   std::unique_ptr<StorageColumn> cols[] = {
-      NumericColumnPtr("ts", &alog.timestamps(), false /* hidden */,
-                       true /* ordered */),
+      // Note: the logs in the storage are NOT sorted by timestamp. We delegate
+      // that to the on-demand sorter by passing the (default)
+      // is_naturally_ordered=false to NumericColumnPtr().
+      NumericColumnPtr("ts", &alog.timestamps()),
       NumericColumnPtr("utid", &alog.utids()),
       NumericColumnPtr("prio", &alog.prios()),
       StringColumnPtr("tag", &alog.tag_ids(), &storage_->string_pool()),
