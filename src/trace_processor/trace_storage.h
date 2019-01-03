@@ -340,10 +340,10 @@ class TraceStorage {
   class AndroidLogs {
    public:
     inline size_t AddLogEvent(int64_t timestamp,
-                                 UniqueTid utid,
-                                 uint8_t prio,
-                                 StringId tag_id,
-                                 StringId msg_id) {
+                              UniqueTid utid,
+                              uint8_t prio,
+                              StringId tag_id,
+                              StringId msg_id) {
       timestamps_.emplace_back(timestamp);
       utids_.emplace_back(utid);
       prios_.emplace_back(prio);

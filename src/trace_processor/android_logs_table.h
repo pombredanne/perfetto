@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef SRC_TRACE_PROCESSOR_AndroidLogsTable_TABLE_H_
-#define SRC_TRACE_PROCESSOR_AndroidLogsTable_TABLE_H_
+#ifndef SRC_TRACE_PROCESSOR_ANDROID_LOGS_TABLE_H_
+#define SRC_TRACE_PROCESSOR_ANDROID_LOGS_TABLE_H_
 
 #include "src/trace_processor/storage_table.h"
 #include "src/trace_processor/trace_storage.h"
@@ -42,4 +42,4 @@ class AndroidLogsTableTable : public StorageTable {
 }  // namespace trace_processor
 }  // namespace perfetto
 
-#endif  // SRC_TRACE_PROCESSOR_AndroidLogsTable_TABLE_H_
+#endif  // SRC_TRACE_PROCESSOR_ANDROID_LOGS_TABLE_H_

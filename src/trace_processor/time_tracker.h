@@ -22,6 +22,8 @@
 #include <array>
 #include <vector>
 
+#include "perfetto/base/logging.h"
+
 namespace perfetto {
 namespace trace_processor {
 
@@ -39,6 +41,11 @@ class TimeTracker {
                          int64_t trace_time_ns);
 
   int64_t ToTraceTime(ClockDomain, int64_t clock_time_ns);
+
+  int64_t GetFirstTimestamp(ClockDomain domain) const {
+    PERFETTO_DCHECK(!clocks_[domain].empty());
+    return clocks_[domain].front().clock_time_ns;
+  }
 
  private:
   TimeTracker(const TimeTracker&) = delete;
