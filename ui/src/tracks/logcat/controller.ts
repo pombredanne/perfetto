@@ -40,7 +40,10 @@ class LogcatTrackController extends TrackController<Config, Data> {
     const quantNs = Math.ceil(resolution * 1e9);
 
     const rawResult = await this.engine.query(`
-      select cast(ts / ${quantNs} as integer) * ${quantNs} as ts_quant, prio
+      select
+        cast(ts / ${quantNs} as integer) * ${quantNs} as ts_quant,
+        prio,
+        count(prio)
       from logcat
       where ts >= ${startNs} and ts <= ${endNs}
       group by ts_quant, prio
@@ -52,14 +55,16 @@ class LogcatTrackController extends TrackController<Config, Data> {
       start,
       end,
       resolution,
+      numEvents: 0,
       timestamps: new Float64Array(rowCount),
-      severities: new Uint8Array(rowCount),
+      priorities: new Uint8Array(rowCount),
     };
     const cols = rawResult.columns;
     for (let i = 0; i < rowCount; i++) {
       result.timestamps[i] = fromNs(+cols[0].longValues![i]);
       const prio = Math.min(+cols[1].longValues![i], 7);
-      result.severities[i] |= (1 << prio);
+      result.priorities[i] |= (1 << prio);
+      result.numEvents += +cols[2].longValues![i];
     }
     this.publish(result);
   }

@@ -13,16 +13,19 @@
 // limitations under the License.
 
 import * as m from 'mithril';
+
+import {assertExists, assertTrue} from '../../base/logging';
 import {Actions} from '../../common/actions';
+import {QueryResponse} from '../../common/queries';
 import {TrackState} from '../../common/state';
+import {TimeSpan, timeToString} from '../../common/time';
 import {checkerboardExcept} from '../../frontend/checkerboard';
 import {globals} from '../../frontend/globals';
+import {Panel} from '../../frontend/panel';
 import {Track} from '../../frontend/track';
 import {trackRegistry} from '../../frontend/track_registry';
+
 import {Config, Data, LOGCAT_TRACK_KIND} from './common';
-import {Panel} from '../../frontend/panel';
-import { QueryResponse } from '../../common/queries';
-import { timeToString } from '../../common/time';
 
 interface LevelCfg {
   color: string;
@@ -105,7 +108,7 @@ class LogcatTrack extends Track<Config, Data> {
       for (let lev = 0; lev < LEVELS.length; lev++) {
         let hasEventsForCurColor = false;
         for (const prio of LEVELS[lev].prios) {
-          if (data.severities[i] & (1 << prio)) hasEventsForCurColor = true;
+          if (data.priorities[i] & (1 << prio)) hasEventsForCurColor = true;
         }
         if (!hasEventsForCurColor) continue;
         ctx.fillStyle = LEVELS[lev].color;
@@ -122,39 +125,173 @@ interface LogcatPanelAttrs {
   // title: string;
 }
 
-const QUERY_ID = 'logcat';
+const QUERY_ID = 'logcat_table';
 const PRIO_TO_LETTER = ['-', '-', 'V', 'D', 'I', 'W', 'E', 'F'];
 
-export class LogcatPanel extends Panel<LogcatPanelAttrs> {
-  private hasData = false;
-  renderCanvas() {}
+interface CachedLogcatEntry {
+  ts: number;
+  prio: number;
+  tag: string;
+  msg: string;
+}
 
-  reqData() {
-    const vizTime = globals.frontendLocalState.visibleWindowTime;
-    const startNs = Math.floor(vizTime.start * 1e9);
-    const endNs = Math.ceil(vizTime.end * 1e9);
-    const query = `select ts, prio, tag, msg from logcat
-    where ts >= ${startNs} and ts <= ${endNs} limit 100`;
-    console.log('Requesting logcat');  // DNS.
-    globals.dispatch(
-      Actions.executeQuery({engineId: '0', queryId: QUERY_ID, query}));
-    this.hasData = true;
+export class LogcatPanel extends Panel<LogcatPanelAttrs> {
+  private state: 'idle'|'updateBounds'|'fetchRows' = 'idle';
+  private req = new TimeSpan(0, 0);
+  private reqOffset = 0;
+  private cache = new Map<number, CachedLogcatEntry>();
+  private staleCache = new Map<number, CachedLogcatEntry>();
+  private totRows = 0;
+  private tbody?: HTMLElement;
+
+  private vizRowStart = 0;
+  private vizRowEnd = 0;
+
+  renderCanvas() {
+    // TODO here maybe check viz time and schedule redraw?.
   }
 
-  view({/*attrs*/}: m.CVnode<LogcatPanelAttrs>) {
-    if (!this.hasData) this.reqData();
+  maybeUpdate() {
+    const vizTime = globals.frontendLocalState.visibleWindowTime;
+    const vizStartNs = Math.floor(vizTime.start * 1e9);
+    const vizEndNs = Math.ceil(vizTime.end * 1e9);
+    const vizSqlBounds = `ts >= ${vizStartNs} and ts <= ${vizEndNs}`;
+
     const queryResp = globals.queryResults.get(QUERY_ID) as QueryResponse;
-    const rows : m.Children = [];
-    if (queryResp !== undefined) {
-      for(const row of queryResp.rows) {
-        rows.push(m('tr',
-          m('td', timeToString(+row['ts'] / 1e9)),
-          m('td', PRIO_TO_LETTER[+row['prio']] || '?'),
-          m('td', row['tag']),
-          m('td', row['msg']),
-        ));
+
+    switch (this.state) {
+      case 'idle':
+        // First of all check if the visible time window has changed. If that's
+        // the case fetch the new event count for the new time bounds.
+        if (!vizTime.equals(this.req)) {
+          console.log('Logcat time window change, brand new request');  // DNS.
+          this.state = 'updateBounds';
+          this.req = vizTime.clone();
+          globals.dispatch(Actions.executeQuery({
+            engineId: '0',
+            queryId: QUERY_ID,
+            query: `select count(*) as num_rows from logcat
+                    where ${vizSqlBounds}`
+          }));
+          return;
+        }
+
+        // Then check if all the visible rows are cached, if not fetch them.
+        let needsData = false;
+        for (let row = this.vizRowStart; row < this.vizRowEnd; row++) {
+          if (!this.cache.has(row)) {
+            needsData = true;
+            break;
+          }
+        }
+        if (!needsData) return;
+        this.state = 'fetchRows';
+        this.reqOffset = this.vizRowStart;
+        console.log(
+            `Requesting rows ${this.vizRowStart}-${this.vizRowEnd}`);  // DNS.
+        globals.dispatch(Actions.executeQuery({
+          engineId: '0',
+          queryId: QUERY_ID,
+          query: `select ts, prio, tag, msg from logcat
+                      where ${vizSqlBounds}
+                      limit ${this.vizRowStart},
+                            ${this.vizRowEnd - this.vizRowStart + 1}`
+        }));
+        break;
+
+      case 'updateBounds':
+        if (queryResp !== undefined) {
+          this.state = 'idle';
+          console.log('tot rows reply');  // DNS.
+          assertTrue(queryResp.totalRowCount === 1);
+          this.totRows = +queryResp.rows[0]['num_rows'];
+          globals.queryResults.delete(QUERY_ID);
+          if (this.cache.size > 0) this.staleCache = this.cache;
+          this.cache = new Map<number, CachedLogcatEntry>();
+        }
+        break;
+
+      case 'fetchRows':
+        if (queryResp !== undefined) {
+          this.state = 'idle';
+          console.log('full rows reply');  // DNS.
+          let rowNum = this.reqOffset;
+          for (const row of queryResp.rows) {
+            this.cache.set(rowNum++, {
+              ts: +row['ts'],
+              prio: +row['prio'],
+              tag: row['tag'] as string,
+              msg: row['msg'] as string
+            });
+          }
+          this.staleCache.clear();
+          globals.queryResults.delete(QUERY_ID);
+        }
+        break;
+
+      default:
+        break;
+    }
+  }
+
+  recomputeVisibleRowsAndUpdate() {
+    const tbody = assertExists(this.tbody);
+    const firstRow = tbody.querySelector('tr');
+    const prevStart = this.vizRowStart;
+    const prevEnd = this.vizRowEnd;
+    if (firstRow === null) {
+      this.vizRowStart = 0;
+      this.vizRowEnd = 0;
+    } else {
+      const rowH = firstRow.scrollHeight;
+      this.vizRowStart = Math.floor(tbody.scrollTop / rowH);
+      this.vizRowEnd = Math.ceil((tbody.scrollTop + tbody.clientHeight) / rowH);
+    }
+    this.maybeUpdate();
+    if (this.vizRowStart !== prevStart || this.vizRowStart !== prevEnd) {
+      globals.rafScheduler.scheduleFullRedraw();
+    }
+  }
+
+  onScroll() {
+    if (this.tbody === undefined) return;
+    this.recomputeVisibleRowsAndUpdate();
+  }
+
+  onupdate({dom}: m.CVnodeDOM) {
+    this.tbody = this.tbody || assertExists(dom.querySelector('tbody'));
+    this.recomputeVisibleRowsAndUpdate();
+  }
+
+
+  view(_: m.CVnode<LogcatPanelAttrs>) {
+    this.maybeUpdate();
+    const rows: m.Children = [];
+    for (let rowNum = 0; rowNum < (this.totRows || 0); rowNum++) {
+      let row = this.cache.get(rowNum);
+      let stale = false;
+      if (row === undefined) {
+        row = this.staleCache.get(rowNum);
+        stale = true;
+      }
+      if (row !== undefined) {
+        rows.push(
+            m(`tr${stale ? '.stale' : ''}`,
+              m('td', timeToString(row.ts / 1e9)),
+              m('td', PRIO_TO_LETTER[row.prio] || '?'),
+              m('td', row.tag),
+              m('td', row.msg)));
+      } else {
+        rows.push(m('tr', m('td[colspan=4]', '... loading ...')));
       }
     }
-    return [m('header', 'Logcat events'), m('table.logcat', m('tbody', rows))];
+    return m(
+        'div',
+        m('header',
+          `Logcat events. Rows [${
+                                  this.vizRowStart
+                                }, ${this.vizRowEnd}] / ${this.totRows || 0}`),
+        m('table.logcat',
+          m('tbody', {onscroll: this.onScroll.bind(this)}, rows)));
   }
 }

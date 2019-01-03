@@ -40,6 +40,14 @@ export class TimeSpan {
     this.end = end;
   }
 
+  clone() {
+    return new TimeSpan(this.start, this.end);
+  }
+
+  equals(other: TimeSpan) {
+    return this.start === other.start && this.end === other.end;
+  }
+
   get duration() {
     return this.end - this.start;
   }

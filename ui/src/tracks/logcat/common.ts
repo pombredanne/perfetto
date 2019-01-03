@@ -17,13 +17,18 @@ export const LOGCAT_TRACK_KIND = 'LogcatTrack';
 export interface Data {
   start: number;
   end: number;
-
   resolution: number;
+
+  // Total number of logcat events within [start, end], before any quantization.
+  numEvents: number;
+
+  // Below: data quantized by resolution and aggregated by event priority.
+
   timestamps: Float64Array;
 
   // Each Uint8 value has the i-th bit is set if there is at least one logcat
   // event at the i-th priority level at the corresponding time in |timestamps|.
-  severities: Uint8Array;
+  priorities: Uint8Array;
 }
 
 export interface Config {}
