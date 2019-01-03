@@ -28,6 +28,7 @@
 #include "src/trace_processor/event_tracker.h"
 #include "src/trace_processor/process_tracker.h"
 #include "src/trace_processor/slice_tracker.h"
+#include "src/trace_processor/time_tracker.h"
 #include "src/trace_processor/trace_processor_context.h"
 
 #include "perfetto/trace/trace.pb.h"
@@ -198,6 +199,16 @@ void ProtoTraceParser::ParseTracePacket(int64_t ts, TraceBlobView packet) {
       case protos::TracePacket::kBatteryFieldNumber: {
         const size_t fld_off = packet.offset_of(fld.data());
         ParseBatteryCounters(ts, packet.slice(fld_off, fld.size()));
+        break;
+      }
+      case protos::TracePacket::kClockSnapshotFieldNumber: {
+        const size_t fld_off = packet.offset_of(fld.data());
+        ParseClockSnapshot(packet.slice(fld_off, fld.size()));
+        break;
+      }
+      case protos::TracePacket::kAndroidLogFieldNumber: {
+        const size_t fld_off = packet.offset_of(fld.data());
+        ParseAndroidLogPacket(packet.slice(fld_off, fld.size()));
         break;
       }
       default:
@@ -923,6 +934,195 @@ void ProtoTraceParser::ParseOOMScoreAdjUpdate(int64_t ts,
   UniquePid upid = context_->process_tracker->UpdateProcess(pid);
   context_->event_tracker->PushCounter(ts, oom_adj, oom_score_adj_id_, upid,
                                        RefType::kRefUpid);
+}
+
+void ProtoTraceParser::ParseClockSnapshot(TraceBlobView packet) {
+  ProtoDecoder decoder(packet.data(), packet.length());
+  int64_t clock_boottime = 0;
+  int64_t clock_monotonic = 0;
+  int64_t clock_realtime = 0;
+
+  // This loop iterates over the "repeated Clock" entries.
+  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    switch (fld.id) {
+      case protos::ClockSnapshot::kClocksFieldNumber: {
+        const size_t fld_off = packet.offset_of(fld.data());
+        TraceBlobView clk_data = packet.slice(fld_off, fld.size());
+        ProtoDecoder clk_decoder(clk_data.data(), clk_data.length());
+        int64_t* clock_ptr = nullptr;
+        int64_t clock_value = -1;
+        // This loop iterates over the |type| and |timestamp| field of each
+        // clock snapshot.
+        for (auto clk = clk_decoder.ReadField(); clk.id;
+             clk = clk_decoder.ReadField()) {
+          switch (clk.id) {
+            case protos::ClockSnapshot::Clock::kTypeFieldNumber:
+              switch (clk.as_int32()) {
+                case protos::ClockSnapshot::Clock::BOOTTIME:
+                  clock_ptr = &clock_boottime;
+                  break;
+                case protos::ClockSnapshot::Clock::REALTIME:
+                  clock_ptr = &clock_realtime;
+                  break;
+                case protos::ClockSnapshot::Clock::MONOTONIC:
+                  clock_ptr = &clock_monotonic;
+                  break;
+              }
+              break;
+            case protos::ClockSnapshot::Clock::kTimestampFieldNumber:
+              clock_value = clk.as_int64();
+              break;
+          }  // switch (clk.id)
+        }    // for(clk)
+        if (clock_value > 0 && clock_ptr)
+          *clock_ptr = clock_value;
+        break;
+      }  // case kClocksFieldNumer.
+      default:
+        break;
+    }  // switch(fld.id)
+  }
+  PERFETTO_DCHECK(decoder.IsEndOfBuffer());
+
+  // Usually these snapshots come all together.
+  PERFETTO_DCHECK(clock_boottime > 0 && clock_monotonic > 0 &&
+                  clock_realtime > 0);
+
+  if (clock_boottime <= 0) {
+    PERFETTO_ELOG("ClockSnapshot has an invalid BOOTTIME (%" PRId64 ")",
+                  clock_boottime);
+    return;
+  }
+
+  // |clock_boottime| is used as the reference trace time.
+
+  if (clock_monotonic > 0) {
+    context_->time_tracker->PushClockSnapshot(ClockDomain::kMonotonic,
+                                              clock_monotonic, clock_boottime);
+  }
+
+  if (clock_realtime > 0) {
+    context_->time_tracker->PushClockSnapshot(ClockDomain::kRealTime,
+                                              clock_realtime, clock_boottime);
+  }
+}
+
+void ProtoTraceParser::ParseAndroidLogPacket(TraceBlobView packet) {
+  ProtoDecoder decoder(packet.data(), packet.length());
+  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    switch (fld.id) {
+      case protos::AndroidLogPacket::kEventsFieldNumber: {
+        const size_t fld_off = packet.offset_of(fld.data());
+        ParseAndroidLogEvent(packet.slice(fld_off, fld.size()));
+        break;
+      }
+      default:
+        // TODO stats.
+        break;
+    }
+  }
+  PERFETTO_DCHECK(decoder.IsEndOfBuffer());
+}
+
+void ProtoTraceParser::ParseAndroidLogEvent(TraceBlobView event) {
+  // TODO(primiano): Add events and non-stringified fields to the "raw" table.
+  // TODO(primiano): Add failure stats to the stats table.
+  ProtoDecoder decoder(event.data(), event.length());
+  int64_t ts = 0;
+  uint32_t pid = 0;
+  uint32_t tid = 0;
+  uint8_t prio = 0;
+  StringId tag_id = 0;
+  StringId msg_id = 0;
+  char arg_msg[4096];
+  char* arg_str = &arg_msg[0];
+  *arg_str = '\0';
+  auto arg_avail = [&arg_msg, &arg_str]() {
+    return sizeof(arg_msg) - static_cast<size_t>(arg_str - arg_msg);
+  };
+
+  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    switch (fld.id) {
+      case protos::AndroidLogPacket::LogEvent::kPidFieldNumber:
+        pid = fld.as_uint32();
+        break;
+      case protos::AndroidLogPacket::LogEvent::kTidFieldNumber:
+        tid = fld.as_uint32();
+        break;
+      case protos::AndroidLogPacket::LogEvent::kTimestampFieldNumber:
+        ts = fld.as_int64();
+        if (ts <
+            context_->time_tracker->GetFirstTimestamp(ClockDomain::kRealTime)) {
+          // Skip log events that happened before the start of the trace.
+          return;
+        }
+        break;
+      case protos::AndroidLogPacket::LogEvent::kPrioFieldNumber:
+        prio = static_cast<uint8_t>(fld.as_uint32());
+        break;
+      case protos::AndroidLogPacket::LogEvent::kTagFieldNumber:
+        tag_id = context_->storage->InternString(fld.as_string());
+        break;
+      case protos::AndroidLogPacket::LogEvent::kMessageFieldNumber:
+        msg_id = context_->storage->InternString(fld.as_string());
+        break;
+      case protos::AndroidLogPacket::LogEvent::kArgsFieldNumber: {
+        // TODO make msg_id safe w.r.t. 4096. // DNS
+        const size_t fld_off = event.offset_of(fld.data());
+        TraceBlobView arg_data = event.slice(fld_off, fld.size());
+        ProtoDecoder arg_decoder(arg_data.data(), arg_data.length());
+        for (auto arg = arg_decoder.ReadField(); arg.id;
+             arg = arg_decoder.ReadField()) {
+          switch (arg.id) {
+            case protos::AndroidLogPacket::LogEvent::Arg::kNameFieldNumber: {
+              base::StringView name = arg.as_string();
+              arg_str += snprintf(arg_str, arg_avail(),
+                                  " %.*s=", static_cast<int>(name.size()),
+                                  name.data());
+              break;
+            }
+            case protos::AndroidLogPacket::LogEvent::Arg::
+                kStringValueFieldNumber: {
+              base::StringView val = arg.as_string();
+              arg_str += snprintf(arg_str, arg_avail(), "\"%.*s\"",
+                                  static_cast<int>(val.size()), val.data());
+              break;
+            }
+            case protos::AndroidLogPacket::LogEvent::Arg::kIntValueFieldNumber:
+              arg_str +=
+                  snprintf(arg_str, arg_avail(), "%" PRId64, arg.as_int64());
+              break;
+            case protos::AndroidLogPacket::LogEvent::Arg::
+                kFloatValueFieldNumber:
+              arg_str += snprintf(arg_str, arg_avail(), "%f",
+                                  static_cast<double>(arg.as_float()));
+              break;
+          }  // switch(arg.id)
+        }    // for(arg)
+        break;
+      }
+      default:
+        break;
+    }
+  }
+  PERFETTO_DCHECK(decoder.IsEndOfBuffer());
+
+  if (prio == 0)
+    prio = protos::AndroidLogPriority::PRIO_INFO;
+
+  if (arg_str != &arg_msg[0]) {
+    PERFETTO_DCHECK(!msg_id);
+    // Skip the first space char (" foo=1 bar=2" -> "foo=1 bar=2").
+    msg_id = context_->storage->InternString(&arg_msg[1]);
+  }
+  UniquePid utid = tid ? context_->process_tracker->UpdateThread(tid, pid) : 0;
+  int64_t trace_time =
+      context_->time_tracker->ToTraceTime(ClockDomain::kRealTime, ts);
+
+  // Log events are NOT required to be sorted by trace_time. The virtual table
+  // will take care of sorting on-demand.
+  context_->storage->mutable_android_log()->AddLogEvent(trace_time, utid, prio,
+                                                        tag_id, msg_id);
 }
 
 }  // namespace trace_processor
