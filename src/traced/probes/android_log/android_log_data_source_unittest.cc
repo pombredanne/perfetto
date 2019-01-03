@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "src/traced/probes/logcat/logcat_data_source.h"
+#include "src/traced/probes/android_log/android_log_data_source.h"
 
 #include "perfetto/tracing/core/data_source_config.h"
 #include "src/base/test/test_task_runner.h"
@@ -32,28 +32,28 @@ using ::testing::Return;
 namespace perfetto {
 namespace {
 
-class TestLogcatDataSource : public LogcatDataSource {
+class TestAndroidLogDataSource : public AndroidLogDataSource {
  public:
-  TestLogcatDataSource(const DataSourceConfig& config,
-                       base::TaskRunner* task_runner,
-                       TracingSessionID id,
-                       std::unique_ptr<TraceWriter> writer)
-      : LogcatDataSource(config, task_runner, id, std::move(writer)) {}
+  TestAndroidLogDataSource(const DataSourceConfig& config,
+                           base::TaskRunner* task_runner,
+                           TracingSessionID id,
+                           std::unique_ptr<TraceWriter> writer)
+      : AndroidLogDataSource(config, task_runner, id, std::move(writer)) {}
 
   MOCK_METHOD0(ReadEventLogDefinitions, std::string());
   MOCK_METHOD0(ConnectLogdrSocket, base::UnixSocketRaw());
 };
 
-class LogcatDataSourceTest : public ::testing::Test {
+class AndroidLogDataSourceTest : public ::testing::Test {
  protected:
-  LogcatDataSourceTest() {}
+  AndroidLogDataSourceTest() {}
 
   void CreateInstance(const DataSourceConfig& cfg) {
     auto writer =
         std::unique_ptr<TraceWriterForTesting>(new TraceWriterForTesting());
     writer_raw_ = writer.get();
     data_source_.reset(
-        new TestLogcatDataSource(cfg, &task_runner_, 0, std::move(writer)));
+        new TestAndroidLogDataSource(cfg, &task_runner_, 0, std::move(writer)));
   }
 
   void StartAndSimulateLogd(
@@ -76,7 +76,7 @@ class LogcatDataSourceTest : public ::testing::Test {
     EXPECT_GT(send_sock.Receive(cmd, sizeof(cmd) - 1), 0);
     EXPECT_STREQ("stream lids=0,2,3,4,7", cmd);
 
-    // Send back logcat messages emulating the logdr socket.
+    // Send back log messages emulating Android's logdr socket.
     for (const auto& buf : fake_events)
       send_sock.Send(buf.data(), buf.size());
 
@@ -86,7 +86,7 @@ class LogcatDataSourceTest : public ::testing::Test {
   }
 
   base::TestTaskRunner task_runner_;
-  std::unique_ptr<TestLogcatDataSource> data_source_;
+  std::unique_ptr<TestAndroidLogDataSource> data_source_;
   TraceWriterForTesting* writer_raw_;
 
   const std::vector<std::vector<uint8_t>> kValidTextEvents{
@@ -159,7 +159,7 @@ class LogcatDataSourceTest : public ::testing::Test {
        0x00, 0x01, 0x27, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}};
 };
 
-TEST_F(LogcatDataSourceTest, ParseEventLogDefinitions) {
+TEST_F(AndroidLogDataSourceTest, ParseEventLogDefinitions) {
   CreateInstance(DataSourceConfig());
   static const char kContents[] = R"(
 42 answer (to life the universe etc|3)
@@ -204,7 +204,7 @@ invalid_line (
   ASSERT_EQ(fmt->fields[1], "data");
 }
 
-TEST_F(LogcatDataSourceTest, TextEvents) {
+TEST_F(AndroidLogDataSourceTest, TextEvents) {
   DataSourceConfig cfg;
   CreateInstance(cfg);
   EXPECT_CALL(*data_source_, ReadEventLogDefinitions()).WillOnce(Return(""));
@@ -214,45 +214,48 @@ TEST_F(LogcatDataSourceTest, TextEvents) {
 
   auto packet = writer_raw_->ParseProto();
   ASSERT_TRUE(packet);
-  ASSERT_TRUE(packet->has_logcat());
-  EXPECT_EQ(packet->logcat().events_size(), 3);
+  ASSERT_TRUE(packet->has_android_log());
+  EXPECT_EQ(packet->android_log().events_size(), 3);
 
-  const auto& decoded = packet->logcat().events();
+  const auto& decoded = packet->android_log().events();
 
-  EXPECT_EQ(decoded.Get(0).log_id(), protos::AndroidLogcatLogId::LID_SYSTEM);
+  EXPECT_EQ(decoded.Get(0).log_id(), protos::AndroidLogId::LID_SYSTEM);
   EXPECT_EQ(decoded.Get(0).pid(), 7546);
   EXPECT_EQ(decoded.Get(0).tid(), 8991);
-  EXPECT_EQ(decoded.Get(0).prio(), protos::AndroidLogcatPriority::PRIO_INFO);
+  EXPECT_EQ(decoded.Get(0).uid(), 1000);
+  EXPECT_EQ(decoded.Get(0).prio(), protos::AndroidLogPriority::PRIO_INFO);
   EXPECT_EQ(decoded.Get(0).timestamp(), 1546125239679172326LL);
   EXPECT_EQ(decoded.Get(0).tag(), "ActivityManager");
   EXPECT_EQ(
       decoded.Get(0).message(),
       "Killing 11660:com.google.android.videos/u0a168 (adj 985): empty #17");
 
-  EXPECT_EQ(decoded.Get(1).log_id(), protos::AndroidLogcatLogId::LID_DEFAULT);
+  EXPECT_EQ(decoded.Get(1).log_id(), protos::AndroidLogId::LID_DEFAULT);
   EXPECT_EQ(decoded.Get(1).pid(), 7546);
   EXPECT_EQ(decoded.Get(1).tid(), 7570);
-  EXPECT_EQ(decoded.Get(1).prio(), protos::AndroidLogcatPriority::PRIO_WARN);
+  EXPECT_EQ(decoded.Get(1).uid(), 1000);
+  EXPECT_EQ(decoded.Get(1).prio(), protos::AndroidLogPriority::PRIO_WARN);
   EXPECT_EQ(decoded.Get(1).timestamp(), 1546125239683537170LL);
   EXPECT_EQ(decoded.Get(1).tag(), "libprocessgroup");
   EXPECT_EQ(decoded.Get(1).message(),
             "kill(-11660, 9) failed: No such process");
 
-  EXPECT_EQ(decoded.Get(2).log_id(), protos::AndroidLogcatLogId::LID_DEFAULT);
+  EXPECT_EQ(decoded.Get(2).log_id(), protos::AndroidLogId::LID_DEFAULT);
   EXPECT_EQ(decoded.Get(2).pid(), 7415);
   EXPECT_EQ(decoded.Get(2).tid(), 7415);
-  EXPECT_EQ(decoded.Get(2).prio(), protos::AndroidLogcatPriority::PRIO_INFO);
+  EXPECT_EQ(decoded.Get(2).uid(), 0);
+  EXPECT_EQ(decoded.Get(2).prio(), protos::AndroidLogPriority::PRIO_INFO);
   EXPECT_EQ(decoded.Get(2).timestamp(), 1546125239719458684LL);
   EXPECT_EQ(decoded.Get(2).tag(), "Zygote");
   EXPECT_EQ(decoded.Get(2).message(), "Process 11660 exited due to signal (9)");
 }
 
-TEST_F(LogcatDataSourceTest, TextEventsWithTagFiltering) {
+TEST_F(AndroidLogDataSourceTest, TextEventsWithTagFiltering) {
   DataSourceConfig cfg;
-  *cfg.mutable_android_logcat_config()->add_filter_tags() = "Zygote";
-  *cfg.mutable_android_logcat_config()->add_filter_tags() = "ActivityManager";
-  *cfg.mutable_android_logcat_config()->add_filter_tags() = "Unmatched";
-  *cfg.mutable_android_logcat_config()->add_filter_tags() = "libprocessgroupZZ";
+  *cfg.mutable_android_log_config()->add_filter_tags() = "Zygote";
+  *cfg.mutable_android_log_config()->add_filter_tags() = "ActivityManager";
+  *cfg.mutable_android_log_config()->add_filter_tags() = "Unmatched";
+  *cfg.mutable_android_log_config()->add_filter_tags() = "libprocessgroupZZ";
 
   CreateInstance(cfg);
   EXPECT_CALL(*data_source_, ReadEventLogDefinitions()).WillOnce(Return(""));
@@ -260,18 +263,18 @@ TEST_F(LogcatDataSourceTest, TextEventsWithTagFiltering) {
 
   auto packet = writer_raw_->ParseProto();
   ASSERT_TRUE(packet);
-  ASSERT_TRUE(packet->has_logcat());
-  EXPECT_EQ(packet->logcat().events_size(), 2);
+  ASSERT_TRUE(packet->has_android_log());
+  EXPECT_EQ(packet->android_log().events_size(), 2);
 
-  const auto& decoded = packet->logcat().events();
+  const auto& decoded = packet->android_log().events();
   EXPECT_EQ(decoded.Get(0).tag(), "ActivityManager");
   EXPECT_EQ(decoded.Get(1).tag(), "Zygote");
 }
 
-TEST_F(LogcatDataSourceTest, TextEventsWithPrioFiltering) {
+TEST_F(AndroidLogDataSourceTest, TextEventsWithPrioFiltering) {
   DataSourceConfig cfg;
-  cfg.mutable_android_logcat_config()->set_min_prio(
-      AndroidLogcatConfig::AndroidLogcatPriority::PRIO_WARN);
+  cfg.mutable_android_log_config()->set_min_prio(
+      AndroidLogConfig::AndroidLogPriority::PRIO_WARN);
 
   CreateInstance(cfg);
   EXPECT_CALL(*data_source_, ReadEventLogDefinitions()).WillOnce(Return(""));
@@ -279,14 +282,14 @@ TEST_F(LogcatDataSourceTest, TextEventsWithPrioFiltering) {
 
   auto packet = writer_raw_->ParseProto();
   ASSERT_TRUE(packet);
-  ASSERT_TRUE(packet->has_logcat());
-  EXPECT_EQ(packet->logcat().events_size(), 1);
+  ASSERT_TRUE(packet->has_android_log());
+  EXPECT_EQ(packet->android_log().events_size(), 1);
 
-  const auto& decoded = packet->logcat().events();
+  const auto& decoded = packet->android_log().events();
   EXPECT_EQ(decoded.Get(0).tag(), "libprocessgroup");
 }
 
-TEST_F(LogcatDataSourceTest, BinaryEvents) {
+TEST_F(AndroidLogDataSourceTest, BinaryEvents) {
   DataSourceConfig cfg;
   CreateInstance(cfg);
   static const char kDefs[] = R"(
@@ -301,14 +304,15 @@ TEST_F(LogcatDataSourceTest, BinaryEvents) {
 
   auto packet = writer_raw_->ParseProto();
   ASSERT_TRUE(packet);
-  ASSERT_TRUE(packet->has_logcat());
-  EXPECT_EQ(packet->logcat().events_size(), 3);
+  ASSERT_TRUE(packet->has_android_log());
+  EXPECT_EQ(packet->android_log().events_size(), 3);
 
-  const auto& decoded = packet->logcat().events();
+  const auto& decoded = packet->android_log().events();
 
-  EXPECT_EQ(decoded.Get(0).log_id(), protos::AndroidLogcatLogId::LID_EVENTS);
+  EXPECT_EQ(decoded.Get(0).log_id(), protos::AndroidLogId::LID_EVENTS);
   EXPECT_EQ(decoded.Get(0).pid(), 29981);
   EXPECT_EQ(decoded.Get(0).tid(), 30962);
+  EXPECT_EQ(decoded.Get(0).uid(), 1000);
   EXPECT_EQ(decoded.Get(0).timestamp(), 1546165328914257883LL);
   EXPECT_EQ(decoded.Get(0).tag(), "am_kill");
   ASSERT_EQ(decoded.Get(0).args_size(), 5);
@@ -323,18 +327,20 @@ TEST_F(LogcatDataSourceTest, BinaryEvents) {
   EXPECT_EQ(decoded.Get(0).args(4).name(), "Reason");
   EXPECT_EQ(decoded.Get(0).args(4).string_value(), "empty #17");
 
-  EXPECT_EQ(decoded.Get(1).log_id(), protos::AndroidLogcatLogId::LID_EVENTS);
+  EXPECT_EQ(decoded.Get(1).log_id(), protos::AndroidLogId::LID_EVENTS);
   EXPECT_EQ(decoded.Get(1).pid(), 29981);
   EXPECT_EQ(decoded.Get(1).tid(), 30962);
+  EXPECT_EQ(decoded.Get(1).uid(), 1000);
   EXPECT_EQ(decoded.Get(1).timestamp(), 1546165328946231844LL);
   EXPECT_EQ(decoded.Get(1).tag(), "am_uid_stopped");
   ASSERT_EQ(decoded.Get(1).args_size(), 1);
   EXPECT_EQ(decoded.Get(1).args(0).name(), "UID");
   EXPECT_EQ(decoded.Get(1).args(0).int_value(), 10018);
 
-  EXPECT_EQ(decoded.Get(2).log_id(), protos::AndroidLogcatLogId::LID_EVENTS);
+  EXPECT_EQ(decoded.Get(2).log_id(), protos::AndroidLogId::LID_EVENTS);
   EXPECT_EQ(decoded.Get(2).pid(), 29981);
   EXPECT_EQ(decoded.Get(2).tid(), 29998);
+  EXPECT_EQ(decoded.Get(2).uid(), 1000);
   EXPECT_EQ(decoded.Get(2).timestamp(), 1546165328960813044LL);
   EXPECT_EQ(decoded.Get(2).tag(), "am_pss");
   ASSERT_EQ(decoded.Get(2).args_size(), 10);
@@ -361,10 +367,10 @@ TEST_F(LogcatDataSourceTest, BinaryEvents) {
   EXPECT_EQ(decoded.Get(2).args(9).int_value(), 39);
 }
 
-TEST_F(LogcatDataSourceTest, BinaryEventsWithTagFiltering) {
+TEST_F(AndroidLogDataSourceTest, BinaryEventsWithTagFiltering) {
   DataSourceConfig cfg;
-  *cfg.mutable_android_logcat_config()->add_filter_tags() = "not mached";
-  *cfg.mutable_android_logcat_config()->add_filter_tags() = "am_uid_stopped";
+  *cfg.mutable_android_log_config()->add_filter_tags() = "not mached";
+  *cfg.mutable_android_log_config()->add_filter_tags() = "am_uid_stopped";
   CreateInstance(cfg);
   static const char kDefs[] = R"(
 30023 am_kill (User|1|5),(PID|1|5),(Process Name|3),(OomAdj|1|5),(Reason|3)
@@ -378,10 +384,10 @@ TEST_F(LogcatDataSourceTest, BinaryEventsWithTagFiltering) {
 
   auto packet = writer_raw_->ParseProto();
   ASSERT_TRUE(packet);
-  ASSERT_TRUE(packet->has_logcat());
-  EXPECT_EQ(packet->logcat().events_size(), 1);
+  ASSERT_TRUE(packet->has_android_log());
+  EXPECT_EQ(packet->android_log().events_size(), 1);
 
-  const auto& decoded = packet->logcat().events();
+  const auto& decoded = packet->android_log().events();
   EXPECT_EQ(decoded.Get(0).timestamp(), 1546165328946231844LL);
   EXPECT_EQ(decoded.Get(0).tag(), "am_uid_stopped");
 }

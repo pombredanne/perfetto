@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef SRC_TRACE_PROCESSOR_LOGCAT_TABLE_H_
-#define SRC_TRACE_PROCESSOR_LOGCAT_TABLE_H_
+#ifndef SRC_TRACE_PROCESSOR_AndroidLogsTable_TABLE_H_
+#define SRC_TRACE_PROCESSOR_AndroidLogsTable_TABLE_H_
 
 #include "src/trace_processor/storage_table.h"
 #include "src/trace_processor/trace_storage.h"
@@ -23,11 +23,11 @@
 namespace perfetto {
 namespace trace_processor {
 
-class LogcatTable : public StorageTable {
+class AndroidLogsTableTable : public StorageTable {
  public:
   static void RegisterTable(sqlite3* db, const TraceStorage* storage);
 
-  LogcatTable(sqlite3*, const TraceStorage*);
+  AndroidLogsTableTable(sqlite3*, const TraceStorage*);
 
   // Table implementation.
   base::Optional<Table::Schema> Init(int, const char* const*) override;
@@ -42,4 +42,4 @@ class LogcatTable : public StorageTable {
 }  // namespace trace_processor
 }  // namespace perfetto
 
-#endif  // SRC_TRACE_PROCESSOR_LOGCAT_TABLE_H_
+#endif  // SRC_TRACE_PROCESSOR_AndroidLogsTable_TABLE_H_

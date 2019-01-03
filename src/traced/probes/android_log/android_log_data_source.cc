@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "src/traced/probes/logcat/logcat_data_source.h"
+#include "src/traced/probes/android_log/android_log_data_source.h"
 
 #include "perfetto/base/file_utils.h"
 #include "perfetto/base/logging.h"
@@ -28,7 +28,7 @@
 #include "perfetto/tracing/core/trace_packet.h"
 #include "perfetto/tracing/core/trace_writer.h"
 
-#include "perfetto/trace/android/android_logcat.pbzero.h"
+#include "perfetto/trace/android/android_log.pbzero.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 
 namespace perfetto {
@@ -39,11 +39,11 @@ constexpr uint32_t kMinPollRateMs = 100;
 constexpr uint32_t kDefaultPollRateMs = 1000;
 constexpr size_t kBufSize = base::kPageSize;
 const char kLogTagsPath[] = "/system/etc/event-log-tags";
-const char kLogcatSocket[] = "/dev/socket/logdr";
+const char kLogdrSocket[] = "/dev/socket/logdr";
 
 // From AOSP's liblog/include/log/log_read.h .
-// Logcat is supposed to be an ABI as it's exposed also by logcat -b (and in
-// practice never changed in backwards-incompatible ways in the past).
+// Android Log is supposed to be an ABI as it's exposed also by logcat -b (and
+// in practice never changed in backwards-incompatible ways in the past).
 // Note: the casing doesn't match the style guide and instead matches the
 // original name in liblog for the sake of code-searcheability.
 struct logger_entry_v4 {
@@ -60,7 +60,7 @@ struct logger_entry_v4 {
 // Event types definition in the binary encoded format, from
 // liblog/include/log/log.h .
 // Note that these values don't match the textual definitions of
-// system/core/logcat/event.logtags (which are not used by perfetto).
+// system/core/android_logevent.logtags (which are not used by perfetto).
 // The latter are off by one (INT = 1, LONG=2 and so on).
 enum AndroidEventLogType {
   EVENT_TYPE_INT = 0,
@@ -81,15 +81,15 @@ inline bool ReadAndAdvance(const char** ptr, const char* end, T* out) {
 
 }  // namespace
 
-LogcatDataSource::LogcatDataSource(DataSourceConfig ds_config,
-                                   base::TaskRunner* task_runner,
-                                   TracingSessionID session_id,
-                                   std::unique_ptr<TraceWriter> writer)
+AndroidLogDataSource::AndroidLogDataSource(DataSourceConfig ds_config,
+                                           base::TaskRunner* task_runner,
+                                           TracingSessionID session_id,
+                                           std::unique_ptr<TraceWriter> writer)
     : ProbesDataSource(session_id, kTypeId),
       task_runner_(task_runner),
       writer_(std::move(writer)),
       weak_factory_(this) {
-  const auto& cfg = ds_config.android_logcat_config();
+  const auto& cfg = ds_config.android_log_config();
   poll_rate_ms_ = cfg.poll_ms() ? cfg.poll_ms() : kDefaultPollRateMs;
   poll_rate_ms_ = std::max(kMinPollRateMs, poll_rate_ms_);
 
@@ -98,11 +98,11 @@ LogcatDataSource::LogcatDataSource(DataSourceConfig ds_config,
     log_ids.push_back(id);
   if (log_ids.empty()) {
     // If no log id is specified, add the most popular ones.
-    log_ids.push_back(AndroidLogcatConfig::AndroidLogcatLogId::LID_DEFAULT);
-    log_ids.push_back(AndroidLogcatConfig::AndroidLogcatLogId::LID_EVENTS);
-    log_ids.push_back(AndroidLogcatConfig::AndroidLogcatLogId::LID_SYSTEM);
-    log_ids.push_back(AndroidLogcatConfig::AndroidLogcatLogId::LID_CRASH);
-    log_ids.push_back(AndroidLogcatConfig::AndroidLogcatLogId::LID_KERNEL);
+    log_ids.push_back(AndroidLogConfig::AndroidLogId::LID_DEFAULT);
+    log_ids.push_back(AndroidLogConfig::AndroidLogId::LID_EVENTS);
+    log_ids.push_back(AndroidLogConfig::AndroidLogId::LID_SYSTEM);
+    log_ids.push_back(AndroidLogConfig::AndroidLogId::LID_CRASH);
+    log_ids.push_back(AndroidLogConfig::AndroidLogId::LID_KERNEL);
   }
   // Build the command string that will be sent to the logdr socket on Start(),
   // which looks like "stream lids=1,2,3,4" (lids == log buffer id(s)).
@@ -116,6 +116,8 @@ LogcatDataSource::LogcatDataSource(DataSourceConfig ds_config,
   // boundaries. Once done, derive StringView(s) out of the vector. This is
   // to create a set<StringView> which is backed by contiguous chars that can be
   // used to lookup StringView(s) from the parsed buffer.
+  // This is to avoid copying strings of tags for the only sake of checking for
+  // their existence in the set.
   std::vector<std::pair<size_t, size_t>> tag_boundaries;
   for (const std::string& tag : cfg.filter_tags()) {
     const size_t begin = filter_tags_strbuf_.size();
@@ -133,29 +135,29 @@ LogcatDataSource::LogcatDataSource(DataSourceConfig ds_config,
   buf_ = base::PagedMemory::Allocate(kBufSize);
 }
 
-LogcatDataSource::~LogcatDataSource() = default;
+AndroidLogDataSource::~AndroidLogDataSource() = default;
 
-base::UnixSocketRaw LogcatDataSource::ConnectLogdrSocket() {
+base::UnixSocketRaw AndroidLogDataSource::ConnectLogdrSocket() {
   auto socket = base::UnixSocketRaw::CreateMayFail(base::SockType::kSeqPacket);
-  if (!socket || !socket.Connect(kLogcatSocket)) {
-    PERFETTO_PLOG("Failed to connect to %s", kLogcatSocket);
+  if (!socket || !socket.Connect(kLogdrSocket)) {
+    PERFETTO_PLOG("Failed to connect to %s", kLogdrSocket);
     return base::UnixSocketRaw();
   }
   return socket;
 }
 
-void LogcatDataSource::Start() {
+void AndroidLogDataSource::Start() {
   ParseEventLogDefinitions();
 
-  if (!(logcat_sock_ = ConnectLogdrSocket()))
+  if (!(logdr_sock_ = ConnectLogdrSocket()))
     return;
 
-  PERFETTO_DLOG("Starting logcat data source: %s", mode_.c_str());
-  if (logcat_sock_.Send(mode_.data(), mode_.size()) <= 0) {
-    PERFETTO_PLOG("send() failed on logcat socket %s", kLogcatSocket);
+  PERFETTO_DLOG("Starting Android log data source: %s", mode_.c_str());
+  if (logdr_sock_.Send(mode_.data(), mode_.size()) <= 0) {
+    PERFETTO_PLOG("send() failed on logdr socket %s", kLogdrSocket);
     return;
   }
-  logcat_sock_.SetBlocking(false);
+  logdr_sock_.SetBlocking(false);
 
   auto weak_this = weak_factory_.GetWeakPtr();
   task_runner_->PostTask([weak_this] {
@@ -164,7 +166,7 @@ void LogcatDataSource::Start() {
   });
 }
 
-void LogcatDataSource::Tick(bool post_next_task) {
+void AndroidLogDataSource::Tick(bool post_next_task) {
   auto weak_this = weak_factory_.GetWeakPtr();
   if (post_next_task) {
     auto now_ms = base::GetWallTimeMs().count();
@@ -177,11 +179,11 @@ void LogcatDataSource::Tick(bool post_next_task) {
   }
 
   TraceWriter::TracePacketHandle packet;
-  protos::pbzero::AndroidLogcatPacket* logcat_packet = nullptr;
+  protos::pbzero::AndroidLogPacket* log_packet = nullptr;
   size_t num_events = 0;
   bool stop = false;
   ssize_t rsize;
-  while (!stop && (rsize = logcat_sock_.Receive(buf_.Get(), kBufSize)) > 0) {
+  while (!stop && (rsize = logdr_sock_.Receive(buf_.Get(), kBufSize)) > 0) {
     num_events++;
     stats_.num_total++;
     // Don't hold the message loop for too long. If there are so many events
@@ -199,8 +201,9 @@ void LogcatDataSource::Tick(bool post_next_task) {
     size_t payload_size = reinterpret_cast<logger_entry_v4*>(buf)->len;
     size_t hdr_size = reinterpret_cast<logger_entry_v4*>(buf)->hdr_size;
     if (payload_size + hdr_size > static_cast<size_t>(rsize)) {
-      PERFETTO_DLOG("Invalid logcat frame (hdr: %zu, payload: %zu, rsize: %zd)",
-                    hdr_size, payload_size, rsize);
+      PERFETTO_DLOG(
+          "Invalid Android log frame (hdr: %zu, payload: %zu, rsize: %zd)",
+          hdr_size, payload_size, rsize);
       stats_.num_failed++;
       continue;
     }
@@ -210,7 +213,7 @@ void LogcatDataSource::Tick(bool post_next_task) {
     // fields. Copy that in a temporary struct, so that unset fields are
     // always zero-initialized.
     logger_entry_v4 entry{};
-    memcpy(&entry, buf, hdr_size);
+    memcpy(&entry, buf, std::min(hdr_size, sizeof(entry)));
     buf += hdr_size;
 
     if (!packet) {
@@ -219,22 +222,24 @@ void LogcatDataSource::Tick(bool post_next_task) {
       packet = writer_->NewTracePacket();
       packet->set_timestamp(
           static_cast<uint64_t>(base::GetBootTimeNs().count()));
-      logcat_packet = packet->set_logcat();
+      log_packet = packet->set_android_log();
     }
 
-    protos::pbzero::AndroidLogcatPacket::LogEvent* evt = nullptr;
+    protos::pbzero::AndroidLogPacket::LogEvent* evt = nullptr;
 
-    if (entry.lid == AndroidLogcatConfig::AndroidLogcatLogId::LID_EVENTS) {
+    if (entry.lid == AndroidLogConfig::AndroidLogId::LID_EVENTS) {
       // Entries in the EVENTS buffer are special, they are binary encoded.
       // See https://developer.android.com/reference/android/util/EventLog.
-      if (!ParseBinaryEvent(buf, end, logcat_packet, &evt)) {
-        PERFETTO_DLOG("Failed to parse logcat binary event");
+      if (!ParseBinaryEvent(buf, end, log_packet, &evt)) {
+        PERFETTO_DLOG("Failed to parse Android log binary event");
         stats_.num_failed++;
+        continue;
       }
     } else {
-      if (!ParseTextEvent(buf, end, logcat_packet, &evt)) {
-        PERFETTO_DLOG("Failed to parse logcat text event");
+      if (!ParseTextEvent(buf, end, log_packet, &evt)) {
+        PERFETTO_DLOG("Failed to parse Android log text event");
         stats_.num_failed++;
+        continue;
       }
     }
     if (!evt) {
@@ -246,18 +251,19 @@ void LogcatDataSource::Tick(bool post_next_task) {
     // Add the common fields to the event.
     uint64_t ts = entry.sec * 1000000000ULL + entry.nsec;
     evt->set_timestamp(ts);
-    evt->set_log_id(static_cast<protos::pbzero::AndroidLogcatLogId>(entry.lid));
+    evt->set_log_id(static_cast<protos::pbzero::AndroidLogId>(entry.lid));
     evt->set_pid(entry.pid);
-    evt->set_tid(entry.tid);
-  }  // while(logcat_sock_.Receive())
-  PERFETTO_DLOG("Seen %zu logcat events", num_events);
+    evt->set_tid(static_cast<int32_t>(entry.tid));
+    evt->set_uid(static_cast<int32_t>(entry.uid));
+  }  // while(logdr_sock_.Receive())
+  PERFETTO_DLOG("Seen %zu Android log events", num_events);
 }
 
-bool LogcatDataSource::ParseTextEvent(
+bool AndroidLogDataSource::ParseTextEvent(
     const char* start,
     const char* end,
-    protos::pbzero::AndroidLogcatPacket* packet,
-    protos::pbzero::AndroidLogcatPacket::LogEvent** out_evt) {
+    protos::pbzero::AndroidLogPacket* packet,
+    protos::pbzero::AndroidLogPacket::LogEvent** out_evt) {
   // Format: [Priority 1 byte] [ tag ] [ NUL ] [ message ]
   const char* buf = start;
   int8_t prio;
@@ -265,7 +271,7 @@ bool LogcatDataSource::ParseTextEvent(
     return false;
 
   if (prio > 10) {
-    PERFETTO_DLOG("Skipping logcat event with suspiciously high priority %d",
+    PERFETTO_DLOG("Skipping log event with suspiciously high priority %d",
                   prio);
     return false;
   }
@@ -287,7 +293,7 @@ bool LogcatDataSource::ParseTextEvent(
 
   auto* evt = packet->add_events();
   *out_evt = evt;
-  evt->set_prio(static_cast<protos::pbzero::AndroidLogcatPriority>(prio));
+  evt->set_prio(static_cast<protos::pbzero::AndroidLogPriority>(prio));
   evt->set_tag(tag.data(), tag.size());
 
   buf = str_end + 1;  // Move |buf| to the start of the message.
@@ -302,11 +308,11 @@ bool LogcatDataSource::ParseTextEvent(
   return true;
 }
 
-bool LogcatDataSource::ParseBinaryEvent(
+bool AndroidLogDataSource::ParseBinaryEvent(
     const char* start,
     const char* end,
-    protos::pbzero::AndroidLogcatPacket* packet,
-    protos::pbzero::AndroidLogcatPacket::LogEvent** out_evt) {
+    protos::pbzero::AndroidLogPacket* packet,
+    protos::pbzero::AndroidLogPacket::LogEvent** out_evt) {
   const char* buf = start;
   int32_t eid;
   if (!ReadAndAdvance(&buf, end, &eid))
@@ -358,12 +364,12 @@ bool LogcatDataSource::ParseBinaryEvent(
         break;
       }
       case EVENT_TYPE_FLOAT: {
-        double value;
+        float value;
         if (!ReadAndAdvance(&buf, end, &value))
           return false;
         auto* arg = evt->add_args();
         arg->set_name(field_name);
-        arg->set_real_value(value);
+        arg->set_float_value(value);
         field_num++;
         break;
       }
@@ -384,14 +390,14 @@ bool LogcatDataSource::ParseBinaryEvent(
           // Lists are supported only as a top-level node. We stop parsing when
           // encountering a list as an inner field. The very few of them are not
           // interesting enough to warrant the extra complexity.
-          return evt;
+          return true;
         }
         break;
       }
       default:
         PERFETTO_DLOG(
-            "Skipping unklonwn logcat binary event of type %d for %s at pos "
-            "%zd after parsing %zu fields",
+            "Skipping unknown Android log binary event of type %d for %s at pos"
+            " %zd after parsing %zu fields",
             static_cast<int>(type), fmt->name.c_str(), buf - start, field_num);
         return true;
     }  // switch(type)
@@ -399,7 +405,8 @@ bool LogcatDataSource::ParseBinaryEvent(
   return true;
 }
 
-void LogcatDataSource::Flush(FlushRequestID, std::function<void()> callback) {
+void AndroidLogDataSource::Flush(FlushRequestID,
+                                 std::function<void()> callback) {
   // Grab most recent entries.
   Tick(/*post_next_task=*/false);
 
@@ -407,7 +414,7 @@ void LogcatDataSource::Flush(FlushRequestID, std::function<void()> callback) {
   {
     auto packet = writer_->NewTracePacket();
     packet->set_timestamp(static_cast<uint64_t>(base::GetBootTimeNs().count()));
-    auto* stats = packet->set_logcat()->set_stats();
+    auto* stats = packet->set_android_log()->set_stats();
     stats->set_num_total(stats_.num_total);
     stats->set_num_skipped(stats_.num_skipped);
     stats->set_num_failed(stats_.num_failed);
@@ -416,17 +423,16 @@ void LogcatDataSource::Flush(FlushRequestID, std::function<void()> callback) {
   writer_->Flush(callback);
 }
 
-void LogcatDataSource::ParseEventLogDefinitions() {
+void AndroidLogDataSource::ParseEventLogDefinitions() {
   std::string event_log_tags = ReadEventLogDefinitions();
   for (base::StringSplitter ss(std::move(event_log_tags), '\n'); ss.Next();) {
     if (!ParseEventLogDefinitionLine(ss.cur_token(), ss.cur_token_size() + 1)) {
       PERFETTO_DLOG("Could not parse event log format: %s", ss.cur_token());
-      continue;
     }
   }
 }
 
-bool LogcatDataSource::ParseEventLogDefinitionLine(char* line, size_t len) {
+bool AndroidLogDataSource::ParseEventLogDefinitionLine(char* line, size_t len) {
   base::StringSplitter tok(line, len, ' ');
   if (!tok.Next())
     return false;
@@ -446,24 +452,25 @@ bool LogcatDataSource::ParseEventLogDefinitionLine(char* line, size_t len) {
   // We don't really care neither about the field type nor its unit (the two
   // numbers after the |). The binary format re-states the type and we don't
   // currently propagate the unit at all.
-  int tokens_seen = 0;
-  int tokens_parsed = 0;
+  bool parsed_all_tokens = true;
   for (base::StringSplitter field(format, format_len, ','); field.Next();) {
-    tokens_seen++;
-    if (field.cur_token_size() <= 2)
+    if (field.cur_token_size() <= 2) {
+      parsed_all_tokens = false;
       continue;
+    }
     char* start = field.cur_token() + 1;
     base::StringSplitter parts(start, field.cur_token_size() - 1, '|');
-    if (!parts.Next())
+    if (!parts.Next()) {
+      parsed_all_tokens = false;
       continue;
+    }
     std::string field_name(parts.cur_token(), parts.cur_token_size());
     it->second.fields.emplace_back(std::move(field_name));
-    tokens_parsed++;
   }
-  return tokens_seen == tokens_parsed;
+  return parsed_all_tokens;
 }
 
-std::string LogcatDataSource::ReadEventLogDefinitions() {
+std::string AndroidLogDataSource::ReadEventLogDefinitions() {
   std::string contents;
   if (!base::ReadFile(kLogTagsPath, &contents)) {
     PERFETTO_PLOG("Failed to read %s", kLogTagsPath);
@@ -472,7 +479,7 @@ std::string LogcatDataSource::ReadEventLogDefinitions() {
   return contents;
 }
 
-const LogcatDataSource::EventFormat* LogcatDataSource::GetEventFormat(
+const AndroidLogDataSource::EventFormat* AndroidLogDataSource::GetEventFormat(
     int id) const {
   auto it = event_formats_.find(id);
   return it == event_formats_.end() ? nullptr : &it->second;

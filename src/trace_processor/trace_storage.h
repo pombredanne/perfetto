@@ -337,9 +337,9 @@ class TraceStorage {
     std::deque<RefType> types_;
   };
 
-  class Logcat {
+  class AndroidLogs {
    public:
-    inline size_t AddLogcatEvent(int64_t timestamp,
+    inline size_t AddLogEvent(int64_t timestamp,
                                  UniqueTid utid,
                                  uint8_t prio,
                                  StringId tag_id,
@@ -432,8 +432,8 @@ class TraceStorage {
   const Instants& instants() const { return instants_; }
   Instants* mutable_instants() { return &instants_; }
 
-  const Logcat& logcat() const { return logcat_; }
-  Logcat* mutable_logcat() { return &logcat_; }
+  const AndroidLogs& android_logs() const { return android_log_; }
+  AndroidLogs* mutable_android_log() { return &android_log_; }
 
   const Stats& stats() const { return stats_; }
   Stats* mutable_stats() { return &stats_; }
@@ -494,7 +494,7 @@ class TraceStorage {
   // e.g. signal events
   Instants instants_;
 
-  Logcat logcat_;
+  AndroidLogs android_log_;
 };
 
 }  // namespace trace_processor

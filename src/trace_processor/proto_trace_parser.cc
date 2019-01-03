@@ -206,9 +206,9 @@ void ProtoTraceParser::ParseTracePacket(int64_t ts, TraceBlobView packet) {
         ParseClockSnapshot(packet.slice(fld_off, fld.size()));
         break;
       }
-      case protos::TracePacket::kLogcatFieldNumber: {
+      case protos::TracePacket::kAndroidLogFieldNumber: {
         const size_t fld_off = packet.offset_of(fld.data());
-        ParseLogcatPacket(packet.slice(fld_off, fld.size()));
+        ParseAndroidLogPacket(packet.slice(fld_off, fld.size()));
         break;
       }
       default:
@@ -1007,13 +1007,13 @@ void ProtoTraceParser::ParseClockSnapshot(TraceBlobView packet) {
   }
 }
 
-void ProtoTraceParser::ParseLogcatPacket(TraceBlobView packet) {
+void ProtoTraceParser::ParseAndroidLogPacket(TraceBlobView packet) {
   ProtoDecoder decoder(packet.data(), packet.length());
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
-      case protos::AndroidLogcatPacket::kEventsFieldNumber: {
+      case protos::AndroidLogPacket::kEventsFieldNumber: {
         const size_t fld_off = packet.offset_of(fld.data());
-        ParseLogcatEvent(packet.slice(fld_off, fld.size()));
+        ParseAndroidLogEvent(packet.slice(fld_off, fld.size()));
         break;
       }
       default:
@@ -1024,7 +1024,7 @@ void ProtoTraceParser::ParseLogcatPacket(TraceBlobView packet) {
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 
-void ProtoTraceParser::ParseLogcatEvent(TraceBlobView event) {
+void ProtoTraceParser::ParseAndroidLogEvent(TraceBlobView event) {
   // TODO(primiano): Add events and non-stringified fields to the "raw" table.
   // TODO(primiano): Add failure stats to the stats table.
   ProtoDecoder decoder(event.data(), event.length());
@@ -1043,25 +1043,25 @@ void ProtoTraceParser::ParseLogcatEvent(TraceBlobView event) {
 
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
-      case protos::AndroidLogcatPacket::LogEvent::kPidFieldNumber:
+      case protos::AndroidLogPacket::LogEvent::kPidFieldNumber:
         pid = fld.as_uint32();
         break;
-      case protos::AndroidLogcatPacket::LogEvent::kTidFieldNumber:
+      case protos::AndroidLogPacket::LogEvent::kTidFieldNumber:
         tid = fld.as_uint32();
         break;
-      case protos::AndroidLogcatPacket::LogEvent::kTimestampFieldNumber:
+      case protos::AndroidLogPacket::LogEvent::kTimestampFieldNumber:
         ts = fld.as_int64();
         break;
-      case protos::AndroidLogcatPacket::LogEvent::kPrioFieldNumber:
+      case protos::AndroidLogPacket::LogEvent::kPrioFieldNumber:
         prio = static_cast<uint8_t>(fld.as_uint32());
         break;
-      case protos::AndroidLogcatPacket::LogEvent::kTagFieldNumber:
+      case protos::AndroidLogPacket::LogEvent::kTagFieldNumber:
         tag_id = context_->storage->InternString(fld.as_string());
         break;
-      case protos::AndroidLogcatPacket::LogEvent::kMessageFieldNumber:
+      case protos::AndroidLogPacket::LogEvent::kMessageFieldNumber:
         msg_id = context_->storage->InternString(fld.as_string());
         break;
-      case protos::AndroidLogcatPacket::LogEvent::kArgsFieldNumber: {
+      case protos::AndroidLogPacket::LogEvent::kArgsFieldNumber: {
         // TODO make msg_id safe w.r.t. 4096. // DNS
         const size_t fld_off = event.offset_of(fld.data());
         TraceBlobView arg_data = event.slice(fld_off, fld.size());
@@ -1069,28 +1069,28 @@ void ProtoTraceParser::ParseLogcatEvent(TraceBlobView event) {
         for (auto arg = arg_decoder.ReadField(); arg.id;
              arg = arg_decoder.ReadField()) {
           switch (arg.id) {
-            case protos::AndroidLogcatPacket::LogEvent::Arg::kNameFieldNumber: {
+            case protos::AndroidLogPacket::LogEvent::Arg::kNameFieldNumber: {
               base::StringView name = arg.as_string();
               arg_str += snprintf(arg_str, arg_avail(),
                                   " %.*s=", static_cast<int>(name.size()),
                                   name.data());
               break;
             }
-            case protos::AndroidLogcatPacket::LogEvent::Arg::
+            case protos::AndroidLogPacket::LogEvent::Arg::
                 kStringValueFieldNumber: {
               base::StringView val = arg.as_string();
               arg_str += snprintf(arg_str, arg_avail(), "\"%.*s\"",
                                   static_cast<int>(val.size()), val.data());
               break;
             }
-            case protos::AndroidLogcatPacket::LogEvent::Arg::
-                kIntValueFieldNumber:
+            case protos::AndroidLogPacket::LogEvent::Arg::kIntValueFieldNumber:
               arg_str +=
                   snprintf(arg_str, arg_avail(), "%" PRId64, arg.as_int64());
               break;
-            case protos::AndroidLogcatPacket::LogEvent::Arg::
-                kRealValueFieldNumber:
-              arg_str += snprintf(arg_str, arg_avail(), "%f", arg.as_double());
+            case protos::AndroidLogPacket::LogEvent::Arg::
+                kFloatValueFieldNumber:
+              arg_str += snprintf(arg_str, arg_avail(), "%f",
+                                  static_cast<double>(arg.as_float()));
               break;
           }  // switch(arg.id)
         }    // for(arg)
@@ -1103,7 +1103,7 @@ void ProtoTraceParser::ParseLogcatEvent(TraceBlobView event) {
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 
   if (prio == 0)
-    prio = protos::AndroidLogcatPriority::PRIO_INFO;
+    prio = protos::AndroidLogPriority::PRIO_INFO;
 
   if (arg_str != &arg_msg[0]) {
     PERFETTO_DCHECK(!msg_id);
@@ -1113,8 +1113,8 @@ void ProtoTraceParser::ParseLogcatEvent(TraceBlobView event) {
   UniquePid utid = tid ? context_->process_tracker->UpdateThread(tid, pid) : 0;
   int64_t trace_time =
       context_->time_tracker->ToTraceTime(ClockDomain::kRealTime, ts);
-  context_->storage->mutable_logcat()->AddLogcatEvent(trace_time, utid, prio,
-                                                      tag_id, msg_id);
+  context_->storage->mutable_android_log()->AddLogEvent(trace_time, utid, prio,
+                                                        tag_id, msg_id);
 }
 
 }  // namespace trace_processor

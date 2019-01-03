@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef SRC_TRACED_PROBES_LOGCAT_LOGCAT_DATA_SOURCE_H_
-#define SRC_TRACED_PROBES_LOGCAT_LOGCAT_DATA_SOURCE_H_
+#ifndef SRC_TRACED_PROBES_ANDROID_LOG_ANDROID_LOG_DATA_SOURCE_H_
+#define SRC_TRACED_PROBES_ANDROID_LOG_ANDROID_LOG_DATA_SOURCE_H_
 
 #include <unordered_map>
 #include <unordered_set>
@@ -38,12 +38,12 @@ class TaskRunner;
 
 namespace protos {
 namespace pbzero {
-class AndroidLogcatPacket;
-class AndroidLogcatPacket_LogEvent;
+class AndroidLogPacket;
+class AndroidLogPacket_LogEvent;
 }  // namespace pbzero
 }  // namespace protos
 
-class LogcatDataSource : public ProbesDataSource {
+class AndroidLogDataSource : public ProbesDataSource {
  public:
   struct Stats {
     uint64_t num_total = 0;    // Total number of log entries received.
@@ -58,12 +58,12 @@ class LogcatDataSource : public ProbesDataSource {
   };
   static constexpr int kTypeId = 6;
 
-  LogcatDataSource(DataSourceConfig,
-                   base::TaskRunner*,
-                   TracingSessionID,
-                   std::unique_ptr<TraceWriter> writer);
+  AndroidLogDataSource(DataSourceConfig,
+                       base::TaskRunner*,
+                       TracingSessionID,
+                       std::unique_ptr<TraceWriter> writer);
 
-  ~LogcatDataSource() override;
+  ~AndroidLogDataSource() override;
 
   // ProbesDataSource implementation.
   void Start() override;
@@ -80,7 +80,7 @@ class LogcatDataSource : public ProbesDataSource {
 
   const EventFormat* GetEventFormat(int id) const;
   const Stats& stats() const { return stats_; }
-  base::WeakPtr<LogcatDataSource> GetWeakPtr() const;
+  base::WeakPtr<AndroidLogDataSource> GetWeakPtr() const;
 
  private:
   // Periodic polling task.
@@ -97,8 +97,8 @@ class LogcatDataSource : public ProbesDataSource {
   // - If a new event is aded to the packet, |out_evt| is set to that.
   bool ParseTextEvent(const char* start,
                       const char* end,
-                      protos::pbzero::AndroidLogcatPacket* packet,
-                      protos::pbzero::AndroidLogcatPacket_LogEvent** out_evt);
+                      protos::pbzero::AndroidLogPacket* packet,
+                      protos::pbzero::AndroidLogPacket_LogEvent** out_evt);
 
   // Parses a binary event from the "events" buffer.
   // If parsing fails returns false and leaves the |out_evt| field unset.
@@ -107,12 +107,12 @@ class LogcatDataSource : public ProbesDataSource {
   // - If a new event is aded to the packet, |out_evt| is set to that.
   bool ParseBinaryEvent(const char* start,
                         const char* end,
-                        protos::pbzero::AndroidLogcatPacket* packet,
-                        protos::pbzero::AndroidLogcatPacket_LogEvent** out_evt);
+                        protos::pbzero::AndroidLogPacket* packet,
+                        protos::pbzero::AndroidLogPacket_LogEvent** out_evt);
 
   base::TaskRunner* const task_runner_;
   std::unique_ptr<TraceWriter> writer_;
-  base::UnixSocketRaw logcat_sock_;
+  base::UnixSocketRaw logdr_sock_;
 
   // Config parameters coming from the data source section in the trace config.
   uint32_t poll_rate_ms_ = 0;
@@ -133,9 +133,9 @@ class LogcatDataSource : public ProbesDataSource {
   base::PagedMemory buf_;
   Stats stats_;
 
-  base::WeakPtrFactory<LogcatDataSource> weak_factory_;  // Keep last.
+  base::WeakPtrFactory<AndroidLogDataSource> weak_factory_;  // Keep last.
 };
 
 }  // namespace perfetto
 
-#endif  // SRC_TRACED_PROBES_LOGCAT_LOGCAT_DATA_SOURCE_H_
+#endif  // SRC_TRACED_PROBES_ANDROID_LOG_ANDROID_LOG_DATA_SOURCE_H_
