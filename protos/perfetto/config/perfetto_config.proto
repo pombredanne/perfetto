@@ -436,7 +436,7 @@ message TestConfig {
 // It contains the general config for the logging buffer(s) and the configs for
 // all the data source being enabled.
 //
-// Next id: 14.
+// Next id: 15.
 message TraceConfig {
   message BufferConfig {
     optional uint32 size_kb = 1;

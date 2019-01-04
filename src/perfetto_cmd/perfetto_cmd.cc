@@ -36,6 +36,7 @@
 #include "perfetto/base/utils.h"
 #include "perfetto/protozero/proto_utils.h"
 #include "perfetto/traced/traced.h"
+#include "perfetto/tracing/core/basic_types.h"
 #include "perfetto/tracing/core/data_source_config.h"
 #include "perfetto/tracing/core/data_source_descriptor.h"
 #include "perfetto/tracing/core/trace_config.h"
@@ -58,7 +59,7 @@
 namespace perfetto {
 namespace {
 
-uint32_t g_flush_timeout_ms = 6000;
+uint32_t g_flush_timeout_ms = kDefaultFlushTimeoutMs + 1000;
 
 perfetto::PerfettoCmd* g_consumer_cmd;
 
@@ -647,7 +648,7 @@ void PerfettoCmd::SetupCtrlCSignalHandler() {
   task_runner_.AddFileDescriptorWatch(ctrl_c_evt_.fd(), [this] {
     PERFETTO_LOG(
         "SIGINT/SIGTERM received: disabling tracing. "
-        "Waiting up to %" PRIu32 " for flush.",
+        "Waiting up to %" PRIu32 " ms for flush.",
         g_flush_timeout_ms);
     ctrl_c_evt_.Clear();
     consumer_endpoint_->Flush(g_flush_timeout_ms, [this](bool) {

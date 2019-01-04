@@ -118,8 +118,13 @@ struct Frame {
   uint64_t rel_pc;
 
   bool operator<(const Frame& other) const {
-    return std::tie(mapping, function_name, rel_pc) <
-           std::tie(other.mapping, other.function_name, other.rel_pc);
+    InternID mapping_id = mapping.id();
+    InternID function_name_id = function_name.id();
+    InternID other_mapping_id = other.mapping.id();
+    InternID other_function_name_id = other.function_name.id();
+
+    return std::tie(mapping_id, function_name_id, rel_pc) <
+           std::tie(other_mapping_id, other_function_name_id, other.rel_pc);
   }
 };
 
