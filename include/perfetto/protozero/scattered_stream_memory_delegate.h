@@ -64,7 +64,10 @@ class ScatteredStreamMemoryDelegate
     writer_ = writer;
   }
 
+  // Update unused_bytes() of the current |Chunk| based on the writer's state.
   void AdjustUsedSizeOfCurrentChunk();
+
+  // Returns the total size the chunks occupy in heap memory (including unused).
   size_t GetTotalSize();
 
  private:
