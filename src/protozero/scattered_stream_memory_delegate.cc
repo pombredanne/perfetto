@@ -18,36 +18,83 @@
 
 namespace perfetto {
 
-ScatteredStreamMemoryDelegate::ScatteredStreamMemoryDelegate(size_t chunk_size)
-    : chunk_size_(chunk_size) {}
+ScatteredStreamMemoryDelegate::Chunk::Chunk(size_t size)
+    : buffer_(std::unique_ptr<uint8_t[]>(new uint8_t[size])),
+      size_(size),
+      unused_bytes_(size) {
+  PERFETTO_DCHECK(size);
+#if PERFETTO_DCHECK_IS_ON()
+  uint8_t* begin = buffer_.get();
+  memset(begin, 0xff, size_);
+#endif  // PERFETTO_DCHECK_IS_ON()
+}
 
-ScatteredStreamMemoryDelegate::~ScatteredStreamMemoryDelegate() {}
+ScatteredStreamMemoryDelegate::Chunk::Chunk(Chunk&& chunk)
+    : buffer_(std::move(chunk.buffer_)),
+      size_(std::move(chunk.size_)),
+      unused_bytes_(std::move(chunk.unused_bytes_)) {}
+
+ScatteredStreamMemoryDelegate::Chunk::~Chunk() = default;
+
+protozero::ContiguousMemoryRange
+ScatteredStreamMemoryDelegate::Chunk::GetTotalRange() const {
+  protozero::ContiguousMemoryRange range = {buffer_.get(),
+                                            buffer_.get() + size_};
+  return range;
+}
+
+protozero::ContiguousMemoryRange
+ScatteredStreamMemoryDelegate::Chunk::GetUsedRange() const {
+  protozero::ContiguousMemoryRange range = {
+      buffer_.get(), buffer_.get() + size_ - unused_bytes_};
+  PERFETTO_CHECK(range.size() <= size_);
+  return range;
+}
+
+ScatteredStreamMemoryDelegate::ScatteredStreamMemoryDelegate(
+    size_t initial_chunk_size_bytes,
+    size_t maximum_chunk_size_bytes)
+    : next_chunk_size_(initial_chunk_size_bytes),
+      maximum_chunk_size_(maximum_chunk_size_bytes) {
+  PERFETTO_DCHECK(next_chunk_size_ && maximum_chunk_size_);
+}
+
+ScatteredStreamMemoryDelegate::~ScatteredStreamMemoryDelegate() = default;
 
 protozero::ContiguousMemoryRange ScatteredStreamMemoryDelegate::GetNewBuffer() {
   PERFETTO_CHECK(writer_);
-  if (!chunks_.empty()) {
-    size_t used = chunk_size_ - writer_->bytes_available();
-    chunks_used_size_.push_back(used);
-  }
-  std::unique_ptr<uint8_t[]> chunk(new uint8_t[chunk_size_]);
-  uint8_t* begin = chunk.get();
-  memset(begin, 0xff, chunk_size_);
-  chunks_.push_back(std::move(chunk));
-  return {begin, begin + chunk_size_};
+  AdjustUsedSizeOfCurrentChunk();
+
+  chunks_.emplace_back(next_chunk_size_);
+  next_chunk_size_ = std::min(maximum_chunk_size_, next_chunk_size_ * 2);
+  return chunks_.back().GetTotalRange();
 }
 
 std::vector<uint8_t> ScatteredStreamMemoryDelegate::StitchChunks() {
+  AdjustUsedSizeOfCurrentChunk();
   std::vector<uint8_t> buffer;
   size_t i = 0;
   for (const auto& chunk : chunks_) {
-    size_t chunk_size = (i < chunks_used_size_.size())
-                            ? chunks_used_size_[i]
-                            : (chunk_size_ - writer_->bytes_available());
-    PERFETTO_CHECK(chunk_size <= chunk_size_);
-    buffer.insert(buffer.end(), chunk.get(), chunk.get() + chunk_size);
+    auto used_range = chunk.GetUsedRange();
+    buffer.insert(buffer.end(), used_range.begin, used_range.end);
     i++;
   }
   return buffer;
+}
+
+void ScatteredStreamMemoryDelegate::AdjustUsedSizeOfCurrentChunk() {
+  if (!chunks_.empty()) {
+    PERFETTO_DCHECK(writer_);
+    chunks_.back().set_unused_bytes(writer_->bytes_available());
+  }
+}
+
+size_t ScatteredStreamMemoryDelegate::GetTotalSize() {
+  size_t total_size = 0;
+  for (auto& chunk : chunks_) {
+    total_size += chunk.size();
+  }
+  return total_size;
 }
 
 }  // namespace perfetto

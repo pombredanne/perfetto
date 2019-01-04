@@ -33,7 +33,7 @@ using namespace proto_utils;
 
 TEST(ProtoDecoder, ReadString) {
   Message message;
-  perfetto::ScatteredStreamMemoryDelegate delegate(512);
+  perfetto::ScatteredStreamMemoryDelegate delegate(512, 512);
   ScatteredStreamWriter writer(&delegate);
   delegate.set_writer(&writer);
   message.Reset(&writer);
@@ -41,10 +41,10 @@ TEST(ProtoDecoder, ReadString) {
   static constexpr char kTestString[] = "test";
   message.AppendString(1, kTestString);
 
-  uint8_t* data = delegate.chunks()[0].get();
-  uint64_t bytes_used = 512 - writer.bytes_available();
+  delegate.AdjustUsedSizeOfCurrentChunk();
+  auto used_range = delegate.chunks()[0].GetUsedRange();
 
-  ProtoDecoder decoder(data, bytes_used);
+  ProtoDecoder decoder(used_range.begin, used_range.size());
   ProtoDecoder::Field field = decoder.ReadField();
 
   ASSERT_EQ(field.id, 1u);

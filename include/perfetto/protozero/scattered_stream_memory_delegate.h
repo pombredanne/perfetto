@@ -28,7 +28,28 @@ namespace perfetto {
 class ScatteredStreamMemoryDelegate
     : public protozero::ScatteredStreamWriter::Delegate {
  public:
-  explicit ScatteredStreamMemoryDelegate(size_t chunk_size);
+  class Chunk {
+   public:
+    explicit Chunk(size_t size);
+    Chunk(Chunk&& chunk);
+    ~Chunk();
+
+    protozero::ContiguousMemoryRange GetTotalRange() const;
+    protozero::ContiguousMemoryRange GetUsedRange() const;
+
+    uint8_t* start() const { return buffer_.get(); }
+    size_t size() const { return size_; }
+    size_t unused_bytes() const { return unused_bytes_; }
+    void set_unused_bytes(size_t unused_bytes) { unused_bytes_ = unused_bytes; }
+
+   private:
+    std::unique_ptr<uint8_t[]> buffer_;
+    const size_t size_;
+    size_t unused_bytes_;
+  };
+
+  ScatteredStreamMemoryDelegate(size_t initial_chunk_size_bytes = 128,
+                                size_t maximum_chunk_size_bytes = 128 * 1024);
   ~ScatteredStreamMemoryDelegate() override;
 
   // protozero::ScatteredStreamWriter::Delegate implementation.
@@ -37,19 +58,20 @@ class ScatteredStreamMemoryDelegate
   // Stitch all the chunks into a single contiguous buffer.
   std::vector<uint8_t> StitchChunks();
 
-  const std::vector<std::unique_ptr<uint8_t[]>>& chunks() const {
-    return chunks_;
-  }
+  const std::vector<Chunk>& chunks() const { return chunks_; }
 
   void set_writer(protozero::ScatteredStreamWriter* writer) {
     writer_ = writer;
   }
 
+  void AdjustUsedSizeOfCurrentChunk();
+  size_t GetTotalSize();
+
  private:
-  const size_t chunk_size_;
+  size_t next_chunk_size_;
+  const size_t maximum_chunk_size_;
   protozero::ScatteredStreamWriter* writer_ = nullptr;
-  std::vector<size_t> chunks_used_size_;
-  std::vector<std::unique_ptr<uint8_t[]>> chunks_;
+  std::vector<Chunk> chunks_;
 };
 
 }  // namespace perfetto
