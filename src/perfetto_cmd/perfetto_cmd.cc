@@ -58,7 +58,7 @@
 namespace perfetto {
 namespace {
 
-constexpr uint32_t kFlushTimeoutMs = 5000;
+uint32_t g_flush_timeout_ms = 5000;
 
 perfetto::PerfettoCmd* g_consumer_cmd;
 
@@ -510,6 +510,9 @@ void PerfettoCmd::OnConnect() {
     task_runner_.PostDelayedTask(std::bind(&PerfettoCmd::OnTimeout, this),
                                  trace_config_->duration_ms() + 10000);
   }
+
+  if (trace_config_->flush_timeout_ms())
+    g_flush_timeout_ms = trace_config_->flush_timeout_ms();
 }
 
 void PerfettoCmd::OnDisconnect() {
@@ -641,7 +644,7 @@ void PerfettoCmd::SetupCtrlCSignalHandler() {
   task_runner_.AddFileDescriptorWatch(ctrl_c_evt_.fd(), [this] {
     PERFETTO_LOG("SIGINT/SIGTERM received: disabling tracing");
     ctrl_c_evt_.Clear();
-    consumer_endpoint_->Flush(kFlushTimeoutMs, [this](bool) {
+    consumer_endpoint_->Flush(g_flush_timeout_ms, [this](bool) {
       consumer_endpoint_->DisableTracing();
     });
   });
@@ -665,7 +668,7 @@ void PerfettoCmd::OnAttach(bool success, const TraceConfig& trace_config) {
   PERFETTO_DCHECK(trace_config_->write_into_file());
 
   if (stop_trace_once_attached_) {
-    consumer_endpoint_->Flush(kFlushTimeoutMs, [this](bool) {
+    consumer_endpoint_->Flush(g_flush_timeout_ms, [this](bool) {
       consumer_endpoint_->DisableTracing();
     });
   }

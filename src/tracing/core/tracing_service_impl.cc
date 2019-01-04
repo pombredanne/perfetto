@@ -60,7 +60,7 @@ constexpr size_t kDefaultShmPageSize = base::kPageSize;
 constexpr int kMaxBuffersPerConsumer = 128;
 constexpr base::TimeMillis kSnapshotsInterval(10 * 1000);
 constexpr int kDefaultWriteIntoFilePeriodMs = 5000;
-constexpr int kFlushTimeoutMs = 5000;
+constexpr int kDefaultFlushTimeoutMs = 5000;
 constexpr int kMaxConcurrentTracingSessions = 5;
 
 constexpr uint64_t kMillisPerHour = 3600000;
@@ -115,6 +115,13 @@ std::unique_ptr<TracingService> TracingService::CreateInstance(
       new TracingServiceImpl(std::move(shm_factory), task_runner));
 }
 
+// static
+uint32_t TracingServiceImpl::GetFlushTimeoutMs(const TracingSession& session) {
+  uint32_t flush_timeout_ms = session.config.flush_timeout_ms();
+  if (flush_timeout_ms == 0)
+    flush_timeout_ms = kDefaultFlushTimeoutMs;
+  return flush_timeout_ms;
+}
 TracingServiceImpl::TracingServiceImpl(
     std::unique_ptr<SharedMemory::Factory> shm_factory,
     base::TaskRunner* task_runner)
@@ -718,7 +725,9 @@ void TracingServiceImpl::OnFlushTimeout(TracingSessionID tsid,
 void TracingServiceImpl::FlushAndDisableTracing(TracingSessionID tsid) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
-  Flush(tsid, kFlushTimeoutMs, [weak_this, tsid](bool success) {
+  uint32_t flush_timeout_ms =
+      GetFlushTimeoutMs(*weak_this->GetTracingSession(tsid));
+  Flush(tsid, flush_timeout_ms, [weak_this, tsid](bool success) {
     PERFETTO_DLOG("Flush done (success: %d), disabling trace session %" PRIu64,
                   success, tsid);
     if (!weak_this)
@@ -746,6 +755,7 @@ void TracingServiceImpl::PeriodicFlushTask(TracingSessionID tsid,
     return;
 
   uint32_t flush_period_ms = tracing_session->config.flush_period_ms();
+  uint32_t flush_timeout_ms = GetFlushTimeoutMs(*tracing_session);
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
   task_runner_->PostDelayedTask(
       [weak_this, tsid] {
@@ -757,7 +767,7 @@ void TracingServiceImpl::PeriodicFlushTask(TracingSessionID tsid,
   if (post_next_only)
     return;
 
-  Flush(tsid, kFlushTimeoutMs, [](bool success) {
+  Flush(tsid, flush_timeout_ms, [](bool success) {
     if (!success)
       PERFETTO_ELOG("Periodic flush timed out");
   });

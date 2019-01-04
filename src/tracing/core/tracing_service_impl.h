@@ -374,6 +374,7 @@ class TracingServiceImpl : public TracingService {
   void DisableTracingNotifyConsumerAndFlushFile(TracingSession*);
   void PeriodicFlushTask(TracingSessionID, bool post_next_only);
   TraceBuffer* GetBufferByID(BufferID);
+  static uint32_t GetFlushTimeoutMs(const TracingSession& session);
 
   base::TaskRunner* const task_runner_;
   std::unique_ptr<SharedMemory::Factory> shm_factory_;
