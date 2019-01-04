@@ -727,6 +727,8 @@ void TracingServiceImpl::FlushAndDisableTracing(TracingSessionID tsid) {
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
   uint32_t flush_timeout_ms =
       GetFlushTimeoutMs(*weak_this->GetTracingSession(tsid));
+  PERFETTO_DLOG("Triggering final flush for %" PRIu64 " with timeout %" PRIu32,
+                tsid, flush_timeout_ms);
   Flush(tsid, flush_timeout_ms, [weak_this, tsid](bool success) {
     PERFETTO_DLOG("Flush done (success: %d), disabling trace session %" PRIu64,
                   success, tsid);
@@ -767,6 +769,9 @@ void TracingServiceImpl::PeriodicFlushTask(TracingSessionID tsid,
   if (post_next_only)
     return;
 
+  PERFETTO_DLOG("Triggering periodic flush for %" PRIu64
+                " with timeout %" PRIu32,
+                tsid, flush_timeout_ms);
   Flush(tsid, flush_timeout_ms, [](bool success) {
     if (!success)
       PERFETTO_ELOG("Periodic flush timed out");

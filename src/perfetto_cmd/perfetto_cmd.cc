@@ -58,7 +58,7 @@
 namespace perfetto {
 namespace {
 
-uint32_t g_flush_timeout_ms = 5000;
+uint32_t g_flush_timeout_ms = 6000;
 
 perfetto::PerfettoCmd* g_consumer_cmd;
 
@@ -511,8 +511,11 @@ void PerfettoCmd::OnConnect() {
                                  trace_config_->duration_ms() + 10000);
   }
 
-  if (trace_config_->flush_timeout_ms())
-    g_flush_timeout_ms = trace_config_->flush_timeout_ms();
+  if (trace_config_->flush_timeout_ms()) {
+    // Add 1s to the timeout in the service to allow for writing the file
+    // if write_to_file is not set.
+    g_flush_timeout_ms = trace_config_->flush_timeout_ms() + 1000;
+  }
 }
 
 void PerfettoCmd::OnDisconnect() {
@@ -642,7 +645,10 @@ void PerfettoCmd::SetupCtrlCSignalHandler() {
   sigaction(SIGTERM, &sa, nullptr);
 
   task_runner_.AddFileDescriptorWatch(ctrl_c_evt_.fd(), [this] {
-    PERFETTO_LOG("SIGINT/SIGTERM received: disabling tracing");
+    PERFETTO_LOG(
+        "SIGINT/SIGTERM received: disabling tracing. "
+        "Waiting up to %" PRIu32 " for flush.",
+        g_flush_timeout_ms);
     ctrl_c_evt_.Clear();
     consumer_endpoint_->Flush(g_flush_timeout_ms, [this](bool) {
       consumer_endpoint_->DisableTracing();
