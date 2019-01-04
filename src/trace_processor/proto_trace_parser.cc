@@ -37,6 +37,13 @@
 namespace perfetto {
 namespace trace_processor {
 
+namespace {
+
+using protozero::ProtoDecoder;
+using Variadic = TraceStorage::Args::Variadic;
+
+}  // namespace
+
 // We have to handle trace_marker events of a few different types:
 // 1. some random text
 // 2. B|1636|pokeUserActivity
@@ -100,8 +107,6 @@ bool ParseSystraceTracePoint(base::StringView str, SystraceTracePoint* out) {
       return false;
   }
 }
-
-using protozero::ProtoDecoder;
 
 ProtoTraceParser::ProtoTraceParser(TraceProcessorContext* context)
     : context_(context),
@@ -472,8 +477,8 @@ void ProtoTraceParser::ParseProcMemCounters(int64_t ts,
     uint64_t value = counter_values[field_id];
     auto row_id = context_->event_tracker->PushCounter(
         ts, value, name, utid, RefType::kRefUtidLookupUpid);
-    context_->storage->mutable_args()->AddArg(row_id, utid_name_id_,
-                                              utid_name_id_, utid);
+    context_->storage->mutable_args()->AddArg(
+        row_id, utid_name_id_, utid_name_id_, Variadic::Integer(utid));
   }
 
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
@@ -971,14 +976,14 @@ void ProtoTraceParser::ParseGenericFtraceField(RowId generic_row_id,
       case protos::GenericFtraceEvent::Field::kUintValue: {
         context_->storage->mutable_args()->AddArg(
             generic_row_id, field_name_id, field_name_id,
-            TraceStorage::Args::Variadic(fld.as_integer()));
+            Variadic::Integer(fld.as_integer()));
         break;
       }
       case protos::GenericFtraceEvent::Field::kStrValue: {
         StringId value = context_->storage->InternString(fld.as_string());
-        context_->storage->mutable_args()->AddArg(
-            generic_row_id, field_name_id, field_name_id,
-            TraceStorage::Args::Variadic(value));
+        context_->storage->mutable_args()->AddArg(generic_row_id, field_name_id,
+                                                  field_name_id,
+                                                  Variadic::String(value));
       }
     }
   }
@@ -1016,22 +1021,20 @@ void ProtoTraceParser::ParseTypedFtraceToRaw(uint32_t ftrace_id,
       case ProtoSchemaType::kEnum: {
         context_->storage->mutable_args()->AddArg(
             raw_event_id, name_id, name_id,
-            TraceStorage::Args::Variadic(fld.as_integer()));
+            Variadic::Integer(fld.as_integer()));
         break;
       }
       case ProtoSchemaType::kString:
       case ProtoSchemaType::kBytes: {
         StringId value = context_->storage->InternString(fld.as_string());
         context_->storage->mutable_args()->AddArg(
-            raw_event_id, name_id, name_id,
-            TraceStorage::Args::Variadic(value));
+            raw_event_id, name_id, name_id, Variadic::String(value));
         break;
       }
       case ProtoSchemaType::kDouble:
       case ProtoSchemaType::kFloat: {
         context_->storage->mutable_args()->AddArg(
-            raw_event_id, name_id, name_id,
-            TraceStorage::Args::Variadic(fld.as_real()));
+            raw_event_id, name_id, name_id, Variadic::Real(fld.as_real()));
         break;
       }
       case ProtoSchemaType::kUnknown:

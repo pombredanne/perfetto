@@ -111,9 +111,26 @@ class TraceStorage {
     struct Variadic {
       enum Type { kInt, kString, kReal };
 
-      Variadic(int64_t int_val) : type(kInt), int_value(int_val) {}
-      Variadic(StringId string_val) : type(kString), string_value(string_val) {}
-      Variadic(double real_val) : type(kReal), real_value(real_val) {}
+      static Variadic Integer(int64_t int_value) {
+        Variadic variadic;
+        variadic.type = Type::kInt;
+        variadic.int_value = int_value;
+        return variadic;
+      }
+
+      static Variadic String(StringId string_id) {
+        Variadic variadic;
+        variadic.type = Type::kString;
+        variadic.string_value = string_id;
+        return variadic;
+      }
+
+      static Variadic Real(double real_value) {
+        Variadic variadic;
+        variadic.type = Type::kReal;
+        variadic.real_value = real_value;
+        return variadic;
+      }
 
       Type type;
       union {
