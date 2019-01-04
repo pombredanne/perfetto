@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import("gn/perfetto.gni")
+import("gn/test.gni")
 
 if (perfetto_build_standalone || perfetto_build_with_android) {
   import("//gn/standalone/android.gni")
@@ -105,8 +106,7 @@ if (perfetto_build_standalone) {
   }
 }
 
-executable("perfetto_unittests") {
-  testonly = true
+test("perfetto_unittests") {
   deps = [
     "gn:default_deps",
     "gn:gtest_main",
@@ -137,8 +137,7 @@ executable("perfetto_unittests") {
 }
 
 if (perfetto_build_standalone || perfetto_build_with_android) {
-  executable("perfetto_integrationtests") {
-    testonly = true
+  test("perfetto_integrationtests") {
     deps = [
       "gn:default_deps",
       "gn:gtest_main",
@@ -150,6 +149,11 @@ if (perfetto_build_standalone || perfetto_build_with_android) {
     }
     if (perfetto_build_with_android) {
       cflags = [ "-DPERFETTO_BUILD_WITH_ANDROID" ]
+    }
+
+    # TODO(fmayer): Fix in process daemons.
+    if (should_build_heapprofd && is_android && !start_daemons_for_testing) {
+      deps += [ "src/profiling/memory:end_to_end_tests" ]
     }
   }
 
