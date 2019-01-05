@@ -29,16 +29,19 @@ namespace trace_processor {
 
 class TraceProcessorContext;
 
-enum ClockDomain : uint32_t { kRealTime, kMonotonic, kNumClockDomains };
+enum ClockDomain : uint32_t {
+  kBootTime,   // Monotonic, counts also time in suspend mode.
+  kMonotonic,  // Monotonic, doesn't advance when the device is suspended.
+  kRealTime,   // Real time clock, can move backward (e.g. NTP adjustements).
+  kNumClockDomains
+};
 
 class ClockTracker {
  public:
   ClockTracker();
   virtual ~ClockTracker();
 
-  void PushClockSnapshot(ClockDomain,
-                         int64_t clock_time_ns,
-                         int64_t trace_time_ns);
+  void SyncClocks(ClockDomain, int64_t clock_time_ns, int64_t trace_time_ns);
 
   int64_t ToTraceTime(ClockDomain, int64_t clock_time_ns);
 
@@ -56,10 +59,10 @@ class ClockTracker {
     int64_t trace_time_ns;
   };
 
-  // One entry for each ClockDomain
   using ClockSnapshotVector = std::vector<ClockSnapshot>;
   std::array<ClockSnapshotVector, kNumClockDomains> clocks_;
 };
+
 }  // namespace trace_processor
 }  // namespace perfetto
 

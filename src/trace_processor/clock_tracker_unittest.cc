@@ -25,10 +25,10 @@ namespace {
 
 TEST(ClockTrackerTest, ClockDomainConversions) {
   ClockTracker ct;
-  ct.PushClockSnapshot(ClockDomain::kRealTime, 10, 10010);
-  ct.PushClockSnapshot(ClockDomain::kRealTime, 20, 20220);
-  ct.PushClockSnapshot(ClockDomain::kRealTime, 30, 30030);
-  ct.PushClockSnapshot(ClockDomain::kMonotonic, 1000, 100000);
+  ct.SyncClocks(ClockDomain::kRealTime, 10, 10010);
+  ct.SyncClocks(ClockDomain::kRealTime, 20, 20220);
+  ct.SyncClocks(ClockDomain::kRealTime, 30, 30030);
+  ct.SyncClocks(ClockDomain::kMonotonic, 1000, 100000);
 
   EXPECT_EQ(ct.ToTraceTime(ClockDomain::kRealTime, 0), 10000);
   EXPECT_EQ(ct.ToTraceTime(ClockDomain::kRealTime, 1), 10001);
@@ -50,20 +50,20 @@ TEST(ClockTrackerTest, ClockDomainConversions) {
 
 TEST(ClockTrackerTest, RealTimeClockMovingBackwards) {
   ClockTracker ct;
-  ct.PushClockSnapshot(ClockDomain::kRealTime, 10, 10010);
-  ct.PushClockSnapshot(ClockDomain::kRealTime, 20, 10020);
-  ct.PushClockSnapshot(ClockDomain::kRealTime, 40, 30040);
-  ct.PushClockSnapshot(ClockDomain::kRealTime, 30, 40030);
+  ct.SyncClocks(ClockDomain::kRealTime, 10, 10010);
+  ct.SyncClocks(ClockDomain::kRealTime, 20, 10020);
+  ct.SyncClocks(ClockDomain::kRealTime, 40, 30040);
+  ct.SyncClocks(ClockDomain::kRealTime, 30, 40030);
 
   EXPECT_EQ(ct.ToTraceTime(ClockDomain::kRealTime, 11), 10011);
   EXPECT_EQ(ct.ToTraceTime(ClockDomain::kRealTime, 29), 10029);
   EXPECT_EQ(ct.ToTraceTime(ClockDomain::kRealTime, 30), 40030);
   EXPECT_EQ(ct.ToTraceTime(ClockDomain::kRealTime, 40), 40040);
 
-  ct.PushClockSnapshot(ClockDomain::kRealTime, 50, 50000);
+  ct.SyncClocks(ClockDomain::kRealTime, 50, 50000);
   EXPECT_EQ(ct.ToTraceTime(ClockDomain::kRealTime, 55), 50005);
 
-  ct.PushClockSnapshot(ClockDomain::kRealTime, 11, 60011);
+  ct.SyncClocks(ClockDomain::kRealTime, 11, 60011);
   EXPECT_EQ(ct.ToTraceTime(ClockDomain::kRealTime, 20), 60020);
 }
 

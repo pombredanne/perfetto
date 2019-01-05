@@ -26,9 +26,9 @@ namespace trace_processor {
 ClockTracker::ClockTracker() = default;
 ClockTracker::~ClockTracker() = default;
 
-void ClockTracker::PushClockSnapshot(ClockDomain domain,
-                                     int64_t clock_time_ns,
-                                     int64_t trace_time_ns) {
+void ClockTracker::SyncClocks(ClockDomain domain,
+                              int64_t clock_time_ns,
+                              int64_t trace_time_ns) {
   ClockSnapshotVector& snapshots = clocks_[domain];
   if (!snapshots.empty()) {
     // The trace clock (typically CLOCK_BOOTTIME) must be monotonic.

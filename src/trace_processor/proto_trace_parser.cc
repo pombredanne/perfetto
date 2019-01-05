@@ -989,17 +989,16 @@ void ProtoTraceParser::ParseClockSnapshot(TraceBlobView packet) {
     return;
   }
 
+  auto* ct = context_->clock_tracker.get();
+
   // |clock_boottime| is used as the reference trace time.
+  ct->SyncClocks(ClockDomain::kBootTime, clock_boottime, clock_boottime);
 
-  if (clock_monotonic > 0) {
-    context_->clock_tracker->PushClockSnapshot(ClockDomain::kMonotonic,
-                                               clock_monotonic, clock_boottime);
-  }
+  if (clock_monotonic > 0)
+    ct->SyncClocks(ClockDomain::kMonotonic, clock_monotonic, clock_boottime);
 
-  if (clock_realtime > 0) {
-    context_->clock_tracker->PushClockSnapshot(ClockDomain::kRealTime,
-                                               clock_realtime, clock_boottime);
-  }
+  if (clock_realtime > 0)
+    ct->SyncClocks(ClockDomain::kRealTime, clock_realtime, clock_boottime);
 }
 
 }  // namespace trace_processor
