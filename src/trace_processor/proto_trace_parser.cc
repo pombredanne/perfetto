@@ -25,6 +25,7 @@
 #include "perfetto/base/utils.h"
 #include "perfetto/protozero/proto_decoder.h"
 #include "perfetto/traced/sys_stats_counters.h"
+#include "src/trace_processor/clock_tracker.h"
 #include "src/trace_processor/event_tracker.h"
 #include "src/trace_processor/process_tracker.h"
 #include "src/trace_processor/slice_tracker.h"
@@ -198,6 +199,11 @@ void ProtoTraceParser::ParseTracePacket(int64_t ts, TraceBlobView packet) {
       case protos::TracePacket::kBatteryFieldNumber: {
         const size_t fld_off = packet.offset_of(fld.data());
         ParseBatteryCounters(ts, packet.slice(fld_off, fld.size()));
+        break;
+      }
+      case protos::TracePacket::kClockSnapshotFieldNumber: {
+        const size_t fld_off = packet.offset_of(fld.data());
+        ParseClockSnapshot(packet.slice(fld_off, fld.size()));
         break;
       }
       default:
@@ -923,6 +929,77 @@ void ProtoTraceParser::ParseOOMScoreAdjUpdate(int64_t ts,
   UniquePid upid = context_->process_tracker->UpdateProcess(pid);
   context_->event_tracker->PushCounter(ts, oom_adj, oom_score_adj_id_, upid,
                                        RefType::kRefUpid);
+}
+
+void ProtoTraceParser::ParseClockSnapshot(TraceBlobView packet) {
+  ProtoDecoder decoder(packet.data(), packet.length());
+  int64_t clock_boottime = 0;
+  int64_t clock_monotonic = 0;
+  int64_t clock_realtime = 0;
+
+  // This loop iterates over the "repeated Clock" entries.
+  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    switch (fld.id) {
+      case protos::ClockSnapshot::kClocksFieldNumber: {
+        const size_t fld_off = packet.offset_of(fld.data());
+        TraceBlobView clk_data = packet.slice(fld_off, fld.size());
+        ProtoDecoder clk_decoder(clk_data.data(), clk_data.length());
+        int64_t* clock_ptr = nullptr;
+        int64_t clock_value = -1;
+        // This loop iterates over the |type| and |timestamp| field of each
+        // clock snapshot.
+        for (auto clk = clk_decoder.ReadField(); clk.id;
+             clk = clk_decoder.ReadField()) {
+          switch (clk.id) {
+            case protos::ClockSnapshot::Clock::kTypeFieldNumber:
+              switch (clk.as_int32()) {
+                case protos::ClockSnapshot::Clock::BOOTTIME:
+                  clock_ptr = &clock_boottime;
+                  break;
+                case protos::ClockSnapshot::Clock::REALTIME:
+                  clock_ptr = &clock_realtime;
+                  break;
+                case protos::ClockSnapshot::Clock::MONOTONIC:
+                  clock_ptr = &clock_monotonic;
+                  break;
+              }
+              break;
+            case protos::ClockSnapshot::Clock::kTimestampFieldNumber:
+              clock_value = clk.as_int64();
+              break;
+          }  // switch (clk.id)
+        }    // for(clk)
+        if (clock_value > 0 && clock_ptr)
+          *clock_ptr = clock_value;
+        break;
+      }  // case kClocksFieldNumer.
+      default:
+        break;
+    }  // switch(fld.id)
+  }
+  PERFETTO_DCHECK(decoder.IsEndOfBuffer());
+
+  // Usually these snapshots come all together.
+  PERFETTO_DCHECK(clock_boottime > 0 && clock_monotonic > 0 &&
+                  clock_realtime > 0);
+
+  if (clock_boottime <= 0) {
+    PERFETTO_ELOG("ClockSnapshot has an invalid BOOTTIME (%" PRId64 ")",
+                  clock_boottime);
+    return;
+  }
+
+  // |clock_boottime| is used as the reference trace time.
+
+  if (clock_monotonic > 0) {
+    context_->clock_tracker->PushClockSnapshot(ClockDomain::kMonotonic,
+                                               clock_monotonic, clock_boottime);
+  }
+
+  if (clock_realtime > 0) {
+    context_->clock_tracker->PushClockSnapshot(ClockDomain::kRealTime,
+                                               clock_realtime, clock_boottime);
+  }
 }
 
 }  // namespace trace_processor
