@@ -19,11 +19,18 @@
 #include <algorithm>
 
 #include "perfetto/base/logging.h"
+#include "src/trace_processor/trace_processor_context.h"
+#include "src/trace_processor/trace_storage.h"
 
 namespace perfetto {
 namespace trace_processor {
 
-ClockTracker::ClockTracker() = default;
+ClockTracker::ClockTracker(TraceProcessorContext* ctx) : context_(ctx) {
+  // TODO(primiano): remove this, will be used in upcoming CLs to solve the
+  // TODOs below.
+  base::ignore_result(context_);
+}
+
 ClockTracker::~ClockTracker() = default;
 
 void ClockTracker::SyncClocks(ClockDomain domain,

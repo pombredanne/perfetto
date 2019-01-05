@@ -15,6 +15,7 @@
  */
 
 #include "src/trace_processor/clock_tracker.h"
+#include "src/trace_processor/trace_processor_context.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -24,7 +25,9 @@ namespace trace_processor {
 namespace {
 
 TEST(ClockTrackerTest, ClockDomainConversions) {
-  ClockTracker ct;
+  TraceProcessorContext context;
+  ClockTracker ct(&context);
+
   ct.SyncClocks(ClockDomain::kRealTime, 10, 10010);
   ct.SyncClocks(ClockDomain::kRealTime, 20, 20220);
   ct.SyncClocks(ClockDomain::kRealTime, 30, 30030);
@@ -49,7 +52,9 @@ TEST(ClockTrackerTest, ClockDomainConversions) {
 }
 
 TEST(ClockTrackerTest, RealTimeClockMovingBackwards) {
-  ClockTracker ct;
+  TraceProcessorContext context;
+  ClockTracker ct(&context);
+
   ct.SyncClocks(ClockDomain::kRealTime, 10, 10010);
   ct.SyncClocks(ClockDomain::kRealTime, 20, 10020);
   ct.SyncClocks(ClockDomain::kRealTime, 40, 30040);

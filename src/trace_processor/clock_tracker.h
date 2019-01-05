@@ -38,7 +38,7 @@ enum ClockDomain : uint32_t {
 
 class ClockTracker {
  public:
-  ClockTracker();
+  explicit ClockTracker(TraceProcessorContext*);
   virtual ~ClockTracker();
 
   void SyncClocks(ClockDomain, int64_t clock_time_ns, int64_t trace_time_ns);
@@ -59,6 +59,7 @@ class ClockTracker {
     int64_t trace_time_ns;
   };
 
+  TraceProcessorContext* const context_;
   using ClockSnapshotVector = std::vector<ClockSnapshot>;
   std::array<ClockSnapshotVector, kNumClockDomains> clocks_;
 };
