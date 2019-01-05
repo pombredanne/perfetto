@@ -25,10 +25,10 @@
 #include "perfetto/base/utils.h"
 #include "perfetto/protozero/proto_decoder.h"
 #include "perfetto/traced/sys_stats_counters.h"
+#include "src/trace_processor/clock_tracker.h"
 #include "src/trace_processor/event_tracker.h"
 #include "src/trace_processor/process_tracker.h"
 #include "src/trace_processor/slice_tracker.h"
-#include "src/trace_processor/time_tracker.h"
 #include "src/trace_processor/trace_processor_context.h"
 
 #include "perfetto/trace/trace.pb.h"
@@ -994,17 +994,16 @@ void ProtoTraceParser::ParseClockSnapshot(TraceBlobView packet) {
     return;
   }
 
+  auto* ct = context_->clock_tracker.get();
+
   // |clock_boottime| is used as the reference trace time.
+  ct->SyncClocks(ClockDomain::kBootTime, clock_boottime, clock_boottime);
 
-  if (clock_monotonic > 0) {
-    context_->time_tracker->PushClockSnapshot(ClockDomain::kMonotonic,
-                                              clock_monotonic, clock_boottime);
-  }
+  if (clock_monotonic > 0)
+    ct->SyncClocks(ClockDomain::kMonotonic, clock_monotonic, clock_boottime);
 
-  if (clock_realtime > 0) {
-    context_->time_tracker->PushClockSnapshot(ClockDomain::kRealTime,
-                                              clock_realtime, clock_boottime);
-  }
+  if (clock_realtime > 0)
+    ct->SyncClocks(ClockDomain::kRealTime, clock_realtime, clock_boottime);
 }
 
 void ProtoTraceParser::ParseAndroidLogPacket(TraceBlobView packet) {
