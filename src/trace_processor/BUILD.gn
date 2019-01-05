@@ -47,6 +47,8 @@ source_set("lib") {
     "args_table.cc",
     "args_table.h",
     "chunked_trace_reader.h",
+    "clock_tracker.cc",
+    "clock_tracker.h",
     "counters_table.cc",
     "counters_table.h",
     "event_tracker.cc",
@@ -95,8 +97,6 @@ source_set("lib") {
     "table.h",
     "thread_table.cc",
     "thread_table.h",
-    "time_tracker.cc",
-    "time_tracker.h",
     "trace_blob_view.h",
     "trace_processor.cc",
     "trace_processor_context.cc",
@@ -166,6 +166,7 @@ copy("trace_processor_shell") {
 source_set("unittests") {
   testonly = true
   sources = [
+    "clock_tracker_unittest.cc",
     "counters_table_unittest.cc",
     "event_tracker_unittest.cc",
     "filtered_row_index_unittest.cc",
@@ -177,7 +178,6 @@ source_set("unittests") {
     "slice_tracker_unittest.cc",
     "span_join_operator_table_unittest.cc",
     "thread_table_unittest.cc",
-    "time_tracker_unittest.cc",
     "trace_processor_impl_unittest.cc",
     "trace_sorter_unittest.cc",
   ]

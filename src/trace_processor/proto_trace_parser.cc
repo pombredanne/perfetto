@@ -25,10 +25,10 @@
 #include "perfetto/base/utils.h"
 #include "perfetto/protozero/proto_decoder.h"
 #include "perfetto/traced/sys_stats_counters.h"
+#include "src/trace_processor/clock_tracker.h"
 #include "src/trace_processor/event_tracker.h"
 #include "src/trace_processor/process_tracker.h"
 #include "src/trace_processor/slice_tracker.h"
-#include "src/trace_processor/time_tracker.h"
 #include "src/trace_processor/trace_processor_context.h"
 
 #include "perfetto/trace/trace.pb.h"
@@ -1033,20 +1033,17 @@ void ProtoTraceParser::ParseFtraceStats(TraceBlobView packet) {
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
       case protos::FtraceStats::kPhaseFieldNumber:
-        if (fld.as_int32() == protos::FtraceStats_Phase_END_OF_TRACE) {
-          // This code relies on the fact that there are as many ftrace_begin_X
-          // events as ftrace_end_X events, so we can avoid if statements when
-          // assigning each counter for BEGIN/END phases.
-          phase =
-              stats::ftrace_end_cpu_entries - stats::ftrace_begin_cpu_entries;
-          static_assert(stats::ftrace_end_cpu_read_events -
-                                stats::ftrace_begin_cpu_read_events ==
-                            stats::ftrace_end_cpu_entries -
-                                stats::ftrace_begin_cpu_entries,
-                        "ftrace stats definition are messed up");
-        } else {
-          phase = 0;
-        }
+        phase = fld.int_value == protos::FtraceStats_Phase_END_OF_TRACE ? 1 : 0;
+
+        // This code relies on the fact that each ftrace_cpu_XXX_end event is
+        // just after the corresponding ftrace_cpu_XXX_begin event.
+        static_assert(stats::ftrace_cpu_read_events_end -
+                                  stats::ftrace_cpu_read_events_begin ==
+                              1 &&
+                          stats::ftrace_cpu_entries_end -
+                                  stats::ftrace_cpu_entries_begin ==
+                              1,
+                      "ftrace_cpu_XXX stats definition are messed up");
         break;
       case protos::FtraceStats::kCpuStatsFieldNumber: {
         const size_t fld_off = packet.offset_of(fld.data());
@@ -1059,40 +1056,40 @@ void ProtoTraceParser::ParseFtraceStats(TraceBlobView packet) {
               cpu_num = fld2.as_int32();
               break;
             case protos::FtraceCpuStats::kEntriesFieldNumber:
-              storage->SetIndexedStats(stats::ftrace_begin_cpu_entries + phase,
+              storage->SetIndexedStats(stats::ftrace_cpu_entries_begin + phase,
                                        cpu_num, fld2.as_int64());
               break;
             case protos::FtraceCpuStats::kOverrunFieldNumber:
-              storage->SetIndexedStats(stats::ftrace_begin_cpu_overrun + phase,
+              storage->SetIndexedStats(stats::ftrace_cpu_overrun_begin + phase,
                                        cpu_num, fld2.as_int64());
               break;
             case protos::FtraceCpuStats::kCommitOverrunFieldNumber:
               storage->SetIndexedStats(
-                  stats::ftrace_begin_cpu_commit_overrun + phase, cpu_num,
+                  stats::ftrace_cpu_commit_overrun_begin + phase, cpu_num,
                   fld2.as_int64());
               break;
             case protos::FtraceCpuStats::kBytesReadFieldNumber:
               storage->SetIndexedStats(
-                  stats::ftrace_begin_cpu_bytes_read + phase, cpu_num,
+                  stats::ftrace_cpu_bytes_read_begin + phase, cpu_num,
                   fld2.as_int64());
               break;
             case protos::FtraceCpuStats::kOldestEventTsFieldNumber:
               storage->SetIndexedStats(
-                  stats::ftrace_begin_cpu_oldest_event_ts + phase, cpu_num,
+                  stats::ftrace_cpu_oldest_event_ts_begin + phase, cpu_num,
                   fld2.as_int64());
               break;
             case protos::FtraceCpuStats::kNowTsFieldNumber:
-              storage->SetIndexedStats(stats::ftrace_begin_cpu_now_ts + phase,
+              storage->SetIndexedStats(stats::ftrace_cpu_now_ts_begin + phase,
                                        cpu_num, fld2.as_int64());
               break;
             case protos::FtraceCpuStats::kDroppedEventsFieldNumber:
               storage->SetIndexedStats(
-                  stats::ftrace_begin_cpu_dropped_events + phase, cpu_num,
+                  stats::ftrace_cpu_dropped_events_begin + phase, cpu_num,
                   fld2.as_int64());
               break;
             case protos::FtraceCpuStats::kReadEventsFieldNumber:
               storage->SetIndexedStats(
-                  stats::ftrace_begin_cpu_read_events + phase, cpu_num,
+                  stats::ftrace_cpu_read_events_begin + phase, cpu_num,
                   fld2.as_int64());
               break;
           }
@@ -1165,17 +1162,16 @@ void ProtoTraceParser::ParseClockSnapshot(TraceBlobView packet) {
     return;
   }
 
+  auto* ct = context_->clock_tracker.get();
+
   // |clock_boottime| is used as the reference trace time.
+  ct->SyncClocks(ClockDomain::kBootTime, clock_boottime, clock_boottime);
 
-  if (clock_monotonic > 0) {
-    context_->time_tracker->PushClockSnapshot(ClockDomain::kMonotonic,
-                                              clock_monotonic, clock_boottime);
-  }
+  if (clock_monotonic > 0)
+    ct->SyncClocks(ClockDomain::kMonotonic, clock_monotonic, clock_boottime);
 
-  if (clock_realtime > 0) {
-    context_->time_tracker->PushClockSnapshot(ClockDomain::kRealTime,
-                                              clock_realtime, clock_boottime);
-  }
+  if (clock_realtime > 0)
+    ct->SyncClocks(ClockDomain::kRealTime, clock_realtime, clock_boottime);
 }
 
 void ProtoTraceParser::ParseAndroidLogPacket(TraceBlobView packet) {
@@ -1223,8 +1219,8 @@ void ProtoTraceParser::ParseAndroidLogEvent(TraceBlobView event) {
         break;
       case protos::AndroidLogPacket::LogEvent::kTimestampFieldNumber:
         ts = fld.as_int64();
-        if (ts <
-            context_->time_tracker->GetFirstTimestamp(ClockDomain::kRealTime)) {
+        if (ts < context_->clock_tracker->GetFirstTimestamp(
+                     ClockDomain::kRealTime)) {
           // Skip log events that happened before the start of the trace.
           return;
         }
@@ -1289,7 +1285,7 @@ void ProtoTraceParser::ParseAndroidLogEvent(TraceBlobView event) {
   }
   UniquePid utid = tid ? context_->process_tracker->UpdateThread(tid, pid) : 0;
   int64_t trace_time =
-      context_->time_tracker->ToTraceTime(ClockDomain::kRealTime, ts);
+      context_->clock_tracker->ToTraceTime(ClockDomain::kRealTime, ts);
 
   // Log events are NOT required to be sorted by trace_time. The virtual table
   // will take care of sorting on-demand.
