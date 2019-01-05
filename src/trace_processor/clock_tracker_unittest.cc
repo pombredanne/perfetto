@@ -23,7 +23,7 @@ namespace perfetto {
 namespace trace_processor {
 namespace {
 
-TEST(ClockTrackerUnittest, ClockDomainConversions) {
+TEST(ClockTrackerTest, ClockDomainConversions) {
   ClockTracker ct;
   ct.PushClockSnapshot(ClockDomain::kRealTime, 10, 10010);
   ct.PushClockSnapshot(ClockDomain::kRealTime, 20, 20220);
@@ -48,7 +48,7 @@ TEST(ClockTrackerUnittest, ClockDomainConversions) {
   EXPECT_EQ(ct.ToTraceTime(ClockDomain::kMonotonic, 1e6), 100000 - 1000 + 1e6);
 }
 
-TEST(ClockTrackerUnittest, RealTimeClockMovingBackwards) {
+TEST(ClockTrackerTest, RealTimeClockMovingBackwards) {
   ClockTracker ct;
   ct.PushClockSnapshot(ClockDomain::kRealTime, 10, 10010);
   ct.PushClockSnapshot(ClockDomain::kRealTime, 20, 10020);
