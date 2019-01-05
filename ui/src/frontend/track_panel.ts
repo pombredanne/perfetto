@@ -201,6 +201,16 @@ export class TrackPanel extends Panel<TrackPanelAttrs> {
         size.height);
 
     this.track.renderCanvas(ctx);
+
+    const highlightedTs = globals.frontendLocalState.highlightedTs;
+    const vizTime = globals.frontendLocalState.visibleWindowTime;
+    if (highlightedTs > 0 && vizTime.start <= highlightedTs &&
+        highlightedTs <= vizTime.end) {
+      ctx.fillStyle = '#333333';
+      const x = globals.frontendLocalState.timeScale.timeToPx(highlightedTs);
+      ctx.fillRect(x, 0, 1, size.height);
+    }
+
     ctx.restore();
   }
 }

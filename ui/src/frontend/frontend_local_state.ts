@@ -29,6 +29,7 @@ export class FrontendLocalState {
   private pendingGlobalTimeUpdate?: TimeSpan;
   perfDebug = false;
   highlightedUtid = -1;
+  highlightedTs = 0;
 
   // TODO: there is some redundancy in the fact that both |visibleWindowTime|
   // and a |timeScale| have a notion of time range. That should live in one

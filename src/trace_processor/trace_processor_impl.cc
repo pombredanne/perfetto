@@ -21,12 +21,13 @@
 #include <functional>
 
 #include "perfetto/base/time.h"
+#include "src/trace_processor/android_logs_table.h"
 #include "src/trace_processor/args_table.h"
+#include "src/trace_processor/clock_tracker.h"
 #include "src/trace_processor/counters_table.h"
 #include "src/trace_processor/event_tracker.h"
 #include "src/trace_processor/instants_table.h"
 #include "src/trace_processor/json_trace_parser.h"
-#include "src/trace_processor/android_logs_table.h"
 #include "src/trace_processor/process_table.h"
 #include "src/trace_processor/process_tracker.h"
 #include "src/trace_processor/proto_trace_parser.h"
@@ -40,7 +41,6 @@
 #include "src/trace_processor/string_table.h"
 #include "src/trace_processor/table.h"
 #include "src/trace_processor/thread_table.h"
-#include "src/trace_processor/time_tracker.h"
 #include "src/trace_processor/trace_sorter.h"
 #include "src/trace_processor/window_operator_table.h"
 
@@ -112,7 +112,7 @@ TraceProcessorImpl::TraceProcessorImpl(const Config& cfg) {
   context_.event_tracker.reset(new EventTracker(&context_));
   context_.proto_parser.reset(new ProtoTraceParser(&context_));
   context_.process_tracker.reset(new ProcessTracker(&context_));
-  context_.time_tracker.reset(new TimeTracker());
+  context_.clock_tracker.reset(new ClockTracker(&context_));
   context_.sorter.reset(
       new TraceSorter(&context_, cfg.optimization_mode,
                       static_cast<int64_t>(cfg.window_size_ns)));

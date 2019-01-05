@@ -26,6 +26,12 @@ export function timeToString(sec: number) {
   return `${sign < 0 ? '-' : ''}${Math.round(n * 10) / 10} ${units[u]}`;
 }
 
+export function timeToTimecode(sec: number) {
+  const parts = sec.toFixed(9).split('.');
+  parts[1] = parts[1].replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  return parts.join('.');
+}
+
 export function fromNs(ns: number) {
   return ns / 1e9;
 }

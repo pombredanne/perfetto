@@ -25,9 +25,9 @@ import {Engine} from '../common/engine';
 import {SCROLLING_TRACK_GROUP} from '../common/state';
 import {TimeSpan} from '../common/time';
 import {QuantizedLoad, ThreadDesc} from '../frontend/globals';
+import {ANDROID_LOGS_TRACK_KIND} from '../tracks/android_log/common';
 import {SLICE_TRACK_KIND} from '../tracks/chrome_slices/common';
 import {CPU_SLICE_TRACK_KIND} from '../tracks/cpu_slices/common';
-import {ANDROID_LOGS_TRACK_KIND} from '../tracks/android_log/common';
 import {PROCESS_SUMMARY_TRACK} from '../tracks/process_summary/common';
 
 import {Child, Children, Controller} from './controller';
@@ -384,7 +384,7 @@ export class TraceController extends Controller<States> {
       }
     }
 
-    addTrackGroupActions.push(Actions.addTrack({
+    addToTrackActions.push(Actions.addTrack({
       engineId: this.engineId,
       kind: ANDROID_LOGS_TRACK_KIND,
       name: 'Android logs',

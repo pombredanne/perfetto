@@ -18,7 +18,7 @@ import {
   trackControllerRegistry
 } from '../../controller/track_controller';
 
-import {Config, Data, ANDROID_LOGS_TRACK_KIND} from './common';
+import {ANDROID_LOGS_TRACK_KIND, Config, Data} from './common';
 
 class AndroidLogTrackController extends TrackController<Config, Data> {
   static readonly kind = ANDROID_LOGS_TRACK_KIND;

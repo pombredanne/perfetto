@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,8 +32,10 @@ base::Optional<Table::Schema> AndroidLogsTableTable::Init(int,
                                                           const char* const*) {
   const auto& alog = storage_->android_logs();
   std::unique_ptr<StorageColumn> cols[] = {
-      NumericColumnPtr("ts", &alog.timestamps(), false /* hidden */,
-                       true /* ordered */),
+      // Note: the logs in the storage are NOT sorted by timestamp. We delegate
+      // that to the on-demand sorter by leaving is_naturally_ordered=false
+      // (default value) when calling NumericColumnPtr().
+      NumericColumnPtr("ts", &alog.timestamps()),
       NumericColumnPtr("utid", &alog.utids()),
       NumericColumnPtr("prio", &alog.prios()),
       StringColumnPtr("tag", &alog.tag_ids(), &storage_->string_pool()),
@@ -56,13 +58,11 @@ std::unique_ptr<Table::Cursor> AndroidLogsTableTable::CreateCursor(
 
 int AndroidLogsTableTable::BestIndex(const QueryConstraints& qc,
                                      BestIndexInfo* info) {
-  info->estimated_cost =
-      static_cast<uint32_t>(storage_->counters().counter_count());
+  info->estimated_cost = static_cast<uint32_t>(storage_->android_logs().size());
 
-  // TODO think more here. // DNS .
-
-  // Only the string columns are handled by SQLite
   info->order_by_consumed = true;
+
+  // Only the string columns are handled by SQLite.
   size_t tag_index = schema_.ColumnIndexFromName("tag");
   size_t msg_index = schema_.ColumnIndexFromName("msg");
   for (size_t i = 0; i < qc.constraints().size(); i++) {

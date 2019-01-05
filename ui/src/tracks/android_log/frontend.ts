@@ -18,14 +18,14 @@ import {assertExists, assertTrue} from '../../base/logging';
 import {Actions} from '../../common/actions';
 import {QueryResponse} from '../../common/queries';
 import {TrackState} from '../../common/state';
-import {TimeSpan, timeToString} from '../../common/time';
+import {TimeSpan, timeToTimecode} from '../../common/time';
 import {checkerboardExcept} from '../../frontend/checkerboard';
 import {globals} from '../../frontend/globals';
 import {Panel} from '../../frontend/panel';
 import {Track} from '../../frontend/track';
 import {trackRegistry} from '../../frontend/track_registry';
 
-import {Config, Data, ANDROID_LOGS_TRACK_KIND} from './common';
+import {ANDROID_LOGS_TRACK_KIND, Config, Data} from './common';
 
 interface LevelCfg {
   color: string;
@@ -43,6 +43,7 @@ const LEVELS: LevelCfg[] = [
 const MARGIN_TOP = 2;
 const RECT_HEIGHT = 35;
 const EVT_PX = 2;  // Width of an event tick in pixels.
+const ROW_H = 20;
 
 function getCurResolution() {
   // Truncate the resolution to the closest power of 10.
@@ -133,23 +134,20 @@ interface CachedLogEntry {
   prio: number;
   tag: string;
   msg: string;
+  generation: number;
 }
 
 export class AndroidLogPanel extends Panel<AndroidLogPanelAttrs> {
   private state: 'idle'|'updateBounds'|'fetchRows' = 'idle';
   private req = new TimeSpan(0, 0);
   private reqOffset = 0;
-  private cache = new Map<number, CachedLogEntry>();
-  private staleCache = new Map<number, CachedLogEntry>();
+  private generation = 0;
+  private cache = new Array<CachedLogEntry>();
   private totRows = 0;
-  private tbody?: HTMLElement;
+  private scrollContainer?: HTMLElement;
 
   private vizRowStart = 0;
   private vizRowEnd = 0;
-
-  renderCanvas() {
-    // TODO here maybe check viz time and schedule redraw?.
-  }
 
   maybeUpdate() {
     const vizTime = globals.frontendLocalState.visibleWindowTime;
@@ -164,9 +162,9 @@ export class AndroidLogPanel extends Panel<AndroidLogPanelAttrs> {
         // First of all check if the visible time window has changed. If that's
         // the case fetch the new event count for the new time bounds.
         if (!vizTime.equals(this.req)) {
-          console.log('Log time-window change, brand new request');  // DNS.
           this.state = 'updateBounds';
           this.req = vizTime.clone();
+          this.generation++;
           globals.dispatch(Actions.executeQuery({
             engineId: '0',
             queryId: QUERY_ID,
@@ -179,7 +177,8 @@ export class AndroidLogPanel extends Panel<AndroidLogPanelAttrs> {
         // Then check if all the visible rows are cached, if not fetch them.
         let needsData = false;
         for (let row = this.vizRowStart; row < this.vizRowEnd; row++) {
-          if (!this.cache.has(row)) {
+          if (!this.cache.hasOwnProperty(row) ||
+              this.cache[row].generation !== this.generation) {
             needsData = true;
             break;
           }
@@ -187,13 +186,12 @@ export class AndroidLogPanel extends Panel<AndroidLogPanelAttrs> {
         if (!needsData) return;
         this.state = 'fetchRows';
         this.reqOffset = this.vizRowStart;
-        console.log(
-            `Requesting rows ${this.vizRowStart}-${this.vizRowEnd}`);  // DNS.
         globals.dispatch(Actions.executeQuery({
           engineId: '0',
           queryId: QUERY_ID,
           query: `select ts, prio, tag, msg from android_logs
                       where ${vizSqlBounds}
+                      order by ts
                       limit ${this.vizRowStart},
                             ${this.vizRowEnd - this.vizRowStart + 1}`
         }));
@@ -202,29 +200,25 @@ export class AndroidLogPanel extends Panel<AndroidLogPanelAttrs> {
       case 'updateBounds':
         if (queryResp !== undefined) {
           this.state = 'idle';
-          console.log('tot rows reply');  // DNS.
           assertTrue(queryResp.totalRowCount === 1);
           this.totRows = +queryResp.rows[0]['num_rows'];
           globals.queryResults.delete(QUERY_ID);
-          if (this.cache.size > 0) this.staleCache = this.cache;
-          this.cache = new Map<number, CachedLogEntry>();
         }
         break;
 
       case 'fetchRows':
         if (queryResp !== undefined) {
           this.state = 'idle';
-          console.log('full rows reply');  // DNS.
           let rowNum = this.reqOffset;
           for (const row of queryResp.rows) {
-            this.cache.set(rowNum++, {
+            this.cache[rowNum++] = {
               ts: +row['ts'],
               prio: +row['prio'],
               tag: row['tag'] as string,
-              msg: row['msg'] as string
-            });
+              msg: row['msg'] as string,
+              generation: this.generation
+            };
           }
-          this.staleCache.clear();
           globals.queryResults.delete(QUERY_ID);
         }
         break;
@@ -235,65 +229,78 @@ export class AndroidLogPanel extends Panel<AndroidLogPanelAttrs> {
   }
 
   recomputeVisibleRowsAndUpdate() {
-    const tbody = assertExists(this.tbody);
-    const firstRow = tbody.querySelector('tr');
+    const scrollContainer = assertExists(this.scrollContainer);
+    const firstRow = scrollContainer.children[0];
     const prevStart = this.vizRowStart;
     const prevEnd = this.vizRowEnd;
     if (firstRow === null) {
       this.vizRowStart = 0;
       this.vizRowEnd = 0;
     } else {
-      const rowH = firstRow.scrollHeight;
-      this.vizRowStart = Math.floor(tbody.scrollTop / rowH);
-      this.vizRowEnd = Math.ceil((tbody.scrollTop + tbody.clientHeight) / rowH);
+      this.vizRowStart = Math.floor(scrollContainer.scrollTop / ROW_H);
+      this.vizRowEnd = Math.ceil(
+          (scrollContainer.scrollTop + scrollContainer.clientHeight) / ROW_H);
     }
     this.maybeUpdate();
-    if (this.vizRowStart !== prevStart || this.vizRowStart !== prevEnd) {
+    if (this.vizRowStart !== prevStart || this.vizRowEnd !== prevEnd) {
         globals.rafScheduler.scheduleFullRedraw();
       }
   }
 
   onupdate({dom}: m.CVnodeDOM) {
-    if (this.tbody === undefined) {
-      this.tbody = assertExists(dom.querySelector('tbody'));
-      this.tbody.addEventListener(
+    if (this.scrollContainer === undefined) {
+      this.scrollContainer = assertExists(
+          dom.querySelector('.scrolling_container') as HTMLElement);
+      this.scrollContainer.addEventListener(
           'scroll', this.onScroll.bind(this), {passive: true});
     }
     this.recomputeVisibleRowsAndUpdate();
   }
 
   onScroll() {
-    if (this.tbody === undefined) return;
+    if (this.scrollContainer === undefined) return;
     this.recomputeVisibleRowsAndUpdate();
+  }
+
+  onRowOver(ts: number) {
+    globals.frontendLocalState.highlightedTs = ts;
+    globals.rafScheduler.scheduleRedraw();
+  }
+
+  onRowOut() {
+    globals.frontendLocalState.highlightedTs = 0;
+    globals.rafScheduler.scheduleRedraw();
   }
 
   view(_: m.CVnode<AndroidLogPanelAttrs>) {
     this.maybeUpdate();
     const rows: m.Children = [];
-    for (let rowNum = 0; rowNum < (this.totRows || 0); rowNum++) {
-      let row = this.cache.get(rowNum);
-      let stale = false;
-      if (row === undefined) {
-        row = this.staleCache.get(rowNum);
-        stale = true;
-      }
-      if (row !== undefined) {
-        rows.push(
-            m(`tr${stale ? '.stale' : ''}`,
-              m('td', timeToString(row.ts / 1e9)),
-              m('td', PRIO_TO_LETTER[row.prio] || '?'),
-              m('td', row.tag),
-              m('td', row.msg)));
-      } else {
-        rows.push(m('tr', m('td[colspan=4]', '... loading ...')));
-      }
+    for (const rowNum in this.cache) {
+      if (!this.cache.hasOwnProperty(rowNum)) continue;
+      const row = this.cache[rowNum];
+      let prioClass = PRIO_TO_LETTER[row.prio] || '';
+      if (row.generation !== this.generation) prioClass += '.stale';
+      rows.push(
+          m(`.row.${prioClass}`,
+            {
+              style: {top: `${+ rowNum * ROW_H}px`},
+              onmouseover: this.onRowOver.bind(this, row.ts / 1e9),
+              onmouseout: this.onRowOut.bind(this),
+            },
+            m('.cell',
+              timeToTimecode(row.ts / 1e9 - globals.state.traceTime.startSec)),
+            m('.cell', PRIO_TO_LETTER[row.prio] || '?'),
+            m('.cell', row.tag),
+            m('.cell', row.msg)));
     }
+
+    const vizRange = `[${this.vizRowStart}, ${this.vizRowEnd}]`;
     return m(
-        'div',
-        m('header',
-          `Android log. Rows [${
-                                  this.vizRowStart
-                                }, ${this.vizRowEnd}] / ${this.totRows || 0}`),
-        m('table.android_log', m('tbody', rows)));
+        '.android_log_panel',
+        m('header', `Android log. Rows ${vizRange} / ${this.totRows || 0}`),
+        m('.scrolling_container',
+          m('.rows', {style: {height: `${this.totRows * ROW_H}px`}}, rows)));
   }
+
+  renderCanvas() {}
 }
