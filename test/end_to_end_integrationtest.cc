@@ -564,7 +564,7 @@ TEST_F(PerfettoCmdlineTest, SimpleConfig) {
 }
 
 TEST_F(PerfettoCmdlineTest, DetachAndAttach) {
-  EXPECT_EQ(1, Exec({"--attach=not_existent"}));
+  EXPECT_NE(0, Exec({"--attach=not_existent"}));
   EXPECT_THAT(stderr_, HasSubstr("Session re-attach failed"));
 
   std::string cfg("duration_ms: 60000; write_into_file: true");
