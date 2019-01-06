@@ -168,7 +168,7 @@ void AndroidLogDataSource::EnableSocketWatchTask(bool enable) {
     auto weak_this = weak_factory_.GetWeakPtr();
     task_runner_->AddFileDescriptorWatch(logdr_sock_.fd(), [weak_this] {
       if (weak_this)
-        weak_this->OnSocketData();
+        weak_this->OnSocketDataAvailable();
     });
     fd_watch_task_enabled_ = true;
   } else {
@@ -179,12 +179,12 @@ void AndroidLogDataSource::EnableSocketWatchTask(bool enable) {
   }
 }
 
-void AndroidLogDataSource::OnSocketData() {
+void AndroidLogDataSource::OnSocketDataAvailable() {
   PERFETTO_DCHECK(fd_watch_task_enabled_);
   auto now_ms = base::GetWallTimeMs().count();
 
   // Disable the FD watch until the delayed read happens, otherwise we get a
-  // storm of OnSocketData() until the delayed ReadLogSocket() call happens.
+  // storm of OnSocketDataAvailable() until the delayed ReadLogSocket() happens.
   EnableSocketWatchTask(false);
 
   // Delay the read by (at most) 100 ms so we get a chance to batch reads and

@@ -83,9 +83,9 @@ class AndroidLogDataSource : public ProbesDataSource {
   base::WeakPtr<AndroidLogDataSource> GetWeakPtr() const;
 
  private:
-  void OnSocketData();
-  void ReadLogSocket();
   void EnableSocketWatchTask(bool);
+  void OnSocketDataAvailable();
+  void ReadLogSocket();
 
   // Parses one line of /system/etc/event-log-tags.
   bool ParseEventLogDefinitionLine(char* line, size_t len);
