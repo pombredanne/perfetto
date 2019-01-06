@@ -1050,8 +1050,8 @@ void ProtoTraceParser::ParseAndroidLogEvent(TraceBlobView event) {
         break;
       case protos::AndroidLogPacket::LogEvent::kTimestampFieldNumber:
         ts = fld.as_int64();
-        if (ts <
-            context_->time_tracker->GetFirstTimestamp(ClockDomain::kRealTime)) {
+        if (ts < context_->clock_tracker->GetFirstTimestamp(
+                     ClockDomain::kRealTime)) {
           // Skip log events that happened before the start of the trace.
           return;
         }
@@ -1066,7 +1066,6 @@ void ProtoTraceParser::ParseAndroidLogEvent(TraceBlobView event) {
         msg_id = context_->storage->InternString(fld.as_string());
         break;
       case protos::AndroidLogPacket::LogEvent::kArgsFieldNumber: {
-        // TODO make msg_id safe w.r.t. 4096. // DNS
         const size_t fld_off = event.offset_of(fld.data());
         TraceBlobView arg_data = event.slice(fld_off, fld.size());
         ProtoDecoder arg_decoder(arg_data.data(), arg_data.length());
@@ -1116,7 +1115,7 @@ void ProtoTraceParser::ParseAndroidLogEvent(TraceBlobView event) {
   }
   UniquePid utid = tid ? context_->process_tracker->UpdateThread(tid, pid) : 0;
   int64_t trace_time =
-      context_->time_tracker->ToTraceTime(ClockDomain::kRealTime, ts);
+      context_->clock_tracker->ToTraceTime(ClockDomain::kRealTime, ts);
 
   // Log events are NOT required to be sorted by trace_time. The virtual table
   // will take care of sorting on-demand.
