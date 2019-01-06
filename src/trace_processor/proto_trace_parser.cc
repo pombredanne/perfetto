@@ -1235,7 +1235,6 @@ void ProtoTraceParser::ParseAndroidLogEvent(TraceBlobView event) {
         msg_id = context_->storage->InternString(fld.as_string());
         break;
       case protos::AndroidLogPacket::LogEvent::kArgsFieldNumber: {
-        // TODO make msg_id safe w.r.t. 4096. // DNS
         const size_t fld_off = event.offset_of(fld.data());
         TraceBlobView arg_data = event.slice(fld_off, fld.size());
         ProtoDecoder arg_decoder(arg_data.data(), arg_data.length());
