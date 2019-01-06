@@ -177,7 +177,7 @@ void TestHelper::OnAttach(bool success, const TraceConfig&) {
 
 // static
 const char* TestHelper::GetConsumerSocketName() {
-  return TEST_PRODUCER_SOCK_NAME;
+  return TEST_CONSUMER_SOCK_NAME;
 }
 
 }  // namespace perfetto
