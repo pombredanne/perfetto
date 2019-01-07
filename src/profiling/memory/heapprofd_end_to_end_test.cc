@@ -251,7 +251,6 @@ TEST_F(HeapprofdEndToEnd, NativeStartup) {
 
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
   ds_config->set_name("android.heapprofd");
-  ds_config->set_target_buffer(0);
 
   auto* heapprofd_config = ds_config->mutable_heapprofd_config();
   heapprofd_config->set_sampling_interval_bytes(1);
@@ -260,8 +259,12 @@ TEST_F(HeapprofdEndToEnd, NativeStartup) {
 
   helper.StartTracing(trace_config);
 
-  // Wait long enough to prevent the signal triggering the profiling.
-  usleep(1000000);
+  // Wait to guarantee that the process forked below is hooked by the profiler
+  // by virtue of the startup check, and not by virtue of being seen as a
+  // runnning process. This sleep is here to prevent that, accidentally, the
+  // test gets to the fork()+exec() too soon, before the heap profiling daemon
+  // has received the trace config.
+  sleep(1);
 
   pid_t pid = fork();
   switch (pid) {
@@ -281,7 +284,7 @@ TEST_F(HeapprofdEndToEnd, NativeStartup) {
       break;
   }
 
-  helper.WaitForTracingDisabled(7000);
+  helper.WaitForTracingDisabled(10000);
 
   helper.ReadData();
   helper.WaitForReadData();
