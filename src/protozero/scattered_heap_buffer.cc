@@ -28,7 +28,7 @@ ScatteredHeapBuffer::Slice::Slice(size_t size)
 #endif  // PERFETTO_DCHECK_IS_ON()
 }
 
-ScatteredHeapBuffer::Slice::Slice(Slice&& slice) = default;
+ScatteredHeapBuffer::Slice::Slice(Slice&& slice) noexcept = default;
 
 ScatteredHeapBuffer::Slice::~Slice() = default;
 
