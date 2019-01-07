@@ -23,11 +23,11 @@
 namespace perfetto {
 namespace trace_processor {
 
-class AndroidLogsTableTable : public StorageTable {
+class AndroidLogsTable : public StorageTable {
  public:
   static void RegisterTable(sqlite3* db, const TraceStorage* storage);
 
-  AndroidLogsTableTable(sqlite3*, const TraceStorage*);
+  AndroidLogsTable(sqlite3*, const TraceStorage*);
 
   // Table implementation.
   base::Optional<Table::Schema> Init(int, const char* const*) override;

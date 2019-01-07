@@ -19,17 +19,14 @@
 namespace perfetto {
 namespace trace_processor {
 
-AndroidLogsTableTable::AndroidLogsTableTable(sqlite3*,
-                                             const TraceStorage* storage)
+AndroidLogsTable::AndroidLogsTable(sqlite3*, const TraceStorage* storage)
     : storage_(storage) {}
 
-void AndroidLogsTableTable::RegisterTable(sqlite3* db,
-                                          const TraceStorage* storage) {
-  Table::Register<AndroidLogsTableTable>(db, storage, "android_logs");
+void AndroidLogsTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
+  Table::Register<AndroidLogsTable>(db, storage, "android_logs");
 }
 
-base::Optional<Table::Schema> AndroidLogsTableTable::Init(int,
-                                                          const char* const*) {
+base::Optional<Table::Schema> AndroidLogsTable::Init(int, const char* const*) {
   const auto& alog = storage_->android_logs();
   std::unique_ptr<StorageColumn> cols[] = {
       // Note: the logs in the storage are NOT sorted by timestamp. We delegate
@@ -47,7 +44,7 @@ base::Optional<Table::Schema> AndroidLogsTableTable::Init(int,
   return schema_.ToTableSchema({"ts", "utid", "msg"});
 }
 
-std::unique_ptr<Table::Cursor> AndroidLogsTableTable::CreateCursor(
+std::unique_ptr<Table::Cursor> AndroidLogsTable::CreateCursor(
     const QueryConstraints& qc,
     sqlite3_value** argv) {
   uint32_t count = static_cast<uint32_t>(storage_->android_logs().size());
@@ -56,8 +53,8 @@ std::unique_ptr<Table::Cursor> AndroidLogsTableTable::CreateCursor(
       new Cursor(std::move(it), schema_.mutable_columns()));
 }
 
-int AndroidLogsTableTable::BestIndex(const QueryConstraints& qc,
-                                     BestIndexInfo* info) {
+int AndroidLogsTable::BestIndex(const QueryConstraints& qc,
+                                BestIndexInfo* info) {
   info->estimated_cost = static_cast<uint32_t>(storage_->android_logs().size());
 
   info->order_by_consumed = true;
