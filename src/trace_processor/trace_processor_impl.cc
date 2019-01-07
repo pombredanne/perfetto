@@ -129,7 +129,7 @@ TraceProcessorImpl::TraceProcessorImpl(const Config& cfg) {
   WindowOperatorTable::RegisterTable(*db_, context_.storage.get());
   InstantsTable::RegisterTable(*db_, context_.storage.get());
   StatsTable::RegisterTable(*db_, context_.storage.get());
-  AndroidLogsTableTable::RegisterTable(*db_, context_.storage.get());
+  AndroidLogsTable::RegisterTable(*db_, context_.storage.get());
 }
 
 TraceProcessorImpl::~TraceProcessorImpl() = default;

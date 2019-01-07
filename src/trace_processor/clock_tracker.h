@@ -41,8 +41,13 @@ class ClockTracker {
   explicit ClockTracker(TraceProcessorContext*);
   virtual ~ClockTracker();
 
+  // Push a snapshot that tells what is the corresponding trace time for the
+  // given |clock_time_ns| in the given clock domain. This is typically called
+  // by the code that reads the ClockSnapshot packet.
   void SyncClocks(ClockDomain, int64_t clock_time_ns, int64_t trace_time_ns);
 
+  // Converts the passed time in the given clock domain to the global trace
+  // time (CLOCK_BOOTTIME for Android traces).
   int64_t ToTraceTime(ClockDomain, int64_t clock_time_ns);
 
   int64_t GetFirstTimestamp(ClockDomain domain) const {
