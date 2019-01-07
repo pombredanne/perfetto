@@ -60,7 +60,7 @@ constexpr size_t kDefaultShmPageSize = base::kPageSize;
 constexpr int kMaxBuffersPerConsumer = 128;
 constexpr base::TimeMillis kSnapshotsInterval(10 * 1000);
 constexpr int kDefaultWriteIntoFilePeriodMs = 5000;
-constexpr int kFlushTimeoutMs = 1000;
+constexpr int kFlushTimeoutMs = 5000;
 constexpr int kMaxConcurrentTracingSessions = 5;
 
 constexpr uint64_t kMillisPerHour = 3600000;
@@ -749,12 +749,18 @@ void TracingServiceImpl::CompleteFlush(TracingSessionID tsid,
 void TracingServiceImpl::ScrapeSharedMemoryBuffers(
     TracingSession* tracing_session,
     ProducerEndpointImpl* producer) {
+  if (!smb_scraping_enabled_)
+    return;
+
   // Can't copy chunks if we don't know about any trace writers.
   if (producer->writers_.empty())
     return;
 
-  // If the producer isn't allowed to write into the session's log buffers, it
-  // doesn't participate in this session.
+  // Performance optimization: On flush or session disconnect, this method is
+  // called for each producer. If the producer doesn't participate in the
+  // session, there's no need to scape its chunks right now. We can tell if a
+  // producer participates in the session by checking if the producer is allowed
+  // to write into the session's log buffers.
   const auto& session_buffers = tracing_session->buffers_index;
   bool producer_in_session =
       std::any_of(session_buffers.begin(), session_buffers.end(),
@@ -767,42 +773,55 @@ void TracingServiceImpl::ScrapeSharedMemoryBuffers(
   PERFETTO_DLOG("Scraping SMB for producer %" PRIu16, producer->id_);
 
   // Find and copy any uncommitted chunks from the SMB.
+  //
+  // In nominal conditions, the page layout of the used SMB pages should never
+  // change because the service is the only one who is supposed to modify used
+  // pages (to make them free again).
+  //
+  // However, the code here needs to deal with the case of a malicious producer
+  // altering the SMB in unpredictable ways. Thankfully the SMB size is
+  // immutable, so a chunk will always point to some valid memory, even if the
+  // producer alters the intended layout and chunk header concurrently.
+  // Ultimately a malicious producer altering the SMB's chunk layout while we
+  // are iterating in this function is not any different from the case of a
+  // malicious producer asking to commit a chunk made of random data, which is
+  // something this class has to deal with regardless.
+  //
+  // The only legitimate mutations that can happen from sane producers,
+  // concurrently to this function, are:
+  //   A. free pages being partitioned,
+  //   B. free chunks being migrated to kChunkBeingWritten,
+  //   C. kChunkBeingWritten chunks being migrated to kChunkCompleted.
+
   SharedMemoryABI* abi = &producer->shmem_abi_;
+  // num_pages() is immutable after the SMB is initialized and cannot be changed
+  // even by a producer even if malicious.
   for (size_t page_idx = 0; page_idx < abi->num_pages(); page_idx++) {
-    if (abi->is_page_free(page_idx))
-      continue;
+    uint32_t layout = abi->GetPageLayout(page_idx);
+
+    uint32_t used_chunks = abi->GetUsedChunks(layout);  // Returns a bitmap.
+    // Skip empty pages.
+    if (used_chunks == 0)
+      return;
 
     // Scrape the chunks that are currently used. These should be either in
     // state kChunkBeingWritten or kChunkComplete.
-    uint32_t used_chunks = abi->GetUsedChunks(page_idx);
     for (uint32_t chunk_idx = 0; used_chunks; chunk_idx++, used_chunks >>= 1) {
       if (!(used_chunks & 1))
         continue;
 
-      SharedMemoryABI::Chunk chunk;
-      SharedMemoryABI::ChunkState state;
-      std::tie(chunk, state) = abi->GetChunkAndStateUnsafe(page_idx, chunk_idx);
-
-      // Misbehaving producer: This should only happen if the producer
-      // modifies the chunking layout of the page after allocating it, which
-      // it shouldn't. In that case, skip the rest of the page.
-      if (!chunk.is_valid()) {
-        PERFETTO_DCHECK(false);
-        break;
-      }
-
-      // Misbehaving producer: This should only happen if the producer marks
-      // the chunk as free or being read concurrently, which it shouldn't. In
-      // that case, skip the chunk.
-      if (state != SharedMemoryABI::kChunkBeingWritten &&
-          state != SharedMemoryABI::kChunkComplete) {
-        PERFETTO_DCHECK(false);
-        continue;
-      }
+      SharedMemoryABI::ChunkState state =
+          SharedMemoryABI::GetChunkStateFromLayout(layout, chunk_idx);
+      PERFETTO_DCHECK(state == SharedMemoryABI::kChunkBeingWritten ||
+                      state == SharedMemoryABI::kChunkComplete);
       bool chunk_complete = state == SharedMemoryABI::kChunkComplete;
+
+      SharedMemoryABI::Chunk chunk =
+          abi->GetChunkUnchecked(page_idx, layout, chunk_idx);
 
       uint16_t packet_count;
       uint8_t flags;
+      // GetPacketCountAndFlags has acquire_load semantics.
       std::tie(packet_count, flags) = chunk.GetPacketCountAndFlags();
 
       // It only makes sense to copy an incomplte chunk if there's at least
@@ -1072,6 +1091,8 @@ void TracingServiceImpl::ReadBuffers(TracingSessionID tsid,
     PERFETTO_DLOG("Draining into file, written: %" PRIu64 " KB, stop: %d",
                   (total_wr_size + 1023) / 1024, stop_writing_into_file);
     if (stop_writing_into_file) {
+      // Ensure all data was written to the file before we close it.
+      base::FlushFile(fd);
       tracing_session->write_into_file.reset();
       tracing_session->write_period_ms = 0;
       if (tracing_session->state == TracingSession::STARTED)

@@ -139,19 +139,6 @@ void SharedMemoryABI::Initialize(uint8_t* start,
   PERFETTO_CHECK(size % page_size == 0);
 }
 
-std::pair<SharedMemoryABI::Chunk, SharedMemoryABI::ChunkState>
-SharedMemoryABI::GetChunkAndStateUnsafe(size_t page_idx, size_t chunk_idx) {
-  uint32_t layout =
-      page_header(page_idx)->layout.load(std::memory_order_relaxed);
-  const size_t num_chunks = GetNumChunksForLayout(layout);
-  // The page layout has changed (or the page is free).
-  if (chunk_idx >= num_chunks)
-    return std::make_pair(Chunk(), ChunkState::kChunkFree);
-  auto state = static_cast<ChunkState>((layout >> (chunk_idx * kChunkShift)) &
-                                       kChunkMask);
-  return std::make_pair(GetChunkUnchecked(page_idx, layout, chunk_idx), state);
-}
-
 SharedMemoryABI::Chunk SharedMemoryABI::GetChunkUnchecked(size_t page_idx,
                                                           uint32_t page_layout,
                                                           size_t chunk_idx) {
@@ -239,18 +226,6 @@ uint32_t SharedMemoryABI::GetFreeChunks(size_t page_idx) {
   return res;
 }
 
-uint32_t SharedMemoryABI::GetUsedChunks(size_t page_idx) {
-  uint32_t layout =
-      page_header(page_idx)->layout.load(std::memory_order_relaxed);
-  const uint32_t num_chunks = GetNumChunksForLayout(layout);
-  uint32_t res = 0;
-  for (uint32_t i = 0; i < num_chunks; i++) {
-    res |= ((layout & kChunkMask) != kChunkFree) ? (1 << i) : 0;
-    layout >>= kChunkShift;
-  }
-  return res;
-}
-
 size_t SharedMemoryABI::ReleaseChunk(Chunk chunk,
                                      ChunkState desired_chunk_state) {
   PERFETTO_DCHECK(desired_chunk_state == kChunkComplete ||
@@ -311,54 +286,6 @@ size_t SharedMemoryABI::ReleaseChunk(Chunk chunk,
   return kInvalidPageIdx;
 }
 
-bool SharedMemoryABI::TryAcquireAllChunksForReading(size_t page_idx) {
-  PageHeader* phdr = page_header(page_idx);
-  uint32_t layout = phdr->layout.load(std::memory_order_relaxed);
-  const uint32_t num_chunks = GetNumChunksForLayout(layout);
-  if (num_chunks == 0)
-    return false;
-  uint32_t next_layout = layout & kLayoutMask;
-  for (size_t chunk_idx = 0; chunk_idx < num_chunks; chunk_idx++) {
-    const uint32_t chunk_state =
-        ((layout >> (chunk_idx * kChunkShift)) & kChunkMask);
-    switch (chunk_state) {
-      case kChunkBeingWritten:
-        return false;
-      case kChunkBeingRead:
-      case kChunkComplete:
-        next_layout |= kChunkBeingRead << (chunk_idx * kChunkShift);
-        break;
-      case kChunkFree:
-        next_layout |= kChunkFree << (chunk_idx * kChunkShift);
-        break;
-    }
-  }
-  return phdr->layout.compare_exchange_strong(layout, next_layout,
-                                              std::memory_order_acq_rel);
-}
-
-void SharedMemoryABI::ReleaseAllChunksAsFree(size_t page_idx) {
-  // Clear all chunk headers.
-  PageHeader* phdr = page_header(page_idx);
-  uint32_t layout = phdr->layout.load(std::memory_order_relaxed);
-  const uint32_t num_chunks = GetNumChunksForLayout(layout);
-  for (size_t chunk_idx = 0; chunk_idx < num_chunks; chunk_idx++) {
-    Chunk chunk = GetChunkUnchecked(page_idx, layout, chunk_idx);
-    ClearChunkHeader(chunk.header());
-  }
-
-  phdr->layout.store(0, std::memory_order_release);
-#if !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
-  uint8_t* page_start = start_ + page_idx * page_size_;
-  // TODO(fmayer): On Linux/Android this should be MADV_REMOVE if we use
-  // memfd_create() and tmpfs supports hole punching (need to consult kernel
-  // sources).
-  int ret = madvise(reinterpret_cast<uint8_t*>(page_start), page_size_,
-                    MADV_DONTNEED);
-  PERFETTO_DCHECK(ret == 0);
-#endif
-}
-
 SharedMemoryABI::Chunk::Chunk() = default;
 
 SharedMemoryABI::Chunk::Chunk(uint8_t* begin, uint16_t size, uint8_t chunk_idx)
@@ -397,7 +324,7 @@ std::pair<size_t, size_t> SharedMemoryABI::GetPageAndChunkIndex(
   PERFETTO_DCHECK((offset - sizeof(PageHeader)) % chunk.size() == 0);
   const size_t chunk_idx = (offset - sizeof(PageHeader)) / chunk.size();
   PERFETTO_DCHECK(chunk_idx < kMaxChunksPerPage);
-  PERFETTO_DCHECK(chunk_idx < GetNumChunksForLayout(page_layout_dbg(page_idx)));
+  PERFETTO_DCHECK(chunk_idx < GetNumChunksForLayout(GetPageLayout(page_idx)));
   return std::make_pair(page_idx, chunk_idx);
 }
 
