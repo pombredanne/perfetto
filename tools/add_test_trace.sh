@@ -41,7 +41,7 @@ echo "SHA1 of file $NEW_TEST_DATA is"
 if which shasum; then
 echo $(shasum /tmp/$NEW_TEST_DATA)  # Mac OS
 else
-echo $(shasum /tmp/$NEW_TEST_DATA)  # Linux
+echo $(sha1sum /tmp/$NEW_TEST_DATA)  # Linux
 fi
 
 echo ""
