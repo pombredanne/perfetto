@@ -27,6 +27,7 @@
 #include "perfetto/traced/sys_stats_counters.h"
 #include "src/trace_processor/clock_tracker.h"
 #include "src/trace_processor/event_tracker.h"
+#include "src/trace_processor/ftrace_descriptors.h"
 #include "src/trace_processor/process_tracker.h"
 #include "src/trace_processor/slice_tracker.h"
 #include "src/trace_processor/trace_processor_context.h"
@@ -36,6 +37,13 @@
 
 namespace perfetto {
 namespace trace_processor {
+
+namespace {
+
+using protozero::ProtoDecoder;
+using Variadic = TraceStorage::Args::Variadic;
+
+}  // namespace
 
 // We have to handle trace_marker events of a few different types:
 // 1. some random text
@@ -100,8 +108,6 @@ bool ParseSystraceTracePoint(base::StringView str, SystraceTracePoint* out) {
       return false;
   }
 }
-
-using protozero::ProtoDecoder;
 
 ProtoTraceParser::ProtoTraceParser(TraceProcessorContext* context)
     : context_(context),
@@ -496,8 +502,8 @@ void ProtoTraceParser::ParseProcMemCounters(int64_t ts,
     uint64_t value = counter_values[field_id];
     auto row_id = context_->event_tracker->PushCounter(
         ts, value, name, utid, RefType::kRefUtidLookupUpid);
-    context_->storage->mutable_args()->AddArg(row_id, utid_name_id_,
-                                              utid_name_id_, utid);
+    context_->storage->mutable_args()->AddArg(
+        row_id, utid_name_id_, utid_name_id_, Variadic::Integer(utid));
   }
 
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
@@ -551,72 +557,70 @@ void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
                                          int64_t timestamp,
                                          TraceBlobView ftrace) {
   ProtoDecoder decoder(ftrace.data(), ftrace.length());
-  uint32_t pid = 0;
+  uint64_t raw_pid = 0;
+  if (!PERFETTO_LIKELY(
+          (decoder.FindIntField<protos::FtraceEvent::kPidFieldNumber>(
+              &raw_pid)))) {
+    PERFETTO_ELOG("Pid field not found in ftrace packet");
+    return;
+  }
+  uint32_t pid = static_cast<uint32_t>(raw_pid);
+
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    bool is_metadata_field =
+        fld.id == protos::FtraceEvent::kPidFieldNumber ||
+        fld.id == protos::FtraceEvent::kTimestampFieldNumber;
+    if (is_metadata_field)
+      continue;
+
+    const size_t fld_off = ftrace.offset_of(fld.data());
+    if (fld.id == protos::FtraceEvent::kGenericFieldNumber) {
+      ParseGenericFtrace(timestamp, pid, ftrace.slice(fld_off, fld.size()));
+    } else {
+      ParseTypedFtraceToRaw(fld.id, timestamp, pid,
+                            ftrace.slice(fld_off, fld.size()));
+    }
+
     switch (fld.id) {
-      case protos::FtraceEvent::kPidFieldNumber: {
-        pid = fld.as_uint32();
-        break;
-      }
       case protos::FtraceEvent::kSchedSwitchFieldNumber: {
-        PERFETTO_DCHECK(timestamp > 0);
-        const size_t fld_off = ftrace.offset_of(fld.data());
         ParseSchedSwitch(cpu, timestamp, ftrace.slice(fld_off, fld.size()));
         break;
       }
       case protos::FtraceEvent::kCpuFrequency: {
-        PERFETTO_DCHECK(timestamp > 0);
-        const size_t fld_off = ftrace.offset_of(fld.data());
         ParseCpuFreq(timestamp, ftrace.slice(fld_off, fld.size()));
         break;
       }
       case protos::FtraceEvent::kCpuIdle: {
-        PERFETTO_DCHECK(timestamp > 0);
-        const size_t fld_off = ftrace.offset_of(fld.data());
         ParseCpuIdle(timestamp, ftrace.slice(fld_off, fld.size()));
         break;
       }
       case protos::FtraceEvent::kPrintFieldNumber: {
-        PERFETTO_DCHECK(timestamp > 0);
-        const size_t fld_off = ftrace.offset_of(fld.data());
         ParsePrint(cpu, timestamp, pid, ftrace.slice(fld_off, fld.size()));
         break;
       }
       case protos::FtraceEvent::kRssStatFieldNumber: {
-        PERFETTO_DCHECK(timestamp > 0);
-        const size_t fld_off = ftrace.offset_of(fld.data());
         ParseRssStat(timestamp, pid, ftrace.slice(fld_off, fld.size()));
         break;
       }
       case protos::FtraceEvent::kIonHeapGrow: {
-        PERFETTO_DCHECK(timestamp > 0);
-        const size_t fld_off = ftrace.offset_of(fld.data());
         ParseIonHeapGrowOrShrink(timestamp, pid,
                                  ftrace.slice(fld_off, fld.size()), true);
         break;
       }
       case protos::FtraceEvent::kIonHeapShrink: {
-        PERFETTO_DCHECK(timestamp > 0);
-        const size_t fld_off = ftrace.offset_of(fld.data());
         ParseIonHeapGrowOrShrink(timestamp, pid,
                                  ftrace.slice(fld_off, fld.size()), false);
         break;
       }
       case protos::FtraceEvent::kSignalGenerate: {
-        PERFETTO_DCHECK(timestamp > 0);
-        const size_t fld_off = ftrace.offset_of(fld.data());
         ParseSignalGenerate(timestamp, ftrace.slice(fld_off, fld.size()));
         break;
       }
       case protos::FtraceEvent::kSignalDeliver: {
-        PERFETTO_DCHECK(timestamp > 0);
-        const size_t fld_off = ftrace.offset_of(fld.data());
         ParseSignalDeliver(timestamp, pid, ftrace.slice(fld_off, fld.size()));
         break;
       }
       case protos::FtraceEvent::kOomScoreAdjUpdate: {
-        PERFETTO_DCHECK(timestamp > 0);
-        const size_t fld_off = ftrace.offset_of(fld.data());
         ParseOOMScoreAdjUpdate(timestamp, ftrace.slice(fld_off, fld.size()));
         break;
       }
@@ -950,6 +954,338 @@ void ProtoTraceParser::ParseOOMScoreAdjUpdate(int64_t ts,
                                        RefType::kRefUpid);
 }
 
+void ProtoTraceParser::ParseGenericFtrace(int64_t timestamp,
+                                          uint32_t tid,
+                                          TraceBlobView view) {
+  ProtoDecoder decoder(view.data(), view.length());
+
+  base::StringView event_name;
+  if (!PERFETTO_LIKELY((decoder.FindStringField<
+                        protos::GenericFtraceEvent::kEventNameFieldNumber>(
+          &event_name)))) {
+    PERFETTO_ELOG("Event name not found in generic ftrace packet");
+    return;
+  }
+
+  UniqueTid utid = context_->process_tracker->UpdateThread(timestamp, tid, 0);
+  StringId event_id = context_->storage->InternString(std::move(event_name));
+  RowId row_id = context_->storage->mutable_raw_events()->AddRawEvent(
+      timestamp, event_id, utid);
+
+  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    switch (fld.id) {
+      case protos::GenericFtraceEvent::kFieldFieldNumber:
+        const size_t fld_off = view.offset_of(fld.data());
+        ParseGenericFtraceField(row_id, view.slice(fld_off, fld.size()));
+        break;
+    }
+  }
+}
+
+void ProtoTraceParser::ParseGenericFtraceField(RowId generic_row_id,
+                                               TraceBlobView view) {
+  ProtoDecoder decoder(view.data(), view.length());
+
+  base::StringView field_name;
+  if (!PERFETTO_LIKELY((decoder.FindStringField<
+                        protos::GenericFtraceEvent::Field::kNameFieldNumber>(
+          &field_name)))) {
+    PERFETTO_ELOG("Event name not found in generic ftrace packet");
+    return;
+  }
+  auto field_name_id = context_->storage->InternString(std::move(field_name));
+  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    switch (fld.id) {
+      case protos::GenericFtraceEvent::Field::kIntValue:
+      case protos::GenericFtraceEvent::Field::kUintValue: {
+        context_->storage->mutable_args()->AddArg(
+            generic_row_id, field_name_id, field_name_id,
+            Variadic::Integer(fld.as_integer()));
+        break;
+      }
+      case protos::GenericFtraceEvent::Field::kStrValue: {
+        StringId value = context_->storage->InternString(fld.as_string());
+        context_->storage->mutable_args()->AddArg(generic_row_id, field_name_id,
+                                                  field_name_id,
+                                                  Variadic::String(value));
+      }
+    }
+  }
+}
+
+void ProtoTraceParser::ParseTypedFtraceToRaw(uint32_t ftrace_id,
+                                             int64_t timestamp,
+                                             uint32_t tid,
+                                             TraceBlobView view) {
+  ProtoDecoder decoder(view.data(), view.length());
+  if (ftrace_id >= GetDescriptorsSize()) {
+    PERFETTO_DLOG("Event with id: %d does not exist and cannot be parsed.",
+                  ftrace_id);
+    return;
+  }
+  MessageDescriptor* m = GetMessageDescriptorForId(ftrace_id);
+  UniqueTid utid = context_->process_tracker->UpdateThread(timestamp, tid, 0);
+  RowId raw_event_id = context_->storage->mutable_raw_events()->AddRawEvent(
+      timestamp, context_->storage->InternString(m->name), utid);
+  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    ProtoSchemaType type = m->fields[fld.id].type;
+    StringId name_id = context_->storage->InternString(m->fields[fld.id].name);
+    switch (type) {
+      case ProtoSchemaType::kUint32:
+      case ProtoSchemaType::kInt32:
+      case ProtoSchemaType::kUint64:
+      case ProtoSchemaType::kInt64:
+      case ProtoSchemaType::kFixed64:
+      case ProtoSchemaType::kFixed32:
+      case ProtoSchemaType::kSfixed32:
+      case ProtoSchemaType::kSfixed64:
+      case ProtoSchemaType::kSint32:
+      case ProtoSchemaType::kSint64:
+      case ProtoSchemaType::kBool:
+      case ProtoSchemaType::kEnum: {
+        context_->storage->mutable_args()->AddArg(
+            raw_event_id, name_id, name_id,
+            Variadic::Integer(fld.as_integer()));
+        break;
+      }
+      case ProtoSchemaType::kString:
+      case ProtoSchemaType::kBytes: {
+        StringId value = context_->storage->InternString(fld.as_string());
+        context_->storage->mutable_args()->AddArg(
+            raw_event_id, name_id, name_id, Variadic::String(value));
+        break;
+      }
+      case ProtoSchemaType::kDouble:
+      case ProtoSchemaType::kFloat: {
+        context_->storage->mutable_args()->AddArg(
+            raw_event_id, name_id, name_id, Variadic::Real(fld.as_real()));
+        break;
+      }
+      case ProtoSchemaType::kUnknown:
+      case ProtoSchemaType::kGroup:
+      case ProtoSchemaType::kMessage:
+        PERFETTO_DLOG("Could not store %s as a field in args table.",
+                      ProtoSchemaToString(type));
+        break;
+    }
+  }
+}
+
+void ProtoTraceParser::ParseClockSnapshot(TraceBlobView packet) {
+  ProtoDecoder decoder(packet.data(), packet.length());
+  int64_t clock_boottime = 0;
+  int64_t clock_monotonic = 0;
+  int64_t clock_realtime = 0;
+
+  // This loop iterates over the "repeated Clock" entries.
+  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    switch (fld.id) {
+      case protos::ClockSnapshot::kClocksFieldNumber: {
+        const size_t fld_off = packet.offset_of(fld.data());
+        auto clk = ParseClockField(packet.slice(fld_off, fld.size()));
+        switch (clk.first) {
+          case protos::ClockSnapshot::Clock::BOOTTIME:
+            clock_boottime = clk.second;
+            break;
+          case protos::ClockSnapshot::Clock::REALTIME:
+            clock_realtime = clk.second;
+            break;
+          case protos::ClockSnapshot::Clock::MONOTONIC:
+            clock_monotonic = clk.second;
+            break;
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  }
+  PERFETTO_DCHECK(decoder.IsEndOfBuffer());
+
+  // Usually these snapshots come all together.
+  PERFETTO_DCHECK(clock_boottime > 0 && clock_monotonic > 0 &&
+                  clock_realtime > 0);
+
+  if (clock_boottime <= 0) {
+    PERFETTO_ELOG("ClockSnapshot has an invalid BOOTTIME (%" PRId64 ")",
+                  clock_boottime);
+    context_->storage->IncrementStats(stats::invalid_clock_snapshots);
+    return;
+  }
+
+  auto* ct = context_->clock_tracker.get();
+
+  // |clock_boottime| is used as the reference trace time.
+  ct->SyncClocks(ClockDomain::kBootTime, clock_boottime, clock_boottime);
+
+  if (clock_monotonic > 0)
+    ct->SyncClocks(ClockDomain::kMonotonic, clock_monotonic, clock_boottime);
+
+  if (clock_realtime > 0)
+    ct->SyncClocks(ClockDomain::kRealTime, clock_realtime, clock_boottime);
+}
+
+std::pair<int, int64_t> ProtoTraceParser::ParseClockField(
+    TraceBlobView packet) {
+  ProtoDecoder decoder(packet.data(), packet.length());
+  int type = protos::ClockSnapshot::Clock::UNKNOWN;
+  int64_t value = -1;
+
+  // This loop iterates over the |type| and |timestamp| field of each
+  // clock snapshot.
+  for (auto fld = decoder.ReadField(); fld.id; fld = decoder.ReadField()) {
+    switch (fld.id) {
+      case protos::ClockSnapshot::Clock::kTypeFieldNumber:
+        type = fld.as_int32();
+        break;
+      case protos::ClockSnapshot::Clock::kTimestampFieldNumber:
+        value = fld.as_int64();
+        break;
+    }
+  }
+  return std::make_pair(type, value);
+}
+
+void ProtoTraceParser::ParseAndroidLogPacket(TraceBlobView packet) {
+  ProtoDecoder decoder(packet.data(), packet.length());
+  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    switch (fld.id) {
+      case protos::AndroidLogPacket::kEventsFieldNumber: {
+        const size_t fld_off = packet.offset_of(fld.data());
+        ParseAndroidLogEvent(packet.slice(fld_off, fld.size()));
+        break;
+      }
+      case protos::AndroidLogPacket::kStatsFieldNumber: {
+        const size_t fld_off = packet.offset_of(fld.data());
+        ParseAndroidLogStats(packet.slice(fld_off, fld.size()));
+        break;
+      }
+    }
+  }
+  PERFETTO_DCHECK(decoder.IsEndOfBuffer());
+}
+
+void ProtoTraceParser::ParseAndroidLogEvent(TraceBlobView event) {
+  // TODO(primiano): Add events and non-stringified fields to the "raw" table.
+  ProtoDecoder decoder(event.data(), event.length());
+  int64_t ts = 0;
+  uint32_t pid = 0;
+  uint32_t tid = 0;
+  uint8_t prio = 0;
+  StringId tag_id = 0;
+  StringId msg_id = 0;
+  char arg_msg[4096];
+  char* arg_str = &arg_msg[0];
+  *arg_str = '\0';
+  auto arg_avail = [&arg_msg, &arg_str]() {
+    return sizeof(arg_msg) - static_cast<size_t>(arg_str - arg_msg);
+  };
+
+  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    switch (fld.id) {
+      case protos::AndroidLogPacket::LogEvent::kPidFieldNumber:
+        pid = fld.as_uint32();
+        break;
+      case protos::AndroidLogPacket::LogEvent::kTidFieldNumber:
+        tid = fld.as_uint32();
+        break;
+      case protos::AndroidLogPacket::LogEvent::kTimestampFieldNumber:
+        ts = fld.as_int64();
+        if (ts < context_->clock_tracker->GetFirstTimestamp(
+                     ClockDomain::kRealTime)) {
+          // Skip log events that happened before the start of the trace.
+          return;
+        }
+        break;
+      case protos::AndroidLogPacket::LogEvent::kPrioFieldNumber:
+        prio = static_cast<uint8_t>(fld.as_uint32());
+        break;
+      case protos::AndroidLogPacket::LogEvent::kTagFieldNumber:
+        tag_id = context_->storage->InternString(fld.as_string());
+        break;
+      case protos::AndroidLogPacket::LogEvent::kMessageFieldNumber:
+        msg_id = context_->storage->InternString(fld.as_string());
+        break;
+      case protos::AndroidLogPacket::LogEvent::kArgsFieldNumber: {
+        const size_t fld_off = event.offset_of(fld.data());
+        TraceBlobView arg_data = event.slice(fld_off, fld.size());
+        ParseAndroidLogBinaryArg(std::move(arg_data), &arg_str, arg_avail());
+        break;
+      }
+      default:
+        break;
+    }
+  }
+  PERFETTO_DCHECK(decoder.IsEndOfBuffer());
+
+  if (prio == 0)
+    prio = protos::AndroidLogPriority::PRIO_INFO;
+
+  if (arg_str != &arg_msg[0]) {
+    PERFETTO_DCHECK(!msg_id);
+    // Skip the first space char (" foo=1 bar=2" -> "foo=1 bar=2").
+    msg_id = context_->storage->InternString(&arg_msg[1]);
+  }
+  UniquePid utid = tid ? context_->process_tracker->UpdateThread(tid, pid) : 0;
+  int64_t trace_time =
+      context_->clock_tracker->ToTraceTime(ClockDomain::kRealTime, ts);
+
+  // Log events are NOT required to be sorted by trace_time. The virtual table
+  // will take care of sorting on-demand.
+  context_->storage->mutable_android_log()->AddLogEvent(trace_time, utid, prio,
+                                                        tag_id, msg_id);
+}
+
+void ProtoTraceParser::ParseAndroidLogBinaryArg(TraceBlobView arg,
+                                                char** str,
+                                                size_t avail) {
+  ProtoDecoder decoder(arg.data(), arg.length());
+  for (auto fld = decoder.ReadField(); fld.id; fld = decoder.ReadField()) {
+    switch (fld.id) {
+      case protos::AndroidLogPacket::LogEvent::Arg::kNameFieldNumber: {
+        base::StringView name = fld.as_string();
+        *str += snprintf(*str, avail, " %.*s=", static_cast<int>(name.size()),
+                         name.data());
+        break;
+      }
+      case protos::AndroidLogPacket::LogEvent::Arg::kStringValueFieldNumber: {
+        base::StringView val = fld.as_string();
+        *str += snprintf(*str, avail, "\"%.*s\"", static_cast<int>(val.size()),
+                         val.data());
+        break;
+      }
+      case protos::AndroidLogPacket::LogEvent::Arg::kIntValueFieldNumber:
+        *str += snprintf(*str, avail, "%" PRId64, fld.as_int64());
+        break;
+      case protos::AndroidLogPacket::LogEvent::Arg::kFloatValueFieldNumber:
+        *str +=
+            snprintf(*str, avail, "%f", static_cast<double>(fld.as_float()));
+        break;
+    }
+  }
+}
+
+void ProtoTraceParser::ParseAndroidLogStats(TraceBlobView packet) {
+  ProtoDecoder decoder(packet.data(), packet.length());
+  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    switch (fld.id) {
+      case protos::AndroidLogPacket::Stats::kNumFailedFieldNumber:
+        context_->storage->SetStats(stats::android_log_num_failed,
+                                    fld.as_int64());
+        break;
+      case protos::AndroidLogPacket::Stats::kNumSkippedFieldNumber:
+        context_->storage->SetStats(stats::android_log_num_skipped,
+                                    fld.as_int64());
+        break;
+      case protos::AndroidLogPacket::Stats::kNumTotalFieldNumber:
+        context_->storage->SetStats(stats::android_log_num_total,
+                                    fld.as_int64());
+        break;
+    }
+  }
+  PERFETTO_DCHECK(decoder.IsEndOfBuffer());
+}
+
 void ProtoTraceParser::ParseTraceStats(TraceBlobView packet) {
   ProtoDecoder decoder(packet.data(), packet.length());
   int buf_num = 0;
@@ -1076,11 +1412,12 @@ void ProtoTraceParser::ParseFtraceStats(TraceBlobView packet) {
             case protos::FtraceCpuStats::kOldestEventTsFieldNumber:
               storage->SetIndexedStats(
                   stats::ftrace_cpu_oldest_event_ts_begin + phase, cpu_num,
-                  fld2.as_int64());
+                  static_cast<int64_t>(fld2.as_double() * 1e9));
               break;
             case protos::FtraceCpuStats::kNowTsFieldNumber:
-              storage->SetIndexedStats(stats::ftrace_cpu_now_ts_begin + phase,
-                                       cpu_num, fld2.as_int64());
+              storage->SetIndexedStats(
+                  stats::ftrace_cpu_now_ts_begin + phase, cpu_num,
+                  static_cast<int64_t>(fld2.as_double() * 1e9));
               break;
             case protos::FtraceCpuStats::kDroppedEventsFieldNumber:
               storage->SetIndexedStats(
@@ -1097,216 +1434,6 @@ void ProtoTraceParser::ParseFtraceStats(TraceBlobView packet) {
         break;
       }
       default:
-        break;
-    }
-  }
-  PERFETTO_DCHECK(decoder.IsEndOfBuffer());
-}
-
-void ProtoTraceParser::ParseClockSnapshot(TraceBlobView packet) {
-  ProtoDecoder decoder(packet.data(), packet.length());
-  int64_t clock_boottime = 0;
-  int64_t clock_monotonic = 0;
-  int64_t clock_realtime = 0;
-
-  // This loop iterates over the "repeated Clock" entries.
-  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
-    switch (fld.id) {
-      case protos::ClockSnapshot::kClocksFieldNumber: {
-        const size_t fld_off = packet.offset_of(fld.data());
-        TraceBlobView clk_data = packet.slice(fld_off, fld.size());
-        ProtoDecoder clk_decoder(clk_data.data(), clk_data.length());
-        int64_t* clock_ptr = nullptr;
-        int64_t clock_value = -1;
-        // This loop iterates over the |type| and |timestamp| field of each
-        // clock snapshot.
-        for (auto clk = clk_decoder.ReadField(); clk.id;
-             clk = clk_decoder.ReadField()) {
-          switch (clk.id) {
-            case protos::ClockSnapshot::Clock::kTypeFieldNumber:
-              switch (clk.as_int32()) {
-                case protos::ClockSnapshot::Clock::BOOTTIME:
-                  clock_ptr = &clock_boottime;
-                  break;
-                case protos::ClockSnapshot::Clock::REALTIME:
-                  clock_ptr = &clock_realtime;
-                  break;
-                case protos::ClockSnapshot::Clock::MONOTONIC:
-                  clock_ptr = &clock_monotonic;
-                  break;
-              }
-              break;
-            case protos::ClockSnapshot::Clock::kTimestampFieldNumber:
-              clock_value = clk.as_int64();
-              break;
-          }  // switch (clk.id)
-        }    // for(clk)
-        if (clock_value > 0 && clock_ptr)
-          *clock_ptr = clock_value;
-        break;
-      }  // case kClocksFieldNumber.
-      default:
-        break;
-    }  // switch(fld.id)
-  }
-  PERFETTO_DCHECK(decoder.IsEndOfBuffer());
-
-  // Usually these snapshots come all together.
-  PERFETTO_DCHECK(clock_boottime > 0 && clock_monotonic > 0 &&
-                  clock_realtime > 0);
-
-  if (clock_boottime <= 0) {
-    PERFETTO_ELOG("ClockSnapshot has an invalid BOOTTIME (%" PRId64 ")",
-                  clock_boottime);
-    context_->storage->IncrementStats(stats::invalid_clock_snapshots);
-    return;
-  }
-
-  auto* ct = context_->clock_tracker.get();
-
-  // |clock_boottime| is used as the reference trace time.
-  ct->SyncClocks(ClockDomain::kBootTime, clock_boottime, clock_boottime);
-
-  if (clock_monotonic > 0)
-    ct->SyncClocks(ClockDomain::kMonotonic, clock_monotonic, clock_boottime);
-
-  if (clock_realtime > 0)
-    ct->SyncClocks(ClockDomain::kRealTime, clock_realtime, clock_boottime);
-}
-
-void ProtoTraceParser::ParseAndroidLogPacket(TraceBlobView packet) {
-  ProtoDecoder decoder(packet.data(), packet.length());
-  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
-    switch (fld.id) {
-      case protos::AndroidLogPacket::kEventsFieldNumber: {
-        const size_t fld_off = packet.offset_of(fld.data());
-        ParseAndroidLogEvent(packet.slice(fld_off, fld.size()));
-        break;
-      }
-      case protos::AndroidLogPacket::kStatsFieldNumber: {
-        const size_t fld_off = packet.offset_of(fld.data());
-        ParseAndroidLogStats(packet.slice(fld_off, fld.size()));
-        break;
-      }
-    }
-  }
-  PERFETTO_DCHECK(decoder.IsEndOfBuffer());
-}
-
-void ProtoTraceParser::ParseAndroidLogEvent(TraceBlobView event) {
-  // TODO(primiano): Add events and non-stringified fields to the "raw" table.
-  ProtoDecoder decoder(event.data(), event.length());
-  int64_t ts = 0;
-  uint32_t pid = 0;
-  uint32_t tid = 0;
-  uint8_t prio = 0;
-  StringId tag_id = 0;
-  StringId msg_id = 0;
-  char arg_msg[4096];
-  char* arg_str = &arg_msg[0];
-  *arg_str = '\0';
-  auto arg_avail = [&arg_msg, &arg_str]() {
-    return sizeof(arg_msg) - static_cast<size_t>(arg_str - arg_msg);
-  };
-
-  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
-    switch (fld.id) {
-      case protos::AndroidLogPacket::LogEvent::kPidFieldNumber:
-        pid = fld.as_uint32();
-        break;
-      case protos::AndroidLogPacket::LogEvent::kTidFieldNumber:
-        tid = fld.as_uint32();
-        break;
-      case protos::AndroidLogPacket::LogEvent::kTimestampFieldNumber:
-        ts = fld.as_int64();
-        if (ts < context_->clock_tracker->GetFirstTimestamp(
-                     ClockDomain::kRealTime)) {
-          // Skip log events that happened before the start of the trace.
-          return;
-        }
-        break;
-      case protos::AndroidLogPacket::LogEvent::kPrioFieldNumber:
-        prio = static_cast<uint8_t>(fld.as_uint32());
-        break;
-      case protos::AndroidLogPacket::LogEvent::kTagFieldNumber:
-        tag_id = context_->storage->InternString(fld.as_string());
-        break;
-      case protos::AndroidLogPacket::LogEvent::kMessageFieldNumber:
-        msg_id = context_->storage->InternString(fld.as_string());
-        break;
-      case protos::AndroidLogPacket::LogEvent::kArgsFieldNumber: {
-        const size_t fld_off = event.offset_of(fld.data());
-        TraceBlobView arg_data = event.slice(fld_off, fld.size());
-        ProtoDecoder arg_decoder(arg_data.data(), arg_data.length());
-        for (auto arg = arg_decoder.ReadField(); arg.id;
-             arg = arg_decoder.ReadField()) {
-          switch (arg.id) {
-            case protos::AndroidLogPacket::LogEvent::Arg::kNameFieldNumber: {
-              base::StringView name = arg.as_string();
-              arg_str += snprintf(arg_str, arg_avail(),
-                                  " %.*s=", static_cast<int>(name.size()),
-                                  name.data());
-              break;
-            }
-            case protos::AndroidLogPacket::LogEvent::Arg::
-                kStringValueFieldNumber: {
-              base::StringView val = arg.as_string();
-              arg_str += snprintf(arg_str, arg_avail(), "\"%.*s\"",
-                                  static_cast<int>(val.size()), val.data());
-              break;
-            }
-            case protos::AndroidLogPacket::LogEvent::Arg::kIntValueFieldNumber:
-              arg_str +=
-                  snprintf(arg_str, arg_avail(), "%" PRId64, arg.as_int64());
-              break;
-            case protos::AndroidLogPacket::LogEvent::Arg::
-                kFloatValueFieldNumber:
-              arg_str += snprintf(arg_str, arg_avail(), "%f",
-                                  static_cast<double>(arg.as_float()));
-              break;
-          }  // switch(arg.id)
-        }    // for(arg)
-        break;
-      }
-      default:
-        break;
-    }
-  }
-  PERFETTO_DCHECK(decoder.IsEndOfBuffer());
-
-  if (prio == 0)
-    prio = protos::AndroidLogPriority::PRIO_INFO;
-
-  if (arg_str != &arg_msg[0]) {
-    PERFETTO_DCHECK(!msg_id);
-    // Skip the first space char (" foo=1 bar=2" -> "foo=1 bar=2").
-    msg_id = context_->storage->InternString(&arg_msg[1]);
-  }
-  UniquePid utid = tid ? context_->process_tracker->UpdateThread(tid, pid) : 0;
-  int64_t trace_time =
-      context_->clock_tracker->ToTraceTime(ClockDomain::kRealTime, ts);
-
-  // Log events are NOT required to be sorted by trace_time. The virtual table
-  // will take care of sorting on-demand.
-  context_->storage->mutable_android_log()->AddLogEvent(trace_time, utid, prio,
-                                                        tag_id, msg_id);
-}
-
-void ProtoTraceParser::ParseAndroidLogStats(TraceBlobView packet) {
-  ProtoDecoder decoder(packet.data(), packet.length());
-  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
-    switch (fld.id) {
-      case protos::AndroidLogPacket::Stats::kNumFailedFieldNumber:
-        context_->storage->SetStats(stats::android_log_num_failed,
-                                    fld.as_int64());
-        break;
-      case protos::AndroidLogPacket::Stats::kNumSkippedFieldNumber:
-        context_->storage->SetStats(stats::android_log_num_skipped,
-                                    fld.as_int64());
-        break;
-      case protos::AndroidLogPacket::Stats::kNumTotalFieldNumber:
-        context_->storage->SetStats(stats::android_log_num_total,
-                                    fld.as_int64());
         break;
     }
   }
