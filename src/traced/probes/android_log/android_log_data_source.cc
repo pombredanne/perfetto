@@ -162,21 +162,20 @@ void AndroidLogDataSource::Start() {
 }
 
 void AndroidLogDataSource::EnableSocketWatchTask(bool enable) {
+  if (fd_watch_task_enabled_ == enable)
+    return;
+
   if (enable) {
-    if (fd_watch_task_enabled_)
-      return;
     auto weak_this = weak_factory_.GetWeakPtr();
     task_runner_->AddFileDescriptorWatch(logdr_sock_.fd(), [weak_this] {
       if (weak_this)
         weak_this->OnSocketDataAvailable();
     });
-    fd_watch_task_enabled_ = true;
   } else {
-    if (!fd_watch_task_enabled_)
-      return;
     task_runner_->RemoveFileDescriptorWatch(logdr_sock_.fd());
-    fd_watch_task_enabled_ = false;
   }
+
+  fd_watch_task_enabled_ = enable;
 }
 
 void AndroidLogDataSource::OnSocketDataAvailable() {
