@@ -1412,11 +1412,12 @@ void ProtoTraceParser::ParseFtraceStats(TraceBlobView packet) {
             case protos::FtraceCpuStats::kOldestEventTsFieldNumber:
               storage->SetIndexedStats(
                   stats::ftrace_cpu_oldest_event_ts_begin + phase, cpu_num,
-                  fld2.as_int64());
+                  static_cast<int64_t>(fld2.as_double() * 1e9));
               break;
             case protos::FtraceCpuStats::kNowTsFieldNumber:
-              storage->SetIndexedStats(stats::ftrace_cpu_now_ts_begin + phase,
-                                       cpu_num, fld2.as_int64());
+              storage->SetIndexedStats(
+                  stats::ftrace_cpu_now_ts_begin + phase, cpu_num,
+                  static_cast<int64_t>(fld2.as_double() * 1e9));
               break;
             case protos::FtraceCpuStats::kDroppedEventsFieldNumber:
               storage->SetIndexedStats(
