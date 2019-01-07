@@ -460,9 +460,12 @@ class SharedMemoryABI {
   }
 
   // Returns the page layout, which is a bitmap that specifies the chunking
-  // layout of the page and each chunk's current state.
+  // layout of the page and each chunk's current state. Reads with an
+  // acquire-load semantic to ensure a producer's writes corresponding to an
+  // update of the layout (e.g. clearing a chunk's header) are observed
+  // consistently.
   uint32_t GetPageLayout(size_t page_idx) {
-    return page_header(page_idx)->layout.load(std::memory_order_relaxed);
+    return page_header(page_idx)->layout.load(std::memory_order_acquire);
   }
 
   // Returns a bitmap in which each bit is set if the corresponding Chunk exists
