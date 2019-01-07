@@ -39,6 +39,17 @@ source_set("perfetto_cmd") {
     "rate_limiter.cc",
     "rate_limiter.h",
   ]
+  if (is_android) {
+    deps += [ "../base:android_task_runner" ]
+  }
+  if (perfetto_build_with_android) {
+    cflags = [ "-DPERFETTO_BUILD_WITH_ANDROID" ]
+    libs = [
+      "binder",
+      "services",
+      "utils",
+    ]
+  }
 }
 
 proto_library("protos") {

@@ -123,12 +123,12 @@ class PerfettoCmdlineTest : public ::testing::Test {
     // Parent.
     in_pipe.rd.reset();
     err_pipe.wr.reset();
-    stderr_ = std::string(4096, '\0');
+    stderr_ = std::string(1024 * 1024, '\0');
 
     // This is generally an unsafe pattern because the child process might be
     // blocked on stdout and stall the stdin reads. It's pragmatically okay for
-    // our test cases because neither stdin nor stdout are expected to exceed
-    // the pipe buffer.
+    // our test cases because stdin is not expected to exceed the pipe buffer.
+    PERFETTO_CHECK(input.size() <= base::kPageSize);
     PERFETTO_CHECK(
         PERFETTO_EINTR(write(*in_pipe.wr, input.data(), input.size())) ==
         static_cast<ssize_t>(input.size()));
@@ -145,7 +145,7 @@ class PerfettoCmdlineTest : public ::testing::Test {
     }
     stderr_.resize(stderr_pos);
     int status = 1;
-    PERFETTO_EINTR(waitpid(pid, &status, 0));
+    PERFETTO_CHECK(PERFETTO_EINTR(waitpid(pid, &status, 0)) == pid);
     int exit_code;
     if (WIFEXITED(status)) {
       exit_code = WEXITSTATUS(status);
@@ -153,7 +153,7 @@ class PerfettoCmdlineTest : public ::testing::Test {
       exit_code = -(WTERMSIG(status));
       PERFETTO_CHECK(exit_code < 0);
     } else {
-      PERFETTO_CHECK(false);
+      PERFETTO_FATAL("Unexpected exit status: %d", status);
     }
     return exit_code;
   }
@@ -509,7 +509,17 @@ TEST_F(PerfettoTest, ReattachFailsAfterTimeout) {
   EXPECT_FALSE(helper.AttachConsumer("key"));
 }
 
-TEST_F(PerfettoCmdlineTest, InvalidCases) {
+// Disable cmdline tests on sanitizets because they use fork() and that messes
+// up leak / races detections, which has been fixed only recently (see
+// https://github.com/google/sanitizers/issues/836 ).
+#if defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER) || \
+    defined(MEMORY_SANITIZER) || defined(LEAK_SANITIZER)
+#define NoSanitizers(X) DISABLED_##X
+#else
+#define NoSanitizers(X) X
+#endif
+
+TEST_F(PerfettoCmdlineTest, NoSanitizers(InvalidCases)) {
   std::string cfg("duration_ms: 100");
 
   EXPECT_EQ(1, Exec({"--invalid-arg"}));
@@ -554,20 +564,20 @@ TEST_F(PerfettoCmdlineTest, InvalidCases) {
   EXPECT_THAT(stderr_, HasSubstr("--out or --dropbox is required"));
 }
 
-TEST_F(PerfettoCmdlineTest, TxtConfig) {
+TEST_F(PerfettoCmdlineTest, NoSanitizers(TxtConfig)) {
   std::string cfg("duration_ms: 100");
   EXPECT_EQ(0, Exec({"-c", "-", "--txt", "-o", "-"}, cfg)) << stderr_;
 }
 
-TEST_F(PerfettoCmdlineTest, SimpleConfig) {
+TEST_F(PerfettoCmdlineTest, NoSanitizers(SimpleConfig)) {
   EXPECT_EQ(0, Exec({"-o", "-", "-c", "-", "-t", "100ms"}));
 }
 
-TEST_F(PerfettoCmdlineTest, DetachAndAttach) {
+TEST_F(PerfettoCmdlineTest, NoSanitizers(DetachAndAttach)) {
   EXPECT_NE(0, Exec({"--attach=not_existent"}));
   EXPECT_THAT(stderr_, HasSubstr("Session re-attach failed"));
 
-  std::string cfg("duration_ms: 60000; write_into_file: true");
+  std::string cfg("duration_ms: 10000; write_into_file: true");
   EXPECT_EQ(0,
             Exec({"-o", "-", "-c", "-", "--txt", "--detach=valid_stop"}, cfg))
       << stderr_;
