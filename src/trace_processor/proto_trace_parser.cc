@@ -542,19 +542,18 @@ void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
   uint32_t pid = static_cast<uint32_t>(raw_pid);
 
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
-    PERFETTO_DCHECK(timestamp > 0);
-    const size_t fld_off = ftrace.offset_of(fld.data());
-
     bool is_metadata_field =
         fld.id == protos::FtraceEvent::kPidFieldNumber ||
         fld.id == protos::FtraceEvent::kTimestampFieldNumber;
-    if (!is_metadata_field) {
-      if (fld.id == protos::FtraceEvent::kGenericFieldNumber) {
-        ParseGenericFtrace(timestamp, pid, ftrace.slice(fld_off, fld.size()));
-      } else {
-        ParseTypedFtraceToRaw(fld.id, timestamp, pid,
-                              ftrace.slice(fld_off, fld.size()));
-      }
+    if (is_metadata_field)
+      continue;
+
+    const size_t fld_off = ftrace.offset_of(fld.data());
+    if (fld.id == protos::FtraceEvent::kGenericFieldNumber) {
+      ParseGenericFtrace(timestamp, pid, ftrace.slice(fld_off, fld.size()));
+    } else {
+      ParseTypedFtraceToRaw(fld.id, timestamp, pid,
+                            ftrace.slice(fld_off, fld.size()));
     }
 
     switch (fld.id) {
