@@ -179,8 +179,8 @@ std::unique_ptr<perfetto::profiling::Client> CreateClientAndPrivateDaemon() {
   if (fork_pid == -1) {
     PERFETTO_PLOG("Failed to fork.");
     return nullptr;
-
-  } else if (fork_pid == 0) {  // child
+  }
+  if (fork_pid == 0) {  // child
     // daemon() forks again, terminating the calling thread (i.e. the direct
     // child of the original process). So the rest of this codepath will be
     // executed in a (new) reparented process.
