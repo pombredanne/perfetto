@@ -32,6 +32,7 @@
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/unix_socket.h"
+#include "perfetto/base/utils.h"
 #include "src/profiling/memory/client.h"
 #include "src/profiling/memory/wire_protocol.h"
 
@@ -39,6 +40,8 @@
 static std::atomic<const MallocDispatch*> g_dispatch{nullptr};
 static std::atomic<perfetto::profiling::Client*> g_client{nullptr};
 static constexpr size_t kNumConnections = 2;
+
+static constexpr char kHeapprofdBinPath[] = "/system/bin/heapprofd";
 
 // The only writes are in the initialization function. Because Bionic does a
 // release write after initialization and an acquire read to retrieve the hooked
@@ -185,14 +188,14 @@ std::unique_ptr<perfetto::profiling::Client> CreateClientAndPrivateDaemon() {
       PERFETTO_PLOG("Daemonization failed.");
       _exit(1);
     }
-    const char* path = "/system/bin/heapprofd";
     std::string pid_arg =
         std::string("--exclusive-for-pid=") + std::to_string(target_pid);
     std::string fd_arg =
         std::string("--inherit-socket-fd=") + std::to_string(child_sock.fd());
-    const char* argv[] = {path, pid_arg.c_str(), fd_arg.c_str(), nullptr};
+    const char* argv[] = {kHeapprofdBinPath, pid_arg.c_str(), fd_arg.c_str(),
+                          nullptr};
 
-    execv(path, const_cast<char**>(argv));
+    execv(kHeapprofdBinPath, const_cast<char**>(argv));
     PERFETTO_PLOG("Failed to execute private heapprofd.");
     _exit(1);
   }  // else - parent continuing the client setup
@@ -203,10 +206,11 @@ std::unique_ptr<perfetto::profiling::Client> CreateClientAndPrivateDaemon() {
     return nullptr;
   }
 
-  // Wait on the immediate child to exit.
-  // TODO(rsavitski): verify behavior of waitid() under ignored SIGCHLD.
+  // Wait on the immediate child to exit (allow for ECHILD in the unlikely case
+  // we're in a process that has made its children unwaitable).
   siginfo_t unused = {};
-  if (waitid(P_PID, fork_pid, &unused, WEXITED) == -1) {
+  if (PERFETTO_EINTR(waitid(P_PID, fork_pid, &unused, WEXITED) == -1) &&
+      errno != ECHILD) {
     PERFETTO_PLOG("Failed to waitid on immediate child.");
     return nullptr;
   }
@@ -232,9 +236,8 @@ bool HEAPPROFD_ADD_PREFIX(_initialize)(const MallocDispatch* malloc_dispatch,
       ShouldForkPrivateDaemon() ? CreateClientAndPrivateDaemon()
                                 : CreateClientForCentralDaemon();
 
-  if (!client || !client->inited()) {
+  if (!client || !client->inited())
     return false;
-  }
 
   g_client.store(client.release());
   return true;
