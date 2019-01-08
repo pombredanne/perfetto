@@ -75,13 +75,29 @@ class ProtoTraceParser {
   void ParseCpuTimes(int64_t ts, TraceBlobView);
   void ParseIrqCount(int64_t ts, TraceBlobView, bool is_soft);
   void ParseRssStat(int64_t ts, uint32_t pid, TraceBlobView);
-  void ParseIonHeapGrow(int64_t ts, uint32_t pid, TraceBlobView);
-  void ParseIonHeapShrink(int64_t ts, uint32_t pid, TraceBlobView);
+  void ParseIonHeapGrowOrShrink(int64_t ts,
+                                uint32_t pid,
+                                TraceBlobView,
+                                bool grow);
   void ParseSignalDeliver(int64_t ts, uint32_t pid, TraceBlobView);
   void ParseSignalGenerate(int64_t ts, TraceBlobView);
   void ParseLowmemoryKill(int64_t ts, TraceBlobView);
   void ParseBatteryCounters(int64_t ts, TraceBlobView);
   void ParseOOMScoreAdjUpdate(int64_t ts, TraceBlobView);
+  void ParseClockSnapshot(TraceBlobView);
+  std::pair<int /*type*/, int64_t> ParseClockField(TraceBlobView);
+  void ParseAndroidLogPacket(TraceBlobView);
+  void ParseAndroidLogEvent(TraceBlobView);
+  void ParseAndroidLogBinaryArg(TraceBlobView, char** str, size_t avail);
+  void ParseAndroidLogStats(TraceBlobView);
+  void ParseGenericFtrace(int64_t timestamp, uint32_t pid, TraceBlobView view);
+  void ParseGenericFtraceField(RowId generic_row_id, TraceBlobView view);
+  void ParseTypedFtraceToRaw(uint32_t ftrace_id,
+                             int64_t timestamp,
+                             uint32_t pid,
+                             TraceBlobView view);
+  void ParseTraceStats(TraceBlobView);
+  void ParseFtraceStats(TraceBlobView);
 
  private:
   TraceProcessorContext* context_;
@@ -100,8 +116,6 @@ class ProtoTraceParser {
   const StringId cpu_times_io_wait_ns_id_;
   const StringId cpu_times_irq_ns_id_;
   const StringId cpu_times_softirq_ns_id_;
-  const StringId ion_heap_grow_id_;
-  const StringId ion_heap_shrink_id_;
   const StringId signal_deliver_id_;
   const StringId signal_generate_id_;
   const StringId batt_charge_id_;
@@ -109,6 +123,8 @@ class ProtoTraceParser {
   const StringId batt_current_id_;
   const StringId batt_current_avg_id_;
   const StringId oom_score_adj_id_;
+  const StringId ion_total_unknown_id_;
+  const StringId ion_change_unknown_id_;
   std::vector<StringId> meminfo_strs_id_;
   std::vector<StringId> vmstat_strs_id_;
   std::vector<StringId> rss_members_;
