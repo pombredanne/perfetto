@@ -583,6 +583,7 @@ void PerfettoCmd::FinalizeTraceAndExit() {
 #if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
     android::sp<android::os::DropBoxManager> dropbox =
         new android::os::DropBoxManager();
+    PERFETTO_CHECK(dropbox->incStrong(this));
     fseek(*trace_out_stream_, 0, SEEK_SET);
     // DropBox takes ownership of the file descriptor, so give it a duplicate.
     // Also we need to give it a read-only copy of the fd or will hit a SELinux
@@ -603,6 +604,7 @@ void PerfettoCmd::FinalizeTraceAndExit() {
     } else {
       PERFETTO_ELOG("DropBox upload failed: %s", status.toString8().c_str());
     }
+    dropbox->decStrong(this);
 #endif  // PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
   }
   task_runner_.Quit();
