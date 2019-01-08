@@ -227,6 +227,10 @@ class TracingServiceImpl : public TracingService {
       Consumer*,
       uid_t) override;
 
+  void SetSMBScrapingEnabled(bool enabled) override {
+    smb_scraping_enabled_ = enabled;
+  }
+
   // Exposed mainly for testing.
   size_t num_producers() const { return producers_.size(); }
   ProducerEndpointImpl* GetProducer(ProducerID) const;
@@ -284,6 +288,11 @@ class TracingServiceImpl : public TracingService {
       PERFETTO_DCHECK(write_period_ms > 0);
       return write_period_ms -
              (base::GetWallTimeMs().count() % write_period_ms);
+    }
+
+    uint32_t flush_timeout_ms() {
+      uint32_t timeout_ms = config.flush_timeout_ms();
+      return timeout_ms ? timeout_ms : kDefaultFlushTimeoutMs;
     }
 
     const TracingSessionID id;
@@ -373,6 +382,11 @@ class TracingServiceImpl : public TracingService {
   void OnDisableTracingTimeout(TracingSessionID);
   void DisableTracingNotifyConsumerAndFlushFile(TracingSession*);
   void PeriodicFlushTask(TracingSessionID, bool post_next_only);
+  void CompleteFlush(TracingSessionID tsid,
+                     ConsumerEndpoint::FlushCallback callback,
+                     bool success);
+  void ScrapeSharedMemoryBuffers(TracingSession* tracing_session,
+                                 ProducerEndpointImpl* producer);
   TraceBuffer* GetBufferByID(BufferID);
 
   base::TaskRunner* const task_runner_;
@@ -393,6 +407,7 @@ class TracingServiceImpl : public TracingService {
   std::map<TracingSessionID, TracingSession> tracing_sessions_;
   std::map<BufferID, std::unique_ptr<TraceBuffer>> buffers_;
 
+  bool smb_scraping_enabled_ = false;
   bool lockdown_mode_ = false;
   uint32_t min_write_period_ms_ = 100;  // Overridable for testing.
 
