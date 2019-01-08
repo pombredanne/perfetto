@@ -28,23 +28,16 @@ void ArgsTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
   Table::Register<ArgsTable>(db, storage, "args");
 }
 
-base::Optional<Table::Schema> ArgsTable::Init(int, const char* const*) {
+StorageSchema ArgsTable::CreateStorageSchema() {
   const auto& args = storage_->args();
-  std::unique_ptr<StorageColumn> cols[] = {
-      std::unique_ptr<IdColumn>(new IdColumn("id", storage_, &args.ids())),
-      StringColumnPtr("flat_key", &args.flat_keys(), &storage_->string_pool()),
-      StringColumnPtr("key", &args.keys(), &storage_->string_pool()),
-      std::unique_ptr<ValueColumn>(
-          new ValueColumn("int_value", VarardicType::kInt, storage_)),
-      std::unique_ptr<ValueColumn>(
-          new ValueColumn("string_value", VarardicType::kString, storage_)),
-      std::unique_ptr<ValueColumn>(
-          new ValueColumn("real_value", VarardicType::kReal, storage_))};
-  schema_ = StorageSchema({
-      std::make_move_iterator(std::begin(cols)),
-      std::make_move_iterator(std::end(cols)),
-  });
-  return schema_.ToTableSchema({"id", "key"});
+  return StorageSchema::Builder()
+      .AddColumn<IdColumn>("id", storage_, &args.ids())
+      .AddStringColumn("flat_key", &args.flat_keys(), &storage_->string_pool())
+      .AddStringColumn("key", &args.keys(), &storage_->string_pool())
+      .AddColumn<ValueColumn>("int_value", VariadicType::kInt, storage_)
+      .AddColumn<ValueColumn>("string_value", VariadicType::kString, storage_)
+      .AddColumn<ValueColumn>("real_value", VariadicType::kReal, storage_)
+      .Build({"id", "key"});
 }
 
 std::unique_ptr<Table::Cursor> ArgsTable::CreateCursor(
@@ -98,7 +91,7 @@ void ArgsTable::IdColumn::Filter(int op,
 }
 
 ArgsTable::ValueColumn::ValueColumn(std::string col_name,
-                                    VarardicType type,
+                                    VariadicType type,
                                     const TraceStorage* storage)
     : StorageColumn(col_name, false /* hidden */),
       type_(type),
@@ -113,13 +106,13 @@ void ArgsTable::ValueColumn::ReportResult(sqlite3_context* ctx,
   }
 
   switch (type_) {
-    case VarardicType::kInt:
+    case VariadicType::kInt:
       sqlite_utils::ReportSqliteResult(ctx, value.int_value);
       break;
-    case VarardicType::kReal:
+    case VariadicType::kReal:
       sqlite_utils::ReportSqliteResult(ctx, value.real_value);
       break;
-    case VarardicType::kString: {
+    case VariadicType::kString: {
       const char* str = storage_->GetString(value.string_value).c_str();
       sqlite3_result_text(ctx, str, -1, sqlite_utils::kSqliteStatic);
       break;
@@ -137,7 +130,7 @@ void ArgsTable::ValueColumn::Filter(int op,
                                     sqlite3_value* value,
                                     FilteredRowIndex* index) const {
   switch (type_) {
-    case VarardicType::kInt: {
+    case VariadicType::kInt: {
       auto predicate = sqlite_utils::CreatePredicate<int64_t>(op, value);
       index->FilterRows([this, &predicate](uint32_t row) {
         const auto& arg = storage_->args().arg_values()[row];
@@ -146,7 +139,7 @@ void ArgsTable::ValueColumn::Filter(int op,
       });
       break;
     }
-    case VarardicType::kReal: {
+    case VariadicType::kReal: {
       auto predicate = sqlite_utils::CreatePredicate<double>(op, value);
       index->FilterRows([this, &predicate](uint32_t row) {
         const auto& arg = storage_->args().arg_values()[row];
@@ -155,7 +148,7 @@ void ArgsTable::ValueColumn::Filter(int op,
       });
       break;
     }
-    case VarardicType::kString: {
+    case VariadicType::kString: {
       auto predicate = sqlite_utils::CreatePredicate<std::string>(op, value);
       index->FilterRows([this, &predicate](uint32_t row) {
         const auto& arg = storage_->args().arg_values()[row];
@@ -181,12 +174,12 @@ int ArgsTable::ValueColumn::CompareRefsAsc(uint32_t f, uint32_t s) const {
 
   if (arg_f.type == type_ && arg_s.type == type_) {
     switch (type_) {
-      case VarardicType::kInt:
+      case VariadicType::kInt:
         return sqlite_utils::CompareValuesAsc(arg_f.int_value, arg_s.int_value);
-      case VarardicType::kReal:
+      case VariadicType::kReal:
         return sqlite_utils::CompareValuesAsc(arg_f.real_value,
                                               arg_s.real_value);
-      case VarardicType::kString: {
+      case VariadicType::kString: {
         const auto& f_str = storage_->GetString(arg_f.string_value);
         const auto& s_str = storage_->GetString(arg_s.string_value);
         return sqlite_utils::CompareValuesAsc(f_str, s_str);
