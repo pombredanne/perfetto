@@ -530,7 +530,8 @@ class SharedMemoryABI {
 
   // Returns a bitmap in which each bit is set if the corresponding Chunk exists
   // in the page (according to the page layout) and is not free. If the page is
-  // not partitioned it returns 0 (as if the page had no used chunks).
+  // not partitioned it returns 0 (as if the page had no used chunks). Bit N
+  // corresponds to Chunk N.
   static uint32_t GetUsedChunks(uint32_t page_layout) {
     const uint32_t num_chunks = GetNumChunksForLayout(page_layout);
     uint32_t res = 0;

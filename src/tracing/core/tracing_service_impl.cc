@@ -804,7 +804,7 @@ void TracingServiceImpl::ScrapeSharedMemoryBuffers(
     uint32_t used_chunks = abi->GetUsedChunks(layout);  // Returns a bitmap.
     // Skip empty pages.
     if (used_chunks == 0)
-      return;
+      continue;
 
     // Scrape the chunks that are currently used. These should be either in
     // state kChunkBeingWritten or kChunkComplete.
