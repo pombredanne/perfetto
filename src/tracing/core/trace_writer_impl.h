@@ -61,7 +61,7 @@ class TraceWriterImpl : public TraceWriter,
 
   // Monotonic (% wrapping) sequence id of the chunk. Together with the WriterID
   // this allows the Service to reconstruct the linear sequence of packets.
-  uint16_t next_chunk_id_ = 0;
+  ChunkID next_chunk_id_ = 0;
 
   // The chunk we are holding onto (if any).
   SharedMemoryABI::Chunk cur_chunk_;
@@ -83,6 +83,11 @@ class TraceWriterImpl : public TraceWriter,
   // false if GetNewBuffer() happened during NewTracePacket() prologue, while
   // starting the TracePacket header.
   bool fragmenting_packet_ = false;
+
+  // Set to |true| when the current chunk contains the maximum number of packets
+  // a chunk can contain. When this is |true|, the next packet requires starting
+  // a new chunk.
+  bool reached_max_packets_per_chunk_ = false;
 
   // When a packet is fragmented across different chunks, the |size_field| of
   // the outstanding nested protobuf messages is redirected onto Patch entries
