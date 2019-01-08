@@ -15,25 +15,25 @@
 import {TimeSpan} from '../common/time';
 
 /**
- * Defines a mapping between number and Milliseconds for the entire application.
+ * Defines a mapping between number and seconds for the entire application.
  * Linearly scales time values from boundsMs to pixel values in boundsPx and
  * back.
  */
 export class TimeScale {
   private timeBounds: TimeSpan;
-  private startPx: number;
-  private endPx: number;
+  private _startPx: number;
+  private _endPx: number;
   private secPerPx = 0;
 
   constructor(timeBounds: TimeSpan, boundsPx: [number, number]) {
     this.timeBounds = timeBounds;
-    this.startPx = boundsPx[0];
-    this.endPx = boundsPx[1];
+    this._startPx = boundsPx[0];
+    this._endPx = boundsPx[1];
     this.updateSlope();
   }
 
   private updateSlope() {
-    this.secPerPx = this.timeBounds.duration / (this.endPx - this.startPx);
+    this.secPerPx = this.timeBounds.duration / (this._endPx - this._startPx);
   }
 
   deltaTimeToPx(time: number): number {
@@ -41,11 +41,11 @@ export class TimeScale {
   }
 
   timeToPx(time: number): number {
-    return this.startPx + (time - this.timeBounds.start) / this.secPerPx;
+    return this._startPx + (time - this.timeBounds.start) / this.secPerPx;
   }
 
   pxToTime(px: number): number {
-    return this.timeBounds.start + (px - this.startPx) * this.secPerPx;
+    return this.timeBounds.start + (px - this._startPx) * this.secPerPx;
   }
 
   deltaPxToDuration(px: number): number {
@@ -58,8 +58,32 @@ export class TimeScale {
   }
 
   setLimitsPx(pxStart: number, pxEnd: number) {
-    this.startPx = pxStart;
-    this.endPx = pxEnd;
+    this._startPx = pxStart;
+    this._endPx = pxEnd;
     this.updateSlope();
   }
+
+  get startPx(): number {
+    return this._startPx;
+  }
+
+  get endPx(): number {
+    return this._endPx;
+  }
+}
+
+export function zoom(
+    scale: TimeScale, span: TimeSpan, zoomFactor: number, zoomPx: number):
+    TimeSpan {
+  const startPx = scale.startPx;
+  const endPx = scale.endPx;
+  const startTime = span.start;
+  const endTime = span.end;
+  const clampedZoomPx = Math.max(startPx, Math.min(endPx, zoomPx));
+  const deltaTime = endTime - startTime;
+
+  const zoomTime = ((clampedZoomPx - startPx) * deltaTime) / (endPx - startPx);
+  const newStartTime = zoomTime * (1 - zoomFactor) + startTime;
+  const newEndTime = deltaTime * zoomFactor + newStartTime;
+  return new TimeSpan(newStartTime, newEndTime);
 }

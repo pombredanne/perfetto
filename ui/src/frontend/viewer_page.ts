@@ -27,11 +27,12 @@ import {PanAndZoomHandler} from './pan_and_zoom_handler';
 import {Panel} from './panel';
 import {AnyAttrsVnode, PanelContainer} from './panel_container';
 import {TimeAxisPanel} from './time_axis_panel';
+import {zoom} from './time_scale';
 import {TrackGroupPanel} from './track_group_panel';
 import {TRACK_SHELL_WIDTH} from './track_panel';
 import {TrackPanel} from './track_panel';
 
-const MAX_ZOOM_SPAN_SEC = 1e-4;  // 0.1 ms.
+// const MAX_ZOOM_SPAN_SEC = 1e-4;  // 0.1 ms.
 const DRAG_HANDLE_HEIGHT_PX = 12;
 
 class QueryTable extends Panel {
@@ -182,16 +183,16 @@ class TraceViewer implements m.ClassComponent {
         frontendLocalState.updateVisibleTime(new TimeSpan(tStart, tEnd));
         globals.rafScheduler.scheduleRedraw();
       },
-      onZoomed: (_: number, zoomRatio: number) => {
-        const vizTime = frontendLocalState.visibleWindowTime;
-        const curSpanSec = vizTime.duration;
-        const newSpanSec =
-            Math.max(curSpanSec - curSpanSec * zoomRatio, MAX_ZOOM_SPAN_SEC);
-        const deltaSec = (curSpanSec - newSpanSec) / 2;
-        const newStartSec = vizTime.start + deltaSec;
-        const newEndSec = vizTime.end - deltaSec;
-        frontendLocalState.updateVisibleTime(
-            new TimeSpan(newStartSec, newEndSec));
+      onZoomed: (zoomedPositionPx: number, zoomRatio: number) => {
+        // TODO(hjd): Avoid hardcoding trackShellWidthPx.
+        // TODO(hjd): Improve support for zooming in overview timeline.
+        const trackShellWidthPx = 250;
+        const span = frontendLocalState.visibleWindowTime;
+        const scale = frontendLocalState.timeScale;
+        const zoomPx = zoomedPositionPx - trackShellWidthPx;
+        const newSpan = zoom(scale, span, 1 - zoomRatio, zoomPx);
+        frontendLocalState.updateVisibleTime(newSpan);
+        globals.rafScheduler.scheduleRedraw();
       }
     });
   }
