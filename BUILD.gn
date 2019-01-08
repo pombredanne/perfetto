@@ -141,12 +141,14 @@ if (perfetto_build_standalone || perfetto_build_with_android) {
     deps = [
       "gn:default_deps",
       "gn:gtest_main",
-      "src/perfetto_cmd",
       "src/traced/probes/ftrace:integrationtests",
       "test:end_to_end_integrationtests",
     ]
     if (perfetto_build_standalone && !is_android) {
       deps += [ "src/trace_processor:integrationtests" ]
+    }
+    if (perfetto_build_with_android) {
+      cflags = [ "-DPERFETTO_BUILD_WITH_ANDROID" ]
     }
 
     # TODO(fmayer): Fix in process daemons.
