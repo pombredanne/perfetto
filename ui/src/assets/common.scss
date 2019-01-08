@@ -300,12 +300,8 @@ button.close {
   // Override top level overflow: hidden so height of this flex item can be
   // its content height.
   overflow: visible;
-
-  // If there are 3 or more panels pinned (there are pinned tracks), make the
-  // border thicker.
-  .panel:nth-child(3) ~ .panel:last-of-type {
-    border-bottom: 4px solid hsla(213, 55%, 60%, 1);
-  }
+  box-shadow: 1px 3px 15px rgba(23, 32, 44, 0.3);
+  z-index: 2;
 }
 
 // In the scrolling case, since the canvas is overdrawn and continuously
