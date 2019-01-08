@@ -192,7 +192,7 @@ std::unique_ptr<perfetto::profiling::Client> CreateClientAndPrivateDaemon() {
         std::string("--inherit-socket-fd=") + std::to_string(child_sock.fd());
     const char* argv[] = {path, pid_arg.c_str(), fd_arg.c_str(), nullptr};
 
-    execv("/bin/heapprofd", const_cast<char**>(argv));
+    execv(path, const_cast<char**>(argv));
     PERFETTO_PLOG("Failed to execute private heapprofd.");
     _exit(1);
   }  // else - parent continuing the client setup
