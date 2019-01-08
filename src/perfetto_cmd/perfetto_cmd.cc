@@ -59,8 +59,6 @@
 namespace perfetto {
 namespace {
 
-uint32_t g_flush_timeout_ms = kDefaultFlushTimeoutMs + 1000;
-
 perfetto::PerfettoCmd* g_consumer_cmd;
 
 class LoggingErrorReporter : public ErrorReporter {
@@ -519,14 +517,11 @@ void PerfettoCmd::OnConnect() {
 
   // Failsafe mechanism to avoid waiting indefinitely if the service hangs.
   if (trace_config_->duration_ms()) {
+    uint32_t trace_timeout = trace_config_->duration_ms() + 10000;
+    if (trace_config_->flush_timeout_ms())
+      trace_timeout += trace_config_->flush_timeout_ms();
     task_runner_.PostDelayedTask(std::bind(&PerfettoCmd::OnTimeout, this),
-                                 trace_config_->duration_ms() + 10000);
-  }
-
-  if (trace_config_->flush_timeout_ms()) {
-    // Add 1s to the timeout in the service to allow for writing the file
-    // if write_to_file is not set.
-    g_flush_timeout_ms = trace_config_->flush_timeout_ms() + 1000;
+                                 trace_timeout);
   }
 }
 
@@ -657,14 +652,10 @@ void PerfettoCmd::SetupCtrlCSignalHandler() {
   sigaction(SIGTERM, &sa, nullptr);
 
   task_runner_.AddFileDescriptorWatch(ctrl_c_evt_.fd(), [this] {
-    PERFETTO_LOG(
-        "SIGINT/SIGTERM received: disabling tracing. "
-        "Waiting up to %" PRIu32 " ms for flush.",
-        g_flush_timeout_ms);
+    PERFETTO_LOG("SIGINT/SIGTERM received: disabling tracing.");
     ctrl_c_evt_.Clear();
-    consumer_endpoint_->Flush(g_flush_timeout_ms, [this](bool) {
-      consumer_endpoint_->DisableTracing();
-    });
+    consumer_endpoint_->Flush(
+        0, [this](bool) { consumer_endpoint_->DisableTracing(); });
   });
 }
 
@@ -698,9 +689,8 @@ void PerfettoCmd::OnAttach(bool success, const TraceConfig& trace_config) {
   PERFETTO_DCHECK(trace_config_->write_into_file());
 
   if (stop_trace_once_attached_) {
-    consumer_endpoint_->Flush(g_flush_timeout_ms, [this](bool) {
-      consumer_endpoint_->DisableTracing();
-    });
+    consumer_endpoint_->Flush(
+        0, [this](bool) { consumer_endpoint_->DisableTracing(); });
   }
 }
 

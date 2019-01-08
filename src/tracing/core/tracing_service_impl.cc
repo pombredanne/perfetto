@@ -639,6 +639,9 @@ void TracingServiceImpl::Flush(TracingSessionID tsid,
     return;
   }
 
+  if (!timeout_ms)
+    timeout_ms = tracing_session->GetFlushTimeoutMs();
+
   if (tracing_session->pending_flushes.size() > 1000) {
     PERFETTO_ELOG("Too many flushes (%zu) pending for the tracing session",
                   tracing_session->pending_flushes.size());
@@ -716,15 +719,9 @@ void TracingServiceImpl::OnFlushTimeout(TracingSessionID tsid,
 
 void TracingServiceImpl::FlushAndDisableTracing(TracingSessionID tsid) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  TracingSession* tracing_session = GetTracingSession(tsid);
-  if (!tracing_session)
-    return;
-
-  uint32_t flush_timeout_ms = tracing_session->GetFlushTimeoutMs();
-  PERFETTO_DLOG("Triggering final flush for %" PRIu64 " with timeout %" PRIu32,
-                tsid, flush_timeout_ms);
+  PERFETTO_DLOG("Triggering final flush for %" PRIu64, tsid);
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
-  Flush(tsid, flush_timeout_ms, [weak_this, tsid](bool success) {
+  Flush(tsid, 0, [weak_this, tsid](bool success) {
     PERFETTO_DLOG("Flush done (success: %d), disabling trace session %" PRIu64,
                   success, tsid);
     if (!weak_this)
@@ -752,7 +749,6 @@ void TracingServiceImpl::PeriodicFlushTask(TracingSessionID tsid,
     return;
 
   uint32_t flush_period_ms = tracing_session->config.flush_period_ms();
-  uint32_t flush_timeout_ms = tracing_session->GetFlushTimeoutMs();
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
   task_runner_->PostDelayedTask(
       [weak_this, tsid] {
@@ -764,10 +760,8 @@ void TracingServiceImpl::PeriodicFlushTask(TracingSessionID tsid,
   if (post_next_only)
     return;
 
-  PERFETTO_DLOG("Triggering periodic flush for %" PRIu64
-                " with timeout %" PRIu32,
-                tsid, flush_timeout_ms);
-  Flush(tsid, flush_timeout_ms, [](bool success) {
+  PERFETTO_DLOG("Triggering periodic flush for %" PRIu64, tsid);
+  Flush(tsid, 0, [](bool success) {
     if (!success)
       PERFETTO_ELOG("Periodic flush timed out");
   });

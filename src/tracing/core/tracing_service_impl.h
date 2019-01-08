@@ -287,10 +287,8 @@ class TracingServiceImpl : public TracingService {
     }
 
     uint32_t GetFlushTimeoutMs() {
-      uint32_t flush_timeout_ms = config.flush_timeout_ms();
-      if (flush_timeout_ms == 0)
-        flush_timeout_ms = kDefaultFlushTimeoutMs;
-      return flush_timeout_ms;
+      uint32_t timeout_ms = config.flush_timeout_ms();
+      return timeout_ms ? timeout_ms : kDefaultFlushTimeoutMs;
     }
 
     const TracingSessionID id;
