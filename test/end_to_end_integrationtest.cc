@@ -115,9 +115,14 @@ class PerfettoCmdlineTest : public ::testing::Test {
       PERFETTO_CHECK(dup2(*in_pipe.rd, STDIN_FILENO) != -1);
       PERFETTO_CHECK(dup2(devnull, STDOUT_FILENO) != -1);
       PERFETTO_CHECK(dup2(*err_pipe.wr, STDERR_FILENO) != -1);
+#if PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
       setenv("PERFETTO_CONSUMER_SOCK_NAME", TestHelper::GetConsumerSocketName(),
              1);
       _exit(PerfettoCmdMain(static_cast<int>(argv.size() - 1), argv.data()));
+#else
+      execv("/system/bin/perfetto", &argv[0]);
+      _exit(3);
+#endif
     }
 
     // Parent.
