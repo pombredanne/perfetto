@@ -27,16 +27,14 @@ void RawTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
   Table::Register<RawTable>(db, storage, "raw");
 }
 
-base::Optional<Table::Schema> RawTable::Init(int, const char* const*) {
+StorageSchema RawTable::CreateStorageSchema() {
   const auto& raw = storage_->raw_events();
-  schema_ =
-      StorageSchema::Builder()
-          .AddColumn<IdColumn>("id", TableId::kRawEvents)
-          .AddOrderedNumericColumn("ts", &raw.timestamps())
-          .AddStringColumn("name", &raw.name_ids(), &storage_->string_pool())
-          .AddNumericColumn("utid", &raw.utids())
-          .Build({"name", "ts"});
-  return schema_.ToTableSchema();
+  return StorageSchema::Builder()
+      .AddColumn<IdColumn>("id", TableId::kRawEvents)
+      .AddOrderedNumericColumn("ts", &raw.timestamps())
+      .AddStringColumn("name", &raw.name_ids(), &storage_->string_pool())
+      .AddNumericColumn("utid", &raw.utids())
+      .Build({"name", "ts"});
 }
 
 std::unique_ptr<Table::Cursor> RawTable::CreateCursor(
