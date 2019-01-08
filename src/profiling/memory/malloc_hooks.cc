@@ -209,7 +209,7 @@ std::unique_ptr<perfetto::profiling::Client> CreateClientAndPrivateDaemon() {
   // Wait on the immediate child to exit (allow for ECHILD in the unlikely case
   // we're in a process that has made its children unwaitable).
   siginfo_t unused = {};
-  if (PERFETTO_EINTR(waitid(P_PID, fork_pid, &unused, WEXITED) == -1) &&
+  if (PERFETTO_EINTR(waitid(P_PID, fork_pid, &unused, WEXITED)) == -1 &&
       errno != ECHILD) {
     PERFETTO_PLOG("Failed to waitid on immediate child.");
     return nullptr;
