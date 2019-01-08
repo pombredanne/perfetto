@@ -34,6 +34,7 @@ class TaskRunner;
 }
 
 class CommitDataRequest;
+class LocalTraceWriterProxy;
 class SharedMemory;
 class TraceWriter;
 
@@ -49,6 +50,11 @@ class PERFETTO_EXPORT SharedMemoryArbiter {
   // Returns null impl of TraceWriter if all WriterID slots are exhausted.
   virtual std::unique_ptr<TraceWriter> CreateTraceWriter(
       BufferID target_buffer) = 0;
+
+  // Like CreateTraceWriter(), but binds the provided LocalTraceWriterProxy to
+  // the new TraceWriter.
+  virtual void CreateProxiedTraceWriter(LocalTraceWriterProxy* proxy,
+                                        BufferID target_buffer) = 0;
 
   // Notifies the service that all data for the given FlushRequestID has been
   // committed in the shared memory buffer.

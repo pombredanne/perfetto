@@ -40,6 +40,7 @@ class TraceWriterImpl : public TraceWriter,
   TracePacketHandle NewTracePacket() override;
   void Flush(std::function<void()> callback = {}) override;
   WriterID writer_id() const override;
+  bool SetFirstChunkId(ChunkID) override;
 
  private:
   TraceWriterImpl(const TraceWriterImpl&) = delete;
