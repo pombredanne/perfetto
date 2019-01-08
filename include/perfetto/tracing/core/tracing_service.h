@@ -207,6 +207,8 @@ class PERFETTO_EXPORT TracingService {
   // flush their active chunks), on producer disconnect (e.g. to recover data
   // from crashed producers), and after disabling a tracing session (e.g. to
   // gather data from producers that didn't stop their data sources in time).
+  //
+  // This feature is currently used by Chrome.
   virtual void SetSMBScrapingEnabled(bool enabled) = 0;
 };
 

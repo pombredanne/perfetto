@@ -704,13 +704,13 @@ void TracingServiceImpl::NotifyFlushDoneForProducer(
       if (pending_flush.producers.empty()) {
         auto weak_this = weak_ptr_factory_.GetWeakPtr();
         TracingSessionID tsid = kv.first;
-        task_runner_->PostTask(std::bind(
-            [weak_this, tsid](ConsumerEndpoint::FlushCallback callback) {
-              if (weak_this)
-                weak_this->CompleteFlush(tsid, std::move(callback),
-                                         /*success=*/true);
-            },
-            std::move(pending_flush.callback)));
+        auto callback = std::move(pending_flush.callback);
+        task_runner_->PostTask([weak_this, tsid, callback]() {
+          if (weak_this) {
+            weak_this->CompleteFlush(tsid, std::move(callback),
+                                     /*success=*/true);
+          }
+        });
         it = pending_flushes.erase(it);
       } else {
         it++;
@@ -736,13 +736,15 @@ void TracingServiceImpl::CompleteFlush(TracingSessionID tsid,
                                        ConsumerEndpoint::FlushCallback callback,
                                        bool success) {
   TracingSession* tracing_session = GetTracingSession(tsid);
-  if (!tracing_session)
-    return;
-  // Producers may not have been able to flush all their data, even if they
-  // indicated flush completion. If possible, also collect uncommitted chunks to
-  // make sure we have everything they wrote so far.
-  for (auto& producer_id_and_producer : producers_)
-    ScrapeSharedMemoryBuffers(tracing_session, producer_id_and_producer.second);
+  if (tracing_session) {
+    // Producers may not have been able to flush all their data, even if they
+    // indicated flush completion. If possible, also collect uncommitted chunks
+    // to make sure we have everything they wrote so far.
+    for (auto& producer_id_and_producer : producers_) {
+      ScrapeSharedMemoryBuffers(tracing_session,
+                                producer_id_and_producer.second);
+    }
+  }
   callback(success);
 }
 
@@ -824,7 +826,7 @@ void TracingServiceImpl::ScrapeSharedMemoryBuffers(
       // GetPacketCountAndFlags has acquire_load semantics.
       std::tie(packet_count, flags) = chunk.GetPacketCountAndFlags();
 
-      // It only makes sense to copy an incomplte chunk if there's at least
+      // It only makes sense to copy an incomplete chunk if there's at least
       // one full packet available. (The producer may not have completed the
       // last packet in it yet, so we need at least 2.)
       if (!chunk_complete && packet_count < 2)
