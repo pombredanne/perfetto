@@ -121,7 +121,6 @@ class PerfettoCmdlineTest : public ::testing::Test {
     }
 
     // Parent.
-    in_pipe.rd.reset();
     err_pipe.wr.reset();
     stderr_ = std::string(1024 * 1024, '\0');
 
@@ -133,6 +132,10 @@ class PerfettoCmdlineTest : public ::testing::Test {
         PERFETTO_EINTR(write(*in_pipe.wr, input.data(), input.size())) ==
         static_cast<ssize_t>(input.size()));
     in_pipe.wr.reset();
+
+    // Close the input pipe only after the write so we don't get an EPIPE signal
+    // in the cases when the child process earlies out without reading stdin.
+    in_pipe.rd.reset();
 
     ssize_t rsize = 0;
     size_t stderr_pos = 0;
