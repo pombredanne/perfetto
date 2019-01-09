@@ -12,12 +12,10 @@ Block diagram:
                    |                    |
                    |                    | [  Non-NDK libraries ]
                    |                    +-> libbase.so
-                   |                    +-> libcutils.so
                    |                    +-> libutils.so
-                   |                    +-> libfmq.so
                    |                    +-> libhidltransport.so
                    |                    +-> libhwbinder.so
-                   |                    +-> android.hardware.xxx@x.x
+                   |                    +-> android.hardware.xxx@2.0
                    |
                    + dynamically loaded on first use via dlopen()
 ```

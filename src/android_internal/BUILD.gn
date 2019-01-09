@@ -41,7 +41,6 @@ source_set("android_internal") {
       "android.hardware.health@2.0",
       "android.hardware.power.stats@1.0",
       "base",
-      "fmq",
       "log",
       "hidlbase",
       "hidltransport",

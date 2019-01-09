@@ -341,7 +341,6 @@ cc_library_shared {
     "android.hardware.health@2.0",
     "android.hardware.power.stats@1.0",
     "libbase",
-    "libfmq",
     "libhidlbase",
     "libhidltransport",
     "libhwbinder",
