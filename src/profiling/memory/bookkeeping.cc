@@ -29,7 +29,7 @@ namespace perfetto {
 namespace profiling {
 namespace {
 using ::perfetto::protos::pbzero::ProfilePacket;
-uint32_t kMaxTracePacketSize = 512000;
+uint32_t kMaxTracePacketSize = 400000;
 }
 
 GlobalCallstackTrie::Node* GlobalCallstackTrie::Node::GetOrCreateChild(
@@ -118,7 +118,7 @@ void HeapTracker::Dump(pid_t pid, DumpState* dump_state) {
       dump_state->current_profile_packet->add_process_dumps();
   proto->set_pid(static_cast<uint64_t>(pid));
   for (auto it_and_alloc : dead_callstack_allocations_) {
-    if (dump_state->current_trace_packet->size() > kMaxTracePacketSize) {
+    if (dump_state->currently_written() > kMaxTracePacketSize) {
       dump_state->NewProfilePacket();
       proto = dump_state->current_profile_packet->add_process_dumps();
       proto->set_pid(static_cast<uint64_t>(pid));
@@ -236,7 +236,7 @@ void DumpState::WriteMap(const Interned<Mapping> map) {
     for (const Interned<std::string>& str : map->path_components)
       WriteString(str);
 
-    if (current_trace_packet->size() > kMaxTracePacketSize)
+    if (currently_written() > kMaxTracePacketSize)
       NewProfilePacket();
 
     auto mapping = current_profile_packet->add_mappings();
@@ -256,7 +256,7 @@ void DumpState::WriteFrame(Interned<Frame> frame) {
   bool inserted;
   std::tie(std::ignore, inserted) = dumped_frames.emplace(frame.id());
   if (inserted) {
-    if (current_trace_packet->size() > kMaxTracePacketSize)
+    if (currently_written() > kMaxTracePacketSize)
       NewProfilePacket();
 
     auto frame_proto = current_profile_packet->add_frames();
@@ -271,7 +271,7 @@ void DumpState::WriteString(const Interned<std::string>& str) {
   bool inserted;
   std::tie(std::ignore, inserted) = dumped_strings.emplace(str.id());
   if (inserted) {
-    if (current_trace_packet->size() > kMaxTracePacketSize)
+    if (currently_written() > kMaxTracePacketSize)
       NewProfilePacket();
 
     auto interned_string = current_profile_packet->add_strings();

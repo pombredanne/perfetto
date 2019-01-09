@@ -77,6 +77,8 @@ class PERFETTO_EXPORT TraceWriter {
 
   virtual WriterID writer_id() const = 0;
 
+  virtual uint64_t written() const = 0;
+
  private:
   TraceWriter(const TraceWriter&) = delete;
   TraceWriter& operator=(const TraceWriter&) = delete;

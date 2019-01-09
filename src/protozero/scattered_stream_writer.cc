@@ -38,6 +38,7 @@ void ScatteredStreamWriter::Reset(ContiguousMemoryRange range) {
 }
 
 void ScatteredStreamWriter::Extend() {
+  written_previously_ += static_cast<uint64_t>(write_ptr_ - cur_range_.begin);
   Reset(delegate_->GetNewBuffer());
 }
 
