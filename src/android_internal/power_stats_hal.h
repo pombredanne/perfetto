@@ -30,34 +30,33 @@ namespace perfetto {
 namespace android_internal {
 
 struct RailDescriptor {
-  /** Index corresponding to the rail */
+  // Index corresponding to the rail
   uint32_t index;
-  /** Name of the rail */
+  // Name of the rail
   char rail_name[64];
-  /** Name of the subsystem to which this rail belongs */
+  // Name of the subsystem to which this rail belongs
   char subsys_name[64];
-  /** Hardware sampling rate */
+  // Hardware sampling rate
   uint32_t sampling_rate;
 };
 
 struct RailEnergyData {
-  /** Index corresponding to RailDescriptor.index */
+  // Index corresponding to RailDescriptor.index
   uint32_t index;
-  /** Time since device boot(CLOCK_BOOTTIME) in milli-seconds */
+  // Time since device boot(CLOCK_BOOTTIME) in milli-seconds
   uint64_t timestamp;
-  /** Accumulated energy since device boot in microwatt-seconds (uWs) */
+  // Accumulated energy since device boot in microwatt-seconds (uWs)
   uint64_t energy;
 };
 
 extern "C" {
 
 // These functions are not thread safe unless specified otherwise.
-// They return one of android.hardware.power.stats@1.0::Status
 
-uint32_t __attribute__((visibility("default")))
+bool __attribute__((visibility("default")))
 GetAvailableRails(RailDescriptor*, size_t* size_of_arr);
 
-uint32_t __attribute__((visibility("default")))
+bool __attribute__((visibility("default")))
 GetRailEnergyData(RailEnergyData*, size_t* size_of_arr);
 
 }  // extern "C"

@@ -243,6 +243,8 @@ export class TraceController extends Controller<States> {
 
       // Only add a cpu freq track if we have
       // cpu freq data.
+      // TODO(taylori): Find a way to display cpu idle
+      // events even if there are no cpu freq events.
       const freqExists = await engine.query(`
         select value
         from counters
@@ -253,7 +255,7 @@ export class TraceController extends Controller<States> {
         addToTrackActions.push(Actions.addTrack({
           engineId: this.engineId,
           kind: CPU_FREQ_TRACK_KIND,
-          name: `Cpu ${cpu} frequency`,
+          name: `Cpu ${cpu} Frequency`,
           trackGroup: SCROLLING_TRACK_GROUP,
           config: {
             cpu,
@@ -297,20 +299,6 @@ export class TraceController extends Controller<States> {
       }));
     }
 
-    // TODO(hjd): Find a way to show per CPU tracks.
-    // for (let cpu=0; cpu < numCpus; cpu++) {
-    //  addToTrackActions.push(Actions.addTrack({
-    //    engineId: this.engineId,
-    //    kind: 'CounterTrack',
-    //    name: `${name} (cpu: ${cpu})`,
-    //    trackGroup: SCROLLING_TRACK_GROUP,
-    //    config: {
-    //      name,
-    //      ref: cpu,
-    //    }
-    //  }));
-    //}
-
     // Local experiments shows getting maxDepth separately is ~2x faster than
     // joining with threads and processes.
     const maxDepthQuery =
@@ -351,7 +339,6 @@ export class TraceController extends Controller<States> {
     const addSummaryTrackActions: DeferredAction[] = [];
     const addTrackGroupActions: DeferredAction[] = [];
 
-
     for (const row of rawQueryToRows(threadQuery, {
            utid: NUM,
            upid: NUM_NULL,
@@ -384,12 +371,14 @@ export class TraceController extends Controller<States> {
         } else {
           upidToUuid.set(upid, pUuid);
         }
+
+        const pidForColor = pid || tid || upid || utid || 0;
         addSummaryTrackActions.push(Actions.addTrack({
           id: summaryTrackId,
           engineId: this.engineId,
           kind: PROCESS_SUMMARY_TRACK,
-          name: `${upid === null ? pid : tid} summary`,
-          config: {upid, pid, maxDepth, utid},
+          name: `${upid === null ? tid : pid} summary`,
+          config: {pidForColor, upid, utid},
         }));
 
         addTrackGroupActions.push(Actions.addTrackGroup({

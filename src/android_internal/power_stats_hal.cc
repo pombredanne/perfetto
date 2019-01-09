@@ -45,12 +45,11 @@ bool GetService() {
 
 }  // namespace
 
-uint32_t GetAvailableRails(RailDescriptor* rail_descriptors,
-                           size_t* size_of_arr) {
+bool GetAvailableRails(RailDescriptor* rail_descriptors, size_t* size_of_arr) {
   const size_t in_array_size = *size_of_arr;
   *size_of_arr = 0;
   if (!GetService())
-    return static_cast<uint32_t>(Status::NOT_SUPPORTED);
+    return false;
 
   Status status;
   auto rails_cb = [rail_descriptors, size_of_arr, &in_array_size, &status](
@@ -76,16 +75,15 @@ uint32_t GetAvailableRails(RailDescriptor* rail_descriptors,
   };
 
   Return<void> ret = g_svc->getRailInfo(rails_cb);
-  return static_cast<uint32_t>(status);
+  return status == Status::SUCCESS;
 }
 
-uint32_t GetRailEnergyData(RailEnergyData* rail_energy_array,
-                           size_t* size_of_arr) {
+bool GetRailEnergyData(RailEnergyData* rail_energy_array, size_t* size_of_arr) {
   const size_t in_array_size = *size_of_arr;
   *size_of_arr = 0;
 
   if (!GetService())
-    return static_cast<uint32_t>(Status::NOT_SUPPORTED);
+    return false;
 
   Status status;
   auto energy_cb = [rail_energy_array, size_of_arr, &in_array_size, &status](
@@ -105,7 +103,7 @@ uint32_t GetRailEnergyData(RailEnergyData* rail_energy_array,
   };
 
   Return<void> ret = g_svc->getEnergyData(hidl_vec<uint32_t>(), energy_cb);
-  return static_cast<uint32_t>(status);
+  return status == Status::SUCCESS;
 }
 
 }  // namespace android_internal

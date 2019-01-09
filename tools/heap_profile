@@ -103,7 +103,7 @@ def main(argv):
   parser.add_argument("-i", "--interval", help="Sampling interval. "
                       "Default 128000 (128kB)", type=int, default=128000)
   parser.add_argument("-d", "--duration", help="Duration of profile (ms). "
-                      "Default 1 minute", type=int, default=60000)
+                      "Default 7 days", type=int, default=604800000)
   parser.add_argument("-a", "--all", help="Profile the whole system",
                       action='store_true')
   parser.add_argument("--no-start", help="Do not start heapprofd",
@@ -181,8 +181,7 @@ def main(argv):
   signal.signal(signal.SIGINT, old_handler)
   if IS_INTERRUPTED:
     # Not check_call because it could have existed in the meantime.
-    subprocess.call(['adb', 'shell', 'su', 'root', 'kill', '-INT',
-                     perfetto_pid])
+    subprocess.call(['adb', 'shell', 'kill', '-INT', perfetto_pid])
 
   # Wait for perfetto cmd to return.
   while exists:
@@ -213,7 +212,8 @@ def main(argv):
 
   symlink_path = os.path.join(os.path.dirname(profile_path),
                                         "heap_profile-latest")
-  os.unlink(symlink_path)
+  if os.path.exists(symlink_path):
+    os.unlink(symlink_path)
   os.symlink(profile_path, symlink_path)
 
   print("Wrote profiles to {} (symlink {})".format(profile_path, symlink_path))
