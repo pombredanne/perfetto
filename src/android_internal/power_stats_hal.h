@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef SRC_ANDROID_INTERNAL_HEALTH_HAL_H_
-#define SRC_ANDROID_INTERNAL_HEALTH_HAL_H_
+#ifndef SRC_ANDROID_INTERNAL_POWER_STATS_HAL_H_
+#define SRC_ANDROID_INTERNAL_POWER_STATS_HAL_H_
 
 #include <stddef.h>
 #include <stdint.h>
@@ -29,12 +29,14 @@
 namespace perfetto {
 namespace android_internal {
 
-enum class BatteryCounter {
-  kUnspecified = 0,
-  kCharge,
-  kCapacityPercent,
-  kCurrent,
-  kCurrentAvg,
+struct RailEnergyData {
+
+  char rail_name[64];
+  char subsys_name[64];
+  /** Time since device boot(CLOCK_BOOTTIME) in milli-seconds */
+  uint64_t timestamp;
+  /** Accumulated energy since device boot in microwatt-seconds (uWs) */
+  int64_t energy;
 };
 
 extern "C" {
@@ -42,11 +44,17 @@ extern "C" {
 // These functions are not thread safe unless specified otherwise.
 
 bool __attribute__((visibility("default")))
-GetBatteryCounter(BatteryCounter, int64_t*);
+GetNumberOfRails(uint32_t*);
+
+// The second argument is the size of the provided RailEnergyData array.
+// After this method returns it'll contain the number of elements that contain
+// energy data.
+bool __attribute__((visibility("default")))
+GetRailEnergyData(RailEnergyData*, size_t*);
 
 }  // extern "C"
 
 }  // namespace android_internal
 }  // namespace perfetto
 
-#endif  // SRC_ANDROID_INTERNAL_HEALTH_HAL_H_
+#endif  // SRC_ANDROID_INTERNAL_POWER_STATS_HAL_H_
