@@ -189,16 +189,27 @@ class GlobalCallstackTrie {
 };
 
 struct DumpState {
-  void WriteMap(protos::pbzero::ProfilePacket* packet,
-                const Interned<Mapping> map);
-  void WriteFrame(protos::pbzero::ProfilePacket* packet,
-                  const Interned<Frame> frame);
-  void WriteString(protos::pbzero::ProfilePacket* packet,
-                   const Interned<std::string>& str);
+  DumpState(TraceWriter* tw) : trace_writer(tw) { NewProfilePacket(); }
+
+  void WriteMap(const Interned<Mapping> map);
+  void WriteFrame(const Interned<Frame> frame);
+  void WriteString(const Interned<std::string>& str);
 
   std::set<InternID> dumped_strings;
   std::set<InternID> dumped_frames;
   std::set<InternID> dumped_mappings;
+
+  std::set<GlobalCallstackTrie::Node*> callstacks_to_dump;
+
+  TraceWriter* trace_writer;
+  protos::pbzero::ProfilePacket* current_profile_packet;
+  TraceWriter::TracePacketHandle current_trace_packet;
+
+  void NewProfilePacket() {
+    current_profile_packet->set_continued(true);
+    current_trace_packet = trace_writer->NewTracePacket();
+    current_profile_packet = current_trace_packet->set_profile_packet();
+  }
 };
 
 // Snapshot for memory allocations of a particular process. Shares callsites
@@ -214,8 +225,7 @@ class HeapTracker {
                     uint64_t size,
                     uint64_t sequence_number);
   void RecordFree(uint64_t address, uint64_t sequence_number);
-  void Dump(protos::pbzero::ProfilePacket::ProcessHeapSamples* proto,
-            std::set<GlobalCallstackTrie::Node*>* callstacks_to_dump);
+  void Dump(pid_t pid, DumpState* dump_state);
 
   uint64_t GetSizeForTesting(const std::vector<unwindstack::FrameData>& stack);
 
@@ -376,6 +386,7 @@ class BookkeepingThread {
 
   std::map<pid_t, BookkeepingData> bookkeeping_data_;
   std::mutex bookkeeping_mutex_;
+  uint64_t next_index = 0;
 };
 
 void swap(BookkeepingThread::ProcessHandle&, BookkeepingThread::ProcessHandle&);

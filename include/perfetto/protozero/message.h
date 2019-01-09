@@ -171,6 +171,8 @@ class PERFETTO_EXPORT Message {
     return message;
   }
 
+  uint32_t size() { return size_; }
+
  private:
   Message(const Message&) = delete;
   Message& operator=(const Message&) = delete;
