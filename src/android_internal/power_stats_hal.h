@@ -29,28 +29,36 @@
 namespace perfetto {
 namespace android_internal {
 
-struct RailEnergyData {
-
+struct RailDescriptor {
+  /** Index corresponding to the rail */
+  uint32_t index;
+  /** Name of the rail */
   char rail_name[64];
+  /** Name of the subsystem to which this rail belongs */
   char subsys_name[64];
+  /** Hardware sampling rate */
+  uint32_t sampling_rate;
+};
+
+struct RailEnergyData {
+  /** Index corresponding to RailDescriptor.index */
+  uint32_t index;
   /** Time since device boot(CLOCK_BOOTTIME) in milli-seconds */
   uint64_t timestamp;
   /** Accumulated energy since device boot in microwatt-seconds (uWs) */
-  int64_t energy;
+  uint64_t energy;
 };
 
 extern "C" {
 
 // These functions are not thread safe unless specified otherwise.
+// They return one of android.hardware.power.stats@1.0::Status
 
-bool __attribute__((visibility("default")))
-GetNumberOfRails(uint32_t*);
+uint32_t __attribute__((visibility("default")))
+GetAvailableRails(RailDescriptor*, size_t* size_of_arr);
 
-// The second argument is the size of the provided RailEnergyData array.
-// After this method returns it'll contain the number of elements that contain
-// energy data.
-bool __attribute__((visibility("default")))
-GetRailEnergyData(RailEnergyData*, size_t*);
+uint32_t __attribute__((visibility("default")))
+GetRailEnergyData(RailEnergyData*, size_t* size_of_arr);
 
 }  // extern "C"
 

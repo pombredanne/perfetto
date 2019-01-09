@@ -16,9 +16,9 @@
 
 #include "src/android_internal/power_stats_hal.h"
 
-#include <algorithm>
-#include <map>
 #include <string.h>
+
+#include <algorithm>
 
 #include <android/hardware/power/stats/1.0/IPowerStats.h>
 
@@ -35,90 +35,77 @@ using android::hardware::power::stats::V1_0::Status;
 namespace {
 
 android::sp<IPowerStats> g_svc;
-std::map<uint32_t, RailInfo>* g_rail_info = nullptr;
 
 bool GetService() {
-  if(!g_svc)
+  if (!g_svc)
     g_svc = IPowerStats::getService();
 
   return g_svc != nullptr;
 }
 
-bool RetrieveRailInfo() {
-  if(g_rail_info) {
-    return true;
-  }
+}  // namespace
+
+uint32_t GetAvailableRails(RailDescriptor* rail_descriptors,
+                           size_t* size_of_arr) {
+  const size_t in_array_size = *size_of_arr;
+  *size_of_arr = 0;
+  if (!GetService())
+    return static_cast<uint32_t>(Status::NOT_SUPPORTED);
 
   Status status;
-  hidl_vec<RailInfo> rails;
-  auto rails_cb =
-      [&rails, &status](hidl_vec<RailInfo> r, Status s) {
-        rails = r;
-        status = s;
-      };
+  auto rails_cb = [rail_descriptors, size_of_arr, &in_array_size, &status](
+                      hidl_vec<RailInfo> r, Status s) {
+    status = s;
+    if (status == Status::SUCCESS) {
+      *size_of_arr = std::min(in_array_size, r.size());
+      for (int i = 0; i < *size_of_arr; ++i) {
+        const RailInfo& rail_info = r[i];
+        RailDescriptor& descriptor = rail_descriptors[i];
+
+        descriptor.index = rail_info.index;
+        descriptor.sampling_rate = rail_info.samplingRate;
+
+        strncpy(descriptor.rail_name, rail_info.railName.c_str(),
+                sizeof(descriptor.rail_name));
+        strncpy(descriptor.subsys_name, rail_info.subsysName.c_str(),
+                sizeof(descriptor.subsys_name));
+        descriptor.rail_name[sizeof(descriptor.rail_name) - 1] = '\0';
+        descriptor.subsys_name[sizeof(descriptor.subsys_name) - 1] = '\0';
+      }
+    }
+  };
 
   Return<void> ret = g_svc->getRailInfo(rails_cb);
-  if (status == Status::SUCCESS) {
-    g_rail_info = new std::map<uint32_t, RailInfo>();
-    for (int i = 0; i < rails.size(); ++i) {
-      (*g_rail_info)[rails[i].index] = rails[i];
-    }
-    return true;
-  }
-
-  return false;
+  return static_cast<uint32_t>(status);
 }
 
-} // namespace
+uint32_t GetRailEnergyData(RailEnergyData* rail_energy_array,
+                           size_t* size_of_arr) {
+  const size_t in_array_size = *size_of_arr;
+  *size_of_arr = 0;
 
-bool GetNumberOfRails(uint32_t* num_rails) {
-  *num_rails = 0;
-  if (!GetService() || !RetrieveRailInfo())
-    return false;
-
-  *num_rails = g_rail_info->size();
-  return true;
-}
-
-bool GetRailEnergyData(RailEnergyData* rail_array, size_t* rail_array_size) {
-  const size_t in_rail_array_size = *rail_array_size;
-  *rail_array_size = 0;
-
-  if (!GetService() || !RetrieveRailInfo())
-    return false;
-
-  if (g_rail_info->empty())
-    return true;  // This device has no power rails
+  if (!GetService())
+    return static_cast<uint32_t>(Status::NOT_SUPPORTED);
 
   Status status;
-  hidl_vec<EnergyData> measurements;
-  auto energy_cb =
-      [&measurements, &status](hidl_vec<EnergyData> m, Status s) {
-        measurements = m;
-        status = s;
-      };
+  auto energy_cb = [rail_energy_array, size_of_arr, &in_array_size, &status](
+                       hidl_vec<EnergyData> m, Status s) {
+    status = s;
+    if (status == Status::SUCCESS) {
+      *size_of_arr = std::min(in_array_size, m.size());
+      for (int i = 0; i < *size_of_arr; ++i) {
+        const EnergyData& measurement = m[i];
+        RailEnergyData& element = rail_energy_array[i];
+
+        element.index = measurement.index;
+        element.timestamp = measurement.timestamp;
+        element.energy = measurement.energy;
+      }
+    }
+  };
 
   Return<void> ret = g_svc->getEnergyData(hidl_vec<uint32_t>(), energy_cb);
-  if (status != Status::SUCCESS) {
-    return false;
-  }
-
-  *rail_array_size = std::min(in_rail_array_size, measurements.size());
-  for (int i = 0; i < *rail_array_size; ++i) {
-    const RailInfo& railInfo = (*g_rail_info)[measurements[i].index];
-    RailEnergyData& element = rail_array[i];
-
-    strncpy(element.rail_name, railInfo.railName.c_str(), sizeof(element.rail_name));
-    strncpy(element.subsys_name, railInfo.subsysName.c_str(), sizeof(element.subsys_name));
-    element.rail_name[sizeof(element.rail_name) - 1] = '\0';
-    element.subsys_name[sizeof(element.subsys_name) - 1] = '\0';
-
-    element.timestamp = measurements[i].timestamp;
-    element.energy = measurements[i].energy;
-  }
-
-  return true;
-
+  return static_cast<uint32_t>(status);
 }
 
 }  // namespace android_internal
