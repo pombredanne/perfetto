@@ -14,6 +14,8 @@
 
 import {TimeSpan} from '../common/time';
 
+const MAX_ZOOM_SPAN_SEC = 1e-4;  // 0.1 ms.
+
 /**
  * Defines a mapping between number and seconds for the entire application.
  * Linearly scales time values from boundsMs to pixel values in boundsPx and
@@ -72,18 +74,18 @@ export class TimeScale {
   }
 }
 
-export function zoom(
+export function computeZoom(
     scale: TimeScale, span: TimeSpan, zoomFactor: number, zoomPx: number):
     TimeSpan {
   const startPx = scale.startPx;
   const endPx = scale.endPx;
-  const startTime = span.start;
-  const endTime = span.end;
+  const deltaPx = endPx - startPx;
+  const deltaTime = span.end - span.start;
+  const newDeltaTime = Math.max(deltaTime * zoomFactor, MAX_ZOOM_SPAN_SEC);
   const clampedZoomPx = Math.max(startPx, Math.min(endPx, zoomPx));
-  const deltaTime = endTime - startTime;
-
-  const zoomTime = ((clampedZoomPx - startPx) * deltaTime) / (endPx - startPx);
-  const newStartTime = zoomTime * (1 - zoomFactor) + startTime;
-  const newEndTime = deltaTime * zoomFactor + newStartTime;
+  const zoomTime = scale.pxToTime(clampedZoomPx);
+  const r = (clampedZoomPx - startPx) / deltaPx;
+  const newStartTime = zoomTime - newDeltaTime * r;
+  const newEndTime = newStartTime + newDeltaTime;
   return new TimeSpan(newStartTime, newEndTime);
 }

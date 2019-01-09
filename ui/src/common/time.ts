@@ -48,13 +48,3 @@ export class TimeSpan {
     return new TimeSpan(this.start + sec, this.end + sec);
   }
 }
-
-// export function zoom(startPx: number, endPx: number, zoomPx: number,
-// zoomRatio: number,
-//  startTime: number, endTime: number): [number, number] {
-//    console.log(arguments);
-//  const zoomTime = ((zoomPx - startPx) * (endTime - startTime)) / (endPx -
-//  startPx); const newStartTime = zoomTime * (1 - zoomRatio) + startTime; const
-//  newEndTime = (endTime - startTime) * zoomRatio + newStartTime; return
-//  [newStartTime, newEndTime];
-//}
