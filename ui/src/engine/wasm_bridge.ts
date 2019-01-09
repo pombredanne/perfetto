@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {defer} from '../base/deferred';
-import {assertExists, assertTrue} from '../base/logging';
+import {defer, Deferred} from '../base/deferred';
 import * as init_trace_processor from '../gen/trace_processor';
 
 function writeToUIConsole(line: string) {
@@ -34,61 +33,82 @@ export interface WasmBridgeResponse {
 }
 
 export class WasmBridge {
-  // When this promise has resolved it is safe to call callWasm.
-  whenInitialized: Promise<void>;
-
+  private deferredRuntimeInitialized: Deferred<void>;
+  private deferredReady: Deferred<void>;
+  private callback: (_: WasmBridgeResponse) => void;
   private aborted: boolean;
-  private currentRequestResult: WasmBridgeResponse|null;
-  private connection: init_trace_processor.Module;
+  private outstandingRequests: Set<number>;
 
-  constructor(init: init_trace_processor.InitWasm) {
+  connection: init_trace_processor.Module;
+
+  constructor(
+      init: init_trace_processor.InitWasm,
+      callback: (_: WasmBridgeResponse) => void) {
+    this.deferredRuntimeInitialized = defer<void>();
+    this.deferredReady = defer<void>();
+    this.callback = callback;
     this.aborted = false;
-    this.currentRequestResult = null;
+    this.outstandingRequests = new Set();
 
-    const deferredRuntimeInitialized = defer<void>();
     this.connection = init({
       locateFile: (s: string) => s,
       print: writeToUIConsole,
       printErr: writeToUIConsole,
-      onRuntimeInitialized: () => deferredRuntimeInitialized.resolve(),
-      onAbort: () => this.aborted = true,
-    });
-    this.whenInitialized = deferredRuntimeInitialized.then(() => {
-      const fn = this.connection.addFunction(this.onReply.bind(this), 'viiii');
-      this.connection.ccall('Initialize', 'void', ['number'], [fn]);
+      onRuntimeInitialized: () => this.deferredRuntimeInitialized.resolve(),
+      onAbort: () => this.onAbort(),
     });
   }
 
-  callWasm(req: WasmBridgeRequest): WasmBridgeResponse {
+  onAbort() {
+    this.aborted = true;
+    for (const id of this.outstandingRequests) {
+      this.abortRequest(id);
+    }
+    this.outstandingRequests.clear();
+  }
+
+  onReply(reqId: number, success: boolean, heapPtr: number, size: number) {
+    if (!this.outstandingRequests.has(reqId)) {
+      throw new Error(`Unknown request id: "${reqId}"`);
+    }
+    this.outstandingRequests.delete(reqId);
+    const data = this.connection.HEAPU8.slice(heapPtr, heapPtr + size);
+    this.callback({
+      id: reqId,
+      success,
+      data,
+    });
+  }
+
+  abortRequest(requestId: number) {
+    this.callback({
+      id: requestId,
+      success: false,
+      data: undefined,
+    });
+  }
+
+  async callWasm(req: WasmBridgeRequest): Promise<void> {
+    await this.deferredReady;
     if (this.aborted) {
-      return {
-        id: req.id,
-        success: false,
-        data: undefined,
-      };
+      this.abortRequest(req.id);
+      return;
     }
 
+    this.outstandingRequests.add(req.id);
     this.connection.ccall(
         `${req.serviceName}_${req.methodName}`,  // C method name.
         'void',                                  // Return type.
         ['number', 'array', 'number'],           // Input args.
         [req.id, req.data, req.data.length]      // Args.
         );
-
-    const result = assertExists(this.currentRequestResult);
-    assertTrue(req.id === result.id);
-    this.currentRequestResult = null;
-    return result;
   }
 
-  // This is invoked from ccall in the same call stack as callWasm.
-  private onReply(
-      reqId: number, success: boolean, heapPtr: number, size: number) {
-    const data = this.connection.HEAPU8.slice(heapPtr, heapPtr + size);
-    this.currentRequestResult = {
-      id: reqId,
-      success,
-      data,
-    };
+  async initialize(): Promise<void> {
+    await this.deferredRuntimeInitialized;
+    const replyFn =
+        this.connection.addFunction(this.onReply.bind(this), 'viiii');
+    this.connection.ccall('Initialize', 'void', ['number'], [replyFn]);
+    this.deferredReady.resolve();
   }
 }

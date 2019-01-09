@@ -28,16 +28,20 @@ void ArgsTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
   Table::Register<ArgsTable>(db, storage, "args");
 }
 
-StorageSchema ArgsTable::CreateStorageSchema() {
+base::Optional<Table::Schema> ArgsTable::Init(int, const char* const*) {
   const auto& args = storage_->args();
-  return StorageSchema::Builder()
-      .AddColumn<IdColumn>("id", storage_, &args.ids())
-      .AddStringColumn("flat_key", &args.flat_keys(), &storage_->string_pool())
-      .AddStringColumn("key", &args.keys(), &storage_->string_pool())
-      .AddColumn<ValueColumn>("int_value", VariadicType::kInt, storage_)
-      .AddColumn<ValueColumn>("string_value", VariadicType::kString, storage_)
-      .AddColumn<ValueColumn>("real_value", VariadicType::kReal, storage_)
-      .Build({"id", "key"});
+  schema_ =
+      StorageSchema::Builder()
+          .AddColumn<IdColumn>("id", storage_, &args.ids())
+          .AddStringColumn("flat_key", &args.flat_keys(),
+                           &storage_->string_pool())
+          .AddStringColumn("key", &args.keys(), &storage_->string_pool())
+          .AddColumn<ValueColumn>("int_value", VariadicType::kInt, storage_)
+          .AddColumn<ValueColumn>("string_value", VariadicType::kString,
+                                  storage_)
+          .AddColumn<ValueColumn>("real_value", VariadicType::kReal, storage_)
+          .Build({"id", "key"});
+  return schema_.ToTableSchema();
 }
 
 std::unique_ptr<Table::Cursor> ArgsTable::CreateCursor(

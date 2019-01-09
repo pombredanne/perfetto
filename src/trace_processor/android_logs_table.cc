@@ -26,18 +26,20 @@ void AndroidLogsTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
   Table::Register<AndroidLogsTable>(db, storage, "android_logs");
 }
 
-StorageSchema AndroidLogsTable::CreateStorageSchema() {
+base::Optional<Table::Schema> AndroidLogsTable::Init(int, const char* const*) {
   const auto& alog = storage_->android_logs();
   // Note: the logs in the storage are NOT sorted by timestamp. We delegate
   // that to the on-demand sorter by calling AddNumericColumn (instead of
   // AddSortedNumericColumn).
-  return StorageSchema::Builder()
-      .AddNumericColumn("ts", &alog.timestamps())
-      .AddNumericColumn("utid", &alog.utids())
-      .AddNumericColumn("prio", &alog.prios())
-      .AddStringColumn("tag", &alog.tag_ids(), &storage_->string_pool())
-      .AddStringColumn("msg", &alog.msg_ids(), &storage_->string_pool())
-      .Build({"ts", "utid", "msg"});
+  schema_ =
+      StorageSchema::Builder()
+          .AddNumericColumn("ts", &alog.timestamps())
+          .AddNumericColumn("utid", &alog.utids())
+          .AddNumericColumn("prio", &alog.prios())
+          .AddStringColumn("tag", &alog.tag_ids(), &storage_->string_pool())
+          .AddStringColumn("msg", &alog.msg_ids(), &storage_->string_pool())
+          .Build({"ts", "utid", "msg"});
+  return schema_.ToTableSchema();
 }
 
 std::unique_ptr<Table::Cursor> AndroidLogsTable::CreateCursor(
