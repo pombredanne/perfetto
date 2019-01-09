@@ -298,7 +298,7 @@ void BookkeepingThread::HandleBookkeepingRecord(BookkeepingRecord* rec) {
     if (!trace_writer)
       return;
     PERFETTO_LOG("Dumping heaps");
-    DumpState dump_state(trace_writer.get());
+    DumpState dump_state(trace_writer.get(), &next_index);
 
     for (const pid_t pid : dump_rec.pids) {
       ProfilePacket::ProcessHeapSamples* sample =

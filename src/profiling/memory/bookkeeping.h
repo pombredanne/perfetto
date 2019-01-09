@@ -189,7 +189,9 @@ class GlobalCallstackTrie {
 };
 
 struct DumpState {
-  DumpState(TraceWriter* tw) : trace_writer(tw) { NewProfilePacket(); }
+  DumpState(TraceWriter* tw, uint64_t* ni) : trace_writer(tw), next_index(ni) {
+    NewProfilePacket();
+  }
 
   void WriteMap(const Interned<Mapping> map);
   void WriteFrame(const Interned<Frame> frame);
@@ -204,11 +206,13 @@ struct DumpState {
   TraceWriter* trace_writer;
   protos::pbzero::ProfilePacket* current_profile_packet;
   TraceWriter::TracePacketHandle current_trace_packet;
+  uint64_t* next_index;
 
   void NewProfilePacket() {
     current_profile_packet->set_continued(true);
     current_trace_packet = trace_writer->NewTracePacket();
     current_profile_packet = current_trace_packet->set_profile_packet();
+    current_profile_packet->set_index((*next_index)++);
   }
 };
 
