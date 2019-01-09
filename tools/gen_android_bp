@@ -77,8 +77,6 @@ library_whitelist = [
     'android',
     'base',
     'binder',
-    'cutils',
-    'fmq',
     'hidlbase',
     'hidltransport',
     'hwbinder',
