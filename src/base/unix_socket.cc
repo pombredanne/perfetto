@@ -163,6 +163,14 @@ void UnixSocketRaw::SetBlocking(bool is_blocking) {
   PERFETTO_CHECK(fcntl_res == 0);
 }
 
+void UnixSocketRaw::RetainOnExec() {
+  PERFETTO_DCHECK(fd_);
+  int flags = fcntl(*fd_, F_GETFD, 0);
+  flags &= ~static_cast<int>(FD_CLOEXEC);
+  bool fcntl_res = fcntl(*fd_, F_SETFD, flags);
+  PERFETTO_CHECK(fcntl_res == 0);
+}
+
 bool UnixSocketRaw::IsBlocking() const {
   PERFETTO_DCHECK(fd_);
   return (fcntl(*fd_, F_GETFL, 0) & O_NONBLOCK) == 0;
@@ -184,6 +192,8 @@ bool UnixSocketRaw::Bind(const std::string& socket_name) {
 }
 
 bool UnixSocketRaw::Listen() {
+  PERFETTO_DCHECK(fd_);
+  PERFETTO_DCHECK(type_ == SockType::kStream || type_ == SockType::kSeqPacket);
   return listen(*fd_, SOMAXCONN) == 0;
 }
 
@@ -285,7 +295,7 @@ ssize_t UnixSocketRaw::Receive(void* msg,
         static_cast<CBufLenType>(CMSG_SPACE(max_files * sizeof(int)));
     PERFETTO_CHECK(msg_hdr.msg_controllen <= sizeof(control_buf));
   }
-  const ssize_t sz = PERFETTO_EINTR(recvmsg(*fd_, &msg_hdr, kNoSigPipe));
+  const ssize_t sz = PERFETTO_EINTR(recvmsg(*fd_, &msg_hdr, 0));
   if (sz <= 0) {
     return sz;
   }
@@ -355,7 +365,7 @@ std::unique_ptr<UnixSocket> UnixSocket::Listen(const std::string& socket_name,
     return nullptr;
 
   // Forward the call to the Listen() overload below.
-  return Listen(sock_raw.ReleaseFd(), event_listener, task_runner);
+  return Listen(sock_raw.ReleaseFd(), event_listener, task_runner, sock_type);
 }
 
 // static
