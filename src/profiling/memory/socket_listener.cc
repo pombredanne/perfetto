@@ -92,6 +92,9 @@ void SocketListener::Match(
   process_info.set_up = true;
 }
 
+// Implementation warning: if adding a use for the first argument, consider the
+// manual call by HeapprofdProducer, which supplies a pre-connected socket (and
+// a nullptr for the "listening" socket).
 void SocketListener::OnNewIncomingConnection(
     base::UnixSocket*,
     std::unique_ptr<base::UnixSocket> new_connection) {

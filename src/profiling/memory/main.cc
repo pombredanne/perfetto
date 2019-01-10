@@ -99,9 +99,17 @@ int HeapprofdMain(int argc, char** argv) {
   return StartCentralHeapprofd();
 }
 
+// TODO(rsavitski): consider reading |target_pid| out of one of the socket's
+// peer credentials instead?
 int StartChildHeapprofd(pid_t target_pid,
                         std::vector<base::ScopedFile> inherited_sock_fds) {
-  PERFETTO_ELOG("Exiting from unimplemented child mode.");
+  auto filter = HeapprofdProducer::SourceFilterForPid(target_pid);
+  base::UnixTaskRunner task_runner;
+  HeapprofdProducer producer(HeapprofdMode::kChild, &task_runner);
+  producer.ConnectWithRetries(GetProducerSocket());
+  producer.SetDataSourceFilter(filter);
+  producer.AdoptConnectedSockets(std::move(inherited_sock_fds));
+  task_runner.Run();
   return 0;
 }
 
