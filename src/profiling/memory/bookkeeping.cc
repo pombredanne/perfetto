@@ -114,16 +114,7 @@ void HeapTracker::Dump(pid_t pid, DumpState* dump_state) {
   // * We need to remove them after the callstacks were dumped, which currently
   //   happens after the allocations are dumped.
   // * This way, we do not destroy and recreate callstacks as frequently.
-  ProfilePacket::ProcessHeapSamples* proto =
-      dump_state->current_profile_packet->add_process_dumps();
-  proto->set_pid(static_cast<uint64_t>(pid));
   for (auto it_and_alloc : dead_callstack_allocations_) {
-    if (dump_state->currently_written() > kMaxTracePacketSize) {
-      dump_state->NewProfilePacket();
-      proto = dump_state->current_profile_packet->add_process_dumps();
-      proto->set_pid(static_cast<uint64_t>(pid));
-    }
-
     auto& it = it_and_alloc.first;
     uint64_t allocated = it_and_alloc.second;
     const CallstackAllocations& alloc = it->second;
@@ -132,8 +123,17 @@ void HeapTracker::Dump(pid_t pid, DumpState* dump_state) {
   }
   dead_callstack_allocations_.clear();
 
+  ProfilePacket::ProcessHeapSamples* proto =
+      dump_state->current_profile_packet->add_process_dumps();
+  proto->set_pid(static_cast<uint64_t>(pid));
   for (auto it = callstack_allocations_.begin();
        it != callstack_allocations_.end(); ++it) {
+    if (dump_state->currently_written() > kMaxTracePacketSize) {
+      dump_state->NewProfilePacket();
+      proto = dump_state->current_profile_packet->add_process_dumps();
+      proto->set_pid(static_cast<uint64_t>(pid));
+    }
+
     const CallstackAllocations& alloc = it->second;
     dump_state->callstacks_to_dump.emplace(alloc.node);
     ProfilePacket::HeapSample* sample = proto->add_samples();

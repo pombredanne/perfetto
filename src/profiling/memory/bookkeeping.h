@@ -190,6 +190,8 @@ class GlobalCallstackTrie {
 
 struct DumpState {
   DumpState(TraceWriter* tw, uint64_t* ni) : trace_writer(tw), next_index(ni) {
+    last_written = trace_writer->written();
+
     current_trace_packet = trace_writer->NewTracePacket();
     current_profile_packet = current_trace_packet->set_profile_packet();
     current_profile_packet->set_index((*next_index)++);
