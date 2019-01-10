@@ -661,6 +661,7 @@ def main():
         default=os.path.join(repo_root(), 'Android.bp'),
     )
     parser.add_argument(
+        '-d',
         '--force_debug',
         action='store_true',
         help='Add flags to enable DCHECK/DLOG/etc, even in release builds.'
