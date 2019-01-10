@@ -164,8 +164,8 @@ void DumpProfilePacket(std::vector<const ProfilePacket> packets,
     }
   }
   for (const auto& p : heap_samples) {
+    GProfile cur_profile = profile;
     for (const ProfilePacket::ProcessHeapSamples* samples : p.second) {
-      GProfile cur_profile = profile;
       for (const ProfilePacket::HeapSample& sample : samples->samples()) {
         GSample* gsample = cur_profile.add_sample();
         auto it = callstack_lookup.find(sample.callstack_id());
@@ -179,17 +179,14 @@ void DumpProfilePacket(std::vector<const ProfilePacket> packets,
         gsample->add_value(static_cast<int64_t>(sample.cumulative_allocated() -
                                                 sample.cumulative_freed()));
       }
-
-      std::string filename =
-          file_prefix + std::to_string(samples->pid()) + ".pb";
-      base::ScopedFile fd(base::OpenFile(filename, O_CREAT | O_WRONLY, 0700));
-      if (!fd)
-        PERFETTO_FATAL("Failed to open %s", filename.c_str());
-      std::string serialized = cur_profile.SerializeAsString();
-      PERFETTO_CHECK(
-          base::WriteAll(*fd, serialized.c_str(), serialized.size()) ==
-          static_cast<ssize_t>(serialized.size()));
     }
+    std::string filename = file_prefix + std::to_string(p.first) + ".pb";
+    base::ScopedFile fd(base::OpenFile(filename, O_CREAT | O_WRONLY, 0700));
+    if (!fd)
+      PERFETTO_FATAL("Failed to open %s", filename.c_str());
+    std::string serialized = cur_profile.SerializeAsString();
+    PERFETTO_CHECK(base::WriteAll(*fd, serialized.c_str(), serialized.size()) ==
+                   static_cast<ssize_t>(serialized.size()));
   }
 }
 
