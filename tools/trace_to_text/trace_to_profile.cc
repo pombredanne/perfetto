@@ -59,7 +59,7 @@ using GValueType = ::perftools::profiles::ValueType;
 using GFunction = ::perftools::profiles::Function;
 using GSample = ::perftools::profiles::Sample;
 
-void DumpProfilePacket(std::vector<const ProfilePacket> packets,
+void DumpProfilePacket(std::vector<const ProfilePacket>& packets,
                        const std::string& file_prefix) {
   std::map<uint64_t, std::string> string_lookup;
   for (const ProfilePacket& packet : packets) {
@@ -203,6 +203,11 @@ int TraceToProfile(std::istream* input, std::ostream* output) {
       return;
     rolling_profile_packets.emplace_back(packet.profile_packet());
     if (!packet.profile_packet().continued()) {
+      for (size_t i = 1; i < rolling_profile_packets.size(); ++i) {
+        // Ensure we are not missing a chunk.
+        PERFETTO_CHECK(rolling_profile_packets[i - 1].index() + 1 ==
+                       rolling_profile_packets[i].index());
+      }
       DumpProfilePacket(rolling_profile_packets,
                         temp_dir + "/heap_dump." + std::to_string(++itr) + ".");
       rolling_profile_packets.clear();
