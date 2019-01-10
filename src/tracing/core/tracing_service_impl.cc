@@ -62,11 +62,12 @@ constexpr base::TimeMillis kSnapshotsInterval(10 * 1000);
 constexpr int kDefaultWriteIntoFilePeriodMs = 5000;
 constexpr int kMaxConcurrentTracingSessions = 5;
 
-constexpr uint64_t kMillisPerHour = 3600000;
+constexpr uint32_t kMillisPerHour = 3600000;
+constexpr uint32_t kMaxTracingDurationMillis = 7 * 24 * kMillisPerHour;
 
 // These apply only if enable_extra_guardrails is true.
-constexpr uint64_t kMaxTracingDurationMillis = 24 * kMillisPerHour;
-constexpr uint64_t kMaxTracingBufferSizeKb = 32 * 1024;
+constexpr uint32_t kGuardrailsMaxTracingBufferSizeKb = 32 * 1024;
+constexpr uint32_t kGuardrailsMaxTracingDurationMillis = 24 * kMillisPerHour;
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 struct iovec {
@@ -296,25 +297,28 @@ bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
     return false;
   }
 
+  const uint32_t max_duration_ms = cfg.enable_extra_guardrails()
+                                       ? kGuardrailsMaxTracingDurationMillis
+                                       : kMaxTracingDurationMillis;
+  if (cfg.duration_ms() > max_duration_ms) {
+    PERFETTO_ELOG("Requested too long trace (%" PRIu32 "ms  > %" PRIu32 " ms)",
+                  cfg.duration_ms(), max_duration_ms);
+    return false;
+  }
+
   if (cfg.enable_extra_guardrails()) {
     if (cfg.deferred_start()) {
       PERFETTO_ELOG(
           "deferred_start=true is not supported in unsupervised traces");
       return false;
     }
-    if (cfg.duration_ms() > kMaxTracingDurationMillis) {
-      PERFETTO_ELOG("Requested too long trace (%" PRIu32 "ms  > %" PRIu64
-                    " ms)",
-                    cfg.duration_ms(), kMaxTracingDurationMillis);
-      return false;
-    }
     uint64_t buf_size_sum = 0;
     for (const auto& buf : cfg.buffers())
       buf_size_sum += buf.size_kb();
-    if (buf_size_sum > kMaxTracingBufferSizeKb) {
+    if (buf_size_sum > kGuardrailsMaxTracingBufferSizeKb) {
       PERFETTO_ELOG("Requested too large trace buffer (%" PRIu64
-                    "kB  > %" PRIu64 " kB)",
-                    buf_size_sum, kMaxTracingBufferSizeKb);
+                    "kB  > %" PRIu32 " kB)",
+                    buf_size_sum, kGuardrailsMaxTracingBufferSizeKb);
       return false;
     }
   }
@@ -684,6 +688,11 @@ void TracingServiceImpl::Flush(TracingSessionID tsid,
     pending_flush.producers.insert(producer_id);
   }
 
+  // If there are no producers to flush (realistically this happens only in
+  // some tests) fire  OnFlushTimeout() straight away, without waiting.
+  if (flush_map.empty())
+    timeout_ms = 0;
+
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
   task_runner_->PostDelayedTask(
       [weak_this, tsid, flush_request_id] {
@@ -729,9 +738,13 @@ void TracingServiceImpl::OnFlushTimeout(TracingSessionID tsid,
   auto it = tracing_session->pending_flushes.find(flush_request_id);
   if (it == tracing_session->pending_flushes.end())
     return;  // Nominal case: flush was completed and acked on time.
+
+  // If there were no producers to flush, consider it a success.
+  bool success = it->second.producers.empty();
+
   auto callback = std::move(it->second.callback);
   tracing_session->pending_flushes.erase(it);
-  CompleteFlush(tsid, std::move(callback), /*success=*/false);
+  CompleteFlush(tsid, std::move(callback), success);
 }
 
 void TracingServiceImpl::CompleteFlush(TracingSessionID tsid,
