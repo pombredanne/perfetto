@@ -295,8 +295,10 @@ void BookkeepingThread::HandleBookkeepingRecord(BookkeepingRecord* rec) {
   if (rec->record_type == BookkeepingRecord::Type::Dump) {
     DumpRecord& dump_rec = rec->dump_record;
     std::shared_ptr<TraceWriter> trace_writer = dump_rec.trace_writer.lock();
-    if (!trace_writer)
+    if (!trace_writer) {
+      PERFETTO_LOG("Not dumping heaps");
       return;
+    }
     PERFETTO_LOG("Dumping heaps");
     DumpState dump_state(trace_writer.get(), &next_index);
 
@@ -338,7 +340,7 @@ void BookkeepingThread::HandleBookkeepingRecord(BookkeepingRecord* rec) {
       }
     }
     dump_state.current_trace_packet->Finalize();
-    dump_rec.callback();
+    trace_writer->Flush(dump_rec.callback);
   } else if (rec->record_type == BookkeepingRecord::Type::Free) {
     FreeRecord& free_rec = rec->free_record;
     FreePageEntry* entries = free_rec.metadata->entries;

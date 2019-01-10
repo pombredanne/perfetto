@@ -214,9 +214,14 @@ struct DumpState {
   uint64_t last_written = 0;
 
   void NewProfilePacket() {
+    PERFETTO_DLOG("New profile packet after %" PRIu64 " bytes. Total: %" PRIu64
+                  ", before %" PRIu64,
+                  trace_writer->written() - last_written,
+                  trace_writer->written(), last_written);
     current_profile_packet->set_continued(true);
     last_written = trace_writer->written();
 
+    current_trace_packet->Finalize();
     current_trace_packet = trace_writer->NewTracePacket();
     current_profile_packet = current_trace_packet->set_profile_packet();
     current_profile_packet->set_index((*next_index)++);

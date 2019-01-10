@@ -265,9 +265,6 @@ bool HeapprofdProducer::Dump(DataSourceInstanceID id,
   if (has_flush_id) {
     dump_record.callback = [task_runner, weak_producer, flush_id,
                             weak_trace_writer] {
-      auto trace_writer = weak_trace_writer.lock();
-      if (trace_writer)
-        trace_writer->Flush();
       task_runner->PostTask([weak_producer, flush_id] {
         if (weak_producer)
           return weak_producer->FinishDataSourceFlush(flush_id);

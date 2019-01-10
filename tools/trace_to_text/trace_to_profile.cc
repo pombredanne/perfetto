@@ -59,18 +59,18 @@ using GValueType = ::perftools::profiles::ValueType;
 using GFunction = ::perftools::profiles::Function;
 using GSample = ::perftools::profiles::Sample;
 
-void DumpProfilePacket(std::vector<const ProfilePacket*> packets,
+void DumpProfilePacket(std::vector<const ProfilePacket> packets,
                        const std::string& file_prefix) {
   std::map<uint64_t, std::string> string_lookup;
-  for (const ProfilePacket* packet : packets) {
+  for (const ProfilePacket& packet : packets) {
     for (const ProfilePacket::InternedString& interned_string :
-         packet->strings())
+         packet.strings())
       string_lookup.emplace(interned_string.id(), interned_string.str());
   }
 
   std::map<uint64_t, const std::vector<uint64_t>> callstack_lookup;
-  for (const ProfilePacket* packet : packets) {
-    for (const ProfilePacket::Callstack& callstack : packet->callstacks()) {
+  for (const ProfilePacket& packet : packets) {
+    for (const ProfilePacket::Callstack& callstack : packet.callstacks()) {
       std::vector<uint64_t> frame_ids(
           static_cast<size_t>(callstack.frame_ids().size()));
       std::reverse_copy(callstack.frame_ids().cbegin(),
@@ -90,8 +90,8 @@ void DumpProfilePacket(std::vector<const ProfilePacket*> packets,
   value_type->set_type(1);
   value_type->set_type(2);
 
-  for (const ProfilePacket* packet : packets) {
-    for (const ProfilePacket::Mapping& mapping : packet->mappings()) {
+  for (const ProfilePacket& packet : packets) {
+    for (const ProfilePacket::Mapping& mapping : packet.mappings()) {
       GMapping* gmapping = profile.add_mapping();
       gmapping->set_id(mapping.id());
       gmapping->set_memory_start(mapping.start());
@@ -118,8 +118,8 @@ void DumpProfilePacket(std::vector<const ProfilePacket*> packets,
   }
 
   std::set<uint64_t> functions_to_dump;
-  for (const ProfilePacket* packet : packets) {
-    for (const ProfilePacket::Frame& frame : packet->frames()) {
+  for (const ProfilePacket& packet : packets) {
+    for (const ProfilePacket::Frame& frame : packet.frames()) {
       GLocation* glocation = profile.add_location();
       glocation->set_id(frame.id());
       glocation->set_mapping_id(frame.mapping_id());
@@ -157,9 +157,9 @@ void DumpProfilePacket(std::vector<const ProfilePacket*> packets,
 
   std::map<uint64_t, std::vector<const ProfilePacket::ProcessHeapSamples*>>
       heap_samples;
-  for (const ProfilePacket* packet : packets) {
+  for (const ProfilePacket& packet : packets) {
     for (const ProfilePacket::ProcessHeapSamples& samples :
-         packet->process_dumps()) {
+         packet.process_dumps()) {
       heap_samples[samples.pid()].emplace_back(&samples);
     }
   }
@@ -199,12 +199,12 @@ int TraceToProfile(std::istream* input, std::ostream* output) {
   std::string temp_dir = GetTemp() + "/heap_profile-XXXXXXX";
   size_t itr = 0;
   PERFETTO_CHECK(mkdtemp(&temp_dir[0]));
-  std::vector<const ProfilePacket*> rolling_profile_packets;
+  std::vector<const ProfilePacket> rolling_profile_packets;
   ForEachPacketInTrace(input, [&temp_dir, &itr, &rolling_profile_packets](
                                   const protos::TracePacket& packet) {
     if (!packet.has_profile_packet())
       return;
-    rolling_profile_packets.emplace_back(&packet.profile_packet());
+    rolling_profile_packets.emplace_back(packet.profile_packet());
     if (!packet.profile_packet().continued()) {
       DumpProfilePacket(rolling_profile_packets,
                         temp_dir + "/heap_dump." + std::to_string(++itr) + ".");
