@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "perfetto/tracing/core/local_trace_writer_proxy.h"
+#include "perfetto/tracing/core/startup_trace_writer.h"
 
 #include "perfetto/base/logging.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
@@ -96,16 +96,7 @@ class LocalBufferReader {
 
 }  // namespace
 
-#if PERFETTO_DCHECK_IS_ON()
-LocalTraceWriterProxy::ScopedLock::~ScopedLock() {
-  if (proxy_) {
-    PERFETTO_DCHECK(!proxy_->cur_packet_ ||
-                    proxy_->cur_packet_->is_finalized());
-  }
-}
-#endif  // PERFETTO_DCHECK_IS_ON()
-
-LocalTraceWriterProxy::LocalTraceWriterProxy()
+StartupTraceWriter::StartupTraceWriter()
     : memory_buffer_(new protozero::ScatteredHeapBuffer()),
       memory_stream_writer_(
           new protozero::ScatteredStreamWriter(memory_buffer_.get())) {
@@ -113,78 +104,125 @@ LocalTraceWriterProxy::LocalTraceWriterProxy()
   PERFETTO_DETACH_FROM_THREAD(writer_thread_checker_);
 }
 
-LocalTraceWriterProxy::LocalTraceWriterProxy(
+StartupTraceWriter::StartupTraceWriter(
     std::unique_ptr<TraceWriter> trace_writer)
     : was_bound_(true), trace_writer_(std::move(trace_writer)) {}
 
-LocalTraceWriterProxy::~LocalTraceWriterProxy() = default;
+StartupTraceWriter::~StartupTraceWriter() = default;
 
-void LocalTraceWriterProxy::BindToTraceWriter(
-    SharedMemoryArbiterImpl* arbiter,
-    std::unique_ptr<TraceWriter> trace_writer,
-    BufferID target_buffer) {
+bool StartupTraceWriter::BindToArbiter(SharedMemoryArbiterImpl* arbiter,
+                                       BufferID target_buffer) {
   std::lock_guard<std::mutex> lock(lock_);
 
   PERFETTO_DCHECK(!trace_writer_);
 
+  // Can't bind while the writer thread is writing.
+  if (write_in_progress_)
+    return false;
+
   // If there's a pending trace packet, it should have been completed by the
-  // writer thread before releasing the lock.
+  // writer thread before write_in_progress_ is reset.
   if (cur_packet_) {
-    TracePacketCompleted();
+    PERFETTO_DCHECK(cur_packet_->is_finalized());
     cur_packet_.reset();
   }
   memory_stream_writer_.reset();
 
+  trace_writer_ = arbiter->CreateTraceWriter(target_buffer);
+
   ChunkID next_chunk_id = CommitLocalBufferChunks(
-      arbiter, trace_writer->writer_id(), target_buffer);
+      arbiter, trace_writer_->writer_id(), target_buffer);
   memory_buffer_.reset();
 
   // The real TraceWriter should start writing at the subsequent chunk ID.
-  trace_writer->SetFirstChunkId(next_chunk_id);
+  bool success = trace_writer_->SetFirstChunkId(next_chunk_id);
+  PERFETTO_DCHECK(success);
 
-  trace_writer_ = std::move(trace_writer);
+  return true;
 }
 
-TraceWriter::TracePacketHandle LocalTraceWriterProxy::NewTracePacket() {
+TraceWriter::TracePacketHandle StartupTraceWriter::NewTracePacket() {
   PERFETTO_DCHECK_THREAD(writer_thread_checker_);
-  if (trace_writer_)
+
+  // Check if we are already bound without grabbing the lock. This is an
+  // optimization to avoid any locking in the common case where the proxy was
+  // bound some time ago.
+  if (was_bound_) {
+    PERFETTO_DCHECK(trace_writer_);
     return trace_writer_->NewTracePacket();
-  // Producer should have acquired lock already by calling BeginWrite().
-  PERFETTO_DCHECK(!lock_.try_lock());
+  }
+
+  // Now grab the lock and safely check whether we are still unbound.
+  {
+    std::lock_guard<std::mutex> lock(lock_);
+    if (trace_writer_) {
+      // Set the |was_bound_| flag to avoid locking in future calls to
+      // NewTracePacket().
+      was_bound_ = true;
+      return trace_writer_->NewTracePacket();
+    }
+    // Not bound. Make sure it stays this way until the TracePacketHandle goes
+    // out of scope by setting |write_in_progress_|.
+    PERFETTO_DCHECK(!write_in_progress_);
+    write_in_progress_ = true;
+  }
+
+  // Write to the local buffer.
   if (cur_packet_) {
-    TracePacketCompleted();
+    // If we hit this, the caller is calling NewTracePacket() without having
+    // finalized the previous packet.
+    PERFETTO_DCHECK(cur_packet_->is_finalized());
   } else {
     cur_packet_.reset(new protos::pbzero::TracePacket());
   }
   cur_packet_->Reset(memory_stream_writer_.get());
-  return TraceWriter::TracePacketHandle(cur_packet_.get());
+  auto completed_callback = [this]() {
+    // |this| outlives the packet handle.
+    this->OnTracePacketCompleted();
+  };
+  return TraceWriter::TracePacketHandle(cur_packet_.get(), completed_callback);
 }
 
-void LocalTraceWriterProxy::Flush(std::function<void()> callback) {
+void StartupTraceWriter::Flush(std::function<void()> callback) {
   PERFETTO_DCHECK_THREAD(writer_thread_checker_);
-  if (trace_writer_)
+  // It's fine to check |was_bound_| instead of acquiring the lock because
+  // |trace_writer_| will only need flushing after the first trace packet was
+  // written to it and |was_bound_| is set.
+  if (was_bound_) {
+    PERFETTO_DCHECK(trace_writer_);
     return trace_writer_->Flush(std::move(callback));
+  }
+
   // Can't flush while unbound.
   callback();
 }
 
-WriterID LocalTraceWriterProxy::writer_id() const {
+WriterID StartupTraceWriter::writer_id() const {
   PERFETTO_DCHECK_THREAD(writer_thread_checker_);
-  if (trace_writer_)
+  // We can't acquire the lock because this is a const method. So we'll only
+  // proxy to |trace_writer_| once we have written the first packet to it
+  // instead.
+  if (was_bound_) {
+    PERFETTO_DCHECK(trace_writer_);
     return trace_writer_->writer_id();
+  }
   return 0;
 }
 
-void LocalTraceWriterProxy::TracePacketCompleted() {
-  // If we hit this, the caller is calling NewTracePacket() or releasing the
-  // lock without having finalized the previous packet.
+void StartupTraceWriter::OnTracePacketCompleted() {
   PERFETTO_DCHECK(cur_packet_->is_finalized());
+  // Finalize() is a no-op because the packet is already finalized.
   uint32_t packet_size = cur_packet_->Finalize();
   packet_sizes_.push_back(packet_size);
   total_payload_size += packet_size;
+
+  // Write is complete, reset the flag to allow binding.
+  std::lock_guard<std::mutex> lock(lock_);
+  PERFETTO_DCHECK(write_in_progress_);
+  write_in_progress_ = false;
 }
 
-ChunkID LocalTraceWriterProxy::CommitLocalBufferChunks(
+ChunkID StartupTraceWriter::CommitLocalBufferChunks(
     SharedMemoryArbiterImpl* arbiter,
     WriterID writer_id,
     BufferID target_buffer) {
@@ -212,7 +250,7 @@ ChunkID LocalTraceWriterProxy::CommitLocalBufferChunks(
     uint32_t packet_size = packet_sizes_[packet_idx];
     uint32_t remaining_packet_size = packet_size;
     ++cur_num_packets;
-    while (remaining_packet_size > 0) {
+    do {
       uint32_t fragment_size = static_cast<uint32_t>(
           std::min(static_cast<size_t>(remaining_packet_size),
                    max_payload_size - cur_payload_size));
@@ -231,7 +269,9 @@ ChunkID LocalTraceWriterProxy::CommitLocalBufferChunks(
         // Write chunk payload.
         local_buffer_reader.ReadBytes(&cur_chunk, cur_payload_size);
 
-        cur_chunk.SetPacketCount(cur_num_packets);
+        auto new_packet_count =
+            cur_chunk.IncreasePacketCountTo(cur_num_packets);
+        PERFETTO_DCHECK(new_packet_count == cur_num_packets);
 
         bool is_fragmenting = remaining_packet_size > 0;
         if (is_fragmenting)
@@ -251,7 +291,7 @@ ChunkID LocalTraceWriterProxy::CommitLocalBufferChunks(
           PERFETTO_DCHECK(!is_fragmenting);
         }
       }
-    }
+    } while (remaining_packet_size > 0);
   }
 
   // The last chunk should have been returned.

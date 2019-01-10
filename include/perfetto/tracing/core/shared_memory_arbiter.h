@@ -34,7 +34,7 @@ class TaskRunner;
 }
 
 class CommitDataRequest;
-class LocalTraceWriterProxy;
+class StartupTraceWriter;
 class SharedMemory;
 class TraceWriter;
 
@@ -51,10 +51,13 @@ class PERFETTO_EXPORT SharedMemoryArbiter {
   virtual std::unique_ptr<TraceWriter> CreateTraceWriter(
       BufferID target_buffer) = 0;
 
-  // Like CreateTraceWriter(), but binds the provided LocalTraceWriterProxy to
-  // the new TraceWriter.
-  virtual void CreateProxiedTraceWriter(LocalTraceWriterProxy* proxy,
-                                        BufferID target_buffer) = 0;
+  // Binds the provided unbound StartupTraceWriter to a new TraceWriter
+  // associated with the arbiter's SMB. Returns |false| if binding failed
+  // because the writer is concurrently writing data to its temporary buffer. In
+  // this case, the caller should retry (it is free to try again immediately or
+  // schedule a wakeup to retry later).
+  virtual bool BindStartupTraceWriter(StartupTraceWriter* writer,
+                                      BufferID target_buffer) = 0;
 
   // Notifies the service that all data for the given FlushRequestID has been
   // committed in the shared memory buffer.

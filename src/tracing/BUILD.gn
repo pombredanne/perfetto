@@ -43,7 +43,6 @@ source_set("tracing") {
     "core/id_allocator.cc",
     "core/id_allocator.h",
     "core/inode_file_config.cc",
-    "core/local_trace_writer_proxy.cc",
     "core/null_trace_writer.cc",
     "core/null_trace_writer.h",
     "core/packet_stream_validator.cc",
@@ -55,6 +54,7 @@ source_set("tracing") {
     "core/shared_memory_arbiter_impl.h",
     "core/sliced_protobuf_input_stream.cc",
     "core/sliced_protobuf_input_stream.h",
+    "core/startup_trace_writer.cc",
     "core/sys_stats_config.cc",
     "core/test_config.cc",
     "core/trace_buffer.cc",
@@ -111,9 +111,9 @@ source_set("unittests") {
   # has no Windows implementation.
   if (!is_win) {
     sources += [
-      "core/local_trace_writer_proxy_unittest.cc",
       "core/service_impl_unittest.cc",
       "core/shared_memory_arbiter_impl_unittest.cc",
+      "core/startup_trace_writer_unittest.cc",
       "core/trace_writer_impl_unittest.cc",
       "test/fake_producer_endpoint.h",
       "test/mock_consumer.cc",

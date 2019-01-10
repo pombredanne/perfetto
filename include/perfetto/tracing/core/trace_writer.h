@@ -80,7 +80,7 @@ class PERFETTO_EXPORT TraceWriter {
   // Set the id of the first chunk the writer will emit. Returns |false| if not
   // implemented or if the first chunk was already emitted by the writer.
   //
-  // LocalTraceWriterProxy will call this if it committed buffered data on
+  // StartupTraceWriter will call this if it committed buffered data on
   // behalf of the TraceWriter.
   virtual bool SetFirstChunkId(ChunkID) { return false; }
 

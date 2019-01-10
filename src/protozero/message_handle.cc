@@ -22,7 +22,11 @@
 
 namespace protozero {
 
-MessageHandleBase::MessageHandleBase(Message* message) : message_(message) {
+MessageHandleBase::MessageHandleBase(
+    Message* message,
+    std::function<void()> message_completed_callback)
+    : message_(message),
+      message_completed_callback_(message_completed_callback) {
 #if PERFETTO_DCHECK_IS_ON()
   generation_ = message_ ? message->generation_ : 0;
   if (message_)
@@ -35,7 +39,7 @@ MessageHandleBase::~MessageHandleBase() {
 #if PERFETTO_DCHECK_IS_ON()
     PERFETTO_DCHECK(generation_ == message_->generation_);
 #endif
-    message_->Finalize();
+    FinalizeMessage();
   }
 }
 
@@ -48,7 +52,7 @@ MessageHandleBase& MessageHandleBase::operator=(MessageHandleBase&& other) {
   // one, finalize the old message. However, if the other message is the same as
   // the one we point to, don't finalize.
   if (message_ && message_ != other.message_)
-    message_->Finalize();
+    FinalizeMessage();
   Move(std::move(other));
   return *this;
 }
@@ -56,12 +60,20 @@ MessageHandleBase& MessageHandleBase::operator=(MessageHandleBase&& other) {
 void MessageHandleBase::Move(MessageHandleBase&& other) {
   message_ = other.message_;
   other.message_ = nullptr;
+  message_completed_callback_ = other.message_completed_callback_;
+  other.message_completed_callback_ = nullptr;
 #if PERFETTO_DCHECK_IS_ON()
   if (message_) {
     generation_ = message_->generation_;
     message_->set_handle(this);
   }
 #endif
+}
+
+void MessageHandleBase::FinalizeMessage() {
+  message_->Finalize();
+  if (message_completed_callback_)
+    message_completed_callback_();
 }
 
 }  // namespace protozero

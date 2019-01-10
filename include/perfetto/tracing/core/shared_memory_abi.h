@@ -392,11 +392,11 @@ class SharedMemoryABI {
       return packets.count;
     }
 
-    // Sets |packets.count| to the given |packet_count|, but only if
+    // Increases |packets.count| to the given |packet_count|, but only if
     // |packet_count| is larger than the current value of |packets.count|.
     // Returns the new packet count. Same atomicity guarantees as
     // IncrementPacketCount().
-    uint16_t SetPacketCount(uint16_t packet_count) {
+    uint16_t IncreasePacketCountTo(uint16_t packet_count) {
       ChunkHeader* chunk_header = header();
       auto packets = chunk_header->packets.load(std::memory_order_relaxed);
       if (packets.count < packet_count)
@@ -472,9 +472,13 @@ class SharedMemoryABI {
     return std::bitset<32>(x).to_string();
   }
 
-  // For testing / debugging only.
-  uint32_t page_layout_dbg(size_t page_idx) {
-    return page_header(page_idx)->layout.load(std::memory_order_relaxed);
+  // Returns the page layout, which is a bitmap that specifies the chunking
+  // layout of the page and each chunk's current state. Reads with an
+  // acquire-load semantic to ensure a producer's writes corresponding to an
+  // update of the layout (e.g. clearing a chunk's header) are observed
+  // consistently.
+  uint32_t GetPageLayout(size_t page_idx) {
+    return page_header(page_idx)->layout.load(std::memory_order_acquire);
   }
 
   // Returns a bitmap in which each bit is set if the corresponding Chunk exists
@@ -504,14 +508,6 @@ class SharedMemoryABI {
     return TryAcquireChunk(page_idx, chunk_idx, kChunkBeingRead, nullptr);
   }
 
-  // Used by the Service to take full ownership of all the chunks in the a page
-  // in one shot.  It tries to atomically migrate all chunks into the
-  // kChunkBeingRead state. Can only be done if all chunks are either kChunkFree
-  // or kChunkComplete. If this fails, the service has to fall back acquiring
-  // the chunks individually.
-  bool TryAcquireAllChunksForReading(size_t page_idx);
-  void ReleaseAllChunksAsFree(size_t page_idx);
-
   // The caller must have successfully TryAcquireAllChunksForReading().
   Chunk GetChunkUnchecked(size_t page_idx,
                           uint32_t page_layout,
@@ -530,18 +526,37 @@ class SharedMemoryABI {
   ChunkState GetChunkState(size_t page_idx, size_t chunk_idx) {
     PageHeader* phdr = page_header(page_idx);
     uint32_t layout = phdr->layout.load(std::memory_order_relaxed);
-    return static_cast<ChunkState>((layout >> (chunk_idx * kChunkShift)) &
-                                   kChunkMask);
+    return GetChunkStateFromLayout(layout, chunk_idx);
   }
 
   std::pair<size_t, size_t> GetPageAndChunkIndex(const Chunk& chunk);
+
+  uint16_t GetChunkSizeForLayout(uint32_t page_layout) const {
+    return chunk_sizes_[(page_layout & kLayoutMask) >> kLayoutShift];
+  }
+
+  static ChunkState GetChunkStateFromLayout(uint32_t page_layout,
+                                            size_t chunk_idx) {
+    return static_cast<ChunkState>((page_layout >> (chunk_idx * kChunkShift)) &
+                                   kChunkMask);
+  }
 
   static constexpr uint32_t GetNumChunksForLayout(uint32_t page_layout) {
     return kNumChunksForLayout[(page_layout & kLayoutMask) >> kLayoutShift];
   }
 
-  uint16_t GetChunkSizeForLayout(uint32_t page_layout) const {
-    return chunk_sizes_[(page_layout & kLayoutMask) >> kLayoutShift];
+  // Returns a bitmap in which each bit is set if the corresponding Chunk exists
+  // in the page (according to the page layout) and is not free. If the page is
+  // not partitioned it returns 0 (as if the page had no used chunks). Bit N
+  // corresponds to Chunk N.
+  static uint32_t GetUsedChunks(uint32_t page_layout) {
+    const uint32_t num_chunks = GetNumChunksForLayout(page_layout);
+    uint32_t res = 0;
+    for (uint32_t i = 0; i < num_chunks; i++) {
+      res |= ((page_layout & kChunkMask) != kChunkFree) ? (1 << i) : 0;
+      page_layout >>= kChunkShift;
+    }
+    return res;
   }
 
  private:

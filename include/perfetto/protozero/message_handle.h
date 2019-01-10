@@ -52,7 +52,9 @@ class PERFETTO_EXPORT MessageHandleBase {
   }
 
  protected:
-  explicit MessageHandleBase(Message* = nullptr);
+  explicit MessageHandleBase(
+      Message* = nullptr,
+      std::function<void()> message_completed_callback = nullptr);
   Message* operator->() const {
 #if PERFETTO_DCHECK_IS_ON()
     PERFETTO_DCHECK(!message_ || generation_ == message_->generation_);
@@ -68,8 +70,10 @@ class PERFETTO_EXPORT MessageHandleBase {
 
   void reset_message() { message_ = nullptr; }
   void Move(MessageHandleBase&&);
+  void FinalizeMessage();
 
   Message* message_;
+  std::function<void()> message_completed_callback_;
 #if PERFETTO_DCHECK_IS_ON()
   uint32_t generation_;
 #endif
@@ -79,7 +83,10 @@ template <typename T>
 class MessageHandle : public MessageHandleBase {
  public:
   MessageHandle() : MessageHandle(nullptr) {}
-  explicit MessageHandle(T* message) : MessageHandleBase(message) {}
+  explicit MessageHandle(
+      T* message,
+      std::function<void()> message_completed_callback = nullptr)
+      : MessageHandleBase(message, message_completed_callback) {}
 
   T& operator*() const {
     return static_cast<T&>(MessageHandleBase::operator*());

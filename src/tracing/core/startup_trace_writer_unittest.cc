@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "perfetto/tracing/core/local_trace_writer_proxy.h"
+#include "perfetto/tracing/core/startup_trace_writer.h"
 
 #include "gtest/gtest.h"
 #include "perfetto/tracing/core/tracing_service.h"
@@ -29,7 +29,7 @@
 namespace perfetto {
 namespace {
 
-class LocalTraceWriterProxyTest : public AlignedBufferTest {
+class StartupTraceWriterTest : public AlignedBufferTest {
  public:
   void SetUp() override {
     SharedMemoryArbiterImpl::set_default_layout_for_testing(
@@ -46,10 +46,9 @@ class LocalTraceWriterProxyTest : public AlignedBufferTest {
     task_runner_.reset();
   }
 
-  void WritePackets(LocalTraceWriterProxy* proxy, size_t packet_count) {
+  void WritePackets(StartupTraceWriter* writer, size_t packet_count) {
     for (size_t i = 0; i < packet_count; i++) {
-      auto scoped_lock = proxy->BeginWrite();
-      auto packet = proxy->NewTracePacket();
+      auto packet = writer->NewTracePacket();
       packet->set_for_testing()->set_str("foo");
     }
   }
@@ -59,7 +58,7 @@ class LocalTraceWriterProxyTest : public AlignedBufferTest {
     size_t packets_count = 0;
     ChunkID current_max_chunk_id = 0;
     for (size_t page_idx = 0; page_idx < kNumPages; page_idx++) {
-      uint32_t page_layout = abi->page_layout_dbg(page_idx);
+      uint32_t page_layout = abi->GetPageLayout(page_idx);
       size_t num_chunks = SharedMemoryABI::GetNumChunksForLayout(page_layout);
       for (size_t chunk_idx = 0; chunk_idx < num_chunks; chunk_idx++) {
         auto chunk_state = abi->GetChunkState(page_idx, chunk_idx);
@@ -100,101 +99,119 @@ class LocalTraceWriterProxyTest : public AlignedBufferTest {
 
 size_t const kPageSizes[] = {4096, 65536};
 INSTANTIATE_TEST_CASE_P(PageSize,
-                        LocalTraceWriterProxyTest,
+                        StartupTraceWriterTest,
                         ::testing::ValuesIn(kPageSizes));
 
-TEST_P(LocalTraceWriterProxyTest, CreateUnboundAndBind) {
-  // Create an unbound proxy.
-  std::unique_ptr<LocalTraceWriterProxy> proxy(new LocalTraceWriterProxy());
+TEST_P(StartupTraceWriterTest, CreateUnboundAndBind) {
+  // Create an unbound writer.
+  std::unique_ptr<StartupTraceWriter> writer(new StartupTraceWriter());
 
   // Bind it right away without having written any data before.
   const BufferID kBufId = 42;
-  arbiter_->CreateProxiedTraceWriter(proxy.get(), kBufId);
+  EXPECT_TRUE(arbiter_->BindStartupTraceWriter(writer.get(), kBufId));
 
   const size_t kNumPackets = 32;
-  WritePackets(proxy.get(), kNumPackets);
+  WritePackets(writer.get(), kNumPackets);
   // Finalizes the last packet and returns the chunk.
-  proxy.reset();
+  writer.reset();
 
   VerifyPacketCount(kNumPackets);
 }
 
-TEST_P(LocalTraceWriterProxyTest, CreateBound) {
-  // Create a bound proxy immediately.
+TEST_P(StartupTraceWriterTest, CreateBound) {
+  // Create a bound writer immediately.
   const BufferID kBufId = 42;
-  std::unique_ptr<LocalTraceWriterProxy> proxy(
-      new LocalTraceWriterProxy(arbiter_->CreateTraceWriter(kBufId)));
+  std::unique_ptr<StartupTraceWriter> writer(
+      new StartupTraceWriter(arbiter_->CreateTraceWriter(kBufId)));
 
   const size_t kNumPackets = 32;
-  WritePackets(proxy.get(), kNumPackets);
+  WritePackets(writer.get(), kNumPackets);
   // Finalizes the last packet and returns the chunk.
-  proxy.reset();
+  writer.reset();
 
   VerifyPacketCount(kNumPackets);
 }
 
-TEST_P(LocalTraceWriterProxyTest, WriteWhileUnboundAndDiscard) {
-  // Create an unbound proxy.
-  std::unique_ptr<LocalTraceWriterProxy> proxy(new LocalTraceWriterProxy());
+TEST_P(StartupTraceWriterTest, WriteWhileUnboundAndDiscard) {
+  // Create an unbound writer.
+  std::unique_ptr<StartupTraceWriter> writer(new StartupTraceWriter());
 
   const size_t kNumPackets = 32;
-  WritePackets(proxy.get(), kNumPackets);
+  WritePackets(writer.get(), kNumPackets);
 
   // Should discard the written data.
-  proxy.reset();
+  writer.reset();
 
   VerifyPacketCount(0);
 }
 
-TEST_P(LocalTraceWriterProxyTest, WriteWhileUnboundAndBind) {
-  // Create an unbound proxy.
-  std::unique_ptr<LocalTraceWriterProxy> proxy(new LocalTraceWriterProxy());
+TEST_P(StartupTraceWriterTest, WriteWhileUnboundAndBind) {
+  // Create an unbound writer.
+  std::unique_ptr<StartupTraceWriter> writer(new StartupTraceWriter());
 
   const size_t kNumPackets = 32;
-  WritePackets(proxy.get(), kNumPackets);
+  WritePackets(writer.get(), kNumPackets);
 
-  // Binding the proxy should cause the previously written packets to be written
-  // to the SMB and committed.
+  // Binding the writer should cause the previously written packets to be
+  // written to the SMB and committed.
   const BufferID kBufId = 42;
-  arbiter_->CreateProxiedTraceWriter(proxy.get(), kBufId);
+  EXPECT_TRUE(arbiter_->BindStartupTraceWriter(writer.get(), kBufId));
 
   VerifyPacketCount(kNumPackets);
 
   // Any further packets should be written to the SMB directly.
   const size_t kNumAdditionalPackets = 16;
-  WritePackets(proxy.get(), kNumAdditionalPackets);
+  WritePackets(writer.get(), kNumAdditionalPackets);
   // Finalizes the last packet and returns the chunk.
-  proxy.reset();
+  writer.reset();
 
   VerifyPacketCount(kNumAdditionalPackets);
 }
 
-TEST_P(LocalTraceWriterProxyTest, WriteMultipleChunksWhileUnboundAndBind) {
-  // Create an unbound proxy.
-  std::unique_ptr<LocalTraceWriterProxy> proxy(new LocalTraceWriterProxy());
+TEST_P(StartupTraceWriterTest, WriteMultipleChunksWhileUnboundAndBind) {
+  // Create an unbound writer.
+  std::unique_ptr<StartupTraceWriter> writer(new StartupTraceWriter());
 
   // Write a single packet to determine its size in the buffer.
-  WritePackets(proxy.get(), 1);
-  size_t packet_size = proxy->used_buffer_size();
+  WritePackets(writer.get(), 1);
+  size_t packet_size = writer->used_buffer_size();
 
   // Write at least 3 pages worth of packets.
   const size_t kNumPackets = (page_size() * 3 + packet_size - 1) / packet_size;
-  WritePackets(proxy.get(), kNumPackets);
+  WritePackets(writer.get(), kNumPackets);
 
-  // Binding the proxy should cause the previously written packets to be written
-  // to the SMB and committed.
+  // Binding the writer should cause the previously written packets to be
+  // written to the SMB and committed.
   const BufferID kBufId = 42;
-  arbiter_->CreateProxiedTraceWriter(proxy.get(), kBufId);
+  EXPECT_TRUE(arbiter_->BindStartupTraceWriter(writer.get(), kBufId));
 
   VerifyPacketCount(kNumPackets + 1);
 
   // Any further packets should be written to the SMB directly.
   const size_t kNumAdditionalPackets = 16;
-  WritePackets(proxy.get(), kNumAdditionalPackets);
+  WritePackets(writer.get(), kNumAdditionalPackets);
   // Finalizes the last packet and returns the chunk.
-  proxy.reset();
+  writer.reset();
 
   VerifyPacketCount(kNumAdditionalPackets);
+}
+
+TEST_P(StartupTraceWriterTest, BindingWhileWritingFails) {
+  // Create an unbound writer.
+  std::unique_ptr<StartupTraceWriter> writer(new StartupTraceWriter());
+
+  const BufferID kBufId = 42;
+  {
+    // Begin a write by opening a TracePacket
+    auto packet = writer->NewTracePacket();
+
+    // Binding while writing should fail.
+    EXPECT_FALSE(arbiter_->BindStartupTraceWriter(writer.get(), kBufId));
+  }
+
+  // Packet was completed, so binding should work now and emit the packet.
+  EXPECT_TRUE(arbiter_->BindStartupTraceWriter(writer.get(), kBufId));
+  VerifyPacketCount(1);
 }
 
 }  // namespace

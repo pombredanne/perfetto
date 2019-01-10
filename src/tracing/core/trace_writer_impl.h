@@ -42,6 +42,8 @@ class TraceWriterImpl : public TraceWriter,
   WriterID writer_id() const override;
   bool SetFirstChunkId(ChunkID) override;
 
+  void ResetChunkForTesting() { cur_chunk_ = SharedMemoryABI::Chunk(); }
+
  private:
   TraceWriterImpl(const TraceWriterImpl&) = delete;
   TraceWriterImpl& operator=(const TraceWriterImpl&) = delete;
