@@ -343,27 +343,6 @@ using protos::SignalGenerateFtraceEvent;
 using protos::OomScoreAdjUpdateFtraceEvent;
 using protos::GenericFtraceEvent;
 
-const char* GetSchedSwitchFlag(int64_t state) {
-  state &= 511;
-  if (state & 1)
-    return "S";
-  if (state & 2)
-    return "D";
-  if (state & 4)
-    return "T";
-  if (state & 8)
-    return "t";
-  if (state & 16)
-    return "Z";
-  if (state & 32)
-    return "X";
-  if (state & 64)
-    return "x";
-  if (state & 128)
-    return "W";
-  return "R";
-}
-
 const char* GetExt4HintFlag(int64_t state) {
   if (state & 0x0001)
     return "HINT_MERGE";
@@ -3535,11 +3514,34 @@ uint64_t TimestampToMicroseconds(uint64_t timestamp) {
   return (timestamp / 1000) % 1000000ul;
 }
 
-std::string FormatPrefix(uint64_t timestamp,
-                         uint32_t cpu,
-                         uint32_t pid,
-                         uint32_t tgid,
-                         std::string name) {
+}  // namespace
+
+const char* GetSchedSwitchFlag(int64_t state) {
+  state &= 511;
+  if (state & 1)
+    return "S";
+  if (state & 2)
+    return "D";
+  if (state & 4)
+    return "T";
+  if (state & 8)
+    return "t";
+  if (state & 16)
+    return "Z";
+  if (state & 32)
+    return "X";
+  if (state & 64)
+    return "x";
+  if (state & 128)
+    return "W";
+  return "R";
+}
+
+std::string FormatFtracePrefix(uint64_t timestamp,
+                               uint32_t cpu,
+                               uint32_t pid,
+                               uint32_t tgid,
+                               std::string name) {
   char line[2048];
   uint64_t seconds = TimestampToSeconds(timestamp);
   uint64_t useconds = TimestampToMicroseconds(timestamp);
@@ -3559,8 +3561,6 @@ std::string FormatPrefix(uint64_t timestamp,
   }
   return std::string(line);
 }
-
-}  // namespace
 
 std::string FormatFtraceEvent(
     uint64_t timestamp,
@@ -3594,7 +3594,7 @@ std::string FormatFtraceEvent(
   if (it != thread_map.end()) {
     tgid = it->second;
   }
-  return FormatPrefix(timestamp, cpu, pid, tgid, name) + line;
+  return FormatFtracePrefix(timestamp, cpu, pid, tgid, name) + line;
 }
 
 }  // namespace perfetto

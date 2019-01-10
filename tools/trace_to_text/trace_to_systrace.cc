@@ -29,6 +29,7 @@
 
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
+#include "perfetto/trace_processor/trace_processor.h"
 #include "perfetto/traced/sys_stats_counters.h"
 #include "tools/trace_to_text/ftrace_event_formatter.h"
 #include "tools/trace_to_text/process_formatter.h"
@@ -36,6 +37,7 @@
 
 #include "perfetto/trace/trace.pb.h"
 #include "perfetto/trace/trace_packet.pb.h"
+#include "perfetto/trace_processor/raw_query.pb.h"
 
 // When running in Web Assembly, fflush() is a no-op and the stdio buffering
 // sends progress updates to JS only when a write ends with \n.
@@ -79,6 +81,19 @@ const char kSystemTraceEvents[] =
     "  \"systemTraceEvents\": \"";
 
 const char kFtraceHeader[] =
+    "# tracer: nop\n"
+    "#\n"
+    "# entries-in-buffer/entries-written: 30624/30624   #P:4\n"
+    "#\n"
+    "#                                      _-----=> irqs-off\n"
+    "#                                     / _----=> need-resched\n"
+    "#                                    | / _---=> hardirq/softirq\n"
+    "#                                    || / _--=> preempt-depth\n"
+    "#                                    ||| /     delay\n"
+    "#           TASK-PID    TGID   CPU#  ||||    TIMESTAMP  FUNCTION\n"
+    "#              | |        |      |   ||||       |         |\n";
+
+const char kJsonFtraceHeader[] =
     "# tracer: nop\\n"
     "#\\n"
     "# entries-in-buffer/entries-written: 30624/30624   #P:4\\n"
@@ -91,11 +106,154 @@ const char kFtraceHeader[] =
     "#           TASK-PID    TGID   CPU#  ||||    TIMESTAMP  FUNCTION\\n"
     "#              | |        |      |   ||||       |         |\\n";
 
+struct EventInfo {
+  int64_t id = 0;
+  int64_t ts = 0;
+  uint32_t cpu = 0;
+  uint32_t tid = 0;
+  uint32_t pid = 0;
+  std::string event_name;
+  std::string thread_name;
+  std::map<std::string, std::string> args;
+};
+
+void WriteEventArgsToOutput(const EventInfo& info, std::ostream* output) {
+  auto write_arg = [&info](const std::string& key) {
+    return " " + key + "=" + info.args.find(key)->second;
+  };
+  if (info.event_name == "sched_switch") {
+    *output << write_arg("prev_comm") << write_arg("prev_pid")
+            << write_arg("prev_prio") << " "
+            << "prev_state="
+            << GetSchedSwitchFlag(
+                   std::stoi(info.args.find("prev_state")->second))
+            << " ==>" << write_arg("next_comm") << write_arg("next_pid")
+            << write_arg("next_prio");
+    return;
+  } else if (info.event_name == "cpu_frequency") {
+    *output << write_arg("state") << write_arg("cpu_id");
+    return;
+  }
+
+  for (auto it = info.args.begin(); it != info.args.end(); it++) {
+    *output << " " << it->first + "=" << it->second;
+  }
+}
+
+void WriteEventToOutput(const EventInfo& info, std::ostream* output) {
+  uint64_t ts = static_cast<uint64_t>(info.ts);
+  std::string prefix =
+      FormatFtracePrefix(ts, info.cpu, info.tid, info.pid, info.thread_name);
+
+  *output << prefix << info.event_name;
+  if (!info.args.empty()) {
+    *output << ":";
+    WriteEventArgsToOutput(info, output);
+  }
+  *output << "\n";
+}
+
 }  // namespace
 
-int TraceToSystrace(std::istream* input,
-                    std::ostream* output,
-                    bool wrap_in_json) {
+int TraceToSystrace(std::istream* input, std::ostream* output, bool) {
+  trace_processor::Config config;
+  config.optimization_mode = trace_processor::OptimizationMode::kMaxBandwidth;
+  std::unique_ptr<trace_processor::TraceProcessor> tp =
+      trace_processor::TraceProcessor::CreateInstance(config);
+
+  // 1MB chunk size seems the best tradeoff on a MacBook Pro 2013 - i7 2.8 GHz.
+  constexpr size_t kChunkSize = 1024 * 1024;
+
+  uint64_t file_size = 0;
+  for (int i = 0;; i++) {
+    std::unique_ptr<uint8_t[]> buf(new uint8_t[kChunkSize]);
+    input->read(reinterpret_cast<char*>(buf.get()), kChunkSize);
+    if (input->bad()) {
+      PERFETTO_ELOG("Failed when reading trace");
+      return 1;
+    }
+
+    auto rsize = input->gcount();
+    if (rsize <= 0)
+      break;
+    file_size += static_cast<uint64_t>(rsize);
+    tp->Parse(std::move(buf), static_cast<size_t>(rsize));
+  }
+  tp->NotifyEndOfFile();
+
+  protos::RawQueryArgs query_args;
+  query_args.set_sql_query(
+      "SELECT id, ts, cpu, raw.name AS event_name, thread.name AS thread_name, "
+      "tid, pid, key, int_value, string_value, real_value "
+      "FROM raw INNER JOIN args USING(id) INNER JOIN thread USING(utid) "
+      "INNER JOIN process USING(upid) "
+      "ORDER BY ts, id");
+
+  // This query is not actually async so just pull the result up to the function
+  // level so we can return on error.
+  protos::RawQueryResult result;
+  tp->ExecuteQuery(query_args, [&result](const protos::RawQueryResult& res) {
+    result = res;
+  });
+
+  if (result.has_error()) {
+    PERFETTO_ELOG("Error when reading events from trace %s",
+                  result.error().c_str());
+    return 1;
+  }
+
+  *output << "TRACE:\n";
+  *output << kFtraceHeader;
+
+  EventInfo info;
+  for (uint64_t i = 0; i < result.num_records(); i++) {
+    int idx = static_cast<int>(i);
+    int64_t id = result.columns(0).long_values(idx);
+
+    if (info.id != id) {
+      if (info.id != 0)
+        WriteEventToOutput(info, output);
+
+      info.id = id;
+      info.ts = result.columns(1).long_values(idx);
+      info.cpu = static_cast<uint32_t>(result.columns(2).long_values(idx));
+      info.event_name = result.columns(3).string_values(idx);
+
+      const auto& thread_names = result.columns(4);
+      if (thread_names.is_nulls(idx))
+        info.thread_name = "<...>";
+      else
+        info.thread_name = thread_names.string_values(idx);
+
+      info.tid = static_cast<uint32_t>(result.columns(5).long_values(idx));
+
+      const auto& pids = result.columns(6);
+      if (!pids.is_nulls(idx))
+        info.pid = static_cast<uint32_t>(pids.long_values(idx));
+    }
+
+    const auto& keys = result.columns(7);
+    if (!keys.is_nulls(idx)) {
+      const auto& key = keys.string_values(idx);
+
+      const auto& int_values = result.columns(8);
+      const auto& string_values = result.columns(9);
+      const auto& real_values = result.columns(10);
+      if (!int_values.is_nulls(idx)) {
+        info.args[key] = std::to_string(int_values.long_values(idx));
+      } else if (!string_values.is_nulls(idx)) {
+        info.args[key] = string_values.string_values(idx);
+      } else if (!real_values.is_nulls(idx)) {
+        info.args[key] = std::to_string(real_values.double_values(idx));
+      }
+    }
+  }
+  return 0;
+}
+
+int TraceToSystraceOld(std::istream* input,
+                       std::ostream* output,
+                       bool wrap_in_json) {
   std::multimap<uint64_t, std::string> ftrace_sorted;
   std::vector<std::string> proc_dump;
   std::vector<std::string> thread_dump;
@@ -187,7 +345,7 @@ int TraceToSystrace(std::istream* input,
     }
     *output << "\",";
     *output << kSystemTraceEvents;
-    *output << kFtraceHeader;
+    *output << kJsonFtraceHeader;
   } else {
     *output << "TRACE:\n";
     *output << kFtraceHeader;
