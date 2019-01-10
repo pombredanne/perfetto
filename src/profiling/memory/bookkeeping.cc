@@ -29,6 +29,9 @@ namespace perfetto {
 namespace profiling {
 namespace {
 using ::perfetto::protos::pbzero::ProfilePacket;
+// This needs to be lower than the maximum acceptable chunk size, because this
+// is checked *before* writing another submessage. We conservatively assume
+// submessages can be up to 100k here for a 500k chunk size.
 uint32_t kMaxTracePacketSize = 400000;
 }
 
