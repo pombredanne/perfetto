@@ -93,7 +93,7 @@ const char kFtraceHeader[] =
     "#           TASK-PID    TGID   CPU#  ||||    TIMESTAMP  FUNCTION\n"
     "#              | |        |      |   ||||       |         |\n";
 
-const char kJsonFtraceHeader[] =
+const char kFtraceJsonHeader[] =
     "# tracer: nop\\n"
     "#\\n"
     "# entries-in-buffer/entries-written: 30624/30624   #P:4\\n"
@@ -300,7 +300,7 @@ int TraceToSystraceOld(std::istream* input,
     }
     *output << "\",";
     *output << kSystemTraceEvents;
-    *output << kJsonFtraceHeader;
+    *output << kFtraceJsonHeader;
   } else {
     *output << "TRACE:\n";
     *output << kFtraceHeader;
