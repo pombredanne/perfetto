@@ -59,7 +59,7 @@ export class FrontendLocalState {
   }
 
   mergeState(highFrequencyState: HighFrequencyState): void {
-    if (this._lastUpdate > highFrequencyState.lastUpdate) {
+    if (this._lastUpdate >= highFrequencyState.lastUpdate) {
       return;
     }
     const visible = highFrequencyState.visibleTraceTime;
