@@ -27,7 +27,6 @@
 #include "src/trace_processor/counters_table.h"
 #include "src/trace_processor/event_tracker.h"
 #include "src/trace_processor/instants_table.h"
-#include "src/trace_processor/json_trace_parser.h"
 #include "src/trace_processor/process_table.h"
 #include "src/trace_processor/process_tracker.h"
 #include "src/trace_processor/proto_trace_parser.h"
@@ -46,6 +45,11 @@
 #include "src/trace_processor/window_operator_table.h"
 
 #include "perfetto/trace_processor/raw_query.pb.h"
+
+// JSON parsing is only supported in the standalone build.
+#if PERFETTO_BUILDFLAG(PERFETTO_STANDALONE_BUILD)
+#include "src/trace_processor/json_trace_parser.h"
+#endif
 
 // defined in sqlite_src/ext/misc/percentile.c
 extern "C" int sqlite3_percentile_init(sqlite3* db,
