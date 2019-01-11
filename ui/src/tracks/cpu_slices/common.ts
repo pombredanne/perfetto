@@ -23,6 +23,8 @@ export interface SummaryData {
 
   bucketSizeSeconds: number;
   utilizations: Float64Array;
+  freqs: Float64Array;
+  idles: Float64Array;
 }
 
 export interface SliceData {
@@ -36,6 +38,10 @@ export interface SliceData {
   starts: Float64Array;
   ends: Float64Array;
   utids: Uint32Array;
+
+  // Freqs are stored in a columnar fashion. All fields have the same length.
+  freqStarts: Float64Array;
+  freqs: Float64Array;
 }
 
 export type Data = SummaryData | SliceData;

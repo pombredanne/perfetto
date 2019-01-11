@@ -53,11 +53,24 @@ const MD_PALETTE: Color[] = [
   {c: 'yellow', h: 54, s: 100, l: 62},
   {c: 'amber', h: 45, s: 100, l: 51},
   {c: 'orange', h: 36, s: 100, l: 50},
-  {c: 'deep organge', h: 14, s: 100, l: 57},
+  {c: 'deep orange', h: 14, s: 100, l: 57},
   {c: 'brown', h: 16, s: 25, l: 38},
   {c: 'grey', h: 0, s: 0, l: 62},
   {c: 'blue gray', h: 200, s: 18, l: 46},
 ];
+
+function colorForFreq(freq: number): string {
+  if (freq < 1132800) return 'green';
+  if (freq < 1670400) return 'yellow';
+  return 'red';
+}
+
+//function colorForIdle(idle: number): string {
+//  if (idle == 1) return 'pink';
+//  if (idle == 2) return 'teal';
+//  if (idle == 3) return 'purple';
+//  return 'black';
+//}
 
 function hash(s: string, max: number): number {
   let hash = 0x811c9dc5 & 0xfffffff;
@@ -160,27 +173,94 @@ class CpuSliceTrack extends Track<Config, Data> {
   renderSummary(ctx: CanvasRenderingContext2D, data: SummaryData): void {
     const {timeScale, visibleWindowTime} = globals.frontendLocalState;
     const startPx = Math.floor(timeScale.timeToPx(visibleWindowTime.start));
-    const bottomY = MARGIN_TOP + RECT_HEIGHT;
 
-    let lastX = startPx;
-    let lastY = bottomY;
+    {
+      const topY = MARGIN_TOP;
+      const height = RECT_HEIGHT;
+      const bottomY = topY + height;
+      let lastX = startPx;
+      let lastY = bottomY;
+      ctx.fillStyle = `hsl(${this.hue}, 50%, 60%)`;
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      for (let i = 0; i < data.utilizations.length; i++) {
+        const utilization = data.utilizations[i];
+        const startTime = i * data.bucketSizeSeconds + data.start;
 
-    ctx.fillStyle = `hsl(${this.hue}, 50%, 60%)`;
-    ctx.beginPath();
-    ctx.moveTo(lastX, lastY);
-    for (let i = 0; i < data.utilizations.length; i++) {
-      const utilization = data.utilizations[i];
-      const startTime = i * data.bucketSizeSeconds + data.start;
+        lastX = Math.floor(timeScale.timeToPx(startTime));
 
-      lastX = Math.floor(timeScale.timeToPx(startTime));
-
-      ctx.lineTo(lastX, lastY);
-      lastY = MARGIN_TOP + Math.round(RECT_HEIGHT * (1 - utilization));
-      ctx.lineTo(lastX, lastY);
+        ctx.lineTo(lastX, lastY);
+        lastY = topY + Math.round(height * (1 - utilization));
+        ctx.lineTo(lastX, lastY);
+      }
+      ctx.lineTo(lastX, bottomY);
+      ctx.closePath();
+      ctx.fill();
     }
-    ctx.lineTo(lastX, bottomY);
-    ctx.closePath();
-    ctx.fill();
+
+    assertTrue(data.freqs.length === data.idles.length);
+    if (data.freqs.length) {
+      const topY = MARGIN_TOP + RECT_HEIGHT + 1;
+      const height = MARGIN_TOP - 2;
+
+      const startX = Math.floor(timeScale.timeToPx(data.start));
+      const endX = Math.floor(timeScale.timeToPx(data.end));
+
+      let leftX = startX;
+      let lastFreq = 0;
+
+      for (let i = 0; i < data.freqs.length; i++) {
+        const startTime = i * data.bucketSizeSeconds + data.start;
+        const rightX = Math.floor(timeScale.timeToPx(startTime));
+        const nextFreq = data.freqs[i];
+
+        if (lastFreq != nextFreq) {
+          if (lastFreq !== 0) {
+            ctx.fillStyle = colorForFreq(lastFreq);
+            ctx.fillRect(leftX, topY, rightX - leftX, height);
+          }
+          leftX = rightX;
+          lastFreq = nextFreq;
+        }
+      }
+
+      if (lastFreq !== 0) {
+        ctx.fillStyle = colorForFreq(lastFreq);
+        ctx.fillRect(leftX, topY, endX - leftX, height);
+      }
+    }
+
+    //if (data.idles.length) {
+    //  const topY = MARGIN_TOP + RECT_HEIGHT + 1 - MARGIN_TOP;
+    //  const height = MARGIN_TOP - 2;
+
+    //  const startX = Math.floor(timeScale.timeToPx(data.start));
+    //  const endX = Math.floor(timeScale.timeToPx(data.end));
+
+    //  let leftX = startX;
+    //  let lastIdle = 0;
+
+    //  for (let i = 0; i < data.idles.length; i++) {
+    //    const startTime = i * data.bucketSizeSeconds + data.start;
+    //    const rightX = Math.floor(timeScale.timeToPx(startTime));
+    //    const nextIdle = data.idles[i];
+
+    //    if (lastIdle != nextIdle) {
+    //      if (lastIdle !== 0) {
+    //        ctx.fillStyle = colorForIdle(lastIdle);
+    //        ctx.fillRect(leftX, topY, rightX - leftX, height);
+    //      }
+    //      leftX = rightX;
+    //      lastIdle = nextIdle;
+    //    }
+    //  }
+
+    //  if (lastIdle !== 0) {
+    //    ctx.fillStyle = colorForIdle(lastIdle);
+    //    ctx.fillRect(leftX, topY, endX - leftX, height);
+    //  }
+    //}
+
   }
 
   renderSlices(ctx: CanvasRenderingContext2D, data: SliceData): void {
@@ -203,7 +283,6 @@ class CpuSliceTrack extends Track<Config, Data> {
       const rectEnd = timeScale.timeToPx(tEnd);
       const rectWidth = rectEnd - rectStart;
       if (rectWidth < 0.1) continue;
-
 
       // TODO: consider de-duplicating this code with the copied one from
       // chrome_slices/frontend.ts.
@@ -271,6 +350,38 @@ class CpuSliceTrack extends Track<Config, Data> {
       ctx.fillText(line1, this.mouseXpos! + 8, 18);
       ctx.fillText(line2, this.mouseXpos! + 8, 28);
     }
+
+    assertTrue(data.freqs.length === data.freqStarts.length);
+    if (data.freqs.length) {
+      const topY = MARGIN_TOP + RECT_HEIGHT + 1;
+      const height = MARGIN_TOP - 2;
+
+      const startX = Math.floor(timeScale.timeToPx(data.start));
+      const endX = Math.floor(timeScale.timeToPx(data.end));
+
+      let leftX = startX;
+      let lastFreq = 0;
+
+      for (let i = 0; i < data.freqs.length; i++) {
+        const rightX = Math.floor(timeScale.timeToPx(data.freqStarts[i]));
+        const nextFreq = data.freqs[i];
+
+        if (lastFreq != nextFreq) {
+          if (lastFreq !== 0) {
+            ctx.fillStyle = colorForFreq(lastFreq);
+            ctx.fillRect(leftX, topY, rightX - leftX, height);
+          }
+          leftX = rightX;
+          lastFreq = nextFreq;
+        }
+      }
+
+      if (lastFreq !== 0) {
+        ctx.fillStyle = colorForFreq(lastFreq);
+        ctx.fillRect(leftX, topY, endX - leftX, height);
+      }
+    }
+
   }
 
   onMouseMove({x, y}: {x: number, y: number}) {

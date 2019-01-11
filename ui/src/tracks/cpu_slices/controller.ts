@@ -47,9 +47,62 @@ class CpuSliceTrackController extends TrackController<Config, Data> {
     if (this.setup === false) {
       await this.query(
           `create virtual table ${this.tableName('window')} using window;`);
-      await this.query(`create virtual table ${this.tableName('span')}
+
+      await this.query(`create virtual table ${this.tableName('span_sched')}
               using span_join(sched PARTITIONED cpu,
                               ${this.tableName('window')} PARTITIONED cpu);`);
+
+      await this.query(`create view ${this.tableName('freq')}
+          as select
+            ts,
+            dur,
+            ref as cpu,
+            name as freq_name,
+            value as freq_value
+          from counters
+          where name = 'cpufreq'
+            and ref = ${this.config.cpu}
+            and ref_type = 'cpu';
+      `);
+
+      await this.query(`create view ${this.tableName('idle')}
+          as select
+            ts,
+            dur,
+            ref as cpu,
+            name as idle_name,
+            value as idle_value
+          from counters
+          where name = 'cpuidle'
+            and ref = ${this.config.cpu}
+            and ref_type = 'cpu';
+      `);
+
+      await this.query(`create virtual table ${this.tableName('freq_idle')}
+              using span_join(${this.tableName('freq')} PARTITIONED cpu,
+                              ${this.tableName('idle')} PARTITIONED cpu);`);
+
+      await this.query(`create virtual table ${this.tableName('span_activity')}
+              using span_join(${this.tableName('freq_idle')} PARTITIONED cpu,
+                              ${this.tableName('window')} PARTITIONED cpu);`);
+
+      await this.query(`create view ${this.tableName('activity')}
+        as select
+          ts,
+          dur,
+          quantum_ts,
+          cpu,
+          case idle_value
+            when 4294967295 then "freq"
+            else "idle"
+          end as name,
+          case idle_value
+            when 4294967295 then freq_value
+            else idle_value
+          end as value
+          from ${this.tableName('span_activity')};
+      `);
+
       this.setup = true;
     }
 
@@ -87,16 +140,26 @@ class CpuSliceTrackController extends TrackController<Config, Data> {
     const endNs = Math.round(end * 1e9);
     const numBuckets = Math.ceil((endNs - startNs) / bucketSizeNs);
 
-    const query = `select
+    const utilizationQuery = `select
         quantum_ts as bucket,
         sum(dur)/cast(${bucketSizeNs} as float) as utilization
-        from ${this.tableName('span')}
+        from ${this.tableName('span_sched')}
         where cpu = ${this.config.cpu}
         and utid != 0
         group by quantum_ts`;
 
-    const rawResult = await this.query(query);
-    const numRows = +rawResult.numRecords;
+    const freqQuery = `select
+        quantum_ts as bucket,
+        name,
+        max(value) as value
+        from ${this.tableName('activity')}
+        where cpu = ${this.config.cpu}
+        group by quantum_ts, name`;
+
+    const [utilizationResult, freqResult] = await Promise.all([
+      this.query(utilizationQuery),
+      this.query(freqQuery),
+    ]);
 
     const summary: Data = {
       kind: 'summary',
@@ -105,11 +168,23 @@ class CpuSliceTrackController extends TrackController<Config, Data> {
       resolution,
       bucketSizeSeconds: fromNs(bucketSizeNs),
       utilizations: new Float64Array(numBuckets),
+      freqs: new Float64Array(numBuckets),
+      idles: new Float64Array(numBuckets),
     };
-    const cols = rawResult.columns;
-    for (let row = 0; row < numRows; row++) {
-      const bucket = +cols[0].longValues![row];
-      summary.utilizations[bucket] = +cols[1].doubleValues![row];
+    const utilizationCols = utilizationResult.columns;
+    const freqCols = freqResult.columns;
+    for (let row = 0; row < utilizationResult.numRecords; row++) {
+      const bucket = +utilizationCols[0].longValues![row];
+      summary.utilizations[bucket] = +utilizationCols[1].doubleValues![row];
+    }
+
+    for (let row = 0; row < freqResult.numRecords; row++) {
+      const bucket = +freqCols[0].longValues![row];
+      if (freqCols[1].stringValues![row] === 'idle') {
+        summary.idles[bucket] = +freqCols[2].doubleValues![row];
+      } else {
+        summary.freqs[bucket] = +freqCols[2].doubleValues![row];
+      }
     }
     return summary;
   }
@@ -119,33 +194,62 @@ class CpuSliceTrackController extends TrackController<Config, Data> {
     // TODO(hjd): Remove LIMIT
     const LIMIT = 10000;
 
-    const query = `select ts,dur,utid from span_${this.trackState.id}
+    const sliceQuery = `select ts,dur,utid from ${this.tableName('span_sched')}
         where cpu = ${this.config.cpu}
         and utid != 0
         limit ${LIMIT};`;
-    const rawResult = await this.query(query);
 
-    const numRows = +rawResult.numRecords;
+    const freqQuery = `select
+        ts,
+        case name
+            when 'freq' then value
+            else 0.0
+        end as freq_or_zero
+        from ${this.tableName('activity')}
+        where cpu = ${this.config.cpu}`;
+
+    const [sliceResult, freqResult] = await Promise.all([
+      this.query(sliceQuery),
+      this.query(freqQuery),
+    ]);
+
+    const numSliceRows = +sliceResult.numRecords;
+    const numFreqRows = +freqResult.numRecords;
     const slices: SliceData = {
       kind: 'slice',
       start,
       end,
       resolution,
-      starts: new Float64Array(numRows),
-      ends: new Float64Array(numRows),
-      utids: new Uint32Array(numRows),
+      starts: new Float64Array(numSliceRows),
+      ends: new Float64Array(numSliceRows),
+      utids: new Uint32Array(numSliceRows),
+      freqStarts: new Float64Array(numFreqRows),
+      freqs: new Float64Array(numFreqRows),
     };
 
-    const cols = rawResult.columns;
-    for (let row = 0; row < numRows; row++) {
-      const startSec = fromNs(+cols[0].longValues![row]);
-      slices.starts[row] = startSec;
-      slices.ends[row] = startSec + fromNs(+cols[1].longValues![row]);
-      slices.utids[row] = +cols[2].longValues![row];
+    {
+      const cols = sliceResult.columns;
+      for (let row = 0; row < numSliceRows; row++) {
+        const startSec = fromNs(+cols[0].longValues![row]);
+        slices.starts[row] = startSec;
+        slices.ends[row] = startSec + fromNs(+cols[1].longValues![row]);
+        slices.utids[row] = +cols[2].longValues![row];
+      }
+      if (numSliceRows === LIMIT) {
+        slices.end = slices.ends[slices.ends.length - 1];
+      }
     }
-    if (numRows === LIMIT) {
-      slices.end = slices.ends[slices.ends.length - 1];
+
+    {
+      const cols = freqResult.columns;
+      for (let row = 0; row < numFreqRows; row++) {
+        slices.freqStarts[row] = fromNs(+cols[0].longValues![row]);
+        slices.freqs[row] = +cols[1].doubleValues![row];
+      }
+      console.log(freqResult);
+      console.log(slices);
     }
+
     return slices;
   }
 
@@ -160,8 +264,10 @@ class CpuSliceTrackController extends TrackController<Config, Data> {
 
   onDestroy(): void {
     if (this.setup) {
-      this.query(`drop table ${this.tableName('window')}`);
-      this.query(`drop table ${this.tableName('span')}`);
+      //this.query(`drop table ${this.tableName('span_counters')}`);
+      //this.query(`drop table ${this.tableName('freq_view')}`);
+      //this.query(`drop table ${this.tableName('span_sched')}`);
+      //this.query(`drop table ${this.tableName('window')}`);
       this.setup = false;
     }
   }
