@@ -26,7 +26,6 @@ export abstract class Panel<Attrs = {}> implements m.ClassComponent<Attrs> {
   abstract view(vnode: m.CVnode<Attrs>): m.Children|null|void;
 }
 
-
 export type PanelVNode<Attrs = {}> = m.Vnode<Attrs, Panel<Attrs>>;
 
 export function isPanelVNode(vnode: m.Vnode): vnode is PanelVNode {

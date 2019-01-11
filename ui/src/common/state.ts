@@ -113,6 +113,12 @@ export interface Status {
   timestamp: number;  // Epoch in seconds (Date.now() / 1000).
 }
 
+export interface Note {
+  id: string;
+  timestamp: number;
+}
+
+
 export interface State {
   route: string|null;
   nextId: number;
@@ -135,6 +141,7 @@ export interface State {
   pinnedTracks: string[];
   queries: ObjectById<QueryConfig>;
   permalink: PermalinkConfig;
+  notes: ObjectById<Note>;
   status: Status;
 }
 
@@ -157,6 +164,7 @@ export function createEmptyState(): State {
     scrollingTracks: [],
     queries: {},
     permalink: {},
+    notes: {},
 
     recordConfig: createEmptyRecordConfig(),
     displayConfigAsPbtxt: false,

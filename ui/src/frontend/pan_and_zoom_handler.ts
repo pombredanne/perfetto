@@ -89,7 +89,7 @@ export class PanAndZoomHandler {
 
     document.body.addEventListener('keydown', this.boundOnKeyDown);
     document.body.addEventListener('keyup', this.boundOnKeyUp);
-    this.element.addEventListener('mousemove', this.boundOnMouseMove);
+    this.element.addEventListener('mousemove', this.boundOnMouseMove, {passive: true});
     this.element.addEventListener('wheel', this.boundOnWheel, {passive: true});
 
     let lastX = -1;

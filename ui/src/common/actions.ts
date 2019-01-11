@@ -276,6 +276,19 @@ export const StateActions = {
   toggleDisplayConfigAsPbtxt(state: StateDraft, _: {}): void {
     state.displayConfigAsPbtxt = !state.displayConfigAsPbtxt;
   },
+
+  addNote(state: StateDraft, args: {timestamp: number}): void {
+    const id = `${state.nextId++}`;
+    state.notes[id] = {
+      id,
+      timestamp: args.timestamp,
+    };
+  },
+
+  removeNote(state: StateDraft, args: {id: string}): void {
+    delete state.notes[args.id];
+  },
+
 };
 
 // When we are on the frontend side, we don't really want to execute the

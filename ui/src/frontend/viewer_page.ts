@@ -21,6 +21,7 @@ import {copyToClipboard} from './clipboard';
 import {DragGestureHandler} from './drag_gesture_handler';
 import {globals} from './globals';
 import {HeaderPanel} from './header_panel';
+import {NotesPanel} from './notes_panel';
 import {OverviewTimelinePanel} from './overview_timeline_panel';
 import {createPage} from './pages';
 import {PanAndZoomHandler} from './pan_and_zoom_handler';
@@ -242,6 +243,7 @@ class TraceViewer implements m.ClassComponent {
                 m(TimeAxisPanel, {key: 'timeaxis'}),
                 ...globals.state.pinnedTracks.map(
                     id => m(TrackPanel, {key: id, id})),
+                m(NotesPanel, {key: 'notes'}),
               ],
             })),
           m('.scrolling-panel-container', m(PanelContainer, {
