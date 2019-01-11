@@ -59,7 +59,7 @@ using GValueType = ::perftools::profiles::ValueType;
 using GFunction = ::perftools::profiles::Function;
 using GSample = ::perftools::profiles::Sample;
 
-void DumpProfilePacket(std::vector<const ProfilePacket>& packets,
+void DumpProfilePacket(std::vector<ProfilePacket>& packets,
                        const std::string& file_prefix) {
   std::map<uint64_t, std::string> string_lookup;
   for (const ProfilePacket& packet : packets) {
@@ -196,7 +196,7 @@ int TraceToProfile(std::istream* input, std::ostream* output) {
   std::string temp_dir = GetTemp() + "/heap_profile-XXXXXXX";
   size_t itr = 0;
   PERFETTO_CHECK(mkdtemp(&temp_dir[0]));
-  std::vector<const ProfilePacket> rolling_profile_packets;
+  std::vector<ProfilePacket> rolling_profile_packets;
   ForEachPacketInTrace(input, [&temp_dir, &itr, &rolling_profile_packets](
                                   const protos::TracePacket& packet) {
     if (!packet.has_profile_packet())
