@@ -106,53 +106,6 @@ const char kJsonFtraceHeader[] =
     "#           TASK-PID    TGID   CPU#  ||||    TIMESTAMP  FUNCTION\\n"
     "#              | |        |      |   ||||       |         |\\n";
 
-struct EventInfo {
-  int64_t id = 0;
-  int64_t ts = 0;
-  uint32_t cpu = 0;
-  uint32_t tid = 0;
-  uint32_t pid = 0;
-  std::string event_name;
-  std::string thread_name;
-  std::map<std::string, std::string> args;
-};
-
-void WriteEventArgsToOutput(const EventInfo& info, std::ostream* output) {
-  auto write_arg = [&info](const std::string& key) {
-    return " " + key + "=" + info.args.find(key)->second;
-  };
-  if (info.event_name == "sched_switch") {
-    *output << write_arg("prev_comm") << write_arg("prev_pid")
-            << write_arg("prev_prio") << " "
-            << "prev_state="
-            << GetSchedSwitchFlag(
-                   std::stoi(info.args.find("prev_state")->second))
-            << " ==>" << write_arg("next_comm") << write_arg("next_pid")
-            << write_arg("next_prio");
-    return;
-  } else if (info.event_name == "cpu_frequency") {
-    *output << write_arg("state") << write_arg("cpu_id");
-    return;
-  }
-
-  for (auto it = info.args.begin(); it != info.args.end(); it++) {
-    *output << " " << it->first + "=" << it->second;
-  }
-}
-
-void WriteEventToOutput(const EventInfo& info, std::ostream* output) {
-  uint64_t ts = static_cast<uint64_t>(info.ts);
-  std::string prefix =
-      FormatFtracePrefix(ts, info.cpu, info.tid, info.pid, info.thread_name);
-
-  *output << prefix << info.event_name;
-  if (!info.args.empty()) {
-    *output << ":";
-    WriteEventArgsToOutput(info, output);
-  }
-  *output << "\n";
-}
-
 }  // namespace
 
 int TraceToSystrace(std::istream* input, std::ostream* output, bool) {
@@ -205,31 +158,33 @@ int TraceToSystrace(std::istream* input, std::ostream* output, bool) {
   *output << "TRACE:\n";
   *output << kFtraceHeader;
 
-  EventInfo info;
+  FtraceSystraceEvent event;
   for (uint64_t i = 0; i < result.num_records(); i++) {
     int idx = static_cast<int>(i);
     int64_t id = result.columns(0).long_values(idx);
 
-    if (info.id != id) {
-      if (info.id != 0)
-        WriteEventToOutput(info, output);
+    if (event.id != id) {
+      if (event.id != 0) {
+        *output << FormatFtraceEvent(event);
+        *output << "\n";
+      }
 
-      info.id = id;
-      info.ts = result.columns(1).long_values(idx);
-      info.cpu = static_cast<uint32_t>(result.columns(2).long_values(idx));
-      info.event_name = result.columns(3).string_values(idx);
+      event.id = id;
+      event.ts = result.columns(1).long_values(idx);
+      event.cpu = static_cast<uint32_t>(result.columns(2).long_values(idx));
+      event.event_name = result.columns(3).string_values(idx);
 
       const auto& thread_names = result.columns(4);
       if (thread_names.is_nulls(idx))
-        info.thread_name = "<...>";
+        event.thread_name = "<...>";
       else
-        info.thread_name = thread_names.string_values(idx);
+        event.thread_name = thread_names.string_values(idx);
 
-      info.tid = static_cast<uint32_t>(result.columns(5).long_values(idx));
+      event.tid = static_cast<uint32_t>(result.columns(5).long_values(idx));
 
       const auto& pids = result.columns(6);
       if (!pids.is_nulls(idx))
-        info.pid = static_cast<uint32_t>(pids.long_values(idx));
+        event.pid = static_cast<uint32_t>(pids.long_values(idx));
     }
 
     const auto& keys = result.columns(7);
@@ -240,11 +195,11 @@ int TraceToSystrace(std::istream* input, std::ostream* output, bool) {
       const auto& string_values = result.columns(9);
       const auto& real_values = result.columns(10);
       if (!int_values.is_nulls(idx)) {
-        info.args[key] = std::to_string(int_values.long_values(idx));
+        event.args[key] = std::to_string(int_values.long_values(idx));
       } else if (!string_values.is_nulls(idx)) {
-        info.args[key] = string_values.string_values(idx);
+        event.args[key] = string_values.string_values(idx);
       } else if (!real_values.is_nulls(idx)) {
-        info.args[key] = std::to_string(real_values.double_values(idx));
+        event.args[key] = std::to_string(real_values.double_values(idx));
       }
     }
   }

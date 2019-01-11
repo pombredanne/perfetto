@@ -343,6 +343,31 @@ using protos::SignalGenerateFtraceEvent;
 using protos::OomScoreAdjUpdateFtraceEvent;
 using protos::GenericFtraceEvent;
 
+const char* GetSchedSwitchFlag(int64_t state) {
+  state &= 511;
+  if (state & 1)
+    return "S";
+  if (state & 2)
+    return "D";
+  if (state & 4)
+    return "T";
+  if (state & 8)
+    return "t";
+  if (state & 16)
+    return "Z";
+  if (state & 32)
+    return "X";
+  if (state & 64)
+    return "x";
+  if (state & 128)
+    return "W";
+  return "R";
+}
+
+std::string GetSchedSwitchFlag(const std::string& state) {
+  return GetSchedSwitchFlag(std::stoi(state));
+}
+
 const char* GetExt4HintFlag(int64_t state) {
   if (state & 0x0001)
     return "HINT_MERGE";
@@ -3514,29 +3539,6 @@ uint64_t TimestampToMicroseconds(uint64_t timestamp) {
   return (timestamp / 1000) % 1000000ul;
 }
 
-}  // namespace
-
-const char* GetSchedSwitchFlag(int64_t state) {
-  state &= 511;
-  if (state & 1)
-    return "S";
-  if (state & 2)
-    return "D";
-  if (state & 4)
-    return "T";
-  if (state & 8)
-    return "t";
-  if (state & 16)
-    return "Z";
-  if (state & 32)
-    return "X";
-  if (state & 64)
-    return "x";
-  if (state & 128)
-    return "W";
-  return "R";
-}
-
 std::string FormatFtracePrefix(uint64_t timestamp,
                                uint32_t cpu,
                                uint32_t pid,
@@ -3560,6 +3562,56 @@ std::string FormatFtracePrefix(uint64_t timestamp,
             name.c_str(), pid, tgid, cpu, seconds, useconds);
   }
   return std::string(line);
+}
+
+using ValueMapFn = std::string (*)(const std::string&);
+
+std::string IdMapValue(const std::string& v) {
+  return v;
+}
+
+std::string FormatFtraceArg(const FtraceSystraceEvent& event,
+                            const std::string& key,
+                            ValueMapFn fn = &IdMapValue) {
+  return " " + key + "=" + fn(event.args.find(key)->second);
+}
+
+std::vector<std::string> FormatFtraceArgs(const FtraceSystraceEvent& event) {
+  if (event.event_name == "sched_switch") {
+    return {FormatFtraceArg(event, "prev_comm"),
+            FormatFtraceArg(event, "prev_pid"),
+            FormatFtraceArg(event, "prev_prio"),
+            FormatFtraceArg(event, "prev_state", &GetSchedSwitchFlag),
+            " ==>",
+            FormatFtraceArg(event, "next_comm"),
+            FormatFtraceArg(event, "next_pid"),
+            FormatFtraceArg(event, "next_prio")};
+  } else if (event.event_name == "cpu_frequency") {
+    return {FormatFtraceArg(event, "state"), FormatFtraceArg(event, "cpu_id")};
+  }
+
+  std::vector<std::string> args;
+  for (auto it = event.args.begin(); it != event.args.end(); it++) {
+    args.emplace_back(" " + it->first + "=" + it->second);
+  }
+  return args;
+}
+
+}  // namespace
+
+std::string FormatFtraceEvent(const FtraceSystraceEvent& event) {
+  uint64_t ts = static_cast<uint64_t>(event.ts);
+  std::string prefix = FormatFtracePrefix(ts, event.cpu, event.tid, event.pid,
+                                          event.thread_name);
+
+  std::string output = prefix + event.event_name;
+  if (!event.args.empty()) {
+    output += ":";
+    for (const auto& arg : FormatFtraceArgs(event)) {
+      output += arg;
+    }
+  }
+  return output;
 }
 
 std::string FormatFtraceEvent(

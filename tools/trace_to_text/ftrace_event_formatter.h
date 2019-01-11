@@ -26,13 +26,18 @@
 
 namespace perfetto {
 
-const char* GetSchedSwitchFlag(int64_t state);
+struct FtraceSystraceEvent {
+  int64_t id = 0;
+  int64_t ts = 0;
+  uint32_t cpu = 0;
+  uint32_t tid = 0;
+  uint32_t pid = 0;
+  std::string event_name;
+  std::string thread_name;
+  std::map<std::string, std::string> args;
+};
 
-std::string FormatFtracePrefix(uint64_t timestamp,
-                               uint32_t cpu,
-                               uint32_t pid,
-                               uint32_t tgid,
-                               std::string name);
+std::string FormatFtraceEvent(const FtraceSystraceEvent& event);
 
 std::string FormatFtraceEvent(
     uint64_t timestamp,
