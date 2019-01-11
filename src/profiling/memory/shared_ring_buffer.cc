@@ -206,7 +206,6 @@ SharedRingBuffer::WriteBuffer SharedRingBuffer::BeginWrite(
 void SharedRingBuffer::EndWrite(const WriteBuffer& buf) {
   reinterpret_cast<std::atomic<uint32_t>*>(buf.wr_ptr_)
       ->store(static_cast<uint32_t>(buf.size_), std::memory_order_release);
-  PERFETTO_DCHECK(!IsCorrupt());
 }
 
 SharedRingBuffer::ReadBuffer SharedRingBuffer::Read() {
