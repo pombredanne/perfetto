@@ -32,24 +32,45 @@ namespace profiling {
 
 class ScopedSpinlock {
  public:
-  ScopedSpinlock(std::atomic<bool>* lock, bool force);
+  friend void swap(ScopedSpinlock&, ScopedSpinlock&);
+
+  enum class Mode { Try, Blocking };
+
+  ScopedSpinlock(std::atomic<bool>* lock, Mode mode);
+  ScopedSpinlock(const ScopedSpinlock&) = delete;
+  ScopedSpinlock& operator=(const ScopedSpinlock&) = delete;
+
+  ScopedSpinlock(ScopedSpinlock&&);
+  ScopedSpinlock& operator=(ScopedSpinlock&&);
+
   ~ScopedSpinlock();
 
-  void Unlock();
-  bool locked() const;
+  void Unlock() {
+    if (locked_) {
+      PERFETTO_DCHECK(lock_->load());
+      lock_->store(false, std::memory_order_release);
+    }
+    locked_ = false;
+  }
+
+  bool locked() const { return locked_; }
 
  private:
-  std::atomic<bool>* const lock_;
+  std::atomic<bool>* lock_;
   bool locked_ = false;
 };
 
+void swap(ScopedSpinlock&, ScopedSpinlock&);
+
 // A concurrent, multi-writer single-reader ring buffer FIFO, based on a
 // circular buffer over shared memory. It has similar semantics to a SEQ_PACKET
-// + O_NONBLOCK socket, specifically: - Writes are atomic, data is either
-// written fully in the buffer or not. - New writes are discarded if the buffer
-// is full. - If a write succeeds, the reader is guaranteed to see the whole
-// buffer. - Reads are atomic, no fragmentation. - The reader sees writes in
-// write order (% discarding).
+// + O_NONBLOCK socket, specifically:
+//
+// - Writes are atomic, data is either written fully in the buffer or not.
+// - New writes are discarded if the buffer is full.
+// - If a write succeeds, the reader is guaranteed to see the whole buffer.
+// - Reads are atomic, no fragmentation.
+// - The reader sees writes in write order (% discarding).
 //
 // This class assumes that reader and write trust each other. Don't use in
 // untrusted contexts.
@@ -68,10 +89,10 @@ class SharedRingBuffer {
     operator bool() { return wr_ptr_ != nullptr; }
 
    private:
-    size_t size_;
+    size_t size_ = 0;
     uint8_t* wr_ptr_ = nullptr;
-    uint64_t write_pos_;
-    size_t size_with_header_;
+    uint64_t write_pos_ = 0;
+    size_t size_with_header_ = 0;
   };
 
   class ReadBuffer {
@@ -88,8 +109,8 @@ class SharedRingBuffer {
     ReadBuffer(ReadBuffer&&) noexcept;
     ReadBuffer& operator=(ReadBuffer&&) noexcept;
 
-    uint8_t* payload() const { return data_; }
-    size_t payload_size() const { return size_; }
+    uint8_t* data() const { return data_; }
+    size_t data_size() const { return size_; }
     operator bool() const { return ring_buffer_ != nullptr; }
 
    private:
@@ -119,11 +140,13 @@ class SharedRingBuffer {
   size_t size() const { return size_; }
   int fd() const { return *mem_fd_; }
 
-  WriteBuffer PrepareWrite(const ScopedSpinlock& spinlock, size_t size);
+  WriteBuffer BeginWrite(const ScopedSpinlock& spinlock, size_t size);
   void EndWrite(const WriteBuffer& buf);
 
-  bool TryWrite(const void*, size_t) PERFETTO_WARN_UNUSED_RESULT;
   ReadBuffer Read();
+  ScopedSpinlock AcquireLock(ScopedSpinlock::Mode mode) {
+    return ScopedSpinlock(&meta_->spinlock, mode);
+  }
 
  private:
   struct alignas(base::kPageSize) MetadataPage {
@@ -146,21 +169,24 @@ class SharedRingBuffer {
   SharedRingBuffer(const SharedRingBuffer&) = delete;
   SharedRingBuffer& operator=(const SharedRingBuffer&) = delete;
   SharedRingBuffer(CreateFlag, size_t size);
-  SharedRingBuffer(AttachFlag, base::ScopedFile mem_fd);
+  SharedRingBuffer(AttachFlag, base::ScopedFile mem_fd) {
+    Initialize(std::move(mem_fd));
+  }
+
   void Initialize(base::ScopedFile mem_fd);
   bool IsCorrupt();
-  void Return(const ReadBuffer&);
+  void EndRead(const ReadBuffer&);
 
-  // Must be called holding the spinlock.
-  inline size_t read_avail() {
+  inline size_t read_avail(const ScopedSpinlock&) {
     PERFETTO_DCHECK(meta_->write_pos >= meta_->read_pos);
     auto res = static_cast<size_t>(meta_->write_pos - meta_->read_pos);
     PERFETTO_DCHECK(res <= size_);
     return res;
   }
 
-  // Must be called holding the spinlock.
-  inline size_t write_avail() { return size_ - read_avail(); }
+  inline size_t write_avail(const ScopedSpinlock& spinlock) {
+    return size_ - read_avail(spinlock);
+  }
 
   inline uint8_t* at(uint64_t pos) { return mem_ + (pos & (size_ - 1)); }
 

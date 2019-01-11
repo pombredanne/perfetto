@@ -45,7 +45,7 @@ constexpr auto kGuardSize = base::kPageSize * 1024 * 16;  // 64 MB.
 
 }  // namespace
 
-ScopedSpinlock::ScopedSpinlock(std::atomic<bool>* lock, bool force)
+ScopedSpinlock::ScopedSpinlock(std::atomic<bool>* lock, Mode mode)
     : lock_(lock) {
   if (PERFETTO_LIKELY(!lock_->exchange(true, std::memory_order_acquire))) {
     locked_ = true;
@@ -53,7 +53,8 @@ ScopedSpinlock::ScopedSpinlock(std::atomic<bool>* lock, bool force)
   }
 
   // Slowpath.
-  for (size_t attempt = 0; force || attempt < 1024 * 10; attempt++) {
+  for (size_t attempt = 0; mode == Mode::Blocking || attempt < 1024 * 10;
+       attempt++) {
     if (!lock_->load(std::memory_order_relaxed) &&
         PERFETTO_LIKELY(!lock_->exchange(true, std::memory_order_acquire))) {
       locked_ = true;
@@ -64,20 +65,25 @@ ScopedSpinlock::ScopedSpinlock(std::atomic<bool>* lock, bool force)
   }
 }
 
+ScopedSpinlock::ScopedSpinlock(ScopedSpinlock&& other)
+    : lock_(other.lock_), locked_(other.locked_) {
+  other.locked_ = false;
+}
+
+ScopedSpinlock& ScopedSpinlock::operator=(ScopedSpinlock&& other) {
+  using std::swap;
+  ScopedSpinlock tmp(std::move(other));
+  swap(*this, tmp);
+  return *this;
+}
+
 ScopedSpinlock::~ScopedSpinlock() {
   Unlock();
 }
 
-void ScopedSpinlock::Unlock() {
-  if (locked_) {
-    PERFETTO_DCHECK(lock_->load());
-    lock_->store(false, std::memory_order_release);
-  }
-  locked_ = false;
-}
-
-bool ScopedSpinlock::locked() const {
-  return locked_;
+void swap(ScopedSpinlock& a, ScopedSpinlock& b) {
+  std::swap(a.lock_, b.lock_);
+  std::swap(a.locked_, b.locked_);
 }
 
 SharedRingBuffer::SharedRingBuffer(CreateFlag, size_t size) {
@@ -109,10 +115,6 @@ SharedRingBuffer::SharedRingBuffer(CreateFlag, size_t size) {
   }
 #endif
   Initialize(std::move(fd));
-}
-
-SharedRingBuffer::SharedRingBuffer(AttachFlag, base::ScopedFile mem_fd) {
-  Initialize(std::move(mem_fd));
 }
 
 SharedRingBuffer::~SharedRingBuffer() {
@@ -156,7 +158,7 @@ void SharedRingBuffer::Initialize(base::ScopedFile mem_fd) {
   void* reg1 = mmap(region, size_with_meta, PROT_READ | PROT_WRITE,
                     MAP_SHARED | MAP_FIXED, *mem_fd, 0);
 
-  // When map again the buffer, skipping the metadata page. The final result is:
+  // Then map again the buffer, skipping the metadata page. The final result is:
   // [ METADATA ] [ RING BUFFER SHMEM ] [ RING BUFFER SHMEM ]
   void* reg2 = mmap(region + size_with_meta, size, PROT_READ | PROT_WRITE,
                     MAP_SHARED | MAP_FIXED, *mem_fd,
@@ -173,7 +175,7 @@ void SharedRingBuffer::Initialize(base::ScopedFile mem_fd) {
   mem_fd_ = std::move(mem_fd);
 }
 
-SharedRingBuffer::WriteBuffer SharedRingBuffer::PrepareWrite(
+SharedRingBuffer::WriteBuffer SharedRingBuffer::BeginWrite(
     const ScopedSpinlock& spinlock,
     size_t size) {
   PERFETTO_DCHECK(spinlock.locked());
@@ -183,7 +185,7 @@ SharedRingBuffer::WriteBuffer SharedRingBuffer::PrepareWrite(
     return result;
 
   result.size_with_header_ = base::AlignUp<kAlignment>(size + kHeaderSize);
-  if (result.size_with_header_ > write_avail()) {
+  if (result.size_with_header_ > write_avail(spinlock)) {
     meta_->num_writes_failed++;
     return result;
   }
@@ -207,35 +209,15 @@ void SharedRingBuffer::EndWrite(const WriteBuffer& buf) {
   PERFETTO_DCHECK(!IsCorrupt());
 }
 
-bool SharedRingBuffer::TryWrite(const void* src, size_t size) {
-  WriteBuffer buf;
-  {
-    ScopedSpinlock try_spinlock(&meta_->spinlock, false);
-    if (!try_spinlock.locked()) {
-      // This is not really thread safe as the spinlock is not held, but it's
-      // best-effort anyways.
-      meta_->failed_spinlocks++;
-      meta_->num_writes_failed++;
-      return false;
-    }
-    buf = PrepareWrite(try_spinlock, size);
-  }
-  if (!buf)
-    return false;
-  memcpy(buf.buf(), src, size);
-  EndWrite(buf);
-  return true;
-}
-
 SharedRingBuffer::ReadBuffer SharedRingBuffer::Read() {
-  ScopedSpinlock spinlock(&meta_->spinlock, true);
+  ScopedSpinlock spinlock(&meta_->spinlock, ScopedSpinlock::Mode::Blocking);
 
   if (IsCorrupt()) {
     meta_->num_reads_failed++;
     return ReadBuffer();
   }
 
-  if (read_avail() < kHeaderSize)
+  if (read_avail(spinlock) < kHeaderSize)
     return ReadBuffer();  // No data
 
   uint8_t* rd_ptr = at(meta_->read_pos);
@@ -245,10 +227,11 @@ SharedRingBuffer::ReadBuffer SharedRingBuffer::Read() {
     return ReadBuffer();
   const size_t size_with_header = base::AlignUp<kAlignment>(size + kHeaderSize);
 
-  if (size_with_header > read_avail()) {
+  if (size_with_header > read_avail(spinlock)) {
     PERFETTO_ELOG("Corrupted header detected, size=%" PRIu64
                   ", read_avail=%zu, rd=%" PRIu64 ", wr=%" PRIu64,
-                  size, read_avail(), meta_->read_pos, meta_->write_pos);
+                  size, read_avail(spinlock), meta_->read_pos,
+                  meta_->write_pos);
     meta_->num_reads_failed++;
     return ReadBuffer();
   }
@@ -257,8 +240,8 @@ SharedRingBuffer::ReadBuffer SharedRingBuffer::Read() {
   return ReadBuffer(rd_ptr, size, size_with_header, this);
 }
 
-void SharedRingBuffer::Return(const ReadBuffer& buf) {
-  ScopedSpinlock spinlock(&meta_->spinlock, true);
+void SharedRingBuffer::EndRead(const ReadBuffer& buf) {
+  ScopedSpinlock spinlock(&meta_->spinlock, ScopedSpinlock::Mode::Blocking);
   meta_->read_pos += buf.size_with_header_;
 }
 
@@ -305,7 +288,7 @@ base::Optional<SharedRingBuffer> SharedRingBuffer::Attach(
 
 SharedRingBuffer::ReadBuffer::~ReadBuffer() {
   if (ring_buffer_)
-    ring_buffer_->Return(*this);
+    ring_buffer_->EndRead(*this);
 }
 
 SharedRingBuffer::ReadBuffer::ReadBuffer(ReadBuffer&& other) noexcept
