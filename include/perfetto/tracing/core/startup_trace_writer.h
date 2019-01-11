@@ -62,11 +62,14 @@ class TracePacket;
 //
 // While unbound, the writer thread should finalize each TracePacket as soon as
 // possible to ensure that it doesn't block binding the writer.
-class PERFETTO_EXPORT StartupTraceWriter : public TraceWriter {
+class PERFETTO_EXPORT StartupTraceWriter
+    : public TraceWriter,
+      public protozero::MessageHandleBase::FinalizationListener {
  public:
   // Create an unbound StartupTraceWriter that can later be bound by calling
   // BindToTraceWriter().
   StartupTraceWriter();
+
   // Create a StartupTraceWriter bound to |trace_writer|. Should only be called
   // on the writer thread.
   explicit StartupTraceWriter(std::unique_ptr<TraceWriter> trace_writer);
@@ -77,6 +80,7 @@ class PERFETTO_EXPORT StartupTraceWriter : public TraceWriter {
   // writer thread.
   TracePacketHandle NewTracePacket() override;
   void Flush(std::function<void()> callback = {}) override;
+
   // Note that this will return 0 until the first TracePacket was started after
   // binding.
   WriterID writer_id() const override;
@@ -91,16 +95,8 @@ class PERFETTO_EXPORT StartupTraceWriter : public TraceWriter {
   // arbiter.
   //
   // Will fail and return |false| if a concurrent write is in progress.
-  bool BindToArbiter(SharedMemoryArbiterImpl*, BufferID target_buffer);
-
-  size_t used_buffer_size() const {
-    size_t used_size = 0;
-    memory_buffer_->AdjustUsedSizeOfCurrentSlice();
-    for (const auto& slice : memory_buffer_->slices()) {
-      used_size += slice.GetUsedRange().size();
-    }
-    return used_size;
-  }
+  bool BindToArbiter(SharedMemoryArbiterImpl*,
+                     BufferID target_buffer) PERFETTO_WARN_UNUSED_RESULT;
 
   // Returns |true| if the writer thread has observed that the writer was bound
   // to an SMB. Should only be called on the writer thread.
@@ -114,7 +110,13 @@ class PERFETTO_EXPORT StartupTraceWriter : public TraceWriter {
     return was_bound_;
   }
 
+  // Should only be called on the writer thread.
+  size_t used_buffer_size();
+
  private:
+  // protozero::MessageHandleBase::FinalizationListener implementation.
+  void OnMessageFinalized(protozero::Message* message) override;
+
   void OnTracePacketCompleted();
   ChunkID CommitLocalBufferChunks(SharedMemoryArbiterImpl*, WriterID, BufferID);
 
@@ -142,8 +144,9 @@ class PERFETTO_EXPORT StartupTraceWriter : public TraceWriter {
   // Whether the writer thread is currently writing a TracePacket.
   bool write_in_progress_ = false;
 
-  // The packet returned via NewTracePacket() while the writer is unbound.
-  // Owned by this class, TracePacketHandle has just a pointer to it.
+  // The packet returned via NewTracePacket() while the writer is unbound. Reset
+  // to |nullptr| once bound. Owned by this class, TracePacketHandle has just a
+  // pointer to it.
   std::unique_ptr<protos::pbzero::TracePacket> cur_packet_;
 };
 

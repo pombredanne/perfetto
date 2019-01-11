@@ -147,7 +147,8 @@ TraceWriter::TracePacketHandle StartupTraceWriter::NewTracePacket() {
   // Check if we are already bound without grabbing the lock. This is an
   // optimization to avoid any locking in the common case where the proxy was
   // bound some time ago.
-  if (was_bound_) {
+  if (PERFETTO_LIKELY(was_bound_)) {
+    PERFETTO_DCHECK(!cur_packet_);
     PERFETTO_DCHECK(trace_writer_);
     return trace_writer_->NewTracePacket();
   }
@@ -156,6 +157,7 @@ TraceWriter::TracePacketHandle StartupTraceWriter::NewTracePacket() {
   {
     std::lock_guard<std::mutex> lock(lock_);
     if (trace_writer_) {
+      PERFETTO_DCHECK(!cur_packet_);
       // Set the |was_bound_| flag to avoid locking in future calls to
       // NewTracePacket().
       was_bound_ = true;
@@ -176,11 +178,10 @@ TraceWriter::TracePacketHandle StartupTraceWriter::NewTracePacket() {
     cur_packet_.reset(new protos::pbzero::TracePacket());
   }
   cur_packet_->Reset(memory_stream_writer_.get());
-  auto completed_callback = [this]() {
-    // |this| outlives the packet handle.
-    this->OnTracePacketCompleted();
-  };
-  return TraceWriter::TracePacketHandle(cur_packet_.get(), completed_callback);
+  TraceWriter::TracePacketHandle handle(cur_packet_.get());
+  // |this| outlives the packet handle.
+  handle.set_finalization_listener(this);
+  return handle;
 }
 
 void StartupTraceWriter::Flush(std::function<void()> callback) {
@@ -188,7 +189,7 @@ void StartupTraceWriter::Flush(std::function<void()> callback) {
   // It's fine to check |was_bound_| instead of acquiring the lock because
   // |trace_writer_| will only need flushing after the first trace packet was
   // written to it and |was_bound_| is set.
-  if (was_bound_) {
+  if (PERFETTO_LIKELY(was_bound_)) {
     PERFETTO_DCHECK(trace_writer_);
     return trace_writer_->Flush(std::move(callback));
   }
@@ -202,14 +203,32 @@ WriterID StartupTraceWriter::writer_id() const {
   // We can't acquire the lock because this is a const method. So we'll only
   // proxy to |trace_writer_| once we have written the first packet to it
   // instead.
-  if (was_bound_) {
+  if (PERFETTO_LIKELY(was_bound_)) {
     PERFETTO_DCHECK(trace_writer_);
     return trace_writer_->writer_id();
   }
   return 0;
 }
 
-void StartupTraceWriter::OnTracePacketCompleted() {
+size_t StartupTraceWriter::used_buffer_size() {
+  PERFETTO_DCHECK_THREAD(writer_thread_checker_);
+  if (PERFETTO_LIKELY(was_bound_))
+    return 0;
+
+  std::lock_guard<std::mutex> lock(lock_);
+  if (trace_writer_)
+    return 0;
+
+  size_t used_size = 0;
+  memory_buffer_->AdjustUsedSizeOfCurrentSlice();
+  for (const auto& slice : memory_buffer_->slices()) {
+    used_size += slice.GetUsedRange().size();
+  }
+  return used_size;
+}
+
+void StartupTraceWriter::OnMessageFinalized(protozero::Message* message) {
+  PERFETTO_DCHECK(cur_packet_.get() == message);
   PERFETTO_DCHECK(cur_packet_->is_finalized());
   // Finalize() is a no-op because the packet is already finalized.
   uint32_t packet_size = cur_packet_->Finalize();
@@ -245,7 +264,7 @@ ChunkID StartupTraceWriter::CommitLocalBufferChunks(
   size_t cur_payload_size = 0;
   uint16_t cur_num_packets = 0;
   size_t total_num_packets = packet_sizes_.size();
-  PatchList patch_list;
+  PatchList empty_patch_list;
   for (size_t packet_idx = 0; packet_idx < total_num_packets; packet_idx++) {
     uint32_t packet_size = packet_sizes_[packet_idx];
     uint32_t remaining_packet_size = packet_size;
@@ -278,7 +297,7 @@ ChunkID StartupTraceWriter::CommitLocalBufferChunks(
           cur_chunk.SetFlag(ChunkHeader::kLastPacketContinuesOnNextChunk);
 
         arbiter->ReturnCompletedChunk(std::move(cur_chunk), target_buffer,
-                                      &patch_list);
+                                      &empty_patch_list);
 
         // Avoid creating a new chunk after the last write.
         if (!last_write) {

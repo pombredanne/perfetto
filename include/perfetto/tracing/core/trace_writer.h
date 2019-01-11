@@ -82,7 +82,7 @@ class PERFETTO_EXPORT TraceWriter {
   //
   // StartupTraceWriter will call this if it committed buffered data on
   // behalf of the TraceWriter.
-  virtual bool SetFirstChunkId(ChunkID) { return false; }
+  virtual bool SetFirstChunkId(ChunkID);
 
  private:
   TraceWriter(const TraceWriter&) = delete;

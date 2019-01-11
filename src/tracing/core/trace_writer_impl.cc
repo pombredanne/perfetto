@@ -227,8 +227,12 @@ bool TraceWriterImpl::SetFirstChunkId(ChunkID chunk_id) {
   return true;
 }
 
-// Base class ctor/dtor definition.
+// Base class definitions.
 TraceWriter::TraceWriter() = default;
 TraceWriter::~TraceWriter() = default;
+
+bool TraceWriter::SetFirstChunkId(ChunkID) {
+  return false;
+}
 
 }  // namespace perfetto

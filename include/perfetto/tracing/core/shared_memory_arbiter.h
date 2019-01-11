@@ -57,7 +57,8 @@ class PERFETTO_EXPORT SharedMemoryArbiter {
   // this case, the caller should retry (it is free to try again immediately or
   // schedule a wakeup to retry later).
   virtual bool BindStartupTraceWriter(StartupTraceWriter* writer,
-                                      BufferID target_buffer) = 0;
+                                      BufferID target_buffer)
+      PERFETTO_WARN_UNUSED_RESULT = 0;
 
   // Notifies the service that all data for the given FlushRequestID has been
   // committed in the shared memory buffer.

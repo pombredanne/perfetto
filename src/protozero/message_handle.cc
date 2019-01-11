@@ -22,11 +22,9 @@
 
 namespace protozero {
 
-MessageHandleBase::MessageHandleBase(
-    Message* message,
-    std::function<void()> message_completed_callback)
-    : message_(message),
-      message_completed_callback_(message_completed_callback) {
+MessageHandleBase::FinalizationListener::~FinalizationListener() {}
+
+MessageHandleBase::MessageHandleBase(Message* message) : message_(message) {
 #if PERFETTO_DCHECK_IS_ON()
   generation_ = message_ ? message->generation_ : 0;
   if (message_)
@@ -60,20 +58,14 @@ MessageHandleBase& MessageHandleBase::operator=(MessageHandleBase&& other) {
 void MessageHandleBase::Move(MessageHandleBase&& other) {
   message_ = other.message_;
   other.message_ = nullptr;
-  message_completed_callback_ = other.message_completed_callback_;
-  other.message_completed_callback_ = nullptr;
+  listener_ = other.listener_;
+  other.listener_ = nullptr;
 #if PERFETTO_DCHECK_IS_ON()
   if (message_) {
     generation_ = message_->generation_;
     message_->set_handle(this);
   }
 #endif
-}
-
-void MessageHandleBase::FinalizeMessage() {
-  message_->Finalize();
-  if (message_completed_callback_)
-    message_completed_callback_();
 }
 
 }  // namespace protozero
