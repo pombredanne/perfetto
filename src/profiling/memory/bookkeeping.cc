@@ -126,6 +126,9 @@ void HeapTracker::Dump(pid_t pid, DumpState* dump_state) {
   }
   dead_callstack_allocations_.clear();
 
+  if (dump_state->currently_written() > kMaxTracePacketSize)
+    dump_state->NewProfilePacket();
+
   ProfilePacket::ProcessHeapSamples* proto =
       dump_state->current_profile_packet->add_process_dumps();
   proto->set_pid(static_cast<uint64_t>(pid));
