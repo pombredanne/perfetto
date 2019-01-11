@@ -88,8 +88,8 @@ class PERFETTO_EXPORT MessageHandleBase {
   void FinalizeMessage() {
     // |message_| and |listener_| may be cleared by reset_message() during
     // Message::Finalize().
-    auto listener = listener_;
-    auto message = message_;
+    auto* listener = listener_;
+    auto* message = message_;
     message->Finalize();
     if (listener)
       listener->OnMessageFinalized(message);
