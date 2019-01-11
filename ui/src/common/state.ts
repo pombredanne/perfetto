@@ -105,6 +105,10 @@ export interface RecordConfig {
 export interface TraceTime {
   startSec: number;
   endSec: number;
+}
+
+export interface HighFrequencyState {
+  visibleTraceTime: TraceTime;
   lastUpdate: number;  // Epoch in seconds (Date.now() / 1000).
 }
 
@@ -128,7 +132,6 @@ export interface State {
    */
   engines: ObjectById<EngineConfig>;
   traceTime: TraceTime;
-  visibleTraceTime: TraceTime;
   trackGroups: ObjectById<TrackGroupState>;
   tracks: ObjectById<TrackState>;
   scrollingTracks: string[];
@@ -136,12 +139,13 @@ export interface State {
   queries: ObjectById<QueryConfig>;
   permalink: PermalinkConfig;
   status: Status;
+
+  highFrequencyState: HighFrequencyState;
 }
 
 export const defaultTraceTime = {
   startSec: 0,
   endSec: 10,
-  lastUpdate: 0
 };
 
 export function createEmptyState(): State {
@@ -150,7 +154,6 @@ export function createEmptyState(): State {
     nextId: 0,
     engines: {},
     traceTime: {...defaultTraceTime},
-    visibleTraceTime: {...defaultTraceTime},
     tracks: {},
     trackGroups: {},
     pinnedTracks: [],
@@ -160,6 +163,11 @@ export function createEmptyState(): State {
 
     recordConfig: createEmptyRecordConfig(),
     displayConfigAsPbtxt: false,
+
+    highFrequencyState: {
+      visibleTraceTime: {...defaultTraceTime},
+      lastUpdate: 0,
+    },
 
     status: {msg: '', timestamp: 0},
   };
