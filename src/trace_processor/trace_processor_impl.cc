@@ -54,12 +54,16 @@ extern "C" int sqlite3_percentile_init(sqlite3* db,
 
 namespace {
 void InitializeSqliteModules(sqlite3* db) {
+// In Android tree builds, we don't have the percentile module.
+// Just don't include it.
+#if !PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
   char* error = nullptr;
   sqlite3_percentile_init(db, &error, nullptr);
   if (error) {
     PERFETTO_ELOG("Error initializing: %s", error);
     sqlite3_free(error);
   }
+#endif
 }
 
 void CreateBuiltinTables(sqlite3* db) {

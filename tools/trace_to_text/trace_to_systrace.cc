@@ -108,7 +108,9 @@ const char kFtraceJsonHeader[] =
 
 }  // namespace
 
-int TraceToSystrace(std::istream* input, std::ostream* output, bool) {
+int TraceToSystrace(std::istream* input,
+                    std::ostream* output,
+                    bool wrap_in_json) {
   trace_processor::Config config;
   config.optimization_mode = trace_processor::OptimizationMode::kMaxBandwidth;
   std::unique_ptr<trace_processor::TraceProcessor> tp =
@@ -155,8 +157,19 @@ int TraceToSystrace(std::istream* input, std::ostream* output, bool) {
     return 1;
   }
 
-  *output << "TRACE:\n";
-  *output << kFtraceHeader;
+  if (wrap_in_json) {
+    *output << kTraceHeader;
+    *output << kProcessDumpHeader;
+    // TODO(lalitm): dump processes here.
+    *output << kThreadHeader;
+    // TODO(lalitm): dump threads here.
+    *output << "\",";
+    *output << kSystemTraceEvents;
+    *output << kFtraceJsonHeader;
+  } else {
+    *output << "TRACE:\n";
+    *output << kFtraceHeader;
+  }
 
   FtraceSystraceEvent event;
   for (uint64_t i = 0; i < result.num_records(); i++) {
@@ -203,6 +216,10 @@ int TraceToSystrace(std::istream* input, std::ostream* output, bool) {
       }
     }
   }
+
+  if (wrap_in_json)
+    *output << kTraceFooter;
+
   return 0;
 }
 

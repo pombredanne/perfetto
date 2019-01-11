@@ -2802,8 +2802,6 @@ cc_binary_host {
     ":perfetto_protos_perfetto_trace_ps_lite_gen",
     ":perfetto_protos_perfetto_trace_sys_stats_lite_gen",
     ":perfetto_protos_third_party_pprof_lite_gen",
-    "buildtools/sqlite/sqlite3.c",
-    "buildtools/sqlite_src/ext/misc/percentile.c",
     "src/base/event.cc",
     "src/base/file_utils.cc",
     "src/base/metatrace.cc",
@@ -2873,6 +2871,7 @@ cc_binary_host {
   ],
   static_libs: [
     "libgtest_prod",
+    "libsqlite",
   ],
   generated_headers: [
     "perfetto_protos_perfetto_common_lite_gen_headers",
@@ -2896,6 +2895,7 @@ cc_binary_host {
   cflags: [
     "-DGOOGLE_PROTOBUF_NO_RTTI",
     "-DGOOGLE_PROTOBUF_NO_STATIC_INITIALIZER",
+    "-DPERFETTO_BUILD_WITH_ANDROID",
   ],
 }
 

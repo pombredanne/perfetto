@@ -218,6 +218,7 @@ if (perfetto_build_standalone || perfetto_build_with_android) {
         "gn:default_deps",
         "tools/trace_to_text:full",
       ]
+      cflags = [ "-DPERFETTO_BUILD_WITH_ANDROID" ]
     }
 
     # This target exports perfetto trace protos in the Android build system,
