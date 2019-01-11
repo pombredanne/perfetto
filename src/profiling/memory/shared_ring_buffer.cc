@@ -132,7 +132,10 @@ SharedRingBuffer::~SharedRingBuffer() {
 void SharedRingBuffer::Initialize(base::ScopedFile mem_fd) {
   struct stat stat_buf = {};
   int res = fstat(*mem_fd, &stat_buf);
-  PERFETTO_CHECK(res == 0 && stat_buf.st_size > 0);
+  if (res != 0 && stat_buf.st_size == 0) {
+    PERFETTO_PLOG("Could not attach to fd.");
+    return;
+  }
   auto size_with_meta = static_cast<size_t>(stat_buf.st_size);
   auto size = size_with_meta - kMetaPageSize;
 
@@ -140,7 +143,8 @@ void SharedRingBuffer::Initialize(base::ScopedFile mem_fd) {
   // metadata).
   if (size_with_meta < 2 * base::kPageSize || size % base::kPageSize ||
       (size & (size - 1))) {
-    PERFETTO_ELOG("SharedRingBuffer size is invalid (%zu)", size_with_meta);
+    //    PERFETTO_ELOG("SharedRingBuffer size is invalid (%zu)",
+    //    size_with_meta);
     return;
   }
 
@@ -172,6 +176,7 @@ void SharedRingBuffer::Initialize(base::ScopedFile mem_fd) {
   size_ = size;
   meta_ = new (region) MetadataPage();
   mem_ = region + kMetaPageSize;
+  mem_end_ = region + size_with_meta + size;
   mem_fd_ = std::move(mem_fd);
 }
 
@@ -226,7 +231,8 @@ SharedRingBuffer::ReadBuffer SharedRingBuffer::Read() {
     return ReadBuffer();
   const size_t size_with_header = base::AlignUp<kAlignment>(size + kHeaderSize);
 
-  if (size_with_header > read_avail(spinlock)) {
+  if (size_with_header > read_avail(spinlock) ||
+      rd_ptr + size_with_header >= mem_end_) {
     PERFETTO_ELOG(
         "Corrupted header detected, size=%zu"
         ", read_avail=%zu, rd=%" PRIu64 ", wr=%" PRIu64,

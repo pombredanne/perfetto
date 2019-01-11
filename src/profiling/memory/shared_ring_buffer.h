@@ -193,6 +193,7 @@ class SharedRingBuffer {
   base::ScopedFile mem_fd_;
   MetadataPage* meta_ = nullptr;  // Start of the mmaped region.
   uint8_t* mem_ = nullptr;  // Start of the contents (i.e. meta_ + kPageSize).
+  uint8_t* mem_end_ = nullptr;
 
   // Size of the ring buffer contents, without including metadata or the 2nd
   // mmap.
