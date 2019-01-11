@@ -221,17 +221,17 @@ SharedRingBuffer::ReadBuffer SharedRingBuffer::Read() {
     return ReadBuffer();  // No data
 
   uint8_t* rd_ptr = at(meta_->read_pos);
-  uint64_t size = reinterpret_cast<std::atomic<uint32_t>*>(rd_ptr)->load(
+  size_t size = reinterpret_cast<std::atomic<uint32_t>*>(rd_ptr)->load(
       std::memory_order_acquire);
   if (size == 0)
     return ReadBuffer();
   const size_t size_with_header = base::AlignUp<kAlignment>(size + kHeaderSize);
 
   if (size_with_header > read_avail(spinlock)) {
-    PERFETTO_ELOG("Corrupted header detected, size=%" PRIu64
-                  ", read_avail=%zu, rd=%" PRIu64 ", wr=%" PRIu64,
-                  size, read_avail(spinlock), meta_->read_pos,
-                  meta_->write_pos);
+    PERFETTO_ELOG(
+        "Corrupted header detected, size=%zu"
+        ", read_avail=%zu, rd=%" PRIu64 ", wr=%" PRIu64,
+        size, read_avail(spinlock), meta_->read_pos, meta_->write_pos);
     meta_->num_reads_failed++;
     return ReadBuffer();
   }
