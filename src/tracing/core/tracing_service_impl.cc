@@ -215,14 +215,12 @@ void TracingServiceImpl::DisconnectConsumer(ConsumerEndpointImpl* consumer) {
     FreeBuffers(consumer->tracing_session_id_);  // Will also DisableTracing().
   consumers_.erase(consumer);
 
-// At this point no more pointers to |consumer| should be around.
-#if PERFETTO_DCHECK_IS_ON()
+  // At this point no more pointers to |consumer| should be around.
   PERFETTO_DCHECK(!std::any_of(
       tracing_sessions_.begin(), tracing_sessions_.end(),
       [consumer](const std::pair<const TracingSessionID, TracingSession>& kv) {
         return kv.second.consumer_maybe_null == consumer;
       }));
-#endif
 }
 
 bool TracingServiceImpl::DetachConsumer(ConsumerEndpointImpl* consumer,
@@ -1620,7 +1618,10 @@ void TracingServiceImpl::SnapshotStats(TracingSession* tracing_session,
     const TraceBuffer::Stats& buf_stats = buf->stats();
     buf_stats_proto->set_bytes_written(buf_stats.bytes_written);
     buf_stats_proto->set_chunks_written(buf_stats.chunks_written);
+    buf_stats_proto->set_chunks_rewritten(buf_stats.chunks_rewritten);
     buf_stats_proto->set_chunks_overwritten(buf_stats.chunks_overwritten);
+    buf_stats_proto->set_chunks_committed_out_of_order(
+        buf_stats.chunks_committed_out_of_order);
     buf_stats_proto->set_write_wrap_count(buf_stats.write_wrap_count);
     buf_stats_proto->set_patches_succeeded(buf_stats.patches_succeeded);
     buf_stats_proto->set_patches_failed(buf_stats.patches_failed);
