@@ -110,7 +110,7 @@ class SharedRingBuffer {
     ReadBuffer& operator=(ReadBuffer&&) noexcept;
 
     uint8_t* data() const { return data_; }
-    size_t data_size() const { return size_; }
+    size_t size() const { return size_; }
     operator bool() const { return ring_buffer_ != nullptr; }
 
    private:

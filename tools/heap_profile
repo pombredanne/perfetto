@@ -161,6 +161,8 @@ def main(argv):
         ['adb', 'shell', 'su root setenforce %s' % enforcing])
     subprocess.check_call(['adb', 'shell', 'su root setenforce 0'])
 
+  atexit.register(subprocess.check_call,
+                  ['adb', 'shell', 'su root stop heapprofd'])
   subprocess.check_call(['adb', 'shell', 'su root start heapprofd'])
 
   perfetto_pid = subprocess.check_output(

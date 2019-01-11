@@ -31,7 +31,7 @@ namespace {
 
 std::string ToString(const SharedRingBuffer::ReadBuffer& buf_and_size) {
   return std::string(reinterpret_cast<const char*>(&buf_and_size.data()[0]),
-                     buf_and_size.data_size());
+                     buf_and_size.size());
 }
 
 bool TryWrite(SharedRingBuffer* wr, const char* src, size_t size) {
@@ -61,19 +61,19 @@ void StructuredTest(SharedRingBuffer* wr, SharedRingBuffer* rd) {
 
   {
     auto buf_and_size = rd->Read();
-    ASSERT_EQ(buf_and_size.data_size(), 4);
+    ASSERT_EQ(buf_and_size.size(), 4);
     ASSERT_STREQ(reinterpret_cast<const char*>(&buf_and_size.data()[0]), "foo");
   }
   {
     auto buf_and_size = rd->Read();
-    ASSERT_EQ(buf_and_size.data_size(), 4);
+    ASSERT_EQ(buf_and_size.size(), 4);
     ASSERT_STREQ(reinterpret_cast<const char*>(&buf_and_size.data()[0]), "bar");
   }
 
   for (int i = 0; i < 3; i++) {
     auto buf_and_size = rd->Read();
     ASSERT_EQ(buf_and_size.data(), nullptr);
-    ASSERT_EQ(buf_and_size.data_size(), 0);
+    ASSERT_EQ(buf_and_size.size(), 0);
   }
 
   // Test extremely large writes (fill the buffer)
@@ -103,7 +103,7 @@ void StructuredTest(SharedRingBuffer* wr, SharedRingBuffer* rd) {
 
   for (int i = 0; i < 4; i++) {
     auto buf_and_size = rd->Read();
-    ASSERT_EQ(buf_and_size.data_size(), data.size());
+    ASSERT_EQ(buf_and_size.size(), data.size());
     ASSERT_EQ(ToString(buf_and_size), data);
   }
 
@@ -193,7 +193,7 @@ TEST(SharedRingBufferTest, MultiThreadingTest) {
           continue;
         }
       }
-      ASSERT_GT(buf_and_size.data_size(), 0);
+      ASSERT_GT(buf_and_size.size(), 0);
       std::string data = ToString(buf_and_size);
       std::lock_guard<std::mutex> lock(mutex);
       expected_contents[std::move(data)]--;
