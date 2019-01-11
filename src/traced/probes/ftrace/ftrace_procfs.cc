@@ -83,7 +83,6 @@ bool FtraceProcfs::EnableEvent(const std::string& group,
   std::string path = root_ + "events/" + group + "/" + name + "/enable";
   if (WriteToFile(path, "1"))
     return true;
-  PERFETTO_DLOG("Falling back on set_event");
   path = root_ + "set_event";
   return AppendToFile(path, group + ":" + name);
 }
