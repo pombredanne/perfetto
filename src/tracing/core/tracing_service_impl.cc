@@ -216,13 +216,11 @@ void TracingServiceImpl::DisconnectConsumer(ConsumerEndpointImpl* consumer) {
   consumers_.erase(consumer);
 
 // At this point no more pointers to |consumer| should be around.
-#if PERFETTO_DCHECK_IS_ON()
   PERFETTO_DCHECK(!std::any_of(
       tracing_sessions_.begin(), tracing_sessions_.end(),
       [consumer](const std::pair<const TracingSessionID, TracingSession>& kv) {
         return kv.second.consumer_maybe_null == consumer;
       }));
-#endif
 }
 
 bool TracingServiceImpl::DetachConsumer(ConsumerEndpointImpl* consumer,
