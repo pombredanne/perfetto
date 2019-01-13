@@ -511,7 +511,8 @@ void HeapprofdProducer::ResetConnectionBackoff() {
 // TODO(rsavitski): would be cleaner to shut down the event loop instead
 // (letting main exit). One test-friendly approach is to supply a shutdown
 // callback in the constructor.
-void HeapprofdProducer::TerminateProcess(int exit_status) {
+__attribute__((noreturn)) void HeapprofdProducer::TerminateProcess(
+    int exit_status) {
   PERFETTO_CHECK(mode_ == HeapprofdMode::kChild);
   exit(exit_status);
 }

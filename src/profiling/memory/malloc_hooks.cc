@@ -239,7 +239,7 @@ bool HEAPPROFD_ADD_PREFIX(_initialize)(const MallocDispatch* malloc_dispatch,
                                 : CreateClientForCentralDaemon();
 
   if (!client || !client->inited()) {
-    PERFETTO_DLOG("Client not initialized, not installing hooks.");
+    PERFETTO_LOG("Client not initialized, not installing hooks.");
     return false;
   }
 

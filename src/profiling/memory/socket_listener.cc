@@ -96,7 +96,7 @@ void SocketListener::Match(
 // manual call by HeapprofdProducer, which supplies a pre-connected socket (and
 // a nullptr for the "listening" socket).
 void SocketListener::OnNewIncomingConnection(
-    base::UnixSocket*,
+    base::UnixSocket*,  // do not use, see above
     std::unique_ptr<base::UnixSocket> new_connection) {
   pid_t peer_pid = new_connection->peer_pid();
   base::UnixSocket* new_connection_raw = new_connection.get();
