@@ -63,10 +63,11 @@ class PERFETTO_EXPORT SharedMemoryArbiter {
       PERFETTO_WARN_UNUSED_RESULT = 0;
 
   // Binds the provided unbound StartupTraceWriterRegistry to the arbiter's SMB.
-  // Binds all StartupTraceWriters created by the registry to the given arbiter
-  // and target buffer. Should only be called once. The writers may not be bound
-  // immediately if they are concurrently being written to. The registry will
-  // retry on its TaskRunner until all writers were bound successfully.
+  // All StartupTraceWriters created by the registry are bound to the arbiter
+  // and the given target buffer. Should only be called once for each registry.
+  // The writers may not be bound immediately if they are concurrently being
+  // written to. The registry will retry on its TaskRunner until all writers
+  // were bound successfully.
   virtual void BindStartupTraceWriterRegistry(
       StartupTraceWriterRegistry* registry,
       BufferID target_buffer) = 0;
