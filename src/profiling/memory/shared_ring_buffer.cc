@@ -233,7 +233,7 @@ SharedRingBuffer::ReadBuffer SharedRingBuffer::Read() {
   const size_t size_with_header = base::AlignUp<kAlignment>(size + kHeaderSize);
 
   if (size_with_header > read_avail(spinlock) ||
-      rd_ptr + size_with_header >= mem_end_) {
+      rd_ptr + size_with_header > mem_end_) {
     PERFETTO_ELOG(
         "Corrupted header detected, size=%zu"
         ", read_avail=%zu, rd=%" PRIu64 ", wr=%" PRIu64,
