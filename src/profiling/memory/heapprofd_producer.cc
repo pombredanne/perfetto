@@ -48,26 +48,6 @@ ClientConfiguration MakeClientConfiguration(const DataSourceConfig& cfg) {
 
 }  // namespace
 
-// static
-std::function<bool(const HeapprofdConfig&)>
-HeapprofdProducer::SourceFilterForPid(pid_t target_pid) {
-  return [target_pid](const HeapprofdConfig& cfg) {
-    if (cfg.all())
-      return true;
-    if (std::find(cfg.pid().cbegin(), cfg.pid().cend(),
-                  static_cast<uint64_t>(target_pid)) != cfg.pid().cend()) {
-      return true;
-    }
-    std::string target_cmdline;
-    GetCmdlineForPID(target_pid, &target_cmdline);
-    if (std::find(cfg.process_cmdline().cbegin(), cfg.process_cmdline().cend(),
-                  target_cmdline) != cfg.process_cmdline().cend()) {
-      return true;
-    }
-    return false;
-  };
-}
-
 // We create kUnwinderThreads unwinding threads and one bookeeping thread.
 // The bookkeeping thread is singleton in order to avoid expensive and
 // complicated synchronisation in the bookkeeping.
@@ -102,6 +82,7 @@ HeapprofdProducer::HeapprofdProducer(HeapprofdMode mode,
       unwinder_queues_(MakeUnwinderQueues(kUnwinderThreads)),
       unwinding_threads_(MakeUnwindingThreads(kUnwinderThreads)),
       socket_listener_(MakeSocketListenerCallback(), &bookkeeping_thread_),
+      target_pid_(base::kInvalidPid),
       weak_factory_(this) {
   if (mode == HeapprofdMode::kCentral) {
     listening_socket_ = MakeListeningSocket();
@@ -119,18 +100,35 @@ HeapprofdProducer::~HeapprofdProducer() {
   }
 }
 
+void HeapprofdProducer::SetTargetProcess(pid_t target_pid) {
+  target_pid_ = target_pid;
+  target_cmdline_.clear();
+  GetCmdlineForPID(target_pid, &target_cmdline_);
+}
+
+bool HeapprofdProducer::SourceMatchesTarget(const HeapprofdConfig& cfg) {
+  if (cfg.all())
+    return true;
+  if (std::find(cfg.pid().cbegin(), cfg.pid().cend(),
+                static_cast<uint64_t>(target_pid_)) != cfg.pid().cend()) {
+    return true;
+  }
+  if (std::find(cfg.process_cmdline().cbegin(), cfg.process_cmdline().cend(),
+                target_cmdline_) != cfg.process_cmdline().cend()) {
+    return true;
+  }
+
+  return false;
+}
+
 void HeapprofdProducer::AdoptConnectedSockets(
     std::vector<base::ScopedFile> inherited_sockets) {
   PERFETTO_DCHECK(mode_ == HeapprofdMode::kChild);
 
   auto weak_producer = weak_factory_.GetWeakPtr();
   for (auto& scoped_fd : inherited_sockets) {
-    // Manually enqueue the on-connection callback. As these sockets are not
-    // obtained from a listen(2), there is no valid listening socket pointer to
-    // pass as the first argument. Pass nullptr and rely on the fact that the
-    // callback doesn't use it.
-    // Pass the raw fd into the closure as we cannot easily move-capture
-    // in c++11.
+    // Manually enqueue the on-connection callback. Pass the raw fd into the
+    // closure as we cannot easily move-capture in c++11.
     int fd = scoped_fd.release();
     task_runner_->PostTask([weak_producer, fd] {
       if (!weak_producer)
@@ -140,15 +138,9 @@ void HeapprofdProducer::AdoptConnectedSockets(
           base::ScopedFile(fd), &weak_producer->socket_listener_,
           weak_producer->task_runner_, base::SockType::kStream);
 
-      weak_producer->socket_listener_.OnNewIncomingConnection(
-          nullptr, std::move(socket));
+      weak_producer->socket_listener_.HandleClientConnection(std::move(socket));
     });
   }
-}
-
-void HeapprofdProducer::SetDataSourceFilter(
-    std::function<bool(const HeapprofdConfig&)> filter) {
-  config_filter_ = filter;
 }
 
 // TODO(fmayer): Delete once we have generic reconnect logic.
@@ -209,7 +201,8 @@ void HeapprofdProducer::SetupDataSource(DataSourceInstanceID id,
 
   // Child mode is only interested in data sources matching the
   // already-connected process.
-  if (mode_ == HeapprofdMode::kChild && !config_filter_(heapprofd_config)) {
+  if (mode_ == HeapprofdMode::kChild &&
+      !SourceMatchesTarget(heapprofd_config)) {
     PERFETTO_DLOG("Child mode skipping setup of unrelated data source.");
     return;
   }
@@ -264,7 +257,8 @@ void HeapprofdProducer::StartDataSource(DataSourceInstanceID id,
 
   // Child mode is only interested in data sources matching the
   // already-connected process.
-  if (mode_ == HeapprofdMode::kChild && !config_filter_(heapprofd_config)) {
+  if (mode_ == HeapprofdMode::kChild &&
+      !SourceMatchesTarget(heapprofd_config)) {
     PERFETTO_DLOG("Child mode skipping start of unrelated data source.");
     return;
   }
@@ -361,16 +355,10 @@ bool HeapprofdProducer::Dump(DataSourceInstanceID id,
   dump_record.pids.insert(dump_record.pids.begin(), pids.cbegin(), pids.cend());
   dump_record.trace_writer = data_source.trace_writer;
 
-  std::weak_ptr<TraceWriter> weak_trace_writer = data_source.trace_writer;
-
   auto weak_producer = weak_factory_.GetWeakPtr();
   base::TaskRunner* task_runner = task_runner_;
   if (has_flush_id) {
-    dump_record.callback = [task_runner, weak_producer, flush_id,
-                            weak_trace_writer] {
-      auto trace_writer = weak_trace_writer.lock();
-      if (trace_writer)
-        trace_writer->Flush();
+    dump_record.callback = [task_runner, weak_producer, flush_id] {
       task_runner->PostTask([weak_producer, flush_id] {
         if (weak_producer)
           return weak_producer->FinishDataSourceFlush(flush_id);

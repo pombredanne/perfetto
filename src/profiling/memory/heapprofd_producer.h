@@ -66,10 +66,7 @@ class HeapprofdProducer : public Producer {
   void AdoptConnectedSockets(std::vector<base::ScopedFile> inherited_sockets);
 
   // Valid only if mode_ == kChild.
-  void SetDataSourceFilter(std::function<bool(const HeapprofdConfig&)> filter);
-
-  static std::function<bool(const HeapprofdConfig&)> SourceFilterForPid(
-      pid_t target_pid);
+  void SetTargetProcess(pid_t target_pid);
 
  private:
   // TODO(fmayer): Delete once we have generic reconnect logic.
@@ -106,6 +103,7 @@ class HeapprofdProducer : public Producer {
 
   // functionality specific to mode_ == kChild
   void TerminateProcess(int exit_status);
+  bool SourceMatchesTarget(const HeapprofdConfig& cfg);
 
   struct DataSource {
     // This is a shared ptr so we can lend a weak_ptr to the bookkeeping
@@ -136,7 +134,8 @@ class HeapprofdProducer : public Producer {
   SystemProperties properties_;
 
   // state specific to mode_ == kChild
-  std::function<bool(const HeapprofdConfig&)> config_filter_;
+  pid_t target_pid_ = base::kInvalidPid;
+  std::string target_cmdline_;
 
   base::WeakPtrFactory<HeapprofdProducer> weak_factory_;
 };
