@@ -59,17 +59,19 @@ using GValueType = ::perftools::profiles::ValueType;
 using GFunction = ::perftools::profiles::Function;
 using GSample = ::perftools::profiles::Sample;
 
-void DumpProfilePacket(std::vector<ProfilePacket>& packets,
+void DumpProfilePacket(std::vector<ProfilePacket>& packet_fragments,
                        const std::string& file_prefix) {
   std::map<uint64_t, std::string> string_lookup;
-  for (const ProfilePacket& packet : packets) {
+  // A profile packet can be split into multiple fragments. We need to iterate
+  // over all of them to reconstruct the original packet.
+  for (const ProfilePacket& packet : packet_fragments) {
     for (const ProfilePacket::InternedString& interned_string :
          packet.strings())
       string_lookup.emplace(interned_string.id(), interned_string.str());
   }
 
   std::map<uint64_t, const std::vector<uint64_t>> callstack_lookup;
-  for (const ProfilePacket& packet : packets) {
+  for (const ProfilePacket& packet : packet_fragments) {
     for (const ProfilePacket::Callstack& callstack : packet.callstacks()) {
       std::vector<uint64_t> frame_ids(
           static_cast<size_t>(callstack.frame_ids().size()));
@@ -90,7 +92,7 @@ void DumpProfilePacket(std::vector<ProfilePacket>& packets,
   value_type->set_type(1);
   value_type->set_type(2);
 
-  for (const ProfilePacket& packet : packets) {
+  for (const ProfilePacket& packet : packet_fragments) {
     for (const ProfilePacket::Mapping& mapping : packet.mappings()) {
       GMapping* gmapping = profile.add_mapping();
       gmapping->set_id(mapping.id());
@@ -118,7 +120,7 @@ void DumpProfilePacket(std::vector<ProfilePacket>& packets,
   }
 
   std::set<uint64_t> functions_to_dump;
-  for (const ProfilePacket& packet : packets) {
+  for (const ProfilePacket& packet : packet_fragments) {
     for (const ProfilePacket::Frame& frame : packet.frames()) {
       GLocation* glocation = profile.add_location();
       glocation->set_id(frame.id());
@@ -157,7 +159,7 @@ void DumpProfilePacket(std::vector<ProfilePacket>& packets,
 
   std::map<uint64_t, std::vector<const ProfilePacket::ProcessHeapSamples*>>
       heap_samples;
-  for (const ProfilePacket& packet : packets) {
+  for (const ProfilePacket& packet : packet_fragments) {
     for (const ProfilePacket::ProcessHeapSamples& samples :
          packet.process_dumps()) {
       heap_samples[samples.pid()].emplace_back(&samples);
@@ -165,6 +167,7 @@ void DumpProfilePacket(std::vector<ProfilePacket>& packets,
   }
   for (const auto& p : heap_samples) {
     GProfile cur_profile = profile;
+    uint64_t pid = p.first;
     for (const ProfilePacket::ProcessHeapSamples* samples : p.second) {
       for (const ProfilePacket::HeapSample& sample : samples->samples()) {
         GSample* gsample = cur_profile.add_sample();
@@ -180,7 +183,7 @@ void DumpProfilePacket(std::vector<ProfilePacket>& packets,
                                                 sample.cumulative_freed()));
       }
     }
-    std::string filename = file_prefix + std::to_string(p.first) + ".pb";
+    std::string filename = file_prefix + std::to_string(pid) + ".pb";
     base::ScopedFile fd(base::OpenFile(filename, O_CREAT | O_WRONLY, 0700));
     if (!fd)
       PERFETTO_FATAL("Failed to open %s", filename.c_str());

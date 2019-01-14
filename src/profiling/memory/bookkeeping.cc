@@ -32,7 +32,8 @@ using ::perfetto::protos::pbzero::ProfilePacket;
 // This needs to be lower than the maximum acceptable chunk size, because this
 // is checked *before* writing another submessage. We conservatively assume
 // submessages can be up to 100k here for a 500k chunk size.
-uint32_t kMaxTracePacketSize = 400000;
+// DropBox has a 500k chunk limit, and each chunk needs to parse as a proto.
+uint32_t kPacketSizeThreshold = 400000;
 }
 
 GlobalCallstackTrie::Node* GlobalCallstackTrie::Node::GetOrCreateChild(
@@ -126,7 +127,7 @@ void HeapTracker::Dump(pid_t pid, DumpState* dump_state) {
   }
   dead_callstack_allocations_.clear();
 
-  if (dump_state->currently_written() > kMaxTracePacketSize)
+  if (dump_state->currently_written() > kPacketSizeThreshold)
     dump_state->NewProfilePacket();
 
   ProfilePacket::ProcessHeapSamples* proto =
@@ -134,7 +135,7 @@ void HeapTracker::Dump(pid_t pid, DumpState* dump_state) {
   proto->set_pid(static_cast<uint64_t>(pid));
   for (auto it = callstack_allocations_.begin();
        it != callstack_allocations_.end(); ++it) {
-    if (dump_state->currently_written() > kMaxTracePacketSize) {
+    if (dump_state->currently_written() > kPacketSizeThreshold) {
       dump_state->NewProfilePacket();
       proto = dump_state->current_profile_packet->add_process_dumps();
       proto->set_pid(static_cast<uint64_t>(pid));
@@ -242,7 +243,7 @@ void DumpState::WriteMap(const Interned<Mapping> map) {
     for (const Interned<std::string>& str : map->path_components)
       WriteString(str);
 
-    if (currently_written() > kMaxTracePacketSize)
+    if (currently_written() > kPacketSizeThreshold)
       NewProfilePacket();
 
     auto mapping = current_profile_packet->add_mappings();
@@ -262,7 +263,7 @@ void DumpState::WriteFrame(Interned<Frame> frame) {
   bool inserted;
   std::tie(std::ignore, inserted) = dumped_frames.emplace(frame.id());
   if (inserted) {
-    if (currently_written() > kMaxTracePacketSize)
+    if (currently_written() > kPacketSizeThreshold)
       NewProfilePacket();
 
     auto frame_proto = current_profile_packet->add_frames();
@@ -277,7 +278,7 @@ void DumpState::WriteString(const Interned<std::string>& str) {
   bool inserted;
   std::tie(std::ignore, inserted) = dumped_strings.emplace(str.id());
   if (inserted) {
-    if (currently_written() > kMaxTracePacketSize)
+    if (currently_written() > kPacketSizeThreshold)
       NewProfilePacket();
 
     auto interned_string = current_profile_packet->add_strings();
