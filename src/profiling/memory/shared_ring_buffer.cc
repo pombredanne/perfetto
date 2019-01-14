@@ -132,7 +132,7 @@ SharedRingBuffer::~SharedRingBuffer() {
 void SharedRingBuffer::Initialize(base::ScopedFile mem_fd) {
   struct stat stat_buf = {};
   int res = fstat(*mem_fd, &stat_buf);
-  if (res != 0 && stat_buf.st_size == 0) {
+  if (res != 0 || stat_buf.st_size == 0) {
     PERFETTO_PLOG("Could not attach to fd.");
     return;
   }
