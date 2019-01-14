@@ -143,8 +143,9 @@ void SharedRingBuffer::Initialize(base::ScopedFile mem_fd) {
   // metadata).
   if (size_with_meta < 2 * base::kPageSize || size % base::kPageSize ||
       (size & (size - 1))) {
-    //    PERFETTO_ELOG("SharedRingBuffer size is invalid (%zu)",
-    //    size_with_meta);
+#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+    PERFETTO_ELOG("SharedRingBuffer size is invalid (%zu)", size_with_meta);
+#endif
     return;
   }
 
