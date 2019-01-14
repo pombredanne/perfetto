@@ -488,7 +488,7 @@ TEST_F(TraceBufferTest, Fragments_OutOfOrderLastChunkIsMiddle) {
   CreateChunk(ProducerID(1), WriterID(1), ChunkID(2))
       .AddPacket(30, 'c')
       .CopyIntoTraceBuffer();
-  EXPECT_EQ(0, trace_buffer()->stats().chunks_commited_out_of_order);
+  EXPECT_EQ(0, trace_buffer()->stats().chunks_committed_out_of_order);
   trace_buffer()->BeginRead();
   ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(10, 'a')));
   ASSERT_THAT(ReadPacket(), IsEmpty());
@@ -496,7 +496,7 @@ TEST_F(TraceBufferTest, Fragments_OutOfOrderLastChunkIsMiddle) {
   CreateChunk(ProducerID(1), WriterID(1), ChunkID(1))
       .AddPacket(20, 'b')
       .CopyIntoTraceBuffer();
-  EXPECT_EQ(1, trace_buffer()->stats().chunks_commited_out_of_order);
+  EXPECT_EQ(1, trace_buffer()->stats().chunks_committed_out_of_order);
   trace_buffer()->BeginRead();
   ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(20, 'b')));
   ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(30, 'c')));

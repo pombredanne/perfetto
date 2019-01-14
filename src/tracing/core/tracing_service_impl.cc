@@ -1623,7 +1623,7 @@ void TracingServiceImpl::SnapshotStats(TracingSession* tracing_session,
     buf_stats_proto->set_chunks_rewritten(buf_stats.chunks_rewritten);
     buf_stats_proto->set_chunks_overwritten(buf_stats.chunks_overwritten);
     buf_stats_proto->set_chunks_committed_out_of_order(
-        buf_stats.chunks_commited_out_of_order);
+        buf_stats.chunks_committed_out_of_order);
     buf_stats_proto->set_write_wrap_count(buf_stats.write_wrap_count);
     buf_stats_proto->set_patches_succeeded(buf_stats.patches_succeeded);
     buf_stats_proto->set_patches_failed(buf_stats.patches_failed);

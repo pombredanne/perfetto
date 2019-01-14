@@ -293,7 +293,7 @@ void TraceBuffer::CopyChunkUntrusted(ProducerID producer_id_trusted,
   if (chunk_id - last_chunk_id < kMaxChunkID / 2) {
     last_chunk_id = chunk_id;
   } else {
-    stats_.chunks_commited_out_of_order++;
+    stats_.chunks_committed_out_of_order++;
   }
 
   if (padding_size)
