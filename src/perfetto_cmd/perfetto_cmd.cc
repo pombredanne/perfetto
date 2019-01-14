@@ -170,6 +170,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
     OPT_ALERT_ID = 1000,
     OPT_CONFIG_ID,
     OPT_CONFIG_UID,
+    OPT_SUBSCRIPTION_ID,
     OPT_RESET_GUARDRAILS,
     OPT_PBTXT_CONFIG,
     OPT_DROPBOX,
@@ -179,10 +180,8 @@ int PerfettoCmd::Main(int argc, char** argv) {
     OPT_ATTACH,
     OPT_IS_DETACHED,
     OPT_STOP,
-    OPT_SUBSCRIPTION_ID,
   };
   static const struct option long_options[] = {
-      // |option_index| relies on the order of options, don't reshuffle them.
       {"help", required_argument, nullptr, 'h'},
       {"config", required_argument, nullptr, 'c'},
       {"out", required_argument, nullptr, 'o'},
