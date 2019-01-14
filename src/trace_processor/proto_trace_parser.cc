@@ -912,12 +912,11 @@ void ProtoTraceParser::ParsePrint(uint32_t,
       // reset to 0 once the kill is complete.
       // Homogenise this with kernel LMK events as an instant event, ignoring
       // the resets to 0.
-      static const char kLmkCounterName[] = "kill_one_process";
-      if (point.name == kLmkCounterName) {
+      if (point.name == "kill_one_process") {
         auto killed_pid = static_cast<uint32_t>(point.value);
         if (killed_pid != 0) {
           UniquePid killed_upid =
-              context_->process_tracker->UpdateProcess(killed_pid, 0);
+              context_->process_tracker->UpdateProcess(killed_pid);
           context_->storage->mutable_instants()->AddInstantEvent(
               timestamp, lmk_id_, 0, killed_upid, RefType::kRefUpid);
         }
