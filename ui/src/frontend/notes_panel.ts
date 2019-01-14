@@ -14,8 +14,9 @@
 
 import * as m from 'mithril';
 
-import {globals} from './globals';
 import {Actions} from '../common/actions';
+
+import {globals} from './globals';
 import {Panel, PanelSize} from './panel';
 import {TRACK_SHELL_WIDTH} from './track_panel';
 
@@ -53,36 +54,31 @@ export class NotesPanel extends Panel {
       const timestamp = note.timestamp;
       if (!timeScale.timeInBounds(timestamp)) continue;
       const x = timeScale.timeToPx(timestamp);
-      const left = Math.floor(x+TRACK_SHELL_WIDTH);
-      ctx.fillRect(left, 1, 1, size.height-1);
-      if (!noteSelected && this.hoveredX && x <= this.hoveredX && this.hoveredX < x+10) {
+      const left = Math.floor(x + TRACK_SHELL_WIDTH);
+      ctx.fillRect(left, 1, 1, size.height - 1);
+      if (!noteSelected && this.hoveredX && x <= this.hoveredX &&
+          this.hoveredX < x + 10) {
         noteSelected = true;
-        ctx.fillRect(left, 1, 10, Math.ceil(size.height/3));
+        ctx.fillRect(left, 1, 10, Math.ceil(size.height / 3));
       } else {
-        ctx.strokeRect(left+0.5, 1.5, 10, Math.ceil(size.height/3));
+        ctx.strokeRect(left + 0.5, 1.5, 10, Math.ceil(size.height / 3));
       }
     }
     if (this.hoveredX !== null && !noteSelected) {
-      const timestamp = this.pxToTime(this.hoveredX);
+      const timestamp = timeScale.pxToTime(this.hoveredX);
       if (timeScale.timeInBounds(timestamp)) {
         const x = timeScale.timeToPx(timestamp);
-        ctx.fillRect(Math.floor(x+TRACK_SHELL_WIDTH), 0, 1, size.height);
+        ctx.fillRect(Math.floor(x + TRACK_SHELL_WIDTH), 0, 1, size.height);
       }
     }
-  }
-
-  private pxToTime(x: number) {
-    const timeScale = globals.frontendLocalState.timeScale;
-    const timestamp = timeScale.pxToTime(x);
-    return timestamp;
   }
 
   private onClick(x: number, _: number) {
     const timeScale = globals.frontendLocalState.timeScale;
-    const timestamp = this.pxToTime(x);
+    const timestamp = timeScale.pxToTime(x);
     for (const note of Object.values(globals.state.notes)) {
       const noteX = timeScale.timeToPx(note.timestamp);
-      if (noteX <= x && x < noteX+10) {
+      if (noteX <= x && x < noteX + 10) {
         globals.dispatch(Actions.removeNote({id: note.id}));
         return;
       }
