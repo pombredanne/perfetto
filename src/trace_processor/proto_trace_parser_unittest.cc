@@ -19,6 +19,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "perfetto/base/string_view.h"
+#include "src/trace_processor/args_tracker.h"
 #include "src/trace_processor/event_tracker.h"
 #include "src/trace_processor/process_tracker.h"
 #include "src/trace_processor/proto_trace_parser.h"
@@ -43,13 +44,14 @@ class MockEventTracker : public EventTracker {
   MockEventTracker(TraceProcessorContext* context) : EventTracker(context) {}
   virtual ~MockEventTracker() = default;
 
-  MOCK_METHOD6(PushSchedSwitch,
+  MOCK_METHOD7(PushSchedSwitch,
                void(uint32_t cpu,
                     int64_t timestamp,
                     uint32_t prev_pid,
-                    uint32_t prev_state,
+                    int64_t prev_state,
                     uint32_t next_pid,
-                    base::StringView next_comm));
+                    base::StringView next_comm,
+                    int32_t next_priority));
 
   MOCK_METHOD5(PushCounter,
                RowId(int64_t timestamp,
@@ -77,11 +79,22 @@ class MockTraceStorage : public TraceStorage {
   MOCK_METHOD1(InternString, StringId(base::StringView));
 };
 
+class MockArgsTracker : public ArgsTracker {
+ public:
+  MockArgsTracker(TraceProcessorContext* context) : ArgsTracker(context) {}
+
+  MOCK_METHOD4(AddArg,
+               void(RowId row_id, StringId flat_key, StringId key, Variadic));
+  MOCK_METHOD0(Flush, void());
+};
+
 class ProtoTraceParserTest : public ::testing::Test {
  public:
   ProtoTraceParserTest() {
     nice_storage_ = new NiceMock<MockTraceStorage>();
     context_.storage.reset(nice_storage_);
+    args_ = new MockArgsTracker(&context_);
+    context_.args_tracker.reset(args_);
     event_ = new MockEventTracker(&context_);
     context_.event_tracker.reset(event_);
     process_ = new MockProcessTracker(&context_);
@@ -106,6 +119,7 @@ class ProtoTraceParserTest : public ::testing::Test {
 
  protected:
   TraceProcessorContext context_;
+  MockArgsTracker* args_;
   MockEventTracker* event_;
   MockProcessTracker* process_;
   NiceMock<MockTraceStorage>* nice_storage_;
@@ -128,9 +142,10 @@ TEST_F(ProtoTraceParserTest, LoadSingleEvent) {
   sched_switch->set_prev_state(32);
   sched_switch->set_next_comm(kProcName);
   sched_switch->set_next_pid(100);
+  sched_switch->set_next_prio(1024);
 
   EXPECT_CALL(*event_, PushSchedSwitch(10, 1000, 10, 32, 100,
-                                       base::StringView(kProcName)));
+                                       base::StringView(kProcName), 1024));
   Tokenize(trace);
 }
 
@@ -163,22 +178,7 @@ TEST_F(ProtoTraceParserTest, LoadEventsIntoRaw) {
   static const char buf_value[] = "This is a print event";
   print->set_buf(buf_value);
 
-  static const char pid[] = "pid";
-  static const char comm[] = "comm";
-  static const char clone[] = "clone_flags";
-  static const char oom[] = "oom_score_adj";
-  static const char print_event[] = "print";
-  static const char ip[] = "ip";
-  static const char buf[] = "buf";
-
-  EXPECT_CALL(*storage_, InternString(base::StringView(task_newtask))).Times(2);
-  EXPECT_CALL(*storage_, InternString(base::StringView(pid)));
-  EXPECT_CALL(*storage_, InternString(base::StringView(comm)));
-  EXPECT_CALL(*storage_, InternString(base::StringView(clone)));
-  EXPECT_CALL(*storage_, InternString(base::StringView(oom)));
-  EXPECT_CALL(*storage_, InternString(base::StringView(print_event)));
-  EXPECT_CALL(*storage_, InternString(base::StringView(ip)));
-  EXPECT_CALL(*storage_, InternString(base::StringView(buf)));
+  EXPECT_CALL(*storage_, InternString(base::StringView(task_newtask)));
   EXPECT_CALL(*storage_, InternString(base::StringView(buf_value)));
 
   Tokenize(trace);
@@ -234,26 +234,25 @@ TEST_F(ProtoTraceParserTest, LoadGenericFtrace) {
 
   Tokenize(trace);
 
-  const auto& events = storage_->raw_events();
+  const auto& raw = storage_->raw_events();
+
+  ASSERT_EQ(raw.raw_event_count(), 1);
+  ASSERT_EQ(raw.timestamps().back(), 100);
+  ASSERT_EQ(storage_->GetThread(raw.utids().back()).tid, 10);
+
+  auto set_id = raw.arg_set_ids().back();
+
   const auto& args = storage_->args();
-
-  ASSERT_EQ(events.raw_event_count(), 1);
-  ASSERT_EQ(events.timestamps().back(), 100);
-  ASSERT_EQ(storage_->GetThread(events.utids().back()).tid, 10);
-
-  auto row_id = TraceStorage::CreateRowId(TableId::kRawEvents, 0);
-  auto id_it = args.args_for_id().equal_range(row_id);
+  auto id_it =
+      std::equal_range(args.set_ids().begin(), args.set_ids().end(), set_id);
 
   // Ignore string calls as they are handled by checking InternString calls
   // above.
 
-  auto it = ++id_it.first;
-  auto row = it->second;
-  ASSERT_EQ(args.arg_values()[row].int_value, -2);
-
-  ++it;
-  row = it->second;
-  ASSERT_EQ(args.arg_values()[row].int_value, 3);
+  auto it = id_it.first;
+  auto row = static_cast<size_t>(std::distance(args.set_ids().begin(), it));
+  ASSERT_EQ(args.arg_values()[++row].int_value, -2);
+  ASSERT_EQ(args.arg_values()[++row].int_value, 3);
 }
 
 TEST_F(ProtoTraceParserTest, LoadMultipleEvents) {
@@ -272,6 +271,7 @@ TEST_F(ProtoTraceParserTest, LoadMultipleEvents) {
   sched_switch->set_prev_state(32);
   sched_switch->set_next_comm(kProcName1);
   sched_switch->set_next_pid(100);
+  sched_switch->set_next_prio(1024);
 
   event = bundle->add_event();
   event->set_timestamp(1001);
@@ -283,12 +283,13 @@ TEST_F(ProtoTraceParserTest, LoadMultipleEvents) {
   sched_switch->set_prev_state(32);
   sched_switch->set_next_comm(kProcName2);
   sched_switch->set_next_pid(10);
+  sched_switch->set_next_prio(512);
 
   EXPECT_CALL(*event_, PushSchedSwitch(10, 1000, 10, 32, 100,
-                                       base::StringView(kProcName1)));
+                                       base::StringView(kProcName1), 1024));
 
   EXPECT_CALL(*event_, PushSchedSwitch(10, 1001, 100, 32, 10,
-                                       base::StringView(kProcName2)));
+                                       base::StringView(kProcName2), 512));
 
   Tokenize(trace);
 }
@@ -309,6 +310,7 @@ TEST_F(ProtoTraceParserTest, LoadMultiplePackets) {
   sched_switch->set_prev_state(32);
   sched_switch->set_next_comm(kProcName1);
   sched_switch->set_next_pid(100);
+  sched_switch->set_next_prio(1024);
 
   bundle = trace.add_packet()->mutable_ftrace_events();
   bundle->set_cpu(10);
@@ -323,12 +325,13 @@ TEST_F(ProtoTraceParserTest, LoadMultiplePackets) {
   sched_switch->set_prev_state(32);
   sched_switch->set_next_comm(kProcName2);
   sched_switch->set_next_pid(10);
+  sched_switch->set_next_prio(512);
 
   EXPECT_CALL(*event_, PushSchedSwitch(10, 1000, 10, 32, 100,
-                                       base::StringView(kProcName1)));
+                                       base::StringView(kProcName1), 1024));
 
   EXPECT_CALL(*event_, PushSchedSwitch(10, 1001, 100, 32, 10,
-                                       base::StringView(kProcName2)));
+                                       base::StringView(kProcName2), 512));
   Tokenize(trace);
 }
 
@@ -345,6 +348,7 @@ TEST_F(ProtoTraceParserTest, RepeatedLoadSinglePacket) {
   sched_switch->set_prev_state(32);
   sched_switch->set_next_comm(kProcName1);
   sched_switch->set_next_pid(100);
+  sched_switch->set_next_prio(1024);
 
   protos::Trace trace_2;
   bundle = trace_2.add_packet()->mutable_ftrace_events();
@@ -358,13 +362,14 @@ TEST_F(ProtoTraceParserTest, RepeatedLoadSinglePacket) {
   sched_switch->set_prev_state(32);
   sched_switch->set_next_comm(kProcName2);
   sched_switch->set_next_pid(10);
+  sched_switch->set_next_prio(512);
 
   EXPECT_CALL(*event_, PushSchedSwitch(10, 1000, 10, 32, 100,
-                                       base::StringView(kProcName1)));
+                                       base::StringView(kProcName1), 1024));
   Tokenize(trace_1);
 
   EXPECT_CALL(*event_, PushSchedSwitch(10, 1001, 100, 32, 10,
-                                       base::StringView(kProcName2)));
+                                       base::StringView(kProcName2), 512));
   Tokenize(trace_2);
 }
 

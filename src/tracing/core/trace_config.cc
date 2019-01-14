@@ -107,6 +107,18 @@ void TraceConfig::FromProto(const perfetto::protos::TraceConfig& proto) {
                 "size mismatch");
   flush_timeout_ms_ =
       static_cast<decltype(flush_timeout_ms_)>(proto.flush_timeout_ms());
+
+  static_assert(sizeof(disable_clock_snapshotting_) ==
+                    sizeof(proto.disable_clock_snapshotting()),
+                "size mismatch");
+  disable_clock_snapshotting_ =
+      static_cast<decltype(disable_clock_snapshotting_)>(
+          proto.disable_clock_snapshotting());
+
+  static_assert(sizeof(notify_traceur_) == sizeof(proto.notify_traceur()),
+                "size mismatch");
+  notify_traceur_ =
+      static_cast<decltype(notify_traceur_)>(proto.notify_traceur());
   unknown_fields_ = proto.unknown_fields();
 }
 
@@ -182,6 +194,18 @@ void TraceConfig::ToProto(perfetto::protos::TraceConfig* proto) const {
                 "size mismatch");
   proto->set_flush_timeout_ms(
       static_cast<decltype(proto->flush_timeout_ms())>(flush_timeout_ms_));
+
+  static_assert(sizeof(disable_clock_snapshotting_) ==
+                    sizeof(proto->disable_clock_snapshotting()),
+                "size mismatch");
+  proto->set_disable_clock_snapshotting(
+      static_cast<decltype(proto->disable_clock_snapshotting())>(
+          disable_clock_snapshotting_));
+
+  static_assert(sizeof(notify_traceur_) == sizeof(proto->notify_traceur()),
+                "size mismatch");
+  proto->set_notify_traceur(
+      static_cast<decltype(proto->notify_traceur())>(notify_traceur_));
   *(proto->mutable_unknown_fields()) = unknown_fields_;
 }
 

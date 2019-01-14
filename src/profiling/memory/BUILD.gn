@@ -37,9 +37,45 @@ source_set("wire_protocol") {
   ]
 }
 
+source_set("proc_utils") {
+  deps = [
+    "../../../gn:default_deps",
+    "../../base",
+  ]
+  sources = [
+    "proc_utils.cc",
+    "proc_utils.h",
+  ]
+}
+
+source_set("ring_buffer") {
+  deps = [
+    "../../../gn:default_deps",
+    "../../base",
+  ]
+  sources = [
+    "shared_ring_buffer.cc",
+    "shared_ring_buffer.ch",
+  ]
+}
+
+source_set("ring_buffer_unittests") {
+  testonly = true
+  deps = [
+    ":ring_buffer",
+    "../../../gn:default_deps",
+    "../../../gn:gtest_deps",
+    "../../base",
+  ]
+  sources = [
+    "shared_ring_buffer_unittest.cc",
+  ]
+}
+
 source_set("daemon") {
   public_configs = [ "../../../buildtools:libunwindstack_config" ]
   deps = [
+    ":proc_utils",
     ":wire_protocol",
     "../../../buildtools:libunwindstack",
     "../../../gn:default_deps",
@@ -58,8 +94,6 @@ source_set("daemon") {
     "heapprofd_producer.cc",
     "heapprofd_producer.h",
     "interner.h",
-    "proc_utils.cc",
-    "proc_utils.h",
     "process_matcher.cc",
     "process_matcher.h",
     "queue_messages.h",
@@ -77,6 +111,7 @@ source_set("daemon") {
 source_set("client") {
   public_configs = [ "../../../buildtools:libunwindstack_config" ]
   deps = [
+    ":proc_utils",
     ":wire_protocol",
     "../../../buildtools:libunwindstack",
     "../../../gn:default_deps",
@@ -97,6 +132,7 @@ source_set("unittests") {
   deps = [
     ":client",
     ":daemon",
+    ":proc_utils",
     ":wire_protocol",
     "../../../gn:default_deps",
     "../../../gn:gtest_deps",
@@ -109,6 +145,7 @@ source_set("unittests") {
     "client_unittest.cc",
     "heapprofd_integrationtest.cc",
     "interner_unittest.cc",
+    "proc_utils_unittest.cc",
     "process_matcher_unittest.cc",
     "record_reader_unittest.cc",
     "sampler_unittest.cc",
@@ -144,6 +181,7 @@ source_set("end_to_end_tests") {
 source_set("malloc_hooks") {
   deps = [
     ":client",
+    ":proc_utils",
     ":wire_protocol",
     "../../../gn:default_deps",
     "../../base",
@@ -165,6 +203,17 @@ perfetto_fuzzer_test("unwinding_fuzzer") {
   deps = [
     ":daemon",
     ":wire_protocol",
+    "../../../gn:default_deps",
+    "../../../src/base",
+  ]
+}
+
+perfetto_fuzzer_test("shared_ring_buffer_fuzzer") {
+  sources = [
+    "shared_ring_buffer_fuzzer.cc",
+  ]
+  deps = [
+    ":ring_buffer",
     "../../../gn:default_deps",
     "../../../src/base",
   ]

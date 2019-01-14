@@ -22,6 +22,7 @@ import {globals} from './globals';
 import {drawGridLines} from './gridline_helper';
 import {Panel, PanelSize} from './panel';
 import {Track} from './track';
+import {TrackContent} from './track_panel';
 import {trackRegistry} from './track_registry';
 
 
@@ -53,20 +54,28 @@ export class TrackGroupPanel extends Panel<Attrs> {
 
   view({attrs}: m.CVnode<Attrs>) {
     const collapsed = this.trackGroupState.collapsed;
+    const name = StripPathFromExecutable(this.trackGroupState.name);
     return m(
         `.track-group-panel[collapsed=${collapsed}]`,
         m('.shell',
-          m('h1', `${StripPathFromExecutable(this.trackGroupState.name)}`),
+          m('h1',
+            {
+              title: name,
+            },
+            name,
+            m.trust('&#x200E;')),
           m('.fold-button',
             {
-              onclick: () =>
-                  globals.dispatch(Actions.toggleTrackGroupCollapsed({
-                    trackGroupId: attrs.trackGroupId,
-                  })),
+              onclick: (e:MouseEvent) => {
+                globals.dispatch(Actions.toggleTrackGroupCollapsed({
+                  trackGroupId: attrs.trackGroupId,
+                })),
+                e.stopPropagation();
+              }
             },
             m('i.material-icons',
-              this.trackGroupState.collapsed ? 'expand_more' :
-                                               'expand_less'))));
+              this.trackGroupState.collapsed ? 'expand_more' : 'expand_less'))),
+        m(TrackContent, {track: this.summaryTrack}), );
   }
 
   oncreate(vnode: m.CVnodeDOM<Attrs>) {
@@ -85,7 +94,6 @@ export class TrackGroupPanel extends Panel<Attrs> {
     if (!collapsed) return;
 
     ctx.save();
-    ctx.translate(this.shellWidth, 0);
 
     ctx.fillStyle = this.backgroundColor;
     ctx.fillRect(0, 0, size.width, size.height);
@@ -94,14 +102,11 @@ export class TrackGroupPanel extends Panel<Attrs> {
         ctx,
         globals.frontendLocalState.timeScale,
         globals.frontendLocalState.visibleWindowTime,
+        size.width,
         size.height);
 
-    // Do not show summary view if there are more than 10 track groups.
-    // Too slow now.
-    // TODO(dproy): Fix this.
-    if (Object.keys(globals.state.trackGroups).length < 10) {
-      this.summaryTrack.renderCanvas(ctx);
-    }
+    ctx.translate(this.shellWidth, 0);
+    this.summaryTrack.renderCanvas(ctx);
     ctx.restore();
   }
 }

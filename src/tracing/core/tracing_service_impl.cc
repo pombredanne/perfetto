@@ -28,6 +28,10 @@
 #include <unistd.h>
 #endif
 
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+#include <sys/system_properties.h>
+#endif
+
 #include <algorithm>
 
 #include "perfetto/base/build_config.h"
@@ -99,6 +103,7 @@ uid_t geteuid() {
   return 0;
 }
 #endif  // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+
 }  // namespace
 
 // These constants instead are defined in the header because are used by tests.
@@ -379,8 +384,12 @@ bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
     tracing_session->buffers_index.push_back(global_id);
     const size_t buf_size_bytes = buffer_cfg.size_kb() * 1024u;
     total_buf_size_kb += buffer_cfg.size_kb();
-    auto it_and_inserted =
-        buffers_.emplace(global_id, TraceBuffer::Create(buf_size_bytes));
+    TraceBuffer::OverwritePolicy policy =
+        buffer_cfg.fill_policy() == TraceConfig::BufferConfig::DISCARD
+            ? TraceBuffer::kDiscard
+            : TraceBuffer::kOverwrite;
+    auto it_and_inserted = buffers_.emplace(
+        global_id, TraceBuffer::Create(buf_size_bytes, policy));
     PERFETTO_DCHECK(it_and_inserted.second);  // buffers_.count(global_id) == 0.
     std::unique_ptr<TraceBuffer>& trace_buffer = it_and_inserted.first->second;
     if (!trace_buffer) {
@@ -964,8 +973,10 @@ void TracingServiceImpl::ReadBuffers(TracingSessionID tsid,
   if (now >= tracing_session->last_snapshot_time + kSnapshotsInterval) {
     tracing_session->last_snapshot_time = now;
     SnapshotSyncMarker(&packets);
-    SnapshotClocks(&packets);
     SnapshotStats(tracing_session, &packets);
+
+    if (!tracing_session->config.disable_clock_snapshotting())
+      SnapshotClocks(&packets);
   }
   MaybeEmitTraceConfig(tracing_session, &packets);
 
@@ -1006,26 +1017,34 @@ void TracingServiceImpl::ReadBuffers(TracingSessionID tsid,
     tbuf.BeginRead();
     while (!did_hit_threshold) {
       TracePacket packet;
-      uid_t producer_uid = kInvalidUid;
-      if (!tbuf.ReadNextTracePacket(&packet, &producer_uid))
+      TraceBuffer::PacketSequenceProperties sequence_properties{};
+      if (!tbuf.ReadNextTracePacket(&packet, &sequence_properties)) {
         break;
-      PERFETTO_DCHECK(producer_uid != kInvalidUid);
+      }
+      PERFETTO_DCHECK(sequence_properties.producer_id_trusted != 0);
+      PERFETTO_DCHECK(sequence_properties.writer_id != 0);
+      PERFETTO_DCHECK(sequence_properties.producer_uid_trusted != kInvalidUid);
       PERFETTO_DCHECK(packet.size() > 0);
       if (!PacketStreamValidator::Validate(packet.slices())) {
         PERFETTO_DLOG("Dropping invalid packet");
         continue;
       }
 
-      // Append a slice with the trusted UID of the producer. This can't
-      // be spoofed because above we validated that the existing slices
-      // don't contain any trusted UID fields. For added safety we append
-      // instead of prepending because according to protobuf semantics, if
-      // the same field is encountered multiple times the last instance
-      // takes priority. Note that truncated packets are also rejected, so
-      // the producer can't give us a partial packet (e.g., a truncated
-      // string) which only becomes valid when the UID is appended here.
+      // Append a slice with the trusted field data. This can't be spoofed
+      // because above we validated that the existing slices don't contain any
+      // trusted fields. For added safety we append instead of prepending
+      // because according to protobuf semantics, if the same field is
+      // encountered multiple times the last instance takes priority. Note that
+      // truncated packets are also rejected, so the producer can't give us a
+      // partial packet (e.g., a truncated string) which only becomes valid when
+      // the trusted data is appended here.
       protos::TrustedPacket trusted_packet;
-      trusted_packet.set_trusted_uid(static_cast<int32_t>(producer_uid));
+      trusted_packet.set_trusted_uid(
+          static_cast<int32_t>(sequence_properties.producer_uid_trusted));
+      trusted_packet.set_trusted_packet_sequence_id(
+          tracing_session->GetPacketSequenceID(
+              sequence_properties.producer_id_trusted,
+              sequence_properties.writer_id));
       static constexpr size_t kTrustedBufSize = 16;
       Slice slice = Slice::Allocate(kTrustedBufSize);
       PERFETTO_CHECK(
@@ -1162,11 +1181,20 @@ void TracingServiceImpl::FreeBuffers(TracingSessionID tsid) {
     PERFETTO_DCHECK(buffers_.count(buffer_id) == 1);
     buffers_.erase(buffer_id);
   }
+  bool notify_traceur = tracing_session->config.notify_traceur();
   tracing_sessions_.erase(tsid);
   UpdateMemoryGuardrail();
 
   PERFETTO_LOG("Tracing session %" PRIu64 " ended, total sessions:%zu", tsid,
                tracing_sessions_.size());
+
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+  static const char kTraceurProp[] = "sys.trace.trace_end_signal";
+  if (notify_traceur && __system_property_set(kTraceurProp, "1"))
+    PERFETTO_ELOG("Failed to setprop %s=1", kTraceurProp);
+#else
+  base::ignore_result(notify_traceur);
+#endif
 }
 
 void TracingServiceImpl::RegisterDataSource(ProducerID producer_id,
@@ -1491,7 +1519,7 @@ TraceBuffer* TracingServiceImpl::GetBufferByID(BufferID buffer_id) {
 }
 
 void TracingServiceImpl::UpdateMemoryGuardrail() {
-#if !PERFETTO_BUILDFLAG(PERFETTO_CHROMIUM_BUILD) && \
+#if !PERFETTO_BUILDFLAG(PERFETTO_EMBEDDER_BUILD) && \
     !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
   uint64_t total_buffer_bytes = 0;
 
@@ -1523,6 +1551,7 @@ void TracingServiceImpl::SnapshotSyncMarker(std::vector<TracePacket>* packets) {
     uint8_t* dst = &sync_marker_packet_[0];
     protos::TrustedPacket packet;
     packet.set_trusted_uid(static_cast<int32_t>(uid_));
+    packet.set_trusted_packet_sequence_id(kServicePacketSequenceID);
     PERFETTO_CHECK(packet.SerializeToArray(dst, size_left));
     size_left -= packet.ByteSize();
     sync_marker_packet_size_ += static_cast<size_t>(packet.ByteSize());
@@ -1574,6 +1603,12 @@ void TracingServiceImpl::SnapshotClocks(std::vector<TracePacket>* packets) {
       PERFETTO_DLOG("clock_gettime failed for clock %d", clock.id);
   }
   for (auto& clock : clocks) {
+    // Put a timestamp in the base packet for sorting on the
+    // trace processor side.
+    if (clock.type == protos::ClockSnapshot::Clock::BOOTTIME) {
+      packet.set_timestamp(
+          static_cast<uint64_t>(base::FromPosixTimespec(clock.ts).count()));
+    };
     protos::ClockSnapshot::Clock* c = clock_snapshot->add_clocks();
     c->set_type(clock.type);
     c->set_timestamp(
@@ -1586,6 +1621,7 @@ void TracingServiceImpl::SnapshotClocks(std::vector<TracePacket>* packets) {
 #endif  // !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
 
   packet.set_trusted_uid(static_cast<int32_t>(uid_));
+  packet.set_trusted_packet_sequence_id(kServicePacketSequenceID);
   Slice slice = Slice::Allocate(static_cast<size_t>(packet.ByteSize()));
   PERFETTO_CHECK(packet.SerializeWithCachedSizesToArray(slice.own_data()));
   packets->emplace_back();
@@ -1596,17 +1632,26 @@ void TracingServiceImpl::SnapshotStats(TracingSession* tracing_session,
                                        std::vector<TracePacket>* packets) {
   protos::TrustedPacket packet;
   packet.set_trusted_uid(static_cast<int32_t>(uid_));
+  packet.set_trusted_packet_sequence_id(kServicePacketSequenceID);
 
   protos::TraceStats* trace_stats = packet.mutable_trace_stats();
-  trace_stats->set_producers_connected(
-      static_cast<uint32_t>(producers_.size()));
-  trace_stats->set_producers_seen(last_producer_id_);
-  trace_stats->set_data_sources_registered(
+  GetTraceStats(tracing_session).ToProto(trace_stats);
+  Slice slice = Slice::Allocate(static_cast<size_t>(packet.ByteSize()));
+  PERFETTO_CHECK(packet.SerializeWithCachedSizesToArray(slice.own_data()));
+  packets->emplace_back();
+  packets->back().AddSlice(std::move(slice));
+}
+
+TraceStats TracingServiceImpl::GetTraceStats(TracingSession* tracing_session) {
+  TraceStats trace_stats;
+  trace_stats.set_producers_connected(static_cast<uint32_t>(producers_.size()));
+  trace_stats.set_producers_seen(last_producer_id_);
+  trace_stats.set_data_sources_registered(
       static_cast<uint32_t>(data_sources_.size()));
-  trace_stats->set_data_sources_seen(last_data_source_instance_id_);
-  trace_stats->set_tracing_sessions(
+  trace_stats.set_data_sources_seen(last_data_source_instance_id_);
+  trace_stats.set_tracing_sessions(
       static_cast<uint32_t>(tracing_sessions_.size()));
-  trace_stats->set_total_buffers(static_cast<uint32_t>(buffers_.size()));
+  trace_stats.set_total_buffers(static_cast<uint32_t>(buffers_.size()));
 
   for (BufferID buf_id : tracing_session->buffers_index) {
     TraceBuffer* buf = GetBufferByID(buf_id);
@@ -1614,22 +1659,9 @@ void TracingServiceImpl::SnapshotStats(TracingSession* tracing_session,
       PERFETTO_DFATAL("Buffer not found.");
       continue;
     }
-    auto* buf_stats_proto = trace_stats->add_buffer_stats();
-    const TraceBuffer::Stats& buf_stats = buf->stats();
-    buf_stats_proto->set_bytes_written(buf_stats.bytes_written);
-    buf_stats_proto->set_chunks_written(buf_stats.chunks_written);
-    buf_stats_proto->set_chunks_overwritten(buf_stats.chunks_overwritten);
-    buf_stats_proto->set_write_wrap_count(buf_stats.write_wrap_count);
-    buf_stats_proto->set_patches_succeeded(buf_stats.patches_succeeded);
-    buf_stats_proto->set_patches_failed(buf_stats.patches_failed);
-    buf_stats_proto->set_readaheads_succeeded(buf_stats.readaheads_succeeded);
-    buf_stats_proto->set_readaheads_failed(buf_stats.readaheads_failed);
-    buf_stats_proto->set_abi_violations(buf_stats.abi_violations);
+    *trace_stats.add_buffer_stats() = buf->stats();
   }  // for (buf in session).
-  Slice slice = Slice::Allocate(static_cast<size_t>(packet.ByteSize()));
-  PERFETTO_CHECK(packet.SerializeWithCachedSizesToArray(slice.own_data()));
-  packets->emplace_back();
-  packets->back().AddSlice(std::move(slice));
+  return trace_stats;
 }
 
 void TracingServiceImpl::MaybeEmitTraceConfig(
@@ -1641,6 +1673,7 @@ void TracingServiceImpl::MaybeEmitTraceConfig(
   protos::TrustedPacket packet;
   tracing_session->config.ToProto(packet.mutable_trace_config());
   packet.set_trusted_uid(static_cast<int32_t>(uid_));
+  packet.set_trusted_packet_sequence_id(kServicePacketSequenceID);
   Slice slice = Slice::Allocate(static_cast<size_t>(packet.ByteSize()));
   PERFETTO_CHECK(packet.SerializeWithCachedSizesToArray(slice.own_data()));
   packets->emplace_back();
@@ -1756,6 +1789,22 @@ void TracingServiceImpl::ConsumerEndpointImpl::Attach(const std::string& key) {
       return;
     }
     consumer->OnAttach(success, session->config);
+  });
+}
+
+void TracingServiceImpl::ConsumerEndpointImpl::GetTraceStats() {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  bool success = false;
+  TraceStats stats;
+  TracingSession* session = service_->GetTracingSession(tracing_session_id_);
+  if (session) {
+    success = true;
+    stats = service_->GetTraceStats(session);
+  }
+  auto weak_this = GetWeakPtr();
+  task_runner_->PostTask([weak_this, success, stats] {
+    if (weak_this)
+      weak_this->consumer_->OnTraceStats(success, stats);
   });
 }
 

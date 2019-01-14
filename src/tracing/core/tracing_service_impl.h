@@ -32,6 +32,7 @@
 #include "perfetto/tracing/core/data_source_descriptor.h"
 #include "perfetto/tracing/core/shared_memory_abi.h"
 #include "perfetto/tracing/core/trace_config.h"
+#include "perfetto/tracing/core/trace_stats.h"
 #include "perfetto/tracing/core/tracing_service.h"
 #include "src/tracing/core/id_allocator.h"
 
@@ -162,6 +163,7 @@ class TracingServiceImpl : public TracingService {
     void Flush(uint32_t timeout_ms, FlushCallback) override;
     void Detach(const std::string& key) override;
     void Attach(const std::string& key) override;
+    void GetTraceStats() override;
 
    private:
     friend class TracingServiceImpl;
@@ -295,6 +297,23 @@ class TracingServiceImpl : public TracingService {
       return timeout_ms ? timeout_ms : kDefaultFlushTimeoutMs;
     }
 
+    PacketSequenceID GetPacketSequenceID(ProducerID producer_id,
+                                         WriterID writer_id) {
+      auto key = std::make_pair(producer_id, writer_id);
+      auto it = packet_sequence_ids.find(key);
+      if (it != packet_sequence_ids.end())
+        return it->second;
+      // We shouldn't run out of sequence IDs (producer ID is 16 bit, writer IDs
+      // are limited to 1024).
+      static_assert(kMaxPacketSequenceID > kMaxProducerID * kMaxWriterID,
+                    "PacketSequenceID value space doesn't cover service "
+                    "sequence ID and all producer/writer ID combinations!");
+      PERFETTO_DCHECK(last_packet_sequence_id < kMaxPacketSequenceID);
+      PacketSequenceID sequence_id = ++last_packet_sequence_id;
+      packet_sequence_ids[key] = sequence_id;
+      return sequence_id;
+    }
+
     const TracingSessionID id;
 
     // The consumer that started the session.
@@ -327,6 +346,10 @@ class TracingServiceImpl : public TracingService {
     // BufferID (shared namespace amongst all consumers). This vector has as
     // many entries as |config.buffers_size()|.
     std::vector<BufferID> buffers_index;
+
+    std::map<std::pair<ProducerID, WriterID>, PacketSequenceID>
+        packet_sequence_ids;
+    PacketSequenceID last_packet_sequence_id = kServicePacketSequenceID;
 
     // When the last snapshots (clock, stats, sync marker) were emitted into
     // the output stream.
@@ -377,6 +400,7 @@ class TracingServiceImpl : public TracingService {
   void SnapshotSyncMarker(std::vector<TracePacket>*);
   void SnapshotClocks(std::vector<TracePacket>*);
   void SnapshotStats(TracingSession*, std::vector<TracePacket>*);
+  TraceStats GetTraceStats(TracingSession* tracing_session);
   void MaybeEmitTraceConfig(TracingSession*, std::vector<TracePacket>*);
   void OnFlushTimeout(TracingSessionID, FlushRequestID);
   void OnDisableTracingTimeout(TracingSessionID);

@@ -105,6 +105,10 @@ export interface RecordConfig {
 export interface TraceTime {
   startSec: number;
   endSec: number;
+}
+
+export interface FrontendLocalState {
+  visibleTraceTime: TraceTime;
   lastUpdate: number;  // Epoch in seconds (Date.now() / 1000).
 }
 
@@ -112,6 +116,26 @@ export interface Status {
   msg: string;
   timestamp: number;  // Epoch in seconds (Date.now() / 1000).
 }
+
+export interface Note {
+  id: string;
+  timestamp: number;
+  color: string;
+  text: string;
+}
+
+export interface NoteSelection {
+  kind: 'NOTE';
+  id: string;
+}
+
+export interface SliceSelection {
+  kind: 'SLICE';
+  utid: number;
+  id: number;
+}
+
+type Selection = NoteSelection|SliceSelection;
 
 export interface State {
   route: string|null;
@@ -128,20 +152,28 @@ export interface State {
    */
   engines: ObjectById<EngineConfig>;
   traceTime: TraceTime;
-  visibleTraceTime: TraceTime;
   trackGroups: ObjectById<TrackGroupState>;
   tracks: ObjectById<TrackState>;
   scrollingTracks: string[];
   pinnedTracks: string[];
   queries: ObjectById<QueryConfig>;
   permalink: PermalinkConfig;
+  notes: ObjectById<Note>;
   status: Status;
+  currentSelection: Selection|null;
+
+  /**
+   * This state is updated on the frontend at 60Hz and eventually syncronised to
+   * the controller at 10Hz. When the controller sends state updates to the
+   * frontend the frontend has special logic to pick whichever version of this
+   * key is most up to date.
+   */
+  frontendLocalState: FrontendLocalState;
 }
 
 export const defaultTraceTime = {
   startSec: 0,
   endSec: 10,
-  lastUpdate: 0
 };
 
 export function createEmptyState(): State {
@@ -150,18 +182,24 @@ export function createEmptyState(): State {
     nextId: 0,
     engines: {},
     traceTime: {...defaultTraceTime},
-    visibleTraceTime: {...defaultTraceTime},
     tracks: {},
     trackGroups: {},
     pinnedTracks: [],
     scrollingTracks: [],
     queries: {},
     permalink: {},
+    notes: {},
 
     recordConfig: createEmptyRecordConfig(),
     displayConfigAsPbtxt: false,
 
+    frontendLocalState: {
+      visibleTraceTime: {...defaultTraceTime},
+      lastUpdate: 0,
+    },
+
     status: {msg: '', timestamp: 0},
+    currentSelection: null,
   };
 }
 

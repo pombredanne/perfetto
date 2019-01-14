@@ -22,17 +22,27 @@ import {
   DeferredAction,
 } from '../common/actions';
 import {Engine} from '../common/engine';
+import {NUM, NUM_NULL, rawQueryToRows, STR_NULL} from '../common/protos';
 import {SCROLLING_TRACK_GROUP} from '../common/state';
 import {TimeSpan} from '../common/time';
 import {QuantizedLoad, ThreadDesc} from '../frontend/globals';
+import {ANDROID_LOGS_TRACK_KIND} from '../tracks/android_log/common';
 import {SLICE_TRACK_KIND} from '../tracks/chrome_slices/common';
+import {CPU_FREQ_TRACK_KIND} from '../tracks/cpu_freq/common';
 import {CPU_SLICE_TRACK_KIND} from '../tracks/cpu_slices/common';
+import {
+  PROCESS_SCHEDULING_TRACK_KIND
+} from '../tracks/process_scheduling/common';
 import {PROCESS_SUMMARY_TRACK} from '../tracks/process_summary/common';
 
 import {Child, Children, Controller} from './controller';
 import {globals} from './globals';
 import {QueryController, QueryControllerArgs} from './query_controller';
 import {TrackControllerArgs, trackControllerRegistry} from './track_controller';
+import {
+  SelectionController,
+  SelectionControllerArgs
+} from './selection_controller';
 
 type States = 'init'|'loading_trace'|'ready';
 
@@ -106,6 +116,10 @@ export class TraceController extends Controller<States> {
           childControllers.push(Child(queryId, QueryController, queryArgs));
         }
 
+        const selectionArgs: SelectionControllerArgs = {engine};
+        childControllers.push(
+          Child('selection', SelectionController, selectionArgs));
+
         return childControllers;
 
       default:
@@ -169,15 +183,17 @@ export class TraceController extends Controller<States> {
     const traceTimeState = {
       startSec: traceTime.start,
       endSec: traceTime.end,
-      lastUpdate: Date.now() / 1000,
     };
-    const actions = [
+    const actions: DeferredAction[] = [
       Actions.setTraceTime(traceTimeState),
       Actions.navigate({route: '/viewer'}),
     ];
 
-    if (globals.state.visibleTraceTime.lastUpdate === 0) {
-      actions.push(Actions.setVisibleTraceTime(traceTimeState));
+    if (globals.state.frontendLocalState.lastUpdate === 0) {
+      actions.push(Actions.setVisibleTraceTime({
+        time: traceTimeState,
+        lastUpdate: Date.now() / 1000,
+      }));
     }
 
     globals.dispatchMultiple(actions);
@@ -220,6 +236,11 @@ export class TraceController extends Controller<States> {
     //    }
     //  }));
     //}
+    const maxFreq = await engine.query(`
+     select max(value)
+     from counters
+     where name = 'cpufreq';
+    `);
 
     for (let cpu = 0; cpu < numCpus; cpu++) {
       addToTrackActions.push(Actions.addTrack({
@@ -231,6 +252,29 @@ export class TraceController extends Controller<States> {
           cpu,
         }
       }));
+
+      // Only add a cpu freq track if we have
+      // cpu freq data.
+      // TODO(taylori): Find a way to display cpu idle
+      // events even if there are no cpu freq events.
+      const freqExists = await engine.query(`
+        select value
+        from counters
+        where name = 'cpufreq' and ref = ${cpu}
+        limit 1;
+      `);
+      if (freqExists.numRecords > 0) {
+        addToTrackActions.push(Actions.addTrack({
+          engineId: this.engineId,
+          kind: CPU_FREQ_TRACK_KIND,
+          name: `Cpu ${cpu} Frequency`,
+          trackGroup: SCROLLING_TRACK_GROUP,
+          config: {
+            cpu,
+            maximumValue: +maxFreq.columns[0].doubleValues![0],
+          }
+        }));
+      }
     }
 
     const counters = await engine.query(`
@@ -267,20 +311,6 @@ export class TraceController extends Controller<States> {
       }));
     }
 
-    // TODO(hjd): Find a way to show per CPU tracks.
-    // for (let cpu=0; cpu < numCpus; cpu++) {
-    //  addToTrackActions.push(Actions.addTrack({
-    //    engineId: this.engineId,
-    //    kind: 'CounterTrack',
-    //    name: `${name} (cpu: ${cpu})`,
-    //    trackGroup: SCROLLING_TRACK_GROUP,
-    //    config: {
-    //      name,
-    //      ref: cpu,
-    //    }
-    //  }));
-    //}
-
     // Local experiments shows getting maxDepth separately is ~2x faster than
     // joining with threads and processes.
     const maxDepthQuery =
@@ -293,44 +323,85 @@ export class TraceController extends Controller<States> {
       utidToMaxDepth.set(utid, maxDepth);
     }
 
-    const threadQuery = await engine.query(
-        'select utid, tid, upid, pid, thread.name, process.name ' +
-        'from thread inner join process using(upid)');
+    // Return all threads
+    // sorted by:
+    //  total cpu time *for the whole parent process*
+    //  upid
+    //  utid
+    const threadQuery = await engine.query(`
+        select
+          utid,
+          tid,
+          upid,
+          pid,
+          thread.name as threadName,
+          process.name as processName,
+          total_dur as totalDur
+        from
+          thread
+          left join process using(upid)
+          left join (select upid, sum(dur) as total_dur
+              from sched join thread using(utid)
+              group by upid
+            ) using(upid) group by utid, upid
+        order by total_dur desc, upid, utid`);
 
     const upidToUuid = new Map<number, string>();
+    const utidToUuid = new Map<number, string>();
     const addSummaryTrackActions: DeferredAction[] = [];
     const addTrackGroupActions: DeferredAction[] = [];
-    for (let i = 0; i < threadQuery.numRecords; i++) {
-      const utid = threadQuery.columns[0].longValues![i] as number;
-      const tid = threadQuery.columns[1].longValues![i] as number;
-      const upid = threadQuery.columns[2].longValues![i] as number;
-      const pid = threadQuery.columns[3].longValues![i] as number;
-      const threadName = threadQuery.columns[4].stringValues![i];
-      const processName = threadQuery.columns[5].stringValues![i];
 
-      const maxDepth = utidToMaxDepth.get(utid);
-      if (maxDepth === undefined && !counterUpids.has(upid) &&
+    for (const row of rawQueryToRows(threadQuery, {
+           utid: NUM,
+           upid: NUM_NULL,
+           tid: NUM_NULL,
+           pid: NUM_NULL,
+           threadName: STR_NULL,
+           processName: STR_NULL,
+           totalDur: NUM_NULL,
+         })) {
+      const utid = row.utid;
+      const tid = row.tid;
+      const upid = row.upid;
+      const pid = row.pid;
+      const threadName = row.threadName;
+      const processName = row.processName;
+      const hasSchedEvents = !!row.totalDur;
+
+      const maxDepth = utid === null ? undefined : utidToMaxDepth.get(utid);
+      if (maxDepth === undefined &&
+          (upid === null || !counterUpids.has(upid)) &&
           !counterUtids.has(utid)) {
         continue;
       }
 
-      let pUuid = upidToUuid.get(upid);
+      // Group by upid if present else by utid.
+      let pUuid = upid === null ? utidToUuid.get(utid) : upidToUuid.get(upid);
       if (pUuid === undefined) {
         pUuid = uuidv4();
         const summaryTrackId = uuidv4();
-        upidToUuid.set(upid, pUuid);
+        if (upid === null) {
+          utidToUuid.set(utid, pUuid);
+        } else {
+          upidToUuid.set(upid, pUuid);
+        }
+
+        const pidForColor = pid || tid || upid || utid || 0;
+        const kind = hasSchedEvents ? PROCESS_SCHEDULING_TRACK_KIND :
+                                      PROCESS_SUMMARY_TRACK;
         addSummaryTrackActions.push(Actions.addTrack({
           id: summaryTrackId,
           engineId: this.engineId,
-          kind: PROCESS_SUMMARY_TRACK,
-          name: `${pid} summary`,
-          config: {upid, pid, maxDepth, utid},
+          kind,
+          name: `${upid === null ? tid : pid} summary`,
+          config: {pidForColor, upid, utid},
         }));
 
         addTrackGroupActions.push(Actions.addTrackGroup({
           engineId: this.engineId,
           summaryTrackId,
-          name: `${processName} ${pid}`,
+          name: upid === null ? `${threadName} ${tid}` :
+                                `${processName} ${pid}`,
           id: pUuid,
           collapsed: true,
         }));
@@ -375,12 +446,24 @@ export class TraceController extends Controller<States> {
         addToTrackActions.push(Actions.addTrack({
           engineId: this.engineId,
           kind: SLICE_TRACK_KIND,
-          name: threadName + `[${tid}]`,
+          name: `${threadName} [${tid}]`,
           trackGroup: pUuid,
           config: {upid, utid, maxDepth},
         }));
       }
     }
+
+    const logCount = await engine.query(`select count(1) from android_logs`);
+    if (logCount.columns[0].longValues![0] > 0) {
+      addToTrackActions.push(Actions.addTrack({
+        engineId: this.engineId,
+        kind: ANDROID_LOGS_TRACK_KIND,
+        name: 'Android logs',
+        trackGroup: SCROLLING_TRACK_GROUP,
+        config: {}
+      }));
+    }
+
     const allActions =
         addSummaryTrackActions.concat(addTrackGroupActions, addToTrackActions);
     globals.dispatchMultiple(allActions);
@@ -389,7 +472,9 @@ export class TraceController extends Controller<States> {
   private async listThreads() {
     this.updateStatus('Reading thread list');
     const sqlQuery = `select utid, tid, pid, thread.name,
-        ifnull(process.name, thread.name)
+        ifnull(
+          case when length(process.name) > 0 then process.name else null end,
+          thread.name)
         from thread left join process using(upid)`;
     const threadRows = await assertExists(this.engine).query(sqlQuery);
     const threads: ThreadDesc[] = [];

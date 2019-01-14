@@ -220,8 +220,10 @@ export const StateActions = {
     state.traceTime = args;
   },
 
-  setVisibleTraceTime(state: StateDraft, args: TraceTime): void {
-    state.visibleTraceTime = args;
+  setVisibleTraceTime(
+      state: StateDraft, args: {time: TraceTime; lastUpdate: number;}): void {
+    state.frontendLocalState.visibleTraceTime = args.time;
+    state.frontendLocalState.lastUpdate = args.lastUpdate;
   },
 
   updateStatus(state: StateDraft, args: Status): void {
@@ -276,6 +278,62 @@ export const StateActions = {
   toggleDisplayConfigAsPbtxt(state: StateDraft, _: {}): void {
     state.displayConfigAsPbtxt = !state.displayConfigAsPbtxt;
   },
+
+  selectNote(state: StateDraft, args: {id: string}): void {
+    if (args.id) {
+      state.currentSelection = {
+        kind: 'NOTE',
+        id: args.id
+      };
+    }
+  },
+
+  addNote(state: StateDraft, args: {timestamp: number}): void {
+    const id = `${state.nextId++}`;
+    state.notes[id] = {
+      id,
+      timestamp: args.timestamp,
+      color: '#000000',
+      text: '',
+    };
+    this.selectNote(state, {id});
+  },
+
+  changeNoteColor(state: StateDraft, args: {id: string, newColor: string}):
+      void {
+        const note = state.notes[args.id];
+        if (note === undefined) return;
+        note.color = args.newColor;
+      },
+
+  changeNoteText(state: StateDraft, args: {id: string, newText: string}): void {
+    const note = state.notes[args.id];
+    if (note === undefined) return;
+    note.text = args.newText;
+  },
+
+  removeNote(state: StateDraft, args: {id: string}): void {
+    delete state.notes[args.id];
+    if (state.currentSelection === null) return;
+    if (state.currentSelection.kind === 'NOTE' &&
+        state.currentSelection.id === args.id) {
+      state.currentSelection = null;
+    }
+  },
+
+  selectSlice(state: StateDraft,
+              args: {utid: number, id: number}): void {
+    state.currentSelection = {
+      kind: 'SLICE',
+      utid: args.utid,
+      id: args.id,
+    };
+  },
+
+  deselect(state: StateDraft, _: {}): void {
+    state.currentSelection = null;
+  }
+
 };
 
 // When we are on the frontend side, we don't really want to execute the
