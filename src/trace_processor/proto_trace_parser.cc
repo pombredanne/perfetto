@@ -907,6 +907,22 @@ void ProtoTraceParser::ParsePrint(uint32_t,
     }
 
     case 'C': {
+      // LMK events from userspace are hacked as counter events with the "value"
+      // of the counter representing the pid of the killed process which is
+      // reset to 0 once the kill is complete.
+      // Homogenise this with kernel LMK events as an instant event, ignoring
+      // the resets to 0.
+      if (point.name == "kill_one_process") {
+        auto killed_tid = static_cast<uint32_t>(point.value);
+        if (killed_tid != 0) {
+          UniqueTid killed_utid =
+              context_->process_tracker->UpdateThread(timestamp, killed_tid, 0);
+          context_->storage->mutable_instants()->AddInstantEvent(
+              timestamp, lmk_id_, 0, killed_utid, RefType::kRefUtid);
+        }
+        // TODO(tilal6991): we should not add LMK events to the counters table
+        // once the UI has support for displaying instants.
+      }
       UniqueTid utid =
           context_->process_tracker->UpdateThread(timestamp, point.tid, 0);
       StringId name_id = context_->storage->InternString(point.name);
