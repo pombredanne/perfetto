@@ -27,7 +27,6 @@
 #include "perfetto/trace/trace_packet.pbzero.h"
 
 namespace perfetto {
-namespace {
 
 class StartupTraceWriterTest : public AlignedBufferTest {
  public:
@@ -89,6 +88,10 @@ class StartupTraceWriterTest : public AlignedBufferTest {
     EXPECT_EQ(expected_count, packets_count);
   }
 
+  size_t GetUnboundWriterCount(const StartupTraceWriterRegistry& registry) {
+    return registry.unbound_writers_.size();
+  }
+
   FakeProducerEndpoint fake_producer_endpoint_;
   std::unique_ptr<base::TestTaskRunner> task_runner_;
   std::unique_ptr<SharedMemoryArbiterImpl> arbiter_;
@@ -96,6 +99,8 @@ class StartupTraceWriterTest : public AlignedBufferTest {
 
   ChunkID last_read_max_chunk_id_ = 0;
 };
+
+namespace {
 
 size_t const kPageSizes[] = {4096, 65536};
 INSTANTIATE_TEST_CASE_P(PageSize,
@@ -202,7 +207,7 @@ TEST_P(StartupTraceWriterTest, BindingWhileWritingFails) {
 
   const BufferID kBufId = 42;
   {
-    // Begin a write by opening a TracePacket
+    // Begin a write by opening a TracePacket.
     auto packet = writer->NewTracePacket();
 
     // Binding while writing should fail.
@@ -212,6 +217,47 @@ TEST_P(StartupTraceWriterTest, BindingWhileWritingFails) {
   // Packet was completed, so binding should work now and emit the packet.
   EXPECT_TRUE(arbiter_->BindStartupTraceWriter(writer.get(), kBufId));
   VerifyPacketCount(1);
+}
+
+TEST_P(StartupTraceWriterTest, CreateAndBindViaRegistry) {
+  StartupTraceWriterRegistry registry(task_runner_.get());
+
+  // Create unbound writers.
+  auto writer1 = registry.CreateTraceWriter();
+  auto writer2 = registry.CreateTraceWriter();
+
+  EXPECT_EQ(2u, GetUnboundWriterCount(registry));
+
+  {
+    // Begin a write by opening a TracePacket on |writer1|.
+    auto packet = writer1->NewTracePacket();
+
+    // Binding |writer1| writing should fail, but |writer2| should be bound.
+    const BufferID kBufId = 42;
+    arbiter_->BindStartupTraceWriterRegistry(&registry, kBufId);
+    EXPECT_EQ(1u, GetUnboundWriterCount(registry));
+  }
+
+  // Wait for |writer1| to be bound as well.
+  auto checkpoint_name = "all_bound";
+  auto all_bound = task_runner_->CreateCheckpoint(checkpoint_name);
+  std::function<void()> task;
+  task = [&task, &registry, all_bound, this]() {
+    if (!GetUnboundWriterCount(registry)) {
+      all_bound();
+      return;
+    }
+    task_runner_->PostDelayedTask(task, 1);
+  };
+  task_runner_->PostDelayedTask(task, 1);
+  task_runner_->RunUntilCheckpoint(checkpoint_name);
+
+  EXPECT_EQ(0u, GetUnboundWriterCount(registry));
+
+  // New writer should immediately be bound.
+  auto writer3 = registry.CreateTraceWriter();
+  EXPECT_EQ(0u, GetUnboundWriterCount(registry));
+  EXPECT_TRUE(writer3->was_bound());
 }
 
 }  // namespace

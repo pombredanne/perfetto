@@ -281,6 +281,12 @@ bool SharedMemoryArbiterImpl::BindStartupTraceWriter(StartupTraceWriter* writer,
   return writer->BindToArbiter(this, target_buffer);
 }
 
+void SharedMemoryArbiterImpl::BindStartupTraceWriterRegistry(
+    StartupTraceWriterRegistry* registry,
+    BufferID target_buffer) {
+  registry->BindToArbiter(this, target_buffer);
+}
+
 void SharedMemoryArbiterImpl::NotifyFlushComplete(FlushRequestID req_id) {
   bool should_post_commit_task = false;
   {

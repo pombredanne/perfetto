@@ -35,6 +35,7 @@ class TaskRunner;
 
 class CommitDataRequest;
 class StartupTraceWriter;
+class StartupTraceWriterRegistry;
 class SharedMemory;
 class TraceWriter;
 
@@ -55,10 +56,20 @@ class PERFETTO_EXPORT SharedMemoryArbiter {
   // associated with the arbiter's SMB. Returns |false| if binding failed
   // because the writer is concurrently writing data to its temporary buffer. In
   // this case, the caller should retry (it is free to try again immediately or
-  // schedule a wakeup to retry later).
+  // schedule a wakeup to retry later). Returns |true| if successfully bound
+  // and should then not be called again for the same writer.
   virtual bool BindStartupTraceWriter(StartupTraceWriter* writer,
                                       BufferID target_buffer)
       PERFETTO_WARN_UNUSED_RESULT = 0;
+
+  // Binds the provided unbound StartupTraceWriterRegistry to the arbiter's SMB.
+  // Binds all StartupTraceWriters created by the registry to the given arbiter
+  // and target buffer. Should only be called once. The writers may not be bound
+  // immediately if they are concurrently being written to. The registry will
+  // retry on its TaskRunner until all writers were bound successfully.
+  virtual void BindStartupTraceWriterRegistry(
+      StartupTraceWriterRegistry* registry,
+      BufferID target_buffer) = 0;
 
   // Notifies the service that all data for the given FlushRequestID has been
   // committed in the shared memory buffer.

@@ -107,6 +107,8 @@ class SharedMemoryArbiterImpl : public SharedMemoryArbiter {
       BufferID target_buffer) override;
   bool BindStartupTraceWriter(StartupTraceWriter* writer,
                               BufferID target_buffer) override;
+  void BindStartupTraceWriterRegistry(StartupTraceWriterRegistry* registry,
+                                      BufferID target_buffer) override;
 
   void NotifyFlushComplete(FlushRequestID) override;
 
