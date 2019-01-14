@@ -47,13 +47,17 @@ declare_args() {
   # The Android blueprint file generator overrides this to true.
   perfetto_build_with_android = false
 
+  # Embedders can override this to true.
+  perfetto_build_with_embedder = build_with_chromium
+
   # Whether the ftrace producer and the service should be started
   # by the integration test or assumed to be running.
   start_daemons_for_testing = true
 }
 
-if (!defined(perfetto_build_with_embedder)) {
-  perfetto_build_with_embedder = build_with_chromium
+declare_args() {
+  # Disable DLOG for embedders by default to avoid spamming them.
+  perfetto_dlog_enabled = !perfetto_build_with_embedder
 }
 
 perfetto_build_standalone =

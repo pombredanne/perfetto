@@ -121,8 +121,7 @@ config("default_config") {
     }
   }
 
-  # Disable debug log spam if we're embedded in a third-party project.
-  if (!perfetto_build_with_embedder) {
+  if (perfetto_dlog_enabled) {
     defines += [ "PERFETTO_ENABLE_DLOG" ]
   }
 
