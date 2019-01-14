@@ -706,9 +706,9 @@ void ProtoTraceParser::ParseLowmemoryKill(int64_t timestamp,
 
   // Storing the pid of the event that is lmk-ed.
   auto* instants = context_->storage->mutable_instants();
-  UniqueTid utid = context_->process_tracker->UpdateThread(timestamp, pid, 0);
+  UniquePid upid = context_->process_tracker->UpdateProcess(pid);
   uint32_t row =
-      instants->AddInstantEvent(timestamp, lmk_id_, 0, utid, RefType::kRefUtid);
+      instants->AddInstantEvent(timestamp, lmk_id_, 0, upid, RefType::kRefUpid);
 
   // Store the comm as an arg.
   RowId row_id = TraceStorage::CreateRowId(TableId::kInstants, row);
@@ -912,13 +912,14 @@ void ProtoTraceParser::ParsePrint(uint32_t,
       // reset to 0 once the kill is complete.
       // Homogenise this with kernel LMK events as an instant event, ignoring
       // the resets to 0.
-      if (point.name == "kill_one_process") {
-        auto killed_tid = static_cast<uint32_t>(point.value);
-        if (killed_tid != 0) {
-          UniqueTid killed_utid =
-              context_->process_tracker->UpdateThread(timestamp, killed_tid, 0);
+      static const char kLmkCounterName[] = "kill_one_process";
+      if (point.name == kLmkCounterName) {
+        auto killed_pid = static_cast<uint32_t>(point.value);
+        if (killed_pid != 0) {
+          UniquePid killed_upid =
+              context_->process_tracker->UpdateProcess(killed_pid, 0);
           context_->storage->mutable_instants()->AddInstantEvent(
-              timestamp, lmk_id_, 0, killed_utid, RefType::kRefUtid);
+              timestamp, lmk_id_, 0, killed_upid, RefType::kRefUpid);
         }
         // TODO(tilal6991): we should not add LMK events to the counters table
         // once the UI has support for displaying instants.
