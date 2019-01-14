@@ -29,8 +29,14 @@ message TraceStats {
     // Num. chunks (!= packets) written into the buffer.
     optional uint64 chunks_written = 2;
 
+    // Num. chunks (!= packets) rewritten into the buffer.
+    optional uint64 chunks_rewritten = 10;
+
     // Num. chunks overwritten before they have been read (i.e. loss of data).
     optional uint64 chunks_overwritten = 3;
+
+    // Num. chunks that were processed out of order (potentially ignored).
+    optional uint64 chunks_committed_out_of_order = 11;
 
     // Num. times the ring buffer wrapped around.
     optional uint64 write_wrap_count = 4;
@@ -56,6 +62,8 @@ message TraceStats {
     // the buffer. This is an indication of either a bug in the producer(s) or
     // malicious producer(s).
     optional uint64 abi_violations = 9;
+
+    // NEXT ID: 12
   }
 
   // Stats for the TraceBuffer(s) of the current trace session.
