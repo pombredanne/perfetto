@@ -214,5 +214,9 @@ void AndroidTaskRunner::RemoveFileDescriptorWatch(int fd) {
   ALooper_removeFd(looper_, fd);
 }
 
+bool AndroidTaskRunner::RunsTaskOnCurrentThread() const {
+  return looper_ == ALooper_forThread();
+}
+
 }  // namespace base
 }  // namespace perfetto

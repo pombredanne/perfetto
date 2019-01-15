@@ -110,5 +110,9 @@ void TestTaskRunner::RemoveFileDescriptorWatch(int fd) {
   task_runner_.RemoveFileDescriptorWatch(fd);
 }
 
+bool TestTaskRunner::RunsTaskOnCurrentThread() const {
+  return task_runner_.RunsTaskOnCurrentThread();
+}
+
 }  // namespace base
 }  // namespace perfetto

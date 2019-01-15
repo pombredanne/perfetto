@@ -25,6 +25,7 @@
 #include <atomic>
 
 #include "perfetto/base/logging.h"
+#include "perfetto/base/thread_utils.h"
 #include "perfetto/base/utils.h"
 
 namespace perfetto {
