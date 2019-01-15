@@ -34,6 +34,8 @@ StorageSchema SchedSliceTable::CreateStorageSchema() {
       .AddNumericColumn("dur", &slices.durations())
       .AddColumn<TsEndColumn>("ts_end", &slices.start_ns(), &slices.durations())
       .AddNumericColumn("utid", &slices.utids())
+      .AddColumn<SchedReasonColumn>("end_reason", &slices.end_reasons())
+      .AddNumericColumn("priority", &slices.priorities())
       .Build({"cpu", "ts"});
 }
 
@@ -54,9 +56,52 @@ int SchedSliceTable::BestIndex(const QueryConstraints& qc,
   // We should be able to handle any constraint and any order by clause given
   // to us.
   info->order_by_consumed = true;
-  std::fill(info->omit.begin(), info->omit.end(), true);
-
+  size_t end_reason_index = schema().ColumnIndexFromName("end_reason");
+  for (size_t i = 0; i < qc.constraints().size(); i++) {
+    info->omit[i] =
+        qc.constraints()[i].iColumn != static_cast<int>(end_reason_index);
+  }
   return SQLITE_OK;
+}
+
+SchedSliceTable::SchedReasonColumn::SchedReasonColumn(
+    std::string col_name,
+    const std::deque<SchedReason>* deque)
+    : StorageColumn(col_name, false), deque_(deque) {}
+
+void SchedSliceTable::SchedReasonColumn::ReportResult(sqlite3_context* ctx,
+                                                      uint32_t row) const {
+  sqlite3_result_text(ctx, (*deque_)[row].data(), -1,
+                      sqlite_utils::kSqliteStatic);
+}
+
+SchedSliceTable::SchedReasonColumn::Bounds
+SchedSliceTable::SchedReasonColumn::BoundFilter(int, sqlite3_value*) const {
+  Bounds bounds;
+  bounds.max_idx = static_cast<uint32_t>(deque_->size());
+  return bounds;
+}
+
+void SchedSliceTable::SchedReasonColumn::Filter(int,
+                                                sqlite3_value*,
+                                                FilteredRowIndex*) const {}
+
+SchedSliceTable::SchedReasonColumn::Comparator
+SchedSliceTable::SchedReasonColumn::Sort(
+    const QueryConstraints::OrderBy& ob) const {
+  constexpr size_t kSchedSize = std::tuple_size<SchedReason>();
+  if (ob.desc) {
+    return [this](uint32_t f, uint32_t s) {
+      const SchedReason& a = (*deque_)[f];
+      const SchedReason& b = (*deque_)[s];
+      return sqlite_utils::CompareValuesAsc(a.data(), b.data(), kSchedSize);
+    };
+  }
+  return [this](uint32_t f, uint32_t s) {
+    const SchedReason& a = (*deque_)[f];
+    const SchedReason& b = (*deque_)[s];
+    return sqlite_utils::CompareValuesDesc(a.data(), b.data(), kSchedSize);
+  };
 }
 
 }  // namespace trace_processor

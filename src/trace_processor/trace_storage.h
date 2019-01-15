@@ -71,6 +71,11 @@ enum RefType {
   kRefMax
 };
 
+// Note: 3 bytes are used here instead of 2 because this array is often treated
+// as if it were a null-terminated const char*. We need the extra byte for the
+// null terminator for this reason.
+using SchedReason = std::array<char, 3>;
+
 // Stores a data inside a trace file in a columnar form. This makes it efficient
 // to read or search across a single field of the trace (e.g. all the thread
 // names for a given CPU).
@@ -169,16 +174,24 @@ class TraceStorage {
     inline size_t AddSlice(uint32_t cpu,
                            int64_t start_ns,
                            int64_t duration_ns,
-                           UniqueTid utid) {
+                           UniqueTid utid,
+                           SchedReason end_reason,
+                           int32_t priority) {
       cpus_.emplace_back(cpu);
       start_ns_.emplace_back(start_ns);
       durations_.emplace_back(duration_ns);
       utids_.emplace_back(utid);
+      end_reasons_.emplace_back(end_reason);
+      priorities_.emplace_back(priority);
       return slice_count() - 1;
     }
 
     void set_duration(size_t index, int64_t duration_ns) {
       durations_[index] = duration_ns;
+    }
+
+    void set_end_reason(size_t index, SchedReason end_reason) {
+      end_reasons_[index] = end_reason;
     }
 
     size_t slice_count() const { return start_ns_.size(); }
@@ -191,6 +204,10 @@ class TraceStorage {
 
     const std::deque<UniqueTid>& utids() const { return utids_; }
 
+    const std::deque<SchedReason>& end_reasons() const { return end_reasons_; }
+
+    const std::deque<int32_t>& priorities() const { return priorities_; }
+
    private:
     // Each deque below has the same number of entries (the number of slices
     // in the trace for the CPU).
@@ -198,6 +215,8 @@ class TraceStorage {
     std::deque<int64_t> start_ns_;
     std::deque<int64_t> durations_;
     std::deque<UniqueTid> utids_;
+    std::deque<SchedReason> end_reasons_;
+    std::deque<int32_t> priorities_;
   };
 
   class NestableSlices {

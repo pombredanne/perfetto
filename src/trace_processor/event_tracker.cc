@@ -25,6 +25,40 @@
 namespace perfetto {
 namespace trace_processor {
 
+namespace {
+
+// TODO(lalitm): merge this function with the one in trace_to_text.
+SchedReason GetSchedSwitchReasonFromState(int64_t state) {
+  static const int64_t kTaskStateMax = 2048;
+  int64_t masked = state & (kTaskStateMax - 1);
+  char fc = 'R';
+  if (masked & 1)
+    fc = 'S';
+  else if (masked & 2)
+    fc = 'D';
+  else if (masked & 4)
+    fc = 'T';
+  else if (masked & 8)
+    fc = 't';
+  else if (masked & 16)
+    fc = 'Z';
+  else if (masked & 32)
+    fc = 'X';
+  else if (masked & 64)
+    fc = 'x';
+  else if (masked & 128)
+    fc = 'K';
+  else if (masked & 256)
+    fc = 'W';
+  else if (masked & 512)
+    fc = 'P';
+  else if (masked & 1024)
+    fc = 'N';
+  return (state & kTaskStateMax) ? SchedReason{fc, '+'} : SchedReason{fc};
+}
+
+}  // namespace
+
 EventTracker::EventTracker(TraceProcessorContext* context)
     : idle_string_id_(context->storage->InternString("idle")),
       context_(context) {}
@@ -38,9 +72,10 @@ StringId EventTracker::GetThreadNameId(uint32_t tid, base::StringView comm) {
 void EventTracker::PushSchedSwitch(uint32_t cpu,
                                    int64_t timestamp,
                                    uint32_t prev_pid,
-                                   uint32_t,
+                                   int64_t prev_state,
                                    uint32_t next_pid,
-                                   base::StringView next_comm) {
+                                   base::StringView next_comm,
+                                   int32_t next_priority) {
   // At this stage all events should be globally timestamp ordered.
   if (timestamp < prev_timestamp_) {
     PERFETTO_ELOG("sched_switch event out of order by %.4f ms, skipping",
@@ -54,23 +89,26 @@ void EventTracker::PushSchedSwitch(uint32_t cpu,
   auto* slices = context_->storage->mutable_slices();
   auto* pending_slice = &pending_sched_per_cpu_[cpu];
   if (pending_slice->storage_index < std::numeric_limits<size_t>::max()) {
-    // If the this events previous pid does not match the previous event's next
-    // pid, make a note of this.
-    if (prev_pid != pending_slice->pid) {
-      context_->storage->IncrementStats(stats::mismatched_sched_switch_tids);
-    }
-
     size_t idx = pending_slice->storage_index;
     int64_t duration = timestamp - slices->start_ns()[idx];
     slices->set_duration(idx, duration);
+
+    if (prev_pid == pending_slice->pid) {
+      slices->set_end_reason(idx, GetSchedSwitchReasonFromState(prev_state));
+    } else {
+      // If the this events previous pid does not match the previous event's
+      // next pid, make a note of this.
+      context_->storage->IncrementStats(stats::mismatched_sched_switch_tids);
+    }
   }
 
   StringId name_id = GetThreadNameId(next_pid, next_comm);
   auto utid =
       context_->process_tracker->UpdateThread(timestamp, next_pid, name_id);
 
-  pending_slice->storage_index =
-      slices->AddSlice(cpu, timestamp, 0 /* duration */, utid);
+  constexpr SchedReason kDefaultReason = SchedReason{'-'};
+  pending_slice->storage_index = slices->AddSlice(
+      cpu, timestamp, 0 /* duration */, utid, kDefaultReason, next_priority);
   pending_slice->pid = next_pid;
 }
 
