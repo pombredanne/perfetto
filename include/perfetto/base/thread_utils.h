@@ -63,6 +63,11 @@ using PlatformThreadID = uint64_t;
 inline PlatformThreadID GetThreadId() {
   return static_cast<uint64_t>(GetCurrentThreadID());
 }
+#else  // Default to pthreads in case no OS is set.
+using PlatformThreadID = pthread_t;
+inline PlatformThreadID GetThreadId() {
+  return pthread_self();
+}
 #endif
 
 }  // namespace base
