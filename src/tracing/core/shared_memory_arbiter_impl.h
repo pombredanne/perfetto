@@ -105,8 +105,6 @@ class SharedMemoryArbiterImpl : public SharedMemoryArbiter {
   // See include/perfetto/tracing/core/shared_memory_arbiter.h for comments.
   std::unique_ptr<TraceWriter> CreateTraceWriter(
       BufferID target_buffer) override;
-  bool BindStartupTraceWriter(StartupTraceWriter* writer,
-                              BufferID target_buffer) override;
   void BindStartupTraceWriterRegistry(StartupTraceWriterRegistry* registry,
                                       BufferID target_buffer) override;
 

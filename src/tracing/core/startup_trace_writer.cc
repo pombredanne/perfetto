@@ -16,12 +16,10 @@
 
 #include "perfetto/tracing/core/startup_trace_writer.h"
 
-#include <functional>
-
 #include "perfetto/base/logging.h"
-#include "perfetto/base/task_runner.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 #include "perfetto/tracing/core/shared_memory_abi.h"
+#include "perfetto/tracing/core/startup_trace_writer_registry.h"
 #include "src/tracing/core/patch_list.h"
 #include "src/tracing/core/shared_memory_arbiter_impl.h"
 
@@ -336,63 +334,6 @@ ChunkID StartupTraceWriter::CommitLocalBufferChunks(
   PERFETTO_DCHECK(!cur_chunk.is_valid());
 
   return next_chunk_id;
-}
-
-StartupTraceWriterRegistry::StartupTraceWriterRegistry(
-    base::TaskRunner* task_runner)
-    : task_runner_(task_runner) {}
-
-StartupTraceWriterRegistry::~StartupTraceWriterRegistry() {
-  std::lock_guard<std::mutex> lock(lock_);
-  for (auto* writer : unbound_writers_)
-    writer->set_registry(nullptr);
-}
-
-std::unique_ptr<StartupTraceWriter>
-StartupTraceWriterRegistry::CreateTraceWriter() {
-  std::lock_guard<std::mutex> lock(lock_);
-  std::unique_ptr<StartupTraceWriter> writer;
-  if (PERFETTO_LIKELY(arbiter_)) {
-    writer.reset(
-        new StartupTraceWriter(arbiter_->CreateTraceWriter(target_buffer_)));
-  } else {
-    writer.reset(new StartupTraceWriter());
-    unbound_writers_.insert(writer.get());
-  }
-  return writer;
-}
-
-void StartupTraceWriterRegistry::BindToArbiter(SharedMemoryArbiterImpl* arbiter,
-                                               BufferID target_buffer) {
-  {
-    std::lock_guard<std::mutex> lock(lock_);
-    PERFETTO_DCHECK(!arbiter_);
-    arbiter_ = arbiter;
-    target_buffer_ = target_buffer;
-  }
-  TryBindWriters();
-}
-
-void StartupTraceWriterRegistry::TryBindWriters() {
-  std::lock_guard<std::mutex> lock(lock_);
-  for (auto it = unbound_writers_.begin(); it != unbound_writers_.end();) {
-    if (arbiter_->BindStartupTraceWriter(*it, target_buffer_)) {
-      (*it)->set_registry(nullptr);
-      it = unbound_writers_.erase(it);
-    } else {
-      it++;
-    }
-  }
-  if (!unbound_writers_.empty()) {
-    task_runner_->PostTask(
-        std::bind(&StartupTraceWriterRegistry::TryBindWriters, this));
-  }
-}
-
-void StartupTraceWriterRegistry::OnStartupTraceWriterDestroyed(
-    StartupTraceWriter* trace_writer) {
-  std::lock_guard<std::mutex> lock(lock_);
-  unbound_writers_.erase(trace_writer);
 }
 
 }  // namespace perfetto

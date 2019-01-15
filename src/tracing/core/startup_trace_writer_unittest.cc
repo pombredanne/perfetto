@@ -17,6 +17,7 @@
 #include "perfetto/tracing/core/startup_trace_writer.h"
 
 #include "gtest/gtest.h"
+#include "perfetto/tracing/core/startup_trace_writer_registry.h"
 #include "perfetto/tracing/core/tracing_service.h"
 #include "src/base/test/test_task_runner.h"
 #include "src/tracing/core/shared_memory_arbiter_impl.h"
@@ -113,7 +114,7 @@ TEST_P(StartupTraceWriterTest, CreateUnboundAndBind) {
 
   // Bind it right away without having written any data before.
   const BufferID kBufId = 42;
-  EXPECT_TRUE(arbiter_->BindStartupTraceWriter(writer.get(), kBufId));
+  EXPECT_TRUE(writer->BindToArbiter(arbiter_.get(), kBufId));
 
   const size_t kNumPackets = 32;
   WritePackets(writer.get(), kNumPackets);
@@ -160,7 +161,7 @@ TEST_P(StartupTraceWriterTest, WriteWhileUnboundAndBind) {
   // Binding the writer should cause the previously written packets to be
   // written to the SMB and committed.
   const BufferID kBufId = 42;
-  EXPECT_TRUE(arbiter_->BindStartupTraceWriter(writer.get(), kBufId));
+  EXPECT_TRUE(writer->BindToArbiter(arbiter_.get(), kBufId));
 
   VerifyPacketCount(kNumPackets);
 
@@ -188,7 +189,7 @@ TEST_P(StartupTraceWriterTest, WriteMultipleChunksWhileUnboundAndBind) {
   // Binding the writer should cause the previously written packets to be
   // written to the SMB and committed.
   const BufferID kBufId = 42;
-  EXPECT_TRUE(arbiter_->BindStartupTraceWriter(writer.get(), kBufId));
+  EXPECT_TRUE(writer->BindToArbiter(arbiter_.get(), kBufId));
 
   VerifyPacketCount(kNumPackets + 1);
 
@@ -211,11 +212,11 @@ TEST_P(StartupTraceWriterTest, BindingWhileWritingFails) {
     auto packet = writer->NewTracePacket();
 
     // Binding while writing should fail.
-    EXPECT_FALSE(arbiter_->BindStartupTraceWriter(writer.get(), kBufId));
+    EXPECT_FALSE(writer->BindToArbiter(arbiter_.get(), kBufId));
   }
 
   // Packet was completed, so binding should work now and emit the packet.
-  EXPECT_TRUE(arbiter_->BindStartupTraceWriter(writer.get(), kBufId));
+  EXPECT_TRUE(writer->BindToArbiter(arbiter_.get(), kBufId));
   VerifyPacketCount(1);
 }
 
