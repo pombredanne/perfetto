@@ -175,7 +175,7 @@ export class TraceController extends Controller<States> {
       Actions.navigate({route: '/viewer'}),
     ];
 
-    if (globals.state.highFrequencyState.lastUpdate === 0) {
+    if (globals.state.frontendLocalState.lastUpdate === 0) {
       actions.push(Actions.setVisibleTraceTime({
         time: traceTimeState,
         lastUpdate: Date.now() / 1000,

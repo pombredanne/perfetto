@@ -38,7 +38,7 @@ class FrontendApi {
     // If the visible time in the global state has been updated more recently
     // than the visible time handled by the frontend @ 60fps, update it. This
     // typically happens when restoring the state from a permalink.
-    globals.frontendLocalState.mergeState(state.highFrequencyState);
+    globals.frontendLocalState.mergeState(state.frontendLocalState);
     this.redraw();
   }
 

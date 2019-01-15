@@ -107,7 +107,7 @@ export interface TraceTime {
   endSec: number;
 }
 
-export interface HighFrequencyState {
+export interface FrontendLocalState {
   visibleTraceTime: TraceTime;
   lastUpdate: number;  // Epoch in seconds (Date.now() / 1000).
 }
@@ -140,7 +140,13 @@ export interface State {
   permalink: PermalinkConfig;
   status: Status;
 
-  highFrequencyState: HighFrequencyState;
+  /**
+   * This state is updated on the frontend at 60Hz and eventually syncronised to
+   * the controller at 10Hz. When the controller sends state updates to the
+   * frontend the frontend has special logic to pick whichever version of this
+   * key is most up to date.
+   */
+  frontendLocalState: FrontendLocalState;
 }
 
 export const defaultTraceTime = {
@@ -164,7 +170,7 @@ export function createEmptyState(): State {
     recordConfig: createEmptyRecordConfig(),
     displayConfigAsPbtxt: false,
 
-    highFrequencyState: {
+    frontendLocalState: {
       visibleTraceTime: {...defaultTraceTime},
       lastUpdate: 0,
     },

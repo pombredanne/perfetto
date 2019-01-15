@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import {Actions} from '../common/actions';
-import {HighFrequencyState} from '../common/state';
+import {FrontendLocalState as FrontendState} from '../common/state';
 import {TimeSpan} from '../common/time';
 
 import {globals} from './globals';
@@ -58,11 +58,11 @@ export class FrontendLocalState {
     }, 100);
   }
 
-  mergeState(highFrequencyState: HighFrequencyState): void {
-    if (this._lastUpdate >= highFrequencyState.lastUpdate) {
+  mergeState(frontendLocalState: FrontendState): void {
+    if (this._lastUpdate >= frontendLocalState.lastUpdate) {
       return;
     }
-    const visible = highFrequencyState.visibleTraceTime;
+    const visible = frontendLocalState.visibleTraceTime;
     this.updateVisibleTime(new TimeSpan(visible.startSec, visible.endSec));
   }
 
