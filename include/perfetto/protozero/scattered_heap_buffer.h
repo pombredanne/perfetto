@@ -25,9 +25,10 @@
 
 namespace protozero {
 
-class ScatteredHeapBuffer : public protozero::ScatteredStreamWriter::Delegate {
+class PERFETTO_EXPORT ScatteredHeapBuffer
+    : public protozero::ScatteredStreamWriter::Delegate {
  public:
-  class Slice {
+  class PERFETTO_EXPORT Slice {
    public:
     explicit Slice(size_t size);
     Slice(Slice&& slice) noexcept;
