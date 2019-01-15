@@ -25,7 +25,7 @@ export interface Data {
   values: Float64Array;
 }
 
-export interface Config { 
-  cpu: number; 
+export interface Config {
+  cpu: number;
   maximumValue?: number;
   minimumValue?: number;}
