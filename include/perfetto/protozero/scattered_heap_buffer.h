@@ -20,6 +20,7 @@
 #include <memory>
 #include <vector>
 
+#include "perfetto/base/export.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/protozero/scattered_stream_writer.h"
 
