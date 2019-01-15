@@ -15,6 +15,7 @@
 import {TimeSpan} from '../common/time';
 
 import {TimeScale} from './time_scale';
+import {TRACK_SHELL_WIDTH} from './track_panel';
 
 export const DESIRED_PX_PER_STEP = 80;
 
@@ -41,6 +42,21 @@ export function drawGridLines(
       ctx.lineTo(xPos, height);
       ctx.stroke();
     }
+  }
+}
+
+export function*
+    gridlines(width: number, span: TimeSpan, timescale: TimeScale):
+        IterableIterator<[number, number]> {
+  const desiredSteps = width / DESIRED_PX_PER_STEP;
+  const step = getGridStepSize(span.duration, desiredSteps);
+  const start = Math.round(span.start / step) * step;
+  for (let s = start; s < span.end; s += step) {
+    let xPos = TRACK_SHELL_WIDTH;
+    xPos += Math.floor(timescale.timeToPx(s));
+    if (xPos < TRACK_SHELL_WIDTH) continue;
+    if (xPos > width) break;
+    yield [xPos, s];
   }
 }
 

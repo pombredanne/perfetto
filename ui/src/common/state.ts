@@ -116,8 +116,9 @@ export interface Status {
 export interface Note {
   id: string;
   timestamp: number;
+  color: string;
+  text: string;
 }
-
 
 export interface State {
   route: string|null;
@@ -143,6 +144,8 @@ export interface State {
   permalink: PermalinkConfig;
   notes: ObjectById<Note>;
   status: Status;
+
+  selectedNote: string|null;
 }
 
 export const defaultTraceTime = {
@@ -170,6 +173,7 @@ export function createEmptyState(): State {
     displayConfigAsPbtxt: false,
 
     status: {msg: '', timestamp: 0},
+    selectedNote: null,
   };
 }
 
