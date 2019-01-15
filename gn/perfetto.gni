@@ -56,7 +56,11 @@ declare_args() {
 }
 
 declare_args() {
-  # Disable DLOG for embedders by default to avoid spamming their console.
+  # Enable DLOG on all build configs, not just debug builds.
+  perfetto_dlog_always_on = false
+
+  # Disable DLOG even on debug builds. We disable it by default for embedders to
+  # avoid spamming their console.
   perfetto_suppress_dlog = perfetto_build_with_embedder
 }
 

@@ -121,8 +121,10 @@ config("default_config") {
     }
   }
 
-  if (perfetto_suppress_dlog) {
-    defines += [ "PERFETTO_SUPPRESS_DLOG" ]
+  if (perfetto_dlog_always_on) {
+    defines += [ "PERFETTO_FORCE_DLOG=1" ]
+  } else if (perfetto_suppress_dlog) {
+    defines += [ "PERFETTO_FORCE_DLOG=0" ]
   }
 
   include_dirs = [

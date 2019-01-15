@@ -476,7 +476,6 @@ cc_binary {
 cc_defaults {
   name: "perfetto_defaults",
   cflags: [
-    "-DPERFETTO_SUPPRESS_DLOG",
     "-Oz",
     "-Wno-error=return-type",
     "-Wno-sign-compare",

@@ -28,10 +28,10 @@
 #define PERFETTO_DCHECK_IS_ON() 1
 #endif
 
-#if defined(PERFETTO_SUPPRESS_DLOG)
-#define PERFETTO_DLOG_IS_ON() 0
-#else
+#if !defined(PERFETTO_FORCE_DLOG)
 #define PERFETTO_DLOG_IS_ON() PERFETTO_DCHECK_IS_ON()
+#else
+#define PERFETTO_DLOG_IS_ON() PERFETTO_FORCE_DLOG
 #endif
 
 #include "perfetto/base/build_config.h"
