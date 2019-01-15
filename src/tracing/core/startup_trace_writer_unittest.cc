@@ -71,9 +71,8 @@ class StartupTraceWriterTest : public AlignedBufferTest {
         // Should only see new chunks with IDs larger than the previous read
         // since our reads and writes are serialized.
         ChunkID chunk_id = chunk.header()->chunk_id.load();
-        if (last_read_max_chunk_id_ != 0) {
+        if (last_read_max_chunk_id_ != 0)
           EXPECT_LT(last_read_max_chunk_id_, chunk_id);
-        }
         current_max_chunk_id = std::max(current_max_chunk_id, chunk_id);
 
         auto packets_header = chunk.header()->packets.load();
@@ -222,13 +221,15 @@ TEST_P(StartupTraceWriterTest, BindingWhileWritingFails) {
 }
 
 TEST_P(StartupTraceWriterTest, CreateAndBindViaRegistry) {
-  StartupTraceWriterRegistry registry(task_runner_.get());
+  std::unique_ptr<StartupTraceWriterRegistry> owned_registry(
+      new StartupTraceWriterRegistry(task_runner_.get()));
+  auto* registry = owned_registry.get();
 
   // Create unbound writers.
-  auto writer1 = registry.CreateTraceWriter();
-  auto writer2 = registry.CreateTraceWriter();
+  auto writer1 = registry->CreateTraceWriter();
+  auto writer2 = registry->CreateTraceWriter();
 
-  EXPECT_EQ(2u, GetUnboundWriterCount(registry));
+  EXPECT_EQ(2u, GetUnboundWriterCount(*registry));
 
   {
     // Begin a write by opening a TracePacket on |writer1|.
@@ -236,8 +237,8 @@ TEST_P(StartupTraceWriterTest, CreateAndBindViaRegistry) {
 
     // Binding |writer1| writing should fail, but |writer2| should be bound.
     const BufferID kBufId = 42;
-    arbiter_->BindStartupTraceWriterRegistry(&registry, kBufId);
-    EXPECT_EQ(1u, GetUnboundWriterCount(registry));
+    arbiter_->BindStartupTraceWriterRegistry(std::move(owned_registry), kBufId);
+    EXPECT_EQ(1u, GetUnboundWriterCount(*registry));
   }
 
   // Wait for |writer1| to be bound as well.
@@ -245,7 +246,7 @@ TEST_P(StartupTraceWriterTest, CreateAndBindViaRegistry) {
   auto all_bound = task_runner_->CreateCheckpoint(checkpoint_name);
   std::function<void()> task;
   task = [&task, &registry, all_bound, this]() {
-    if (!GetUnboundWriterCount(registry)) {
+    if (!GetUnboundWriterCount(*registry)) {
       all_bound();
       return;
     }
@@ -254,11 +255,11 @@ TEST_P(StartupTraceWriterTest, CreateAndBindViaRegistry) {
   task_runner_->PostDelayedTask(task, 1);
   task_runner_->RunUntilCheckpoint(checkpoint_name);
 
-  EXPECT_EQ(0u, GetUnboundWriterCount(registry));
+  EXPECT_EQ(0u, GetUnboundWriterCount(*registry));
 
   // New writer should immediately be bound.
-  auto writer3 = registry.CreateTraceWriter();
-  EXPECT_EQ(0u, GetUnboundWriterCount(registry));
+  auto writer3 = registry->CreateTraceWriter();
+  EXPECT_EQ(0u, GetUnboundWriterCount(*registry));
   EXPECT_TRUE(writer3->was_bound());
 }
 

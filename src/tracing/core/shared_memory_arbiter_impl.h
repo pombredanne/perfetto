@@ -29,6 +29,7 @@
 #include "perfetto/tracing/core/basic_types.h"
 #include "perfetto/tracing/core/shared_memory_abi.h"
 #include "perfetto/tracing/core/shared_memory_arbiter.h"
+#include "perfetto/tracing/core/startup_trace_writer_registry.h"
 #include "src/tracing/core/id_allocator.h"
 
 namespace perfetto {
@@ -105,8 +106,9 @@ class SharedMemoryArbiterImpl : public SharedMemoryArbiter {
   // See include/perfetto/tracing/core/shared_memory_arbiter.h for comments.
   std::unique_ptr<TraceWriter> CreateTraceWriter(
       BufferID target_buffer) override;
-  void BindStartupTraceWriterRegistry(StartupTraceWriterRegistry* registry,
-                                      BufferID target_buffer) override;
+  void BindStartupTraceWriterRegistry(
+      std::unique_ptr<StartupTraceWriterRegistry> registry,
+      BufferID target_buffer) override;
 
   void NotifyFlushComplete(FlushRequestID) override;
 
@@ -137,6 +139,8 @@ class SharedMemoryArbiterImpl : public SharedMemoryArbiter {
   std::unique_ptr<CommitDataRequest> commit_data_req_;
   size_t bytes_pending_commit_ = 0;  // SUM(chunk.size() : commit_data_req_).
   IdAllocator<WriterID> active_writer_ids_;
+  std::vector<std::unique_ptr<StartupTraceWriterRegistry>>
+      bound_startup_trace_writer_registries_;
   // --- End lock-protected members ---
 
   // Keep at the end.
