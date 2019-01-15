@@ -206,7 +206,8 @@ TEST_F(HeapprofdEndToEnd, Smoke) {
   EXPECT_GT(last_freed, 0);
 }
 
-TEST_F(HeapprofdEndToEnd, FinalFlush) {
+// TODO(b/121352331): deflake & re-enable.
+TEST_F(HeapprofdEndToEnd, DISABLED_FinalFlush) {
   constexpr size_t kAllocSize = 1024;
 
   pid_t pid = ForkContinousMalloc(kAllocSize);
