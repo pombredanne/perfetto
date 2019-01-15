@@ -175,7 +175,7 @@ class NumericColumn : public StorageColumn {
   void FilterWithCast(int op,
                       sqlite3_value* value,
                       FilteredRowIndex* index) const {
-    auto predicate = sqlite_utils::CreatePredicate<C>(op, value);
+    auto predicate = sqlite_utils::CreateNumericPredicate<C>(op, value);
     index->FilterRows([this, &predicate](uint32_t row) {
       return predicate(static_cast<C>((*deque_)[row]));
     });
@@ -196,10 +196,11 @@ class StringColumn final : public StorageColumn {
         string_map_(string_map) {}
 
   void ReportResult(sqlite3_context* ctx, uint32_t row) const override {
-    const auto& str = (*string_map_)[(*deque_)[row]];
-    if (str.empty()) {
+    auto idx = (*deque_)[row];
+    if (idx == kNullStringId) {
       sqlite3_result_null(ctx);
     } else {
+      const auto& str = (*string_map_)[idx];
       sqlite3_result_text(ctx, str.c_str(), -1, sqlite_utils::kSqliteStatic);
     }
   }
@@ -210,19 +211,40 @@ class StringColumn final : public StorageColumn {
     return bounds;
   }
 
-  void Filter(int, sqlite3_value*, FilteredRowIndex*) const override {}
+  void Filter(int op,
+              sqlite3_value* value,
+              FilteredRowIndex* index) const override {
+    auto predicate = sqlite_utils::CreateStringTablePredicate(
+        op, value, string_map_, kNullStringId);
+    index->FilterRows(
+        [this, &predicate](uint32_t row) { return predicate((*deque_)[row]); });
+  }
 
   Comparator Sort(const QueryConstraints::OrderBy& ob) const override {
     if (ob.desc) {
       return [this](uint32_t f, uint32_t s) {
-        const std::string& a = (*string_map_)[(*deque_)[f]];
-        const std::string& b = (*string_map_)[(*deque_)[s]];
+        auto f_idx = (*deque_)[f];
+        auto s_idx = (*deque_)[s];
+        if (f_idx == kNullStringId) {
+          return s_idx == kNullStringId ? 0 : -1;
+        } else if (s_idx == kNullStringId) {
+          return 1;
+        }
+        const std::string& a = (*string_map_)[f_idx];
+        const std::string& b = (*string_map_)[s_idx];
         return sqlite_utils::CompareValuesDesc(a, b);
       };
     }
     return [this](uint32_t f, uint32_t s) {
-      const std::string& a = (*string_map_)[(*deque_)[f]];
-      const std::string& b = (*string_map_)[(*deque_)[s]];
+      auto f_idx = (*deque_)[f];
+      auto s_idx = (*deque_)[s];
+      if (f_idx == kNullStringId) {
+        return s_idx == 0 ? 0 : 1;
+      } else if (s_idx == kNullStringId) {
+        return -1;
+      }
+      const std::string& a = (*string_map_)[f_idx];
+      const std::string& b = (*string_map_)[s_idx];
       return sqlite_utils::CompareValuesAsc(a, b);
     };
   }
@@ -284,7 +306,7 @@ class IdColumn final : public StorageColumn {
   void Filter(int op,
               sqlite3_value* value,
               FilteredRowIndex* index) const override {
-    auto predicate = sqlite_utils::CreatePredicate<RowId>(op, value);
+    auto predicate = sqlite_utils::CreateNumericPredicate<RowId>(op, value);
     index->FilterRows([this, &predicate](uint32_t row) {
       return predicate(TraceStorage::CreateRowId(table_id_, row));
     });
@@ -314,39 +336,6 @@ class IdColumn final : public StorageColumn {
  private:
   TableId table_id_;
 };
-
-template <typename T>
-inline std::unique_ptr<TsEndColumn> TsEndPtr(std::string column_name,
-                                             const std::deque<T>* ts_start,
-                                             const std::deque<T>* ts_end) {
-  return std::unique_ptr<TsEndColumn>(
-      new TsEndColumn(column_name, ts_start, ts_end));
-}
-
-template <typename T>
-inline std::unique_ptr<NumericColumn<T>> NumericColumnPtr(
-    std::string column_name,
-    const std::deque<T>* deque,
-    bool hidden = false,
-    bool is_naturally_ordered = false) {
-  return std::unique_ptr<NumericColumn<T>>(
-      new NumericColumn<T>(column_name, deque, hidden, is_naturally_ordered));
-}
-
-template <typename Id>
-inline std::unique_ptr<StringColumn<Id>> StringColumnPtr(
-    std::string column_name,
-    const std::deque<Id>* deque,
-    const std::deque<std::string>* lookup_map,
-    bool hidden = false) {
-  return std::unique_ptr<StringColumn<Id>>(
-      new StringColumn<Id>(column_name, deque, lookup_map, hidden));
-}
-
-inline std::unique_ptr<IdColumn> IdColumnPtr(std::string column_name,
-                                             TableId table_id) {
-  return std::unique_ptr<IdColumn>(new IdColumn(column_name, table_id));
-}
 
 }  // namespace trace_processor
 }  // namespace perfetto

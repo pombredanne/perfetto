@@ -58,6 +58,8 @@ class StorageSchema {
       return *this;
     }
 
+    // Note: string_map[0] will always be reported to be NULL so care should
+    // be take to reserve index 0 in string_map.
     template <class Id>
     Builder& AddStringColumn(std::string column_name,
                              const std::deque<Id>* ids,

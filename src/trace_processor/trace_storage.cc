@@ -26,7 +26,11 @@ TraceStorage::TraceStorage() {
   unique_processes_.emplace_back(0);
   unique_threads_.emplace_back(0);
 
-  // Reserve string ID 0 for the empty string.
+  // StringId == 0 represents a SQL NULL value. Choose a string value which
+  // should not appear in traces.
+  InternString("<[NULL]>");
+
+  // Reserve StringId == 1 for the empty string.
   InternString("");
 }
 

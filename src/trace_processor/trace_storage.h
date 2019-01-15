@@ -45,6 +45,11 @@ using UniqueTid = uint32_t;
 // StringId is an offset into |string_pool_|.
 using StringId = uint32_t;
 
+// Constant offsets into the string table. The strings associated with these
+// constants are interned in TraceStorage constructor.
+constexpr StringId kNullStringId = 0;
+constexpr StringId kEmptyStringId = 1;
+
 // Identifiers for all the tables in the database.
 enum TableId : uint8_t {
   // Intentionally don't have TableId == 0 so that RowId == 0 can refer to an
@@ -86,7 +91,7 @@ class TraceStorage {
     explicit Process(uint32_t p) : pid(p) {}
     int64_t start_ns = 0;
     int64_t end_ns = 0;
-    StringId name_id = 0;
+    StringId name_id = kNullStringId;
     uint32_t pid = 0;
   };
 
@@ -95,7 +100,7 @@ class TraceStorage {
     explicit Thread(uint32_t t) : tid(t) {}
     int64_t start_ns = 0;
     int64_t end_ns = 0;
-    StringId name_id = 0;
+    StringId name_id = kNullStringId;
     base::Optional<UniquePid> upid;
     uint32_t tid = 0;
   };

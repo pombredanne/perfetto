@@ -126,7 +126,7 @@ void ArgsTable::ValueColumn::Filter(int op,
                                     FilteredRowIndex* index) const {
   switch (type_) {
     case VariadicType::kInt: {
-      auto predicate = sqlite_utils::CreatePredicate<int64_t>(op, value);
+      auto predicate = sqlite_utils::CreateNumericPredicate<int64_t>(op, value);
       index->FilterRows([this, &predicate](uint32_t row) {
         const auto& arg = storage_->args().arg_values()[row];
         return arg.type == type_ ? predicate(arg.int_value)
@@ -135,7 +135,7 @@ void ArgsTable::ValueColumn::Filter(int op,
       break;
     }
     case VariadicType::kReal: {
-      auto predicate = sqlite_utils::CreatePredicate<double>(op, value);
+      auto predicate = sqlite_utils::CreateNumericPredicate<double>(op, value);
       index->FilterRows([this, &predicate](uint32_t row) {
         const auto& arg = storage_->args().arg_values()[row];
         return arg.type == type_ ? predicate(arg.real_value)
@@ -144,11 +144,12 @@ void ArgsTable::ValueColumn::Filter(int op,
       break;
     }
     case VariadicType::kString: {
-      auto predicate = sqlite_utils::CreatePredicate<std::string>(op, value);
+      auto predicate = sqlite_utils::CreateStringTablePredicate(
+          op, value, &storage_->string_pool(), kNullStringId);
       index->FilterRows([this, &predicate](uint32_t row) {
         const auto& arg = storage_->args().arg_values()[row];
-        const auto& str = storage_->GetString(arg.string_value);
-        return arg.type == type_ ? predicate(str) : predicate(base::nullopt);
+        return arg.type == type_ ? predicate(arg.string_value)
+                                 : predicate(kNullStringId);
       });
       break;
     }

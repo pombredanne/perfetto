@@ -20,6 +20,7 @@
 #include <math.h>
 #include <sqlite3.h>
 
+#include <deque>
 #include <functional>
 #include <limits>
 #include <string>
@@ -117,9 +118,55 @@ inline std::string ExtractSqliteValue(sqlite3_value* value) {
   return std::string(extracted);
 }
 
+inline std::function<bool(size_t)> CreateStringTablePredicate(
+    int op,
+    sqlite3_value* value,
+    const std::deque<std::string>* map,
+    size_t null_idx) {
+  switch (op) {
+    case SQLITE_INDEX_CONSTRAINT_ISNULL:
+      return [null_idx](size_t f) { return f == null_idx; };
+    case SQLITE_INDEX_CONSTRAINT_ISNOTNULL:
+      return [null_idx](size_t f) { return f != null_idx; };
+  }
+
+  const char* val = reinterpret_cast<const char*>(sqlite3_value_text(value));
+  switch (op) {
+    case SQLITE_INDEX_CONSTRAINT_EQ:
+    case SQLITE_INDEX_CONSTRAINT_IS:
+      return [map, val, null_idx](size_t f) {
+        return f != null_idx && strcmp((*map)[f].c_str(), val) == 0;
+      };
+    case SQLITE_INDEX_CONSTRAINT_NE:
+    case SQLITE_INDEX_CONSTRAINT_ISNOT:
+      return [map, val, null_idx](size_t f) {
+        return f != null_idx && strcmp((*map)[f].c_str(), val) != 0;
+      };
+    case SQLITE_INDEX_CONSTRAINT_GE:
+      return [map, val, null_idx](size_t f) {
+        return f != null_idx && strcmp((*map)[f].c_str(), val) >= 0;
+      };
+    case SQLITE_INDEX_CONSTRAINT_GT:
+      return [map, val, null_idx](size_t f) {
+        return f != null_idx && strcmp((*map)[f].c_str(), val) > 0;
+      };
+    case SQLITE_INDEX_CONSTRAINT_LE:
+      return [map, val, null_idx](size_t f) {
+        return f != null_idx && strcmp((*map)[f].c_str(), val) <= 0;
+      };
+    case SQLITE_INDEX_CONSTRAINT_LT:
+      return [map, val, null_idx](size_t f) {
+        return f != null_idx && strcmp((*map)[f].c_str(), val) < 0;
+      };
+    default:
+      return [null_idx](size_t f) { return f != null_idx; };
+  }
+}
+
 template <class T>
-std::function<bool(base::Optional<T>)> CreatePredicate(int op,
-                                                       sqlite3_value* value) {
+std::function<bool(base::Optional<T>)> CreateNumericPredicate(
+    int op,
+    sqlite3_value* value) {
   switch (op) {
     case SQLITE_INDEX_CONSTRAINT_ISNULL:
       return [](base::Optional<T> f) { return !f.has_value(); };
