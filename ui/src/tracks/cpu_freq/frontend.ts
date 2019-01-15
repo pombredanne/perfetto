@@ -1,4 +1,4 @@
-// Copyright (C) 2018 The Android Open Source Project
+// Copyright (C) 2019 The Android Open Source Project
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -105,7 +105,8 @@ class CpuFreqTrack extends Track<Config, Data> {
     yMax = Math.ceil(yMax / (pow10 / 4)) * (pow10 / 4);
     const yRange = data.minimumValue < 0 ? yMax * 2 : yMax;
     const unitGroup = Math.floor(exp / 3);
-    const yLabel = `${yMax / Math.pow(10, unitGroup * 3)} ${kUnits[unitGroup]}`;
+    const num = yMax / Math.pow(10, unitGroup * 3);
+    const yLabel = `${num} ${kUnits[unitGroup]}Hz`;
 
     const hue = (128 + (32 * this.config.cpu)) % 256;
 
@@ -130,21 +131,10 @@ class CpuFreqTrack extends Track<Config, Data> {
     ctx.fill();
     ctx.stroke();
 
-    // Draw the Y=0 dashed line.
-    ctx.strokeStyle = `hsl(${hue}, 10%, 15%)`;
-    ctx.beginPath();
-    ctx.setLineDash([2, 4]);
-    ctx.moveTo(0, zeroY);
-    ctx.lineTo(endPx, zeroY);
-    ctx.closePath();
-    ctx.stroke();
-    ctx.setLineDash([]);
-
     ctx.font = '10px Google Sans';
 
     if (this.hoveredValue !== undefined && this.hoveredTs !== undefined) {
-      // TODO(hjd): Add units.
-      const text = `value: ${this.hoveredValue.toLocaleString()}`;
+      const text = `value: ${this.hoveredValue.toLocaleString()}Hz`;
       const width = ctx.measureText(text).width;
 
       ctx.fillStyle = `hsl(${hue}, 45%, 75%)`;

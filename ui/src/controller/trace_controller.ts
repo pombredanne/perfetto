@@ -221,6 +221,11 @@ export class TraceController extends Controller<States> {
     //    }
     //  }));
     //}
+    const maxFreq = await engine.query(`
+     select max(value)
+     from counters
+     where name = 'cpufreq';
+    `);
 
     for (let cpu = 0; cpu < numCpus; cpu++) {
       addToTrackActions.push(Actions.addTrack({
@@ -241,7 +246,7 @@ export class TraceController extends Controller<States> {
         where name = 'cpufreq' and ref = ${cpu}
         limit 1;
       `);
-      if(freqExists.numRecords > 0) {
+      if (freqExists.numRecords > 0) {
         addToTrackActions.push(Actions.addTrack({
           engineId: this.engineId,
           kind: CPU_FREQ_TRACK_KIND,
@@ -249,6 +254,7 @@ export class TraceController extends Controller<States> {
           trackGroup: SCROLLING_TRACK_GROUP,
           config: {
             cpu,
+            maximumValue: maxFreq.columns[0].longValues![0],
           }
         }));
       }
