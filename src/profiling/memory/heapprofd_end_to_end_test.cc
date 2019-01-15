@@ -59,7 +59,8 @@ class HeapprofdDelegate : public ThreadDelegate {
   ~HeapprofdDelegate() override = default;
 
   void Initialize(base::TaskRunner* task_runner) override {
-    producer_.reset(new HeapprofdProducer(task_runner));
+    producer_.reset(
+        new HeapprofdProducer(HeapprofdMode::kCentral, task_runner));
     producer_->ConnectWithRetries(producer_socket_.c_str());
   }
 
@@ -173,11 +174,14 @@ TEST_F(HeapprofdEndToEnd, Smoke) {
   helper.WaitForReadData();
 
   PERFETTO_CHECK(kill(pid, SIGKILL) == 0);
+  PERFETTO_CHECK(waitpid(pid, nullptr, 0) == pid);
 
   const auto& packets = helper.trace();
   ASSERT_GT(packets.size(), 0u);
   size_t profile_packets = 0;
   size_t samples = 0;
+  uint64_t last_allocated = 0;
+  uint64_t last_freed = 0;
   for (const protos::TracePacket& packet : packets) {
     if (packet.has_profile_packet() &&
         packet.profile_packet().process_dumps().size() > 0) {
@@ -185,15 +189,21 @@ TEST_F(HeapprofdEndToEnd, Smoke) {
       ASSERT_EQ(dumps.size(), 1);
       const protos::ProfilePacket_ProcessHeapSamples& dump = dumps.Get(0);
       EXPECT_EQ(dump.pid(), pid);
+      EXPECT_EQ(dump.samples().size(), 1);
       for (const auto& sample : dump.samples()) {
         samples++;
         EXPECT_EQ(sample.cumulative_allocated() % kAllocSize, 0);
+        EXPECT_EQ(sample.cumulative_freed() % kAllocSize, 0);
+        last_allocated = sample.cumulative_allocated();
+        last_freed = sample.cumulative_freed();
       }
       profile_packets++;
     }
   }
   EXPECT_GT(profile_packets, 0);
   EXPECT_GT(samples, 0);
+  EXPECT_GT(last_allocated, 0);
+  EXPECT_GT(last_freed, 0);
 }
 
 TEST_F(HeapprofdEndToEnd, FinalFlush) {
@@ -221,11 +231,14 @@ TEST_F(HeapprofdEndToEnd, FinalFlush) {
   helper.WaitForReadData();
 
   PERFETTO_CHECK(kill(pid, SIGKILL) == 0);
+  PERFETTO_CHECK(waitpid(pid, nullptr, 0) == pid);
 
   const auto& packets = helper.trace();
   ASSERT_GT(packets.size(), 0u);
   size_t profile_packets = 0;
   size_t samples = 0;
+  uint64_t last_allocated = 0;
+  uint64_t last_freed = 0;
   for (const protos::TracePacket& packet : packets) {
     if (packet.has_profile_packet() &&
         packet.profile_packet().process_dumps().size() > 0) {
@@ -233,15 +246,21 @@ TEST_F(HeapprofdEndToEnd, FinalFlush) {
       ASSERT_EQ(dumps.size(), 1);
       const protos::ProfilePacket_ProcessHeapSamples& dump = dumps.Get(0);
       EXPECT_EQ(dump.pid(), pid);
+      EXPECT_EQ(dump.samples().size(), 1);
       for (const auto& sample : dump.samples()) {
         samples++;
         EXPECT_EQ(sample.cumulative_allocated() % kAllocSize, 0);
+        EXPECT_EQ(sample.cumulative_freed() % kAllocSize, 0);
+        last_allocated = sample.cumulative_allocated();
+        last_freed = sample.cumulative_freed();
       }
       profile_packets++;
     }
   }
   EXPECT_EQ(profile_packets, 1);
   EXPECT_GT(samples, 0);
+  EXPECT_GT(last_allocated, 0);
+  EXPECT_GT(last_freed, 0);
 }
 
 TEST_F(HeapprofdEndToEnd, NativeStartup) {
@@ -290,11 +309,14 @@ TEST_F(HeapprofdEndToEnd, NativeStartup) {
   helper.WaitForReadData();
 
   PERFETTO_CHECK(kill(pid, SIGKILL) == 0);
+  PERFETTO_CHECK(waitpid(pid, nullptr, 0) == pid);
 
   const auto& packets = helper.trace();
   ASSERT_GT(packets.size(), 0u);
   size_t profile_packets = 0;
   size_t samples = 0;
+  uint64_t total_allocated = 0;
+  uint64_t total_freed = 0;
   for (const protos::TracePacket& packet : packets) {
     if (packet.has_profile_packet() &&
         packet.profile_packet().process_dumps().size() > 0) {
@@ -302,12 +324,18 @@ TEST_F(HeapprofdEndToEnd, NativeStartup) {
       ASSERT_EQ(dumps.size(), 1);
       const protos::ProfilePacket_ProcessHeapSamples& dump = dumps.Get(0);
       EXPECT_EQ(dump.pid(), pid);
-      samples += static_cast<size_t>(dump.samples().size());
       profile_packets++;
+      for (const auto& sample : dump.samples()) {
+        samples++;
+        total_allocated += sample.cumulative_allocated();
+        total_freed += sample.cumulative_freed();
+      }
     }
   }
   EXPECT_EQ(profile_packets, 1);
   EXPECT_GT(samples, 0);
+  EXPECT_GT(total_allocated, 0);
+  EXPECT_GT(total_freed, 0);
 }
 
 }  // namespace
