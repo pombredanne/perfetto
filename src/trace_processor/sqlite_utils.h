@@ -36,6 +36,17 @@ namespace sqlite_utils {
 
 const auto kSqliteStatic = reinterpret_cast<sqlite3_destructor_type>(0);
 
+template <typename T>
+using is_numeric =
+    typename std::enable_if<std::is_arithmetic<T>::value, T>::type;
+
+template <typename T>
+using is_float =
+    typename std::enable_if<std::is_floating_point<T>::value, T>::type;
+
+template <typename T>
+using is_int = typename std::enable_if<std::is_integral<T>::value, T>::type;
+
 inline bool IsOpEq(int op) {
   return op == SQLITE_INDEX_CONSTRAINT_EQ;
 }
@@ -54,6 +65,10 @@ inline bool IsOpLe(int op) {
 
 inline bool IsOpLt(int op) {
   return op == SQLITE_INDEX_CONSTRAINT_LT;
+}
+
+inline bool IsOpIsNull(int op) {
+  return op == SQLITE_INDEX_CONSTRAINT_ISNULL;
 }
 
 inline std::string OpToString(int op) {
@@ -118,6 +133,36 @@ inline std::string ExtractSqliteValue(sqlite3_value* value) {
   return std::string(extracted);
 }
 
+template <typename T, typename sqlite_utils::is_numeric<T>* = nullptr>
+std::function<bool(T)> CreateNumericPredicate(int op, sqlite3_value* value) {
+  switch (op) {
+    case SQLITE_INDEX_CONSTRAINT_ISNULL:
+      return [](T) { return false; };
+    case SQLITE_INDEX_CONSTRAINT_ISNOTNULL:
+      return [](T) { return true; };
+  }
+
+  T val = ExtractSqliteValue<T>(value);
+  switch (op) {
+    case SQLITE_INDEX_CONSTRAINT_EQ:
+    case SQLITE_INDEX_CONSTRAINT_IS:
+      return [val](T f) { return std::equal_to<T>()(f, val); };
+    case SQLITE_INDEX_CONSTRAINT_NE:
+    case SQLITE_INDEX_CONSTRAINT_ISNOT:
+      return [val](T f) { return std::not_equal_to<T>()(f, val); };
+    case SQLITE_INDEX_CONSTRAINT_GE:
+      return [val](T f) { return f >= val; };
+    case SQLITE_INDEX_CONSTRAINT_GT:
+      return [val](T f) { return f > val; };
+    case SQLITE_INDEX_CONSTRAINT_LE:
+      return [val](T f) { return f <= val; };
+    case SQLITE_INDEX_CONSTRAINT_LT:
+      return [val](T f) { return f < val; };
+    default:
+      PERFETTO_FATAL("For GCC");
+  }
+}
+
 inline std::function<bool(size_t)> CreateStringTablePredicate(
     int op,
     sqlite3_value* value,
@@ -162,49 +207,6 @@ inline std::function<bool(size_t)> CreateStringTablePredicate(
       return [null_idx](size_t f) { return f != null_idx; };
   }
 }
-
-template <class T>
-std::function<bool(base::Optional<T>)> CreateNumericPredicate(
-    int op,
-    sqlite3_value* value) {
-  switch (op) {
-    case SQLITE_INDEX_CONSTRAINT_ISNULL:
-      return [](base::Optional<T> f) { return !f.has_value(); };
-    case SQLITE_INDEX_CONSTRAINT_ISNOTNULL:
-      return [](base::Optional<T> f) { return f.has_value(); };
-  }
-
-  T val = ExtractSqliteValue<T>(value);
-  switch (op) {
-    case SQLITE_INDEX_CONSTRAINT_EQ:
-    case SQLITE_INDEX_CONSTRAINT_IS:
-      return [val](base::Optional<T> f) {
-        return f.has_value() && std::equal_to<T>()(*f, val);
-      };
-    case SQLITE_INDEX_CONSTRAINT_NE:
-    case SQLITE_INDEX_CONSTRAINT_ISNOT:
-      return [val](base::Optional<T> f) {
-        return f.has_value() && std::not_equal_to<T>()(*f, val);
-      };
-    case SQLITE_INDEX_CONSTRAINT_GE:
-      return [val](base::Optional<T> f) { return f.has_value() && *f >= val; };
-    case SQLITE_INDEX_CONSTRAINT_GT:
-      return [val](base::Optional<T> f) { return f.has_value() && *f > val; };
-    case SQLITE_INDEX_CONSTRAINT_LE:
-      return [val](base::Optional<T> f) { return f.has_value() && *f <= val; };
-    case SQLITE_INDEX_CONSTRAINT_LT:
-      return [val](base::Optional<T> f) { return f.has_value() && *f < val; };
-    default:
-      PERFETTO_FATAL("For GCC");
-  }
-}
-
-template <typename T>
-using is_float =
-    typename std::enable_if<std::is_floating_point<T>::value, T>::type;
-
-template <typename T>
-using is_int = typename std::enable_if<std::is_integral<T>::value, T>::type;
 
 // Greater bound for floating point numbers.
 template <typename T, typename sqlite_utils::is_float<T>* = nullptr>
