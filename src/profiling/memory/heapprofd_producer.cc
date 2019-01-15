@@ -103,17 +103,24 @@ HeapprofdProducer::~HeapprofdProducer() {
 void HeapprofdProducer::SetTargetProcess(pid_t target_pid) {
   target_pid_ = target_pid;
   target_cmdline_.clear();
-  GetCmdlineForPID(target_pid, &target_cmdline_);
+  if (!GetCmdlineForPID(target_pid, &target_cmdline_)) {
+    PERFETTO_ELOG(
+        "Failed to look up cmdline for target pid [%d], cmdline-based "
+        "configurations will not work. Proceeding.",
+        static_cast<int>(target_pid));
+  }
 }
 
 bool HeapprofdProducer::SourceMatchesTarget(const HeapprofdConfig& cfg) {
   if (cfg.all())
     return true;
-  if (std::find(cfg.pid().cbegin(), cfg.pid().cend(),
+  if (target_pid_ != base::kInvalidPid &&
+      std::find(cfg.pid().cbegin(), cfg.pid().cend(),
                 static_cast<uint64_t>(target_pid_)) != cfg.pid().cend()) {
     return true;
   }
-  if (std::find(cfg.process_cmdline().cbegin(), cfg.process_cmdline().cend(),
+  if (!target_cmdline_.empty() &&
+      std::find(cfg.process_cmdline().cbegin(), cfg.process_cmdline().cend(),
                 target_cmdline_) != cfg.process_cmdline().cend()) {
     return true;
   }
