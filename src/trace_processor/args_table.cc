@@ -144,7 +144,7 @@ void ArgsTable::ValueColumn::Filter(int op,
       break;
     }
     case VariadicType::kString: {
-      auto predicate = sqlite_utils::CreateStringTablePredicate(op, value);
+      auto predicate = sqlite_utils::CreateStringPredicate(op, value);
       index->FilterRows([this, &predicate](uint32_t row) {
         const auto& arg = storage_->args().arg_values()[row];
         return predicate(arg.type == type_

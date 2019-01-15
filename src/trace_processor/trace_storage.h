@@ -44,11 +44,7 @@ using UniqueTid = uint32_t;
 
 // StringId is an offset into |string_pool_|.
 using StringId = uint32_t;
-
-// Constant offsets into the string table. The strings associated with these
-// constants are interned in TraceStorage constructor.
 constexpr StringId kNullStringId = 0;
-constexpr StringId kEmptyStringId = 1;
 
 // Identifiers for all the tables in the database.
 enum TableId : uint8_t {
@@ -62,7 +58,6 @@ enum TableId : uint8_t {
 // The top 8 bits are set to the TableId and the bottom 32 to the row of the
 // table.
 using RowId = int64_t;
-
 static const RowId kInvalidRowId = 0;
 
 enum RefType {

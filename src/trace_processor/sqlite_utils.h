@@ -163,7 +163,7 @@ std::function<bool(T)> CreateNumericPredicate(int op, sqlite3_value* value) {
   }
 }
 
-inline std::function<bool(const char*)> CreateStringTablePredicate(
+inline std::function<bool(const char*)> CreateStringPredicate(
     int op,
     sqlite3_value* value) {
   switch (op) {
