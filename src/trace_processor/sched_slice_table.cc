@@ -20,7 +20,23 @@ namespace perfetto {
 namespace trace_processor {
 
 SchedSliceTable::SchedSliceTable(sqlite3*, const TraceStorage* storage)
-    : storage_(storage) {}
+    : storage_(storage) {
+  sched_reasons_.resize(SchedReason::kSchedReasonMax);
+  sched_reasons_[SchedReason::kUnknown] = "";
+  sched_reasons_[SchedReason::kRunnable] = "R";
+  sched_reasons_[SchedReason::kRunnablePreempt] = "R+";
+  sched_reasons_[SchedReason::kInterruptible] = "S";
+  sched_reasons_[SchedReason::kUninteruptible] = "D";
+  sched_reasons_[SchedReason::kStopped] = "T";
+  sched_reasons_[SchedReason::kTraced] = "t";
+  sched_reasons_[SchedReason::kExitDead] = "Z";
+  sched_reasons_[SchedReason::kZombie] = "X";
+  sched_reasons_[SchedReason::kTaskDead] = "x";
+  sched_reasons_[SchedReason::kWakeKill] = "K";
+  sched_reasons_[SchedReason::kWaking] = "W";
+  sched_reasons_[SchedReason::kParked] = "P";
+  sched_reasons_[SchedReason::kNoLoad] = "N";
+}
 
 void SchedSliceTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
   Table::Register<SchedSliceTable>(db, storage, "sched");
@@ -34,7 +50,7 @@ StorageSchema SchedSliceTable::CreateStorageSchema() {
       .AddNumericColumn("dur", &slices.durations())
       .AddColumn<TsEndColumn>("ts_end", &slices.start_ns(), &slices.durations())
       .AddNumericColumn("utid", &slices.utids())
-      .AddColumn<SchedReasonColumn>("end_reason", &slices.end_reasons())
+      .AddStringColumn("end_reason", &slices.end_reasons(), &sched_reasons_)
       .AddNumericColumn("priority", &slices.priorities())
       .Build({"cpu", "ts"});
 }
@@ -62,46 +78,6 @@ int SchedSliceTable::BestIndex(const QueryConstraints& qc,
         qc.constraints()[i].iColumn != static_cast<int>(end_reason_index);
   }
   return SQLITE_OK;
-}
-
-SchedSliceTable::SchedReasonColumn::SchedReasonColumn(
-    std::string col_name,
-    const std::deque<SchedReason>* deque)
-    : StorageColumn(col_name, false), deque_(deque) {}
-
-void SchedSliceTable::SchedReasonColumn::ReportResult(sqlite3_context* ctx,
-                                                      uint32_t row) const {
-  sqlite3_result_text(ctx, (*deque_)[row].data(), -1,
-                      sqlite_utils::kSqliteStatic);
-}
-
-SchedSliceTable::SchedReasonColumn::Bounds
-SchedSliceTable::SchedReasonColumn::BoundFilter(int, sqlite3_value*) const {
-  Bounds bounds;
-  bounds.max_idx = static_cast<uint32_t>(deque_->size());
-  return bounds;
-}
-
-void SchedSliceTable::SchedReasonColumn::Filter(int,
-                                                sqlite3_value*,
-                                                FilteredRowIndex*) const {}
-
-SchedSliceTable::SchedReasonColumn::Comparator
-SchedSliceTable::SchedReasonColumn::Sort(
-    const QueryConstraints::OrderBy& ob) const {
-  constexpr size_t kSchedSize = std::tuple_size<SchedReason>();
-  if (ob.desc) {
-    return [this](uint32_t f, uint32_t s) {
-      const SchedReason& a = (*deque_)[f];
-      const SchedReason& b = (*deque_)[s];
-      return sqlite_utils::CompareValuesAsc(a.data(), b.data(), kSchedSize);
-    };
-  }
-  return [this](uint32_t f, uint32_t s) {
-    const SchedReason& a = (*deque_)[f];
-    const SchedReason& b = (*deque_)[s];
-    return sqlite_utils::CompareValuesDesc(a.data(), b.data(), kSchedSize);
-  };
 }
 
 }  // namespace trace_processor

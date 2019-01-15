@@ -36,29 +36,7 @@ class SchedSliceTable : public StorageTable {
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
 
  private:
-  class SchedReasonColumn final : public StorageColumn {
-   public:
-    SchedReasonColumn(std::string col_name,
-                      const std::deque<SchedReason>* deque);
-
-    void ReportResult(sqlite3_context* ctx, uint32_t row) const override;
-
-    Bounds BoundFilter(int, sqlite3_value*) const override;
-
-    void Filter(int, sqlite3_value*, FilteredRowIndex*) const override;
-
-    Comparator Sort(const QueryConstraints::OrderBy& ob) const override;
-
-    Table::ColumnType GetType() const override {
-      return Table::ColumnType::kString;
-    }
-
-    bool IsNaturallyOrdered() const override { return false; }
-
-   private:
-    const std::deque<SchedReason>* deque_ = nullptr;
-  };
-
+  std::deque<std::string> sched_reasons_;
   const TraceStorage* const storage_;
 };
 

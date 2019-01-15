@@ -31,30 +31,30 @@ namespace {
 SchedReason GetSchedSwitchReasonFromState(int64_t state) {
   static const int64_t kTaskStateMax = 2048;
   int64_t masked = state & (kTaskStateMax - 1);
-  char fc = 'R';
   if (masked & 1)
-    fc = 'S';
+    return SchedReason::kInterruptible;
   else if (masked & 2)
-    fc = 'D';
+    return SchedReason::kUninteruptible;
   else if (masked & 4)
-    fc = 'T';
+    return SchedReason::kStopped;
   else if (masked & 8)
-    fc = 't';
+    return SchedReason::kTraced;
   else if (masked & 16)
-    fc = 'Z';
+    return SchedReason::kExitDead;
   else if (masked & 32)
-    fc = 'X';
+    return SchedReason::kZombie;
   else if (masked & 64)
-    fc = 'x';
+    return SchedReason::kTaskDead;
   else if (masked & 128)
-    fc = 'K';
+    return SchedReason::kWakeKill;
   else if (masked & 256)
-    fc = 'W';
+    return SchedReason::kWaking;
   else if (masked & 512)
-    fc = 'P';
+    return SchedReason::kParked;
   else if (masked & 1024)
-    fc = 'N';
-  return (state & kTaskStateMax) ? SchedReason{fc, '+'} : SchedReason{fc};
+    return SchedReason::kNoLoad;
+  return (state & kTaskStateMax) ? SchedReason::kRunnablePreempt
+                                 : SchedReason::kRunnable;
 }
 
 }  // namespace
@@ -106,9 +106,9 @@ void EventTracker::PushSchedSwitch(uint32_t cpu,
   auto utid =
       context_->process_tracker->UpdateThread(timestamp, next_pid, name_id);
 
-  constexpr SchedReason kDefaultReason = SchedReason{'-'};
-  pending_slice->storage_index = slices->AddSlice(
-      cpu, timestamp, 0 /* duration */, utid, kDefaultReason, next_priority);
+  pending_slice->storage_index =
+      slices->AddSlice(cpu, timestamp, 0 /* duration */, utid,
+                       SchedReason::kUnknown, next_priority);
   pending_slice->pid = next_pid;
 }
 

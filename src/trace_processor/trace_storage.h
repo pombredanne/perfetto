@@ -71,10 +71,24 @@ enum RefType {
   kRefMax
 };
 
-// Note: 3 bytes are used here instead of 2 because this array is often treated
-// as if it were a null-terminated const char*. We need the extra byte for the
-// null terminator for this reason.
-using SchedReason = std::array<char, 3>;
+enum SchedReason {
+  // Keep kUnknown == 0 for id == 0 to be treated as null in tables.
+  kUnknown = 0,
+  kRunnable = 1,
+  kRunnablePreempt = 2,
+  kInterruptible = 3,
+  kUninteruptible = 4,
+  kStopped = 5,
+  kTraced = 6,
+  kExitDead = 7,
+  kZombie = 8,
+  kTaskDead = 9,
+  kWakeKill = 10,
+  kWaking = 11,
+  kParked = 12,
+  kNoLoad = 13,
+  kSchedReasonMax
+};
 
 // Stores a data inside a trace file in a columnar form. This makes it efficient
 // to read or search across a single field of the trace (e.g. all the thread

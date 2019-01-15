@@ -365,17 +365,9 @@ int CompareValuesAsc(const T& f, const T& s) {
   return f < s ? -1 : (f > s ? 1 : 0);
 }
 
-inline int CompareValuesAsc(const char* f, const char* s, size_t n) {
-  return strncmp(f, s, n);
-}
-
 template <typename T>
 int CompareValuesDesc(const T& f, const T& s) {
   return -CompareValuesAsc(f, s);
-}
-
-inline int CompareValuesDesc(const char* f, const char* s, size_t n) {
-  return -CompareValuesAsc(f, s, n);
 }
 
 }  // namespace sqlite_utils
