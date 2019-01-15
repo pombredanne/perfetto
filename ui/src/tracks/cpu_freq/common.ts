@@ -12,11 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Import all currently implemented tracks. After implemeting a new track, an
-// import statement for it needs to be added here.
-import './cpu_slices/frontend';
-import './chrome_slices/frontend';
-import './vsync/frontend';
-import './process_summary/frontend';
-import './counter/frontend';
-import './cpu_freq/frontend';
+export const CPU_FREQ_TRACK_KIND = 'CpuFreqTrack';
+
+export interface Data {
+  start: number;
+  end: number;
+  resolution: number;
+  maximumValue: number;
+  minimumValue: number;
+
+  timestamps: Float64Array;
+  values: Float64Array;
+}
+
+export interface Config { 
+  cpu: number; 
+  maximumValue?: number;
+  minimumValue?: number;}
