@@ -607,7 +607,7 @@ def create_blueprint_for_targets(desc, force_debug, targets):
     if force_debug:
       defaults.cflags.extend(['-UNDEBUG'])
     else:
-      defaults.cflags.extend(['-DPERFETTO_SUPRESS_DLOG'])
+      defaults.cflags.extend(['-DPERFETTO_SUPPRESS_DLOG'])
     defaults.user_debug_flag = True
 
     blueprint.add_module(defaults)

@@ -57,7 +57,7 @@ declare_args() {
 
 declare_args() {
   # Disable DLOG for embedders by default to avoid spamming their console.
-  perfetto_supress_dlog = perfetto_build_with_embedder
+  perfetto_suppress_dlog = perfetto_build_with_embedder
 }
 
 perfetto_build_standalone =

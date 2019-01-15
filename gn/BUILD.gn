@@ -121,8 +121,8 @@ config("default_config") {
     }
   }
 
-  if (perfetto_supress_dlog) {
-    defines += [ "PERFETTO_SUPRESS_DLOG" ]
+  if (perfetto_suppress_dlog) {
+    defines += [ "PERFETTO_SUPPRESS_DLOG" ]
   }
 
   include_dirs = [

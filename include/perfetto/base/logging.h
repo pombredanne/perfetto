@@ -28,7 +28,7 @@
 #define PERFETTO_DCHECK_IS_ON() 1
 #endif
 
-#if defined(PERFETTO_SUPRESS_DLOG)
+#if defined(PERFETTO_SUPPRESS_DLOG)
 #define PERFETTO_DLOG_IS_ON() 0
 #else
 #define PERFETTO_DLOG_IS_ON() PERFETTO_DCHECK_IS_ON()
