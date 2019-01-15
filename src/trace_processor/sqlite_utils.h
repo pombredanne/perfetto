@@ -163,48 +163,70 @@ std::function<bool(T)> CreateNumericPredicate(int op, sqlite3_value* value) {
   }
 }
 
-inline std::function<bool(size_t)> CreateStringTablePredicate(
-    int op,
-    sqlite3_value* value,
-    const std::deque<std::string>* map,
-    size_t null_idx) {
+inline bool FilterString(int op, sqlite3_value* value, const char* f) {
   switch (op) {
     case SQLITE_INDEX_CONSTRAINT_ISNULL:
-      return [null_idx](size_t f) { return f == null_idx; };
+      return f == nullptr;
     case SQLITE_INDEX_CONSTRAINT_ISNOTNULL:
-      return [null_idx](size_t f) { return f != null_idx; };
+      return f != nullptr;
   }
 
   const char* val = reinterpret_cast<const char*>(sqlite3_value_text(value));
   switch (op) {
     case SQLITE_INDEX_CONSTRAINT_EQ:
     case SQLITE_INDEX_CONSTRAINT_IS:
-      return [map, val, null_idx](size_t f) {
-        return f != null_idx && strcmp((*map)[f].c_str(), val) == 0;
-      };
+      return f != nullptr && strcmp(f, val) == 0;
     case SQLITE_INDEX_CONSTRAINT_NE:
     case SQLITE_INDEX_CONSTRAINT_ISNOT:
-      return [map, val, null_idx](size_t f) {
-        return f != null_idx && strcmp((*map)[f].c_str(), val) != 0;
-      };
+      return f != nullptr && strcmp(f, val) != 0;
     case SQLITE_INDEX_CONSTRAINT_GE:
-      return [map, val, null_idx](size_t f) {
-        return f != null_idx && strcmp((*map)[f].c_str(), val) >= 0;
-      };
+      return f != nullptr && strcmp(f, val) >= 0;
+      ;
     case SQLITE_INDEX_CONSTRAINT_GT:
-      return [map, val, null_idx](size_t f) {
-        return f != null_idx && strcmp((*map)[f].c_str(), val) > 0;
-      };
+      return f != nullptr && strcmp(f, val) > 0;
     case SQLITE_INDEX_CONSTRAINT_LE:
-      return [map, val, null_idx](size_t f) {
-        return f != null_idx && strcmp((*map)[f].c_str(), val) <= 0;
-      };
+      return f != nullptr && strcmp(f, val) <= 0;
     case SQLITE_INDEX_CONSTRAINT_LT:
-      return [map, val, null_idx](size_t f) {
-        return f != null_idx && strcmp((*map)[f].c_str(), val) < 0;
-      };
+      return f != nullptr && strcmp(f, val) < 0;
     default:
-      return [null_idx](size_t f) { return f != null_idx; };
+      return f != nullptr;
+  }
+}
+
+inline std::function<bool(const char*)> CreateStringTablePredicate(
+    int op,
+    sqlite3_value* value) {
+  switch (op) {
+    case SQLITE_INDEX_CONSTRAINT_ISNULL:
+      return [](const char* f) { return f == nullptr; };
+    case SQLITE_INDEX_CONSTRAINT_ISNOTNULL:
+      return [](const char* f) { return f != nullptr; };
+  }
+
+  const char* val = reinterpret_cast<const char*>(sqlite3_value_text(value));
+  switch (op) {
+    case SQLITE_INDEX_CONSTRAINT_EQ:
+    case SQLITE_INDEX_CONSTRAINT_IS:
+      return
+          [val](const char* f) { return f != nullptr && strcmp(f, val) == 0; };
+    case SQLITE_INDEX_CONSTRAINT_NE:
+    case SQLITE_INDEX_CONSTRAINT_ISNOT:
+      return
+          [val](const char* f) { return f != nullptr && strcmp(f, val) != 0; };
+    case SQLITE_INDEX_CONSTRAINT_GE:
+      return
+          [val](const char* f) { return f != nullptr && strcmp(f, val) >= 0; };
+    case SQLITE_INDEX_CONSTRAINT_GT:
+      return
+          [val](const char* f) { return f != nullptr && strcmp(f, val) > 0; };
+    case SQLITE_INDEX_CONSTRAINT_LE:
+      return
+          [val](const char* f) { return f != nullptr && strcmp(f, val) <= 0; };
+    case SQLITE_INDEX_CONSTRAINT_LT:
+      return
+          [val](const char* f) { return f != nullptr && strcmp(f, val) < 0; };
+    default:
+      return [](const char* f) { return f != nullptr; };
   }
 }
 

@@ -211,13 +211,11 @@ class StringColumn final : public StorageColumn {
     return bounds;
   }
 
-  void Filter(int op,
-              sqlite3_value* value,
-              FilteredRowIndex* index) const override {
-    auto predicate = sqlite_utils::CreateStringTablePredicate(
-        op, value, string_map_, kNullStringId);
-    index->FilterRows(
-        [this, &predicate](uint32_t row) { return predicate((*deque_)[row]); });
+  void Filter(int, sqlite3_value*, FilteredRowIndex* index) const override {
+    index->FilterRows([this](uint32_t row) {
+      auto idx = (*deque_)[row];
+      return strcmp((*string_map_)[idx].c_str(), "utid") == 0;
+    });
   }
 
   Comparator Sort(const QueryConstraints::OrderBy& ob) const override {
