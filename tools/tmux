@@ -138,10 +138,10 @@ elif [[ "$CONFIG" != ":test" ]]; then
   # Check if this is a valid absolute path
   if [[ ! -f $CONFIG_PATH ]]; then
     CONFIG_PATH=$CONFIG
-  fi
-  if [[ ! -f $CONFIG_PATH ]]; then
-    echo 'Config "'$CONFIG'" not known.'
-    exit 1
+    if [[ ! -f $CONFIG_PATH ]]; then
+      echo 'Config "'$CONFIG'" not known.'
+      exit 1
+    fi
   fi
   CMD_OPTS="--txt $CMD_OPTS"
   push $CONFIG_PATH
