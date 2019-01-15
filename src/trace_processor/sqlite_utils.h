@@ -163,36 +163,6 @@ std::function<bool(T)> CreateNumericPredicate(int op, sqlite3_value* value) {
   }
 }
 
-inline bool FilterString(int op, sqlite3_value* value, const char* f) {
-  switch (op) {
-    case SQLITE_INDEX_CONSTRAINT_ISNULL:
-      return f == nullptr;
-    case SQLITE_INDEX_CONSTRAINT_ISNOTNULL:
-      return f != nullptr;
-  }
-
-  const char* val = reinterpret_cast<const char*>(sqlite3_value_text(value));
-  switch (op) {
-    case SQLITE_INDEX_CONSTRAINT_EQ:
-    case SQLITE_INDEX_CONSTRAINT_IS:
-      return f != nullptr && strcmp(f, val) == 0;
-    case SQLITE_INDEX_CONSTRAINT_NE:
-    case SQLITE_INDEX_CONSTRAINT_ISNOT:
-      return f != nullptr && strcmp(f, val) != 0;
-    case SQLITE_INDEX_CONSTRAINT_GE:
-      return f != nullptr && strcmp(f, val) >= 0;
-      ;
-    case SQLITE_INDEX_CONSTRAINT_GT:
-      return f != nullptr && strcmp(f, val) > 0;
-    case SQLITE_INDEX_CONSTRAINT_LE:
-      return f != nullptr && strcmp(f, val) <= 0;
-    case SQLITE_INDEX_CONSTRAINT_LT:
-      return f != nullptr && strcmp(f, val) < 0;
-    default:
-      return f != nullptr;
-  }
-}
-
 inline std::function<bool(const char*)> CreateStringTablePredicate(
     int op,
     sqlite3_value* value) {

@@ -211,12 +211,7 @@ class StringColumn final : public StorageColumn {
     return bounds;
   }
 
-  void Filter(int, sqlite3_value*, FilteredRowIndex* index) const override {
-    index->FilterRows([this](uint32_t row) {
-      auto idx = (*deque_)[row];
-      return strcmp((*string_map_)[idx].c_str(), "utid") == 0;
-    });
-  }
+  void Filter(int, sqlite3_value*, FilteredRowIndex*) const override {}
 
   Comparator Sort(const QueryConstraints::OrderBy& ob) const override {
     if (ob.desc) {
