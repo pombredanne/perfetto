@@ -86,7 +86,7 @@ class CpuFreqTrack extends Track<Config, Data> {
     }
     if (data === undefined) return;  // Can't possibly draw anything.
 
-    assertTrue(data.timestamps.length === data.values.length);
+    assertTrue(data.timestamps.length === data.valuesKHz.length);
 
     const startPx = Math.floor(timeScale.timeToPx(visibleWindowTime.start));
     const endPx = Math.floor(timeScale.timeToPx(visibleWindowTime.end));
@@ -106,7 +106,8 @@ class CpuFreqTrack extends Track<Config, Data> {
     const yRange = data.minimumValue < 0 ? yMax * 2 : yMax;
     const unitGroup = Math.floor(exp / 3);
     const num = yMax / Math.pow(10, unitGroup * 3);
-    const yLabel = `${num} ${kUnits[unitGroup]}Hz`;
+    // The values we have for cpufreq are in kHz so +1 to unitGroup.
+    const yLabel = `${num} ${kUnits[unitGroup + 1]}Hz`;
 
     const hue = (128 + (32 * this.config.cpu)) % 256;
 
@@ -114,8 +115,8 @@ class CpuFreqTrack extends Track<Config, Data> {
     ctx.strokeStyle = `hsl(${hue}, 45%, 55%)`;
     ctx.beginPath();
     ctx.moveTo(lastX, lastY);
-    for (let i = 0; i < data.values.length; i++) {
-      const value = data.values[i];
+    for (let i = 0; i < data.valuesKHz.length; i++) {
+      const value = data.valuesKHz[i];
       const startTime = data.timestamps[i];
       const nextY = zeroY - Math.round((value / yRange) * RECT_HEIGHT);
       if (nextY === lastY) continue;
@@ -134,7 +135,7 @@ class CpuFreqTrack extends Track<Config, Data> {
     ctx.font = '10px Google Sans';
 
     if (this.hoveredValue !== undefined && this.hoveredTs !== undefined) {
-      const text = `value: ${this.hoveredValue.toLocaleString()}Hz`;
+      const text = `value: ${this.hoveredValue.toLocaleString()}kHz`;
       const width = ctx.measureText(text).width;
 
       ctx.fillStyle = `hsl(${hue}, 45%, 75%)`;
@@ -196,7 +197,7 @@ class CpuFreqTrack extends Track<Config, Data> {
     const [left, right] = searchSegment(data.timestamps, time);
     this.hoveredTs = left === -1 ? undefined : data.timestamps[left];
     this.hoveredTsEnd = right === -1 ? undefined : data.timestamps[right];
-    this.hoveredValue = left === -1 ? undefined : data.values[left];
+    this.hoveredValue = left === -1 ? undefined : data.valuesKHz[left];
   }
 
   onMouseOut() {
