@@ -16,6 +16,7 @@
 
 #include <aio.h>
 #include <fcntl.h>
+#include <gperftools/profiler.h>
 #include <inttypes.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -301,6 +302,7 @@ int StartInteractiveShell() {
   return 0;
 }
 
+/*
 void PrintQueryResultAsCsv(const protos::RawQueryResult& res, FILE* output) {
   PERFETTO_CHECK(res.columns_size() == res.column_descriptors_size());
 
@@ -344,6 +346,7 @@ void PrintQueryResultAsCsv(const protos::RawQueryResult& res, FILE* output) {
     fprintf(output, "\n");
   }
 }
+*/
 
 int RunQueryAndPrintResult(FILE* input, FILE* output) {
   char buffer[4096];
@@ -375,24 +378,29 @@ int RunQueryAndPrintResult(FILE* input, FILE* output) {
 
     protos::RawQueryArgs query;
     query.set_sql_query(sql_query);
-    g_tp->ExecuteQuery(query, [output, &is_query_error, &has_output_printed](
-                                  const protos::RawQueryResult& res) {
-      if (res.has_error()) {
-        PERFETTO_ELOG("SQLite error: %s", res.error().c_str());
-        is_query_error = true;
-        return;
-      } else if (res.num_records() != 0) {
-        if (has_output_printed) {
-          PERFETTO_ELOG(
-              "More than one query generated result rows. This is "
-              "unsupported.");
+    ProfilerStart("/tmp/perf.data");
+    for (int i = 0; i < 10000; i++) {
+      g_tp->ExecuteQuery(query, [output, &is_query_error, &has_output_printed](
+                                    const protos::RawQueryResult& res) {
+        if (res.has_error()) {
+          PERFETTO_ELOG("SQLite error: %s", res.error().c_str());
           is_query_error = true;
           return;
+        } else if (res.num_records() != 0) {
+          if (has_output_printed) {
+            PERFETTO_ELOG(
+                "More than one query generated result rows. This is "
+                "unsupported.");
+            is_query_error = true;
+            return;
+          }
+          perfetto::base::ignore_result(output);
+          // has_output_printed = true;
         }
-        has_output_printed = true;
-      }
-      PrintQueryResultAsCsv(res, output);
-    });
+        // PrintQueryResultAsCsv(res, output);
+      });
+    }
+    ProfilerStop();
   }
   if (ferror(input)) {
     PERFETTO_ELOG("Error reading query file");
