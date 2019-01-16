@@ -112,8 +112,14 @@ class SharedMemoryArbiterImpl : public SharedMemoryArbiter {
 
   void NotifyFlushComplete(FlushRequestID) override;
 
+  // Called by StartupTraceWriterRegistry when all its writers were bound. As
+  // the registry's ownership was transferred to the arbiter previously, we
+  // delete the registry when this is called.
+  void OnStartupTraceWriterRegistryBound(StartupTraceWriterRegistry*);
+
  private:
   friend class TraceWriterImpl;
+  friend class StartupTraceWriterTest;
 
   static SharedMemoryABI::PageLayout default_page_layout;
 
@@ -140,7 +146,7 @@ class SharedMemoryArbiterImpl : public SharedMemoryArbiter {
   size_t bytes_pending_commit_ = 0;  // SUM(chunk.size() : commit_data_req_).
   IdAllocator<WriterID> active_writer_ids_;
   std::vector<std::unique_ptr<StartupTraceWriterRegistry>>
-      bound_startup_trace_writer_registries_;
+      binding_startup_trace_writer_registries_;
   // --- End lock-protected members ---
 
   // Keep at the end.

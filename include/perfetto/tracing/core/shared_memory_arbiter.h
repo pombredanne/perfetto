@@ -53,15 +53,17 @@ class PERFETTO_EXPORT SharedMemoryArbiter {
       BufferID target_buffer) = 0;
 
   // Binds the provided unbound StartupTraceWriterRegistry to the arbiter's SMB.
+  // Normally this happens when the perfetto service has been initialized and we
+  // want to rebind all the writers created in the early startup phase.
+  //
   // All StartupTraceWriters created by the registry are bound to the arbiter
   // and the given target buffer. Should only be called once for each registry.
   // The writers may not be bound immediately if they are concurrently being
-  // written to. The registry will retry on its TaskRunner until all writers
-  // were bound successfully.
+  // written to. The registry will retry on the arbiter's TaskRunner until all
+  // writers were bound successfully.
   //
   // By calling this method, the registry's ownership is transferred to the
-  // arbiter. The caller can continue to use the registry until the arbiter is
-  // destructed.
+  // arbiter. The arbiter will delete the registry once all writers were bound.
   //
   // TODO(eseckler): Make target buffer assignment more flexible (i.e. per
   // writer). For now, embedders can use multiple registries instead.

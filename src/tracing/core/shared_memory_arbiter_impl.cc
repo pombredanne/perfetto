@@ -281,7 +281,30 @@ void SharedMemoryArbiterImpl::BindStartupTraceWriterRegistry(
     BufferID target_buffer) {
   registry->BindToArbiter(this, target_buffer, task_runner_);
   std::lock_guard<std::mutex> scoped_lock(lock_);
-  bound_startup_trace_writer_registries_.push_back(std::move(registry));
+  binding_startup_trace_writer_registries_.push_back(std::move(registry));
+}
+
+void SharedMemoryArbiterImpl::OnStartupTraceWriterRegistryBound(
+    StartupTraceWriterRegistry* registry) {
+  // Delete the registry in a PostTask to avoid deadlock during its destruction.
+  auto weak_this = weak_ptr_factory_.GetWeakPtr();
+  task_runner_->PostTask([weak_this, registry] {
+    if (!weak_this)
+      return;
+
+    for (auto it = weak_this->binding_startup_trace_writer_registries_.begin();
+         it != weak_this->binding_startup_trace_writer_registries_.end();
+         it++) {
+      if (it->get() == registry) {
+        weak_this->binding_startup_trace_writer_registries_.erase(it);
+        return;
+      }
+    }
+
+    // The registry should have been in
+    // |binding_startup_trace_writer_registries_|.
+    PERFETTO_DCHECK(false);
+  });
 }
 
 void SharedMemoryArbiterImpl::NotifyFlushComplete(FlushRequestID req_id) {

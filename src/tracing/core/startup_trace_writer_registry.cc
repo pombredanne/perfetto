@@ -37,16 +37,12 @@ StartupTraceWriterRegistry::~StartupTraceWriterRegistry() {
 }
 
 std::unique_ptr<StartupTraceWriter>
-StartupTraceWriterRegistry::CreateTraceWriter() {
+StartupTraceWriterRegistry::CreateUnboundTraceWriter() {
   std::lock_guard<std::mutex> lock(lock_);
   std::unique_ptr<StartupTraceWriter> writer;
-  if (PERFETTO_LIKELY(arbiter_)) {
-    writer.reset(
-        new StartupTraceWriter(arbiter_->CreateTraceWriter(target_buffer_)));
-  } else {
-    writer.reset(new StartupTraceWriter());
-    unbound_writers_.insert(writer.get());
-  }
+  PERFETTO_DCHECK(!arbiter_);  // Should only be called while unbound.
+  writer.reset(new StartupTraceWriter());
+  unbound_writers_.insert(writer.get());
   return writer;
 }
 
@@ -80,12 +76,19 @@ void StartupTraceWriterRegistry::TryBindWriters() {
         weak_this->TryBindWriters();
     });
   }
+  OnUnboundWritersRemovedLocked();
 }
 
 void StartupTraceWriterRegistry::OnStartupTraceWriterDestroyed(
     StartupTraceWriter* trace_writer) {
   std::lock_guard<std::mutex> lock(lock_);
   unbound_writers_.erase(trace_writer);
+  OnUnboundWritersRemovedLocked();
+}
+
+void StartupTraceWriterRegistry::OnUnboundWritersRemovedLocked() {
+  if (arbiter_ && unbound_writers_.empty())
+    arbiter_->OnStartupTraceWriterRegistryBound(this);
 }
 
 }  // namespace perfetto

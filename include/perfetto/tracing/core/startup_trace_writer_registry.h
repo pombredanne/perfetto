@@ -39,15 +39,13 @@ class PERFETTO_EXPORT StartupTraceWriterRegistry {
   StartupTraceWriterRegistry();
   ~StartupTraceWriterRegistry();
 
-  // Returns a new StartupTraceWriter. The new writer will already be bound if
-  // BindToArbiter() was called previously. Otherwise, it will be unbound.
-  // Should only be called on the writer thread.
-  std::unique_ptr<StartupTraceWriter> CreateTraceWriter();
+  // Returns a new unbound StartupTraceWriter. Should only be called while
+  // unbound and only on the writer thread.
+  std::unique_ptr<StartupTraceWriter> CreateUnboundTraceWriter();
 
   // Binds all StartupTraceWriters created by this registry to the given arbiter
-  // and target buffer. Should only be called once. Normally this happens when
-  // the perfetto service has been initialized and we want to rebind all the
-  // writers created in the early startup phase.
+  // and target buffer. Should only be called once. See
+  // SharedMemoryArbiter::BindStartupTraceWriterRegistry() for details.
   //
   // Note that the writers may not be bound synchronously if they are
   // concurrently being written to. The registry will retry on the passed
@@ -66,6 +64,9 @@ class PERFETTO_EXPORT StartupTraceWriterRegistry {
   // Try to bind the remaining unbound writers and post a continuation to
   // |task_runner_| if any writers could not be bound.
   void TryBindWriters();
+
+  // Notifies the arbiter when we have bound all writers. May delete |this|.
+  void OnUnboundWritersRemovedLocked();
 
   base::TaskRunner* task_runner_;
 
