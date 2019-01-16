@@ -98,9 +98,15 @@ bool ParseSystraceTracePoint(base::StringView str, SystraceTracePoint* out) {
         }
       }
       out->name = base::StringView(s + name_index, name_length);
+
       size_t value_index = name_index + name_length + 1;
+      size_t value_len = len - value_index;
       char value_str[32];
-      strcpy(value_str, s + value_index);
+      if (value_len >= sizeof(value_str)) {
+        return false;
+      }
+      memcpy(value_str, s + value_index, value_len);
+      value_str[value_len] = 0;
       out->value = std::stod(value_str);
       return true;
     }
@@ -114,6 +120,7 @@ ProtoTraceParser::ProtoTraceParser(TraceProcessorContext* context)
       utid_name_id_(context->storage->InternString("utid")),
       cpu_freq_name_id_(context->storage->InternString("cpufreq")),
       cpu_idle_name_id_(context->storage->InternString("cpuidle")),
+      comm_name_id_(context->storage->InternString("comm")),
       num_forks_name_id_(context->storage->InternString("num_forks")),
       num_irq_total_name_id_(context->storage->InternString("num_irq_total")),
       num_softirq_total_name_id_(
@@ -140,6 +147,7 @@ ProtoTraceParser::ProtoTraceParser(TraceProcessorContext* context)
       batt_current_id_(context->storage->InternString("batt.current_ua")),
       batt_current_avg_id_(
           context->storage->InternString("batt.current.avg_ua")),
+      lmk_id_(context->storage->InternString("mem.lmk")),
       oom_score_adj_id_(context->storage->InternString("oom_score_adj")),
       ion_total_unknown_id_(context->storage->InternString("mem.ion.unknown")),
       ion_change_unknown_id_(
@@ -576,9 +584,10 @@ void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
 
     const size_t fld_off = ftrace.offset_of(fld.data());
     if (fld.id == protos::FtraceEvent::kGenericFieldNumber) {
-      ParseGenericFtrace(timestamp, pid, ftrace.slice(fld_off, fld.size()));
+      ParseGenericFtrace(timestamp, cpu, pid,
+                         ftrace.slice(fld_off, fld.size()));
     } else {
-      ParseTypedFtraceToRaw(fld.id, timestamp, pid,
+      ParseTypedFtraceToRaw(fld.id, timestamp, cpu, pid,
                             ftrace.slice(fld_off, fld.size()));
     }
 
@@ -619,6 +628,10 @@ void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
       }
       case protos::FtraceEvent::kSignalDeliver: {
         ParseSignalDeliver(timestamp, pid, ftrace.slice(fld_off, fld.size()));
+        break;
+      }
+      case protos::FtraceEvent::kLowmemoryKill: {
+        ParseLowmemoryKill(timestamp, ftrace.slice(fld_off, fld.size()));
         break;
       }
       case protos::FtraceEvent::kOomScoreAdjUpdate: {
@@ -690,13 +703,18 @@ void ProtoTraceParser::ParseLowmemoryKill(int64_t timestamp,
         break;
     }
   }
-  // TODO(taylori): Move the comm to the args table once it exists.
-  StringId name = context_->storage->InternString(
-      base::StringView("mem.lmk." + comm.ToStdString()));
-  auto* instants = context_->storage->mutable_instants();
+
   // Storing the pid of the event that is lmk-ed.
-  UniqueTid utid = context_->process_tracker->UpdateThread(timestamp, pid, 0);
-  instants->AddInstantEvent(timestamp, 0, name, utid, RefType::kRefUtid);
+  auto* instants = context_->storage->mutable_instants();
+  UniquePid upid = context_->process_tracker->UpdateProcess(pid);
+  uint32_t row =
+      instants->AddInstantEvent(timestamp, lmk_id_, 0, upid, RefType::kRefUpid);
+
+  // Store the comm as an arg.
+  RowId row_id = TraceStorage::CreateRowId(TableId::kInstants, row);
+  auto comm_id = context_->storage->InternString(comm);
+  context_->storage->mutable_args()->AddArg(
+      row_id, comm_name_id_, comm_name_id_, Variadic::String(comm_id));
 }
 
 void ProtoTraceParser::ParseRssStat(int64_t timestamp,
@@ -889,6 +907,22 @@ void ProtoTraceParser::ParsePrint(uint32_t,
     }
 
     case 'C': {
+      // LMK events from userspace are hacked as counter events with the "value"
+      // of the counter representing the pid of the killed process which is
+      // reset to 0 once the kill is complete.
+      // Homogenise this with kernel LMK events as an instant event, ignoring
+      // the resets to 0.
+      if (point.name == "kill_one_process") {
+        auto killed_pid = static_cast<uint32_t>(point.value);
+        if (killed_pid != 0) {
+          UniquePid killed_upid =
+              context_->process_tracker->UpdateProcess(killed_pid);
+          context_->storage->mutable_instants()->AddInstantEvent(
+              timestamp, lmk_id_, 0, killed_upid, RefType::kRefUpid);
+        }
+        // TODO(tilal6991): we should not add LMK events to the counters table
+        // once the UI has support for displaying instants.
+      }
       UniqueTid utid =
           context_->process_tracker->UpdateThread(timestamp, point.tid, 0);
       StringId name_id = context_->storage->InternString(point.name);
@@ -956,6 +990,7 @@ void ProtoTraceParser::ParseOOMScoreAdjUpdate(int64_t ts,
 }
 
 void ProtoTraceParser::ParseGenericFtrace(int64_t timestamp,
+                                          uint32_t cpu,
                                           uint32_t tid,
                                           TraceBlobView view) {
   ProtoDecoder decoder(view.data(), view.length());
@@ -971,7 +1006,7 @@ void ProtoTraceParser::ParseGenericFtrace(int64_t timestamp,
   UniqueTid utid = context_->process_tracker->UpdateThread(timestamp, tid, 0);
   StringId event_id = context_->storage->InternString(std::move(event_name));
   RowId row_id = context_->storage->mutable_raw_events()->AddRawEvent(
-      timestamp, event_id, utid);
+      timestamp, event_id, cpu, utid);
 
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
@@ -1016,6 +1051,7 @@ void ProtoTraceParser::ParseGenericFtraceField(RowId generic_row_id,
 
 void ProtoTraceParser::ParseTypedFtraceToRaw(uint32_t ftrace_id,
                                              int64_t timestamp,
+                                             uint32_t cpu,
                                              uint32_t tid,
                                              TraceBlobView view) {
   ProtoDecoder decoder(view.data(), view.length());
@@ -1027,7 +1063,7 @@ void ProtoTraceParser::ParseTypedFtraceToRaw(uint32_t ftrace_id,
   MessageDescriptor* m = GetMessageDescriptorForId(ftrace_id);
   UniqueTid utid = context_->process_tracker->UpdateThread(timestamp, tid, 0);
   RowId raw_event_id = context_->storage->mutable_raw_events()->AddRawEvent(
-      timestamp, context_->storage->InternString(m->name), utid);
+      timestamp, context_->storage->InternString(m->name), cpu, utid);
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     ProtoSchemaType type = m->fields[fld.id].type;
     StringId name_id = context_->storage->InternString(m->fields[fld.id].name);
@@ -1192,11 +1228,6 @@ void ProtoTraceParser::ParseAndroidLogEvent(TraceBlobView event) {
         break;
       case protos::AndroidLogPacket::LogEvent::kTimestampFieldNumber:
         ts = fld.as_int64();
-        if (ts < context_->clock_tracker->GetFirstTimestamp(
-                     ClockDomain::kRealTime)) {
-          // Skip log events that happened before the start of the trace.
-          return;
-        }
         break;
       case protos::AndroidLogPacket::LogEvent::kPrioFieldNumber:
         prio = static_cast<uint8_t>(fld.as_uint32());
@@ -1326,9 +1357,19 @@ void ProtoTraceParser::ParseTraceStats(TraceBlobView packet) {
               storage->SetIndexedStats(stats::traced_buf_chunks_written,
                                        buf_num, fld2.as_int64());
               break;
+            case protos::TraceStats::BufferStats::kChunksRewrittenFieldNumber:
+              storage->SetIndexedStats(stats::traced_buf_chunks_rewritten,
+                                       buf_num, fld2.as_int64());
+              break;
             case protos::TraceStats::BufferStats::kChunksOverwrittenFieldNumber:
               storage->SetIndexedStats(stats::traced_buf_chunks_overwritten,
                                        buf_num, fld2.as_int64());
+              break;
+            case protos::TraceStats::BufferStats::
+                kChunksCommittedOutOfOrderFieldNumber:
+              storage->SetIndexedStats(
+                  stats::traced_buf_chunks_committed_out_of_order, buf_num,
+                  fld2.as_int64());
               break;
             case protos::TraceStats::BufferStats::kWriteWrapCountFieldNumber:
               storage->SetIndexedStats(stats::traced_buf_write_wrap_count,

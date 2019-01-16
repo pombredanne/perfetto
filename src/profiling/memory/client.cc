@@ -44,9 +44,10 @@ namespace perfetto {
 namespace profiling {
 namespace {
 
-constexpr uint32_t kSendTimeoutMs = 1000;
 constexpr std::chrono::seconds kLockTimeout{1};
 
+// TODO(rsavitski): consider setting a receive timeout as well, otherwise the
+// constructor can block indefinitely (while waiting on the client config).
 std::vector<base::UnixSocketRaw> ConnectPool(const std::string& sock_name,
                                              size_t n) {
   std::vector<base::UnixSocketRaw> res;
@@ -57,7 +58,7 @@ std::vector<base::UnixSocketRaw> ConnectPool(const std::string& sock_name,
       PERFETTO_PLOG("Failed to connect to %s", sock_name.c_str());
       continue;
     }
-    if (!sock.SetTxTimeout(kSendTimeoutMs)) {
+    if (!sock.SetTxTimeout(kClientSockTxTimeoutMs)) {
       PERFETTO_PLOG("Failed to set timeout for %s", sock_name.c_str());
       continue;
     }
@@ -118,7 +119,7 @@ bool FreePage::FlushLocked(SocketPool* pool) {
   msg.free_header = &free_page_;
   BorrowedSocket sock(pool->Borrow());
   if (!sock || !SendWireMessage(sock.get(), msg)) {
-    PERFETTO_ELOG("Failed to send wire message");
+    PERFETTO_PLOG("Failed to send wire message");
     sock.Shutdown();
     return false;
   }
@@ -287,7 +288,7 @@ void Client::RecordMalloc(uint64_t alloc_size,
 
   BorrowedSocket sock = socket_pool_.Borrow();
   if (!sock || !SendWireMessage(sock.get(), msg)) {
-    PERFETTO_DFATAL("Failed to send wire message.");
+    PERFETTO_PLOG("Failed to send wire message.");
     sock.Shutdown();
     Shutdown();
   }
