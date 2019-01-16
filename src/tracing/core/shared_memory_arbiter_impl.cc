@@ -279,7 +279,7 @@ std::unique_ptr<TraceWriter> SharedMemoryArbiterImpl::CreateTraceWriter(
 void SharedMemoryArbiterImpl::BindStartupTraceWriterRegistry(
     std::unique_ptr<StartupTraceWriterRegistry> registry,
     BufferID target_buffer) {
-  registry->BindToArbiter(this, target_buffer);
+  registry->BindToArbiter(this, target_buffer, task_runner_);
   std::lock_guard<std::mutex> scoped_lock(lock_);
   bound_startup_trace_writer_registries_.push_back(std::move(registry));
 }

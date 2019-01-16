@@ -27,9 +27,8 @@ using ChunkHeader = perfetto::SharedMemoryABI::ChunkHeader;
 
 namespace perfetto {
 
-StartupTraceWriterRegistry::StartupTraceWriterRegistry(
-    base::TaskRunner* task_runner)
-    : task_runner_(task_runner) {}
+StartupTraceWriterRegistry::StartupTraceWriterRegistry()
+    : weak_ptr_factory_(this) {}
 
 StartupTraceWriterRegistry::~StartupTraceWriterRegistry() {
   std::lock_guard<std::mutex> lock(lock_);
@@ -52,13 +51,15 @@ StartupTraceWriterRegistry::CreateTraceWriter() {
 }
 
 void StartupTraceWriterRegistry::BindToArbiter(SharedMemoryArbiterImpl* arbiter,
-                                               BufferID target_buffer) {
+                                               BufferID target_buffer,
+                                               base::TaskRunner* task_runner) {
   {
     std::lock_guard<std::mutex> lock(lock_);
     PERFETTO_DCHECK(!arbiter_);
     arbiter_ = arbiter;
     target_buffer_ = target_buffer;
   }
+  task_runner_ = task_runner;
   TryBindWriters();
 }
 
@@ -73,8 +74,11 @@ void StartupTraceWriterRegistry::TryBindWriters() {
     }
   }
   if (!unbound_writers_.empty()) {
-    task_runner_->PostTask(
-        std::bind(&StartupTraceWriterRegistry::TryBindWriters, this));
+    auto weak_this = weak_ptr_factory_.GetWeakPtr();
+    task_runner_->PostTask([weak_this] {
+      if (weak_this)
+        weak_this->TryBindWriters();
+    });
   }
 }
 

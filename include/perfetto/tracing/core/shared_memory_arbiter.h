@@ -66,7 +66,7 @@ class PERFETTO_EXPORT SharedMemoryArbiter {
   // TODO(eseckler): Make target buffer assignment more flexible (i.e. per
   // writer). For now, embedders can use multiple registries instead.
   virtual void BindStartupTraceWriterRegistry(
-      std::unique_ptr<StartupTraceWriterRegistry> registry,
+      std::unique_ptr<StartupTraceWriterRegistry>,
       BufferID target_buffer) = 0;
 
   // Notifies the service that all data for the given FlushRequestID has been

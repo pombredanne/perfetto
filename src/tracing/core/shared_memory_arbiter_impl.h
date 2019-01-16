@@ -107,7 +107,7 @@ class SharedMemoryArbiterImpl : public SharedMemoryArbiter {
   std::unique_ptr<TraceWriter> CreateTraceWriter(
       BufferID target_buffer) override;
   void BindStartupTraceWriterRegistry(
-      std::unique_ptr<StartupTraceWriterRegistry> registry,
+      std::unique_ptr<StartupTraceWriterRegistry>,
       BufferID target_buffer) override;
 
   void NotifyFlushComplete(FlushRequestID) override;

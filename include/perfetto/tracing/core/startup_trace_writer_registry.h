@@ -22,6 +22,7 @@
 #include <set>
 
 #include "perfetto/base/export.h"
+#include "perfetto/base/weak_ptr.h"
 #include "perfetto/tracing/core/basic_types.h"
 
 namespace perfetto {
@@ -35,7 +36,7 @@ class TaskRunner;
 
 class PERFETTO_EXPORT StartupTraceWriterRegistry {
  public:
-  explicit StartupTraceWriterRegistry(base::TaskRunner*);
+  StartupTraceWriterRegistry();
   ~StartupTraceWriterRegistry();
 
   // Returns a new StartupTraceWriter. The new writer will already be bound if
@@ -49,9 +50,11 @@ class PERFETTO_EXPORT StartupTraceWriterRegistry {
   // writers created in the early startup phase.
   //
   // Note that the writers may not be bound synchronously if they are
-  // concurrently being written to. The registry will retry on its TaskRunner
-  // until all writers were bound successfully.
-  void BindToArbiter(SharedMemoryArbiterImpl*, BufferID target_buffer);
+  // concurrently being written to. The registry will retry on the passed
+  // TaskRunner until all writers were bound successfully.
+  void BindToArbiter(SharedMemoryArbiterImpl*,
+                     BufferID target_buffer,
+                     base::TaskRunner*);
 
  private:
   friend class StartupTraceWriter;
@@ -66,11 +69,15 @@ class PERFETTO_EXPORT StartupTraceWriterRegistry {
 
   base::TaskRunner* task_runner_;
 
-  // All variables below this point are protected by |lock_|.
+  // Begin lock-protected members.
   std::mutex lock_;
   std::set<StartupTraceWriter*> unbound_writers_;
   SharedMemoryArbiterImpl* arbiter_ = nullptr;  // |nullptr| while unbound.
   BufferID target_buffer_ = 0;
+  // End lock-protected members.
+
+  // Keep at the end.
+  base::WeakPtrFactory<StartupTraceWriterRegistry> weak_ptr_factory_;
 };
 
 }  // namespace perfetto
