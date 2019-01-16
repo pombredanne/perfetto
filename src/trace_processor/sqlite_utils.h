@@ -195,8 +195,16 @@ inline std::function<bool(const char*)> CreateStringPredicate(
     case SQLITE_INDEX_CONSTRAINT_LT:
       return
           [val](const char* f) { return f != nullptr && strcmp(f, val) < 0; };
+    case SQLITE_INDEX_CONSTRAINT_LIKE:
+      return [val](const char* f) {
+        return f != nullptr && sqlite3_strlike(val, f, 0) == 0;
+      };
+    case SQLITE_INDEX_CONSTRAINT_GLOB:
+      return [val](const char* f) {
+        return f != nullptr && sqlite3_strglob(val, f) == 0;
+      };
     default:
-      return [](const char* f) { return f != nullptr; };
+      PERFETTO_FATAL("For GCC");
   }
 }
 

@@ -27,8 +27,9 @@ TraceStorage::TraceStorage() {
   unique_threads_.emplace_back(0);
 
   // StringId == 0 represents a SQL NULL value. Choose a string value which
-  // should not appear in traces.
-  InternString("<[NULL]>");
+  // should not appear in traces & ensure if it is ever user-visible, it is
+  // clear that there is a bug.
+  InternString("<[Seeing this is a bug]>");
 
   // Reserve StringId == 1 for the empty string.
   InternString("");

@@ -58,8 +58,9 @@ class StorageSchema {
       return *this;
     }
 
-    // Note: string_map[0] will always be reported to be NULL so care should
-    // be take to reserve index 0 in string_map.
+    // Callers of this function should ensure that the index 0 in |ids| is only
+    // used to represent NULL. string_map[0] will NOT be looked up - it will
+    // be ignored.
     template <class Id>
     Builder& AddStringColumn(std::string column_name,
                              const std::deque<Id>* ids,
