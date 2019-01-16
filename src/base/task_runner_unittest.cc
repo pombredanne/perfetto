@@ -360,13 +360,13 @@ TYPED_TEST(TaskRunnerTest, IsIdleForTesting) {
 
 TYPED_TEST(TaskRunnerTest, RunsOnCurrentThread) {
   auto& task_runner = this->task_runner;
-  EXPECT_TRUE(task_runner.RunsTaskOnCurrentThread());
+  EXPECT_TRUE(task_runner.RunsTasksOnCurrentThread());
 }
 
 TYPED_TEST(TaskRunnerTest, RunsOnDifferentThread) {
   auto& task_runner = this->task_runner;
   std::thread thread(
-      [&task_runner] { EXPECT_FALSE(task_runner.RunsTaskOnCurrentThread()); });
+      [&task_runner] { EXPECT_FALSE(task_runner.RunsTasksOnCurrentThread()); });
   thread.join();
 }
 

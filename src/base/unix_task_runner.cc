@@ -217,7 +217,7 @@ void UnixTaskRunner::RemoveFileDescriptorWatch(int fd) {
   // No need to schedule a wake-up for this.
 }
 
-bool UnixTaskRunner::RunsTaskOnCurrentThread() const {
+bool UnixTaskRunner::RunsTasksOnCurrentThread() const {
   return GetThreadId() == created_thread_id_;
 }
 

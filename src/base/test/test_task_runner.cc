@@ -110,8 +110,8 @@ void TestTaskRunner::RemoveFileDescriptorWatch(int fd) {
   task_runner_.RemoveFileDescriptorWatch(fd);
 }
 
-bool TestTaskRunner::RunsTaskOnCurrentThread() const {
-  return task_runner_.RunsTaskOnCurrentThread();
+bool TestTaskRunner::RunsTasksOnCurrentThread() const {
+  return task_runner_.RunsTasksOnCurrentThread();
 }
 
 }  // namespace base

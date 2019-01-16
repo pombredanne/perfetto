@@ -56,7 +56,7 @@ class UnixTaskRunner : public TaskRunner {
   void AddFileDescriptorWatch(int fd, std::function<void()>) override;
   void RemoveFileDescriptorWatch(int fd) override;
 
-  bool RunsTaskOnCurrentThread() const override;
+  bool RunsTasksOnCurrentThread() const override;
 
  private:
   void WakeUp();

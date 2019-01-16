@@ -67,7 +67,7 @@ class PERFETTO_EXPORT TaskRunner {
   // thread.
   virtual void RemoveFileDescriptorWatch(int fd) = 0;
 
-  virtual bool RunsTaskOnCurrentThread() const = 0;
+  virtual bool RunsTasksOnCurrentThread() const = 0;
 
  protected:
   static void RunTask(const std::function<void()>& task) {
