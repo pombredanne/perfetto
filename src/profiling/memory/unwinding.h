@@ -93,7 +93,7 @@ struct UnwindingMetadata {
   pid_t pid;
   FileDescriptorMaps maps;
   // The API of libunwindstack expects shared_ptr for Memory.
-  std::shared_ptr<FDMemory> fd_mem;
+  std::shared_ptr<unwindstack::Memory> fd_mem;
 #if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
   unwindstack::JitDebug jit_debug;
   unwindstack::DexFiles dex_files;
