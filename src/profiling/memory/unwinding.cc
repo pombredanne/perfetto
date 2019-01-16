@@ -154,7 +154,9 @@ void FileDescriptorMaps::Reset() {
   maps_.clear();
 }
 
-bool DoUnwind(WireMessage* msg, UnwindingMetadata* metadata, AllocRecord* out) {
+bool UnwindingThread::DoUnwind(WireMessage* msg,
+                               UnwindingMetadata* metadata,
+                               AllocRecord* out) {
   AllocMetadata* alloc_metadata = msg->alloc_header;
   std::unique_ptr<unwindstack::Regs> regs(
       CreateFromRawData(alloc_metadata->arch, alloc_metadata->register_data));
@@ -192,13 +194,27 @@ bool DoUnwind(WireMessage* msg, UnwindingMetadata* metadata, AllocRecord* out) {
   }
 
   for (unwindstack::FrameData& fd : out->frames) {
+    if (fd.map_name != "") {
+      auto it = build_id_cache_.find(fd.map_name);
+      if (it == build_id_cache_.end()) {
+        unwindstack::MapInfo* map_info = metadata->maps.Find(fd.pc);
+        if (map_info) {
+          auto elf = map_info->elf;
+
+          std::string build_id;
+          elf->GetBuildID(&build_id);
+          build_id_cache_.emplace(fd.map_name, std::move(build_id));
+        }
+      }
+    }
     if (base::EndsWith(fd.map_name, ".so"))
       MaybeDemangle(&fd.function_name);
   }
   return true;
 }
 
-bool HandleUnwindingRecord(UnwindingRecord* rec, BookkeepingRecord* out) {
+bool UnwindingThread::HandleUnwindingRecord(UnwindingRecord* rec,
+                                            BookkeepingRecord* out) {
   WireMessage msg;
   if (!ReceiveWireMessage(reinterpret_cast<char*>(rec->data.get()), rec->size,
                           &msg))
@@ -227,8 +243,9 @@ bool HandleUnwindingRecord(UnwindingRecord* rec, BookkeepingRecord* out) {
   }
 }
 
-void UnwindingMainLoop(BoundedQueue<UnwindingRecord>* input_queue,
-                       BoundedQueue<BookkeepingRecord>* output_queue) {
+void UnwindingThread::UnwindingMainLoop(
+    BoundedQueue<UnwindingRecord>* input_queue,
+    BoundedQueue<BookkeepingRecord>* output_queue) {
   for (;;) {
     UnwindingRecord rec;
     if (!input_queue->Get(&rec))

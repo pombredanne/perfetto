@@ -65,12 +65,18 @@ class StackMemory : public unwindstack::Memory {
   uint8_t* stack_;
 };
 
-bool DoUnwind(WireMessage*, UnwindingMetadata* metadata, AllocRecord* out);
+class UnwindingThread {
+ public:
+  bool DoUnwind(WireMessage*, UnwindingMetadata* metadata, AllocRecord* out);
 
-bool HandleUnwindingRecord(UnwindingRecord* rec, BookkeepingRecord* out);
+  bool HandleUnwindingRecord(UnwindingRecord* rec, BookkeepingRecord* out);
 
-void UnwindingMainLoop(BoundedQueue<UnwindingRecord>* input_queue,
-                       BoundedQueue<BookkeepingRecord>* output_queue);
+  void UnwindingMainLoop(BoundedQueue<UnwindingRecord>* input_queue,
+                         BoundedQueue<BookkeepingRecord>* output_queue);
+
+ private:
+  std::map<std::string, std::string> build_id_cache_;
+};
 
 }  // namespace profiling
 }  // namespace perfetto

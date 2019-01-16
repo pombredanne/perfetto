@@ -80,7 +80,8 @@ HeapprofdProducer::HeapprofdProducer(HeapprofdMode mode,
       bookkeeping_queue_(kBookkeepingQueueSize),
       bookkeeping_th_([this] { bookkeeping_thread_.Run(&bookkeeping_queue_); }),
       unwinder_queues_(MakeUnwinderQueues(kUnwinderThreads)),
-      unwinding_threads_(MakeUnwindingThreads(kUnwinderThreads)),
+      unwinding_threads_(kUnwinderThreads),
+      unwinding_thread_runners_(MakeUnwindingThreadRunners(kUnwinderThreads)),
       socket_listener_(MakeSocketListenerCallback(), &bookkeeping_thread_),
       target_pid_(base::kInvalidPid),
       weak_factory_(this) {
@@ -95,7 +96,7 @@ HeapprofdProducer::~HeapprofdProducer() {
     queue.Shutdown();
   }
   bookkeeping_th_.join();
-  for (std::thread& th : unwinding_threads_) {
+  for (std::thread& th : unwinding_thread_runners_) {
     th.join();
   }
 }
@@ -421,11 +422,15 @@ HeapprofdProducer::MakeUnwinderQueues(size_t n) {
   return ret;
 }
 
-std::vector<std::thread> HeapprofdProducer::MakeUnwindingThreads(size_t n) {
+std::vector<std::thread> HeapprofdProducer::MakeUnwindingThreadRunners(
+    size_t n) {
+  PERFETTO_DCHECK(unwinding_threads_.size() == n &&
+                  unwinder_queues_.size() == n);
   std::vector<std::thread> ret;
   for (size_t i = 0; i < n; ++i) {
     ret.emplace_back([this, i] {
-      UnwindingMainLoop(&unwinder_queues_[i], &bookkeeping_queue_);
+      unwinding_threads_[i].UnwindingMainLoop(&unwinder_queues_[i],
+                                              &bookkeeping_queue_);
     });
   }
   return ret;

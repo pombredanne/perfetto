@@ -128,7 +128,8 @@ TEST(UnwindingTest, MAYBE_DoUnwind) {
   WireMessage msg;
   auto record = GetRecord(&msg);
   AllocRecord out;
-  ASSERT_TRUE(DoUnwind(&msg, &metadata, &out));
+  UnwindingThread th;
+  ASSERT_TRUE(th.DoUnwind(&msg, &metadata, &out));
   int st;
   std::unique_ptr<char> demangled(abi::__cxa_demangle(
       out.frames[0].function_name.c_str(), nullptr, nullptr, &st));

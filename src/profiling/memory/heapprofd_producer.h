@@ -90,7 +90,7 @@ class HeapprofdProducer : public Producer {
 
   std::function<void(UnwindingRecord)> MakeSocketListenerCallback();
   std::vector<BoundedQueue<UnwindingRecord>> MakeUnwinderQueues(size_t n);
-  std::vector<std::thread> MakeUnwindingThreads(size_t n);
+  std::vector<std::thread> MakeUnwindingThreadRunners(size_t n);
 
   void FinishDataSourceFlush(FlushRequestID flush_id);
   bool Dump(DataSourceInstanceID id,
@@ -126,7 +126,8 @@ class HeapprofdProducer : public Producer {
   BookkeepingThread bookkeeping_thread_;
   std::thread bookkeeping_th_;
   std::vector<BoundedQueue<UnwindingRecord>> unwinder_queues_;
-  std::vector<std::thread> unwinding_threads_;
+  std::vector<UnwindingThread> unwinding_threads_;
+  std::vector<std::thread> unwinding_thread_runners_;
   SocketListener socket_listener_;
 
   // state specific to mode_ == kCentral
