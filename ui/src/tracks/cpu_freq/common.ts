@@ -22,7 +22,7 @@ export interface Data {
   minimumValue: number;
 
   timestamps: Float64Array;
-  valuesKHz: Float32Array;
+  valuesKHz: Uint32Array;
 }
 
 export interface Config {

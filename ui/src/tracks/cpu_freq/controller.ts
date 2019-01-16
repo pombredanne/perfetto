@@ -69,7 +69,7 @@ class CpuFreqTrackController extends TrackController<Config, Data> {
       minimumValue: this.minimumValue(),
       resolution,
       timestamps: new Float64Array(numRows),
-      valuesKHz: new Float32Array(numRows),
+      valuesKHz: new Uint32Array(numRows),
     };
 
     const cols = rawResult.columns;
