@@ -91,7 +91,8 @@ class StartupTraceWriterTest : public AlignedBufferTest {
 
   size_t GetUnboundWriterCount(
       const StartupTraceWriterRegistry& registry) const {
-    return registry.unbound_writers_.size();
+    return registry.unbound_writers_.size() +
+           registry.unbound_owned_writers_.size();
   }
 
   size_t GetBindingRegistriesCount(
@@ -103,6 +104,7 @@ class StartupTraceWriterTest : public AlignedBufferTest {
     size_t count = 0u;
     for (const auto& reg : arbiter.binding_startup_trace_writer_registries_) {
       count += reg->unbound_writers_.size();
+      count += reg->unbound_owned_writers_.size();
     }
     return count;
   }
@@ -243,6 +245,9 @@ TEST_P(StartupTraceWriterTest, CreateAndBindViaRegistry) {
   auto writer2 = registry->CreateUnboundTraceWriter();
 
   EXPECT_EQ(2u, GetUnboundWriterCount(*registry));
+
+  // Return |writer2|. It should be kept alive until the registry is bound.
+  registry->ReturnUnboundTraceWriter(std::move(writer2));
 
   {
     // Begin a write by opening a TracePacket on |writer1|.

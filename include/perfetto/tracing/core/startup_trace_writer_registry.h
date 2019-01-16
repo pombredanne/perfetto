@@ -20,6 +20,7 @@
 #include <memory>
 #include <mutex>
 #include <set>
+#include <vector>
 
 #include "perfetto/base/export.h"
 #include "perfetto/base/weak_ptr.h"
@@ -42,6 +43,14 @@ class PERFETTO_EXPORT StartupTraceWriterRegistry {
   // Returns a new unbound StartupTraceWriter. Should only be called while
   // unbound and only on the writer thread.
   std::unique_ptr<StartupTraceWriter> CreateUnboundTraceWriter();
+
+  // Return an unbound StartupTraceWriter back to the registry before it could
+  // be bound. The registry will keep this writer alive until it is bound to an
+  // arbiter (or destroyed itself). This way, its buffered data is retained.
+  // Should only be called while unbound. All packets written to the passed
+  // writer should have been completed and it should no longer be used to write
+  // data after calling this method.
+  void ReturnUnboundTraceWriter(std::unique_ptr<StartupTraceWriter>);
 
   // Binds all StartupTraceWriters created by this registry to the given arbiter
   // and target buffer. Should only be called once. See
@@ -73,6 +82,7 @@ class PERFETTO_EXPORT StartupTraceWriterRegistry {
   // Begin lock-protected members.
   std::mutex lock_;
   std::set<StartupTraceWriter*> unbound_writers_;
+  std::vector<std::unique_ptr<StartupTraceWriter>> unbound_owned_writers_;
   SharedMemoryArbiterImpl* arbiter_ = nullptr;  // |nullptr| while unbound.
   BufferID target_buffer_ = 0;
   // End lock-protected members.

@@ -39,11 +39,20 @@ StartupTraceWriterRegistry::~StartupTraceWriterRegistry() {
 std::unique_ptr<StartupTraceWriter>
 StartupTraceWriterRegistry::CreateUnboundTraceWriter() {
   std::lock_guard<std::mutex> lock(lock_);
-  std::unique_ptr<StartupTraceWriter> writer;
   PERFETTO_DCHECK(!arbiter_);  // Should only be called while unbound.
-  writer.reset(new StartupTraceWriter());
+  std::unique_ptr<StartupTraceWriter> writer(new StartupTraceWriter());
   unbound_writers_.insert(writer.get());
   return writer;
+}
+
+void StartupTraceWriterRegistry::ReturnUnboundTraceWriter(
+    std::unique_ptr<StartupTraceWriter> trace_writer) {
+  std::lock_guard<std::mutex> lock(lock_);
+  PERFETTO_DCHECK(!arbiter_);  // Should only be called while unbound.
+  PERFETTO_DCHECK(!trace_writer->write_in_progress_);
+  PERFETTO_DCHECK(unbound_writers_.count(trace_writer.get()));
+  unbound_writers_.erase(trace_writer.get());
+  unbound_owned_writers_.push_back(std::move(trace_writer));
 }
 
 void StartupTraceWriterRegistry::BindToArbiter(SharedMemoryArbiterImpl* arbiter,
@@ -54,6 +63,15 @@ void StartupTraceWriterRegistry::BindToArbiter(SharedMemoryArbiterImpl* arbiter,
     PERFETTO_DCHECK(!arbiter_);
     arbiter_ = arbiter;
     target_buffer_ = target_buffer;
+
+    // Bind the owned writers immediately since they should not be written to
+    // concurrently.
+    for (const auto& writer : unbound_owned_writers_) {
+      bool success = writer->BindToArbiter(arbiter_, target_buffer_);
+      PERFETTO_DCHECK(success);
+      writer->set_registry(nullptr);
+    }
+    unbound_owned_writers_.clear();
   }
   task_runner_ = task_runner;
   TryBindWriters();
