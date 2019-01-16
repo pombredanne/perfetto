@@ -14,6 +14,12 @@
  * limitations under the License.
  */
 
+#include "src/profiling/memory/unwinding.h"
+
+#include "perfetto/base/build_config.h"
+
+// TODO(fmayer): Maybe replace this with
+//   https://android.googlesource.com/platform/system/core/+/master/demangle/
 #include <cxxabi.h>
 
 #include <unwindstack/MachineArm.h>
@@ -39,13 +45,17 @@
 #include <unwindstack/UserX86.h>
 #include <unwindstack/UserX86_64.h>
 
+#if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
+#include <unwindstack/DexFiles.h>
+#include <unwindstack/JitDebug.h>
+#endif
+
 #include <procinfo/process_map.h>
 
 #include "perfetto/base/file_utils.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/scoped_file.h"
 #include "perfetto/base/string_utils.h"
-#include "src/profiling/memory/unwinding.h"
 #include "src/profiling/memory/wire_protocol.h"
 
 namespace perfetto {
@@ -176,8 +186,8 @@ bool DoUnwind(WireMessage* msg, UnwindingMetadata* metadata, AllocRecord* out) {
 
   unwindstack::Unwinder unwinder(kMaxFrames, &metadata->maps, regs.get(), mems);
 #if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
-  unwinder.SetJitDebug(&jit_debug);
-  unwinder.SetDexFiles(&dex_files);
+  unwinder.SetJitDebug(&jit_debug, regs->Arch());
+  unwinder.SetDexFiles(&dex_files, regs->Arch());
 #endif
   // Surpress incorrect "variable may be uninitialized" error for if condition
   // after this loop. error_code = LastErrorCode gets run at least once.
