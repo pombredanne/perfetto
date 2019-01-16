@@ -605,7 +605,8 @@ def create_blueprint_for_targets(desc, force_debug, targets):
         '-Oz',
     ]
     if force_debug:
-      defaults.cflags.extend(['-UNDEBUG'])
+      defaults.cflags.extend(['-UNDEBUG',
+                              '-DPERFETTO_ENABLE_DLOG'])
     defaults.user_debug_flag = True
 
     blueprint.add_module(defaults)

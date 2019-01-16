@@ -220,10 +220,8 @@ export const StateActions = {
     state.traceTime = args;
   },
 
-  setVisibleTraceTime(
-      state: StateDraft, args: {time: TraceTime; lastUpdate: number;}): void {
-    state.frontendLocalState.visibleTraceTime = args.time;
-    state.frontendLocalState.lastUpdate = args.lastUpdate;
+  setVisibleTraceTime(state: StateDraft, args: TraceTime): void {
+    state.visibleTraceTime = args;
   },
 
   updateStatus(state: StateDraft, args: Status): void {

@@ -101,12 +101,7 @@ int HeapprofdMain(int argc, char** argv) {
 
 int StartChildHeapprofd(pid_t target_pid,
                         std::vector<base::ScopedFile> inherited_sock_fds) {
-  base::UnixTaskRunner task_runner;
-  HeapprofdProducer producer(HeapprofdMode::kChild, &task_runner);
-  producer.SetTargetProcess(target_pid);
-  producer.ConnectWithRetries(GetProducerSocket());
-  producer.AdoptConnectedSockets(std::move(inherited_sock_fds));
-  task_runner.Run();
+  PERFETTO_ELOG("Exiting from unimplemented child mode.");
   return 0;
 }
 
