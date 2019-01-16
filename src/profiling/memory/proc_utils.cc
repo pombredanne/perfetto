@@ -25,6 +25,34 @@ namespace perfetto {
 namespace profiling {
 namespace {
 
+const char* __attribute__((unused))
+FindChar(const char* s, unsigned char c, size_t n) {
+  const char* ret = s;
+  const char* end = s + n;
+  for (;;) {
+    const char* next = static_cast<const char*>(
+        memchr(ret, c, static_cast<size_t>(end - ret)));
+    if (next)
+      ret = next;
+    else
+      break;
+  };
+  if (ret == s) {
+    if (*ret == c)
+      return ret;
+    return nullptr;
+  }
+  return ret;
+}
+
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
+// Only conditionally compile this to have less platform specific code.
+void* memrchr(const void* s, int c, size_t n) {
+  return static_cast<void*>(const_cast<char*>(
+      FindChar(static_cast<const char*>(s), static_cast<unsigned char>(c), n)));
+}
+#endif
+
 bool GetProcFile(pid_t pid, const char* file, char* filename_buf, size_t size) {
   ssize_t written = snprintf(filename_buf, size, "/proc/%d/%s", pid, file);
   if (written < 0 || static_cast<size_t>(written) >= size) {
@@ -42,7 +70,7 @@ bool GetProcFile(pid_t pid, const char* file, char* filename_buf, size_t size) {
 bool NormalizeCmdLine(char* cmdline, size_t size, std::string* name) {
   char* first_arg = static_cast<char*>(memchr(cmdline, '\0', size));
   if (first_arg == nullptr) {
-    PERFETTO_LOG("Overflow reading cmdline");
+    PERFETTO_DLOG("Overflow reading cmdline");
     return false;
   }
   // For consistency with what we do with Java app cmdlines, trim everything
@@ -56,7 +84,7 @@ bool NormalizeCmdLine(char* cmdline, size_t size, std::string* name) {
       memrchr(cmdline, '/', static_cast<size_t>(first_arg - cmdline)));
   if (start == first_arg) {
     // The first argument ended in a slash.
-    PERFETTO_LOG("cmdline ends in /");
+    PERFETTO_DLOG("cmdline ends in /");
     return false;
   } else if (start == nullptr) {
     start = cmdline;
