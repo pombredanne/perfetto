@@ -300,10 +300,6 @@ if (should_build_heapprofd) {
       "src/tracing:ipc",
     ]
 
-    # TODO(fmayer): We should not have to manually do this.
-    if (perfetto_build_with_android) {
-      cflags = [ "-DPERFETTO_BUILD_WITH_ANDROID" ]
-    }
     sources = [
       "src/profiling/memory/main.cc",
     ]
