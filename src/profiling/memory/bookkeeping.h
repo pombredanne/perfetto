@@ -96,7 +96,7 @@ namespace profiling {
 class HeapTracker;
 
 struct Mapping {
-  uint64_t build_id;
+  std::string build_id;
   uint64_t offset;
   uint64_t start;
   uint64_t end;
@@ -171,14 +171,14 @@ class GlobalCallstackTrie {
   GlobalCallstackTrie(const GlobalCallstackTrie&) = delete;
   GlobalCallstackTrie& operator=(const GlobalCallstackTrie&) = delete;
 
-  Node* CreateCallsite(const std::vector<unwindstack::FrameData>& locs);
+  Node* CreateCallsite(const std::vector<FrameData>& locs);
   static void DecrementNode(Node* node);
   static void IncrementNode(Node* node);
 
   std::vector<Interned<Frame>> BuildCallstack(const Node* node) const;
 
  private:
-  Interned<Frame> InternCodeLocation(const unwindstack::FrameData& loc);
+  Interned<Frame> InternCodeLocation(const FrameData& loc);
   Interned<Frame> MakeRootFrame();
 
   Interner<std::string> string_interner_;
@@ -240,14 +240,14 @@ class HeapTracker {
   explicit HeapTracker(GlobalCallstackTrie* callsites)
       : callsites_(callsites) {}
 
-  void RecordMalloc(const std::vector<unwindstack::FrameData>& stack,
+  void RecordMalloc(const std::vector<FrameData>& stack,
                     uint64_t address,
                     uint64_t size,
                     uint64_t sequence_number);
   void RecordFree(uint64_t address, uint64_t sequence_number);
   void Dump(pid_t pid, DumpState* dump_state);
 
-  uint64_t GetSizeForTesting(const std::vector<unwindstack::FrameData>& stack);
+  uint64_t GetSizeForTesting(const std::vector<FrameData>& stack);
 
  private:
   static constexpr uint64_t kNoopFree = 0;

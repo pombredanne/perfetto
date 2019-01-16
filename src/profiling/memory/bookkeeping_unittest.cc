@@ -23,29 +23,29 @@ namespace perfetto {
 namespace profiling {
 namespace {
 
-std::vector<unwindstack::FrameData> stack() {
-  std::vector<unwindstack::FrameData> res;
+std::vector<FrameData> stack() {
+  std::vector<FrameData> res;
   unwindstack::FrameData data{};
   data.function_name = "fun1";
   data.map_name = "map1";
-  res.emplace_back(std::move(data));
+  res.emplace_back(std::move(data), "dummy_buildid");
   data = {};
   data.function_name = "fun2";
   data.map_name = "map2";
-  res.emplace_back(std::move(data));
+  res.emplace_back(std::move(data), "dummy_buildid");
   return res;
 }
 
-std::vector<unwindstack::FrameData> stack2() {
-  std::vector<unwindstack::FrameData> res;
+std::vector<FrameData> stack2() {
+  std::vector<FrameData> res;
   unwindstack::FrameData data{};
   data.function_name = "fun1";
   data.map_name = "map1";
-  res.emplace_back(std::move(data));
+  res.emplace_back(std::move(data), "dummy_buildid");
   data = {};
   data.function_name = "fun3";
   data.map_name = "map3";
-  res.emplace_back(std::move(data));
+  res.emplace_back(std::move(data), "dummy_buildid");
   return res;
 }
 

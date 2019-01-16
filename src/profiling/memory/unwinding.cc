@@ -183,17 +183,8 @@ bool UnwindingThread::DoUnwind(WireMessage* msg,
     if (error_code != unwindstack::ERROR_INVALID_MAP)
       break;
   }
-  out->frames = unwinder.frames();
-  if (error_code != 0) {
-    unwindstack::FrameData frame_data{};
-    frame_data.function_name = "ERROR " + std::to_string(error_code);
-    frame_data.map_name = "ERROR";
-
-    out->frames.emplace_back(frame_data);
-    PERFETTO_DLOG("unwinding failed %" PRIu8, error_code);
-  }
-
-  for (unwindstack::FrameData& fd : out->frames) {
+  for (unwindstack::FrameData fd : unwinder.frames()) {
+    std::string build_id;
     if (fd.map_name != "") {
       auto it = build_id_cache_.find(fd.map_name);
       if (it == build_id_cache_.end()) {
@@ -201,15 +192,28 @@ bool UnwindingThread::DoUnwind(WireMessage* msg,
         if (map_info) {
           auto elf = map_info->elf;
 
-          std::string build_id;
           elf->GetBuildID(&build_id);
           build_id_cache_.emplace(fd.map_name, std::move(build_id));
         }
+      } else {
+        build_id = it->second;
       }
     }
+
     if (base::EndsWith(fd.map_name, ".so"))
       MaybeDemangle(&fd.function_name);
+    out->frames.emplace_back(std::move(fd), std::move(build_id));
   }
+
+  if (error_code != 0) {
+    unwindstack::FrameData frame_data{};
+    frame_data.function_name = "ERROR " + std::to_string(error_code);
+    frame_data.map_name = "ERROR";
+
+    out->frames.emplace_back(frame_data, "");
+    PERFETTO_DLOG("unwinding failed %" PRIu8, error_code);
+  }
+
   return true;
 }
 
