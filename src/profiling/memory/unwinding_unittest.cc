@@ -37,7 +37,9 @@ TEST(UnwindingTest, StackMemoryOverlay) {
   base::ScopedFile proc_mem(base::OpenFile("/proc/self/mem", O_RDONLY));
   ASSERT_TRUE(proc_mem);
   uint8_t fake_stack[1] = {120};
-  StackMemory memory(*proc_mem, 0u, fake_stack, 1);
+  std::shared_ptr<FDMemory> mem(
+      std::make_shared<FDMemory>(std::move(proc_mem)));
+  StackMemory memory(mem, 0u, fake_stack, 1);
   uint8_t buf[1] = {};
   ASSERT_EQ(memory.Read(0u, buf, 1), 1);
   ASSERT_EQ(buf[0], 120);
@@ -49,7 +51,9 @@ TEST(UnwindingTest, StackMemoryNonOverlay) {
   base::ScopedFile proc_mem(base::OpenFile("/proc/self/mem", O_RDONLY));
   ASSERT_TRUE(proc_mem);
   uint8_t fake_stack[1] = {120};
-  StackMemory memory(*proc_mem, 0u, fake_stack, 1);
+  std::shared_ptr<FDMemory> mem(
+      std::make_shared<FDMemory>(std::move(proc_mem)));
+  StackMemory memory(mem, 0u, fake_stack, 1);
   uint8_t buf[1] = {1};
   ASSERT_EQ(memory.Read(reinterpret_cast<uint64_t>(&value), buf, 1), 1);
   ASSERT_EQ(buf[0], value);
