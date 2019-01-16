@@ -110,20 +110,16 @@ config("default_config") {
 
   defines = [ "PERFETTO_IMPLEMENTATION" ]
 
-  if (build_with_chromium) {
-    if (is_component_build) {
-      defines += [ "PERFETTO_SHARED_LIBRARY" ]
-    }
-
-    if (is_android) {
-      # Included for __android_log_print
-      libs = [ "log" ]
-    }
+  if (build_with_chromium && is_android) {
+    # Included for __android_log_print
+    libs = [ "log" ]
   }
 
   include_dirs = [ ".." ]
 }
 
+# This config is exposed to embedders via libperfetto. It's also included in the
+# default_config above.
 config("public_config") {
   include_dirs = [
     "../include",
@@ -135,9 +131,19 @@ config("public_config") {
 
   defines = []
 
-  if (build_with_chromium) {
-    defines += [ "PERFETTO_BUILD_WITH_CHROMIUM" ]
-  }
+  if (perfetto_build_with_android) {
+    defines += [ "PERFETTO_BUILD_WITH_ANDROID" ]
+  } else if (perfetto_build_with_embedder) {
+    defines += [ "PERFETTO_BUILD_WITH_EMBEDDER" ]
+
+    if (build_with_chromium) {
+      defines += [ "PERFETTO_BUILD_WITH_CHROMIUM" ]
+
+      if (is_component_build) {
+        defines += [ "PERFETTO_SHARED_LIBRARY" ]
+      }
+    }  # if (build_with_chromium)
+  }  # if (build_with_embedder)
 
   if (perfetto_force_dlog == "on") {
     defines += [ "PERFETTO_FORCE_DLOG=1" ]
