@@ -105,13 +105,13 @@ void MaybeDemangle(std::string* name) {
 
 }  // namespace
 
-StackMemory::StackMemory(std::shared_ptr<unwindstack::Memory> mem,
-                         uint64_t sp,
-                         uint8_t* stack,
-                         size_t size)
+StackOverlayMemory::StackOverlayMemory(std::shared_ptr<unwindstack::Memory> mem,
+                                       uint64_t sp,
+                                       uint8_t* stack,
+                                       size_t size)
     : mem_(std::move(mem)), sp_(sp), stack_end_(sp + size), stack_(stack) {}
 
-size_t StackMemory::Read(uint64_t addr, void* dst, size_t size) {
+size_t StackOverlayMemory::Read(uint64_t addr, void* dst, size_t size) {
   if (addr >= sp_ && addr + size <= stack_end_ && addr + size > sp_) {
     size_t offset = static_cast<size_t>(addr - sp_);
     memcpy(dst, stack_ + offset, size);
@@ -176,9 +176,10 @@ bool DoUnwind(WireMessage* msg, UnwindingMetadata* metadata, AllocRecord* out) {
   }
   out->alloc_metadata = *alloc_metadata;
   uint8_t* stack = reinterpret_cast<uint8_t*>(msg->payload);
-  std::shared_ptr<unwindstack::Memory> mems = std::make_shared<StackMemory>(
-      metadata->fd_mem, alloc_metadata->stack_pointer, stack,
-      msg->payload_size);
+  std::shared_ptr<unwindstack::Memory> mems =
+      std::make_shared<StackOverlayMemory>(metadata->fd_mem,
+                                           alloc_metadata->stack_pointer, stack,
+                                           msg->payload_size);
 
 #if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
   // These should be declared first for correct destructor order.

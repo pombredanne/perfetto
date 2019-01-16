@@ -33,19 +33,19 @@ namespace perfetto {
 namespace profiling {
 namespace {
 
-TEST(UnwindingTest, StackMemoryOverlay) {
+TEST(UnwindingTest, StackOverlayMemoryOverlay) {
   base::ScopedFile proc_mem(base::OpenFile("/proc/self/mem", O_RDONLY));
   ASSERT_TRUE(proc_mem);
   uint8_t fake_stack[1] = {120};
   std::shared_ptr<FDMemory> mem(
       std::make_shared<FDMemory>(std::move(proc_mem)));
-  StackMemory memory(mem, 0u, fake_stack, 1);
+  StackOverlayMemory memory(mem, 0u, fake_stack, 1);
   uint8_t buf[1] = {};
   ASSERT_EQ(memory.Read(0u, buf, 1), 1);
   ASSERT_EQ(buf[0], 120);
 }
 
-TEST(UnwindingTest, StackMemoryNonOverlay) {
+TEST(UnwindingTest, StackOverlayMemoryNonOverlay) {
   uint8_t value = 52;
 
   base::ScopedFile proc_mem(base::OpenFile("/proc/self/mem", O_RDONLY));
@@ -53,7 +53,7 @@ TEST(UnwindingTest, StackMemoryNonOverlay) {
   uint8_t fake_stack[1] = {120};
   std::shared_ptr<FDMemory> mem(
       std::make_shared<FDMemory>(std::move(proc_mem)));
-  StackMemory memory(mem, 0u, fake_stack, 1);
+  StackOverlayMemory memory(mem, 0u, fake_stack, 1);
   uint8_t buf[1] = {1};
   ASSERT_EQ(memory.Read(reinterpret_cast<uint64_t>(&value), buf, 1), 1);
   ASSERT_EQ(buf[0], value);

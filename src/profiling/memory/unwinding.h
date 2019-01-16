@@ -60,12 +60,12 @@ class FDMemory : public unwindstack::Memory {
 // Overlays size bytes pointed to by stack for addresses in [sp, sp + size).
 // Addresses outside of that range are read from mem_fd, which should be an fd
 // that opened /proc/[pid]/mem.
-class StackMemory : public unwindstack::Memory {
+class StackOverlayMemory : public unwindstack::Memory {
  public:
-  StackMemory(std::shared_ptr<unwindstack::Memory> mem,
-              uint64_t sp,
-              uint8_t* stack,
-              size_t size);
+  StackOverlayMemory(std::shared_ptr<unwindstack::Memory> mem,
+                     uint64_t sp,
+                     uint8_t* stack,
+                     size_t size);
   size_t Read(uint64_t addr, void* dst, size_t size) override;
 
  private:
