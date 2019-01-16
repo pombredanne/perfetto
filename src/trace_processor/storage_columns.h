@@ -41,7 +41,11 @@ class StorageColumn {
   virtual ~StorageColumn();
 
   // Implements StorageCursor::ColumnReporter.
-  virtual void ReportResult(sqlite3_context*, uint32_t row) const = 0;
+  virtual void ReportResult(sqlite3_context*, uint32_t) const = 0;
+
+  // Bounds a filter on this column between a minimum and maximum index.
+  // Generally this is only possible if the column is sorted.
+  virtual Bounds BoundFilter(int op, sqlite3_value* value) const = 0;
 
   // Given a SQLite operator and value for the comparision, returns a
   // predicate which takes in a row index and returns whether the row should
@@ -55,12 +59,8 @@ class StorageColumn {
   // Returns the type of this column.
   virtual Table::ColumnType GetType() const = 0;
 
-  // Bounds a filter on this column between a minimum and maximum index.
-  // Generally this is only possible if the column is sorted.
-  virtual Bounds BoundFilter(int, sqlite3_value*) const { return Bounds{}; }
-
   // Returns whether this column is sorted in the storage.
-  virtual bool IsNaturallyOrdered() const { return false; }
+  virtual bool IsNaturallyOrdered() const = 0;
 
   const std::string& name() const { return col_name_; }
   bool hidden() const { return hidden_; }

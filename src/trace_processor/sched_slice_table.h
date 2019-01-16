@@ -36,24 +36,6 @@ class SchedSliceTable : public StorageTable {
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
 
  private:
-  class EndReasonColumn : public StorageColumn {
-   public:
-    EndReasonColumn(std::string col_name,
-                    std::deque<ftrace_utils::TaskState>* deque);
-    ~EndReasonColumn() override;
-
-    void ReportResult(sqlite3_context*, uint32_t row) const override;
-
-    void Filter(int op, sqlite3_value*, FilteredRowIndex*) const override;
-
-    Comparator Sort(const QueryConstraints::OrderBy& ob) const override;
-
-    Table::ColumnType GetType() const override;
-
-   private:
-    std::deque<ftrace_utils::TaskState>* deque_ = nullptr;
-  };
-
   const TraceStorage* const storage_;
 };
 

@@ -18,7 +18,6 @@
 #define SRC_TRACE_PROCESSOR_TRACE_STORAGE_H_
 
 #include <array>
-#include <bitset>
 #include <deque>
 #include <map>
 #include <string>
@@ -29,7 +28,6 @@
 #include "perfetto/base/optional.h"
 #include "perfetto/base/string_view.h"
 #include "perfetto/base/utils.h"
-#include "src/trace_processor/ftrace_utils.h"
 #include "src/trace_processor/stats.h"
 
 namespace perfetto {
@@ -171,24 +169,16 @@ class TraceStorage {
     inline size_t AddSlice(uint32_t cpu,
                            int64_t start_ns,
                            int64_t duration_ns,
-                           UniqueTid utid,
-                           ftrace_utils::TaskState end_state,
-                           int32_t priority) {
+                           UniqueTid utid) {
       cpus_.emplace_back(cpu);
       start_ns_.emplace_back(start_ns);
       durations_.emplace_back(duration_ns);
       utids_.emplace_back(utid);
-      end_states_.emplace_back(end_state);
-      priorities_.emplace_back(priority);
       return slice_count() - 1;
     }
 
     void set_duration(size_t index, int64_t duration_ns) {
       durations_[index] = duration_ns;
-    }
-
-    void set_end_state(size_t index, ftrace_utils::TaskState end_state) {
-      end_states_[index] = end_state;
     }
 
     size_t slice_count() const { return start_ns_.size(); }
@@ -201,12 +191,6 @@ class TraceStorage {
 
     const std::deque<UniqueTid>& utids() const { return utids_; }
 
-    const std::deque<ftrace_utils::TaskState>& end_state() const {
-      return end_states_;
-    }
-
-    const std::deque<int32_t>& priorities() const { return priorities_; }
-
    private:
     // Each deque below has the same number of entries (the number of slices
     // in the trace for the CPU).
@@ -214,8 +198,6 @@ class TraceStorage {
     std::deque<int64_t> start_ns_;
     std::deque<int64_t> durations_;
     std::deque<UniqueTid> utids_;
-    std::deque<ftrace_utils::TaskState> end_states_;
-    std::deque<int32_t> priorities_;
   };
 
   class NestableSlices {

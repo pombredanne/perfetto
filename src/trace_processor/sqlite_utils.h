@@ -34,7 +34,6 @@ namespace trace_processor {
 namespace sqlite_utils {
 
 const auto kSqliteStatic = reinterpret_cast<sqlite3_destructor_type>(0);
-const auto kSqliteTransient = reinterpret_cast<sqlite3_destructor_type>(-1);
 
 inline bool IsOpEq(int op) {
   return op == SQLITE_INDEX_CONSTRAINT_EQ;
@@ -90,13 +89,6 @@ inline uint32_t ExtractSqliteValue(sqlite3_value* value) {
   auto type = sqlite3_value_type(value);
   PERFETTO_DCHECK(type == SQLITE_INTEGER);
   return static_cast<uint32_t>(sqlite3_value_int64(value));
-}
-
-template <>
-inline int32_t ExtractSqliteValue(sqlite3_value* value) {
-  auto type = sqlite3_value_type(value);
-  PERFETTO_DCHECK(type == SQLITE_INTEGER);
-  return sqlite3_value_int(value);
 }
 
 template <>
