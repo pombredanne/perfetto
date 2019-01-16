@@ -181,16 +181,10 @@ bool DoUnwind(WireMessage* msg, UnwindingMetadata* metadata, AllocRecord* out) {
                                            alloc_metadata->stack_pointer, stack,
                                            msg->payload_size);
 
-#if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
-  // These should be declared first for correct destructor order.
-  unwindstack::JitDebug jit_debug(mems);
-  unwindstack::DexFiles dex_files(mems);
-#endif
-
   unwindstack::Unwinder unwinder(kMaxFrames, &metadata->maps, regs.get(), mems);
 #if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
-  unwinder.SetJitDebug(&jit_debug, regs->Arch());
-  unwinder.SetDexFiles(&dex_files, regs->Arch());
+  unwinder.SetJitDebug(metadata->jit_debug, regs->Arch());
+  unwinder.SetDexFiles(metadata->dex_files, regs->Arch());
 #endif
   // Surpress incorrect "variable may be uninitialized" error for if condition
   // after this loop. error_code = LastErrorCode gets run at least once.
