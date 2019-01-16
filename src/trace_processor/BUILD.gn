@@ -57,6 +57,8 @@ source_set("lib") {
     "filtered_row_index.h",
     "ftrace_descriptors.cc",
     "ftrace_descriptors.h",
+    "ftrace_utils.cc",
+    "ftrace_utils.h",
     "instants_table.cc",
     "instants_table.h",
     "process_table.cc",

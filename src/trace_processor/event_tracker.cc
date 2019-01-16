@@ -25,40 +25,6 @@
 namespace perfetto {
 namespace trace_processor {
 
-namespace {
-
-// TODO(lalitm): merge this function with the one in trace_to_text.
-SchedReason GetSchedSwitchReasonFromState(int64_t state) {
-  static const int64_t kTaskStateMax = 2048;
-  int64_t masked = state & (kTaskStateMax - 1);
-  if (masked & 1)
-    return SchedReason::kInterruptible;
-  else if (masked & 2)
-    return SchedReason::kUninteruptible;
-  else if (masked & 4)
-    return SchedReason::kStopped;
-  else if (masked & 8)
-    return SchedReason::kTraced;
-  else if (masked & 16)
-    return SchedReason::kExitDead;
-  else if (masked & 32)
-    return SchedReason::kZombie;
-  else if (masked & 64)
-    return SchedReason::kTaskDead;
-  else if (masked & 128)
-    return SchedReason::kWakeKill;
-  else if (masked & 256)
-    return SchedReason::kWaking;
-  else if (masked & 512)
-    return SchedReason::kParked;
-  else if (masked & 1024)
-    return SchedReason::kNoLoad;
-  return (state & kTaskStateMax) ? SchedReason::kRunnablePreempt
-                                 : SchedReason::kRunnable;
-}
-
-}  // namespace
-
 EventTracker::EventTracker(TraceProcessorContext* context)
     : idle_string_id_(context->storage->InternString("idle")),
       context_(context) {}
@@ -94,7 +60,11 @@ void EventTracker::PushSchedSwitch(uint32_t cpu,
     slices->set_duration(idx, duration);
 
     if (prev_pid == pending_slice->pid) {
-      slices->set_end_reason(idx, GetSchedSwitchReasonFromState(prev_state));
+      // We store the state as a uint16 as we only consider values up to 2048
+      // when unpacking the information inside; this allows savings of 48 bits
+      // per slice.
+      slices->set_end_state(
+          idx, ftrace_utils::TaskState::From(static_cast<int16_t>(prev_state)));
     } else {
       // If the this events previous pid does not match the previous event's
       // next pid, make a note of this.
@@ -108,7 +78,7 @@ void EventTracker::PushSchedSwitch(uint32_t cpu,
 
   pending_slice->storage_index =
       slices->AddSlice(cpu, timestamp, 0 /* duration */, utid,
-                       SchedReason::kUnknown, next_priority);
+                       ftrace_utils::TaskState::Unknown(), next_priority);
   pending_slice->pid = next_pid;
 }
 

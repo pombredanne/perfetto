@@ -18,6 +18,7 @@
 #define SRC_TRACE_PROCESSOR_TRACE_STORAGE_H_
 
 #include <array>
+#include <bitset>
 #include <deque>
 #include <map>
 #include <string>
@@ -28,6 +29,7 @@
 #include "perfetto/base/optional.h"
 #include "perfetto/base/string_view.h"
 #include "perfetto/base/utils.h"
+#include "src/trace_processor/ftrace_utils.h"
 #include "src/trace_processor/stats.h"
 
 namespace perfetto {
@@ -69,25 +71,6 @@ enum RefType {
   kRefUpid = 5,
   kRefUtidLookupUpid = 6,
   kRefMax
-};
-
-enum SchedReason {
-  // Keep kUnknown == 0 for id == 0 to be treated as null in tables.
-  kUnknown = 0,
-  kRunnable = 1,
-  kRunnablePreempt = 2,
-  kInterruptible = 3,
-  kUninteruptible = 4,
-  kStopped = 5,
-  kTraced = 6,
-  kExitDead = 7,
-  kZombie = 8,
-  kTaskDead = 9,
-  kWakeKill = 10,
-  kWaking = 11,
-  kParked = 12,
-  kNoLoad = 13,
-  kSchedReasonMax
 };
 
 // Stores a data inside a trace file in a columnar form. This makes it efficient
@@ -189,13 +172,13 @@ class TraceStorage {
                            int64_t start_ns,
                            int64_t duration_ns,
                            UniqueTid utid,
-                           SchedReason end_reason,
+                           ftrace_utils::TaskState end_state,
                            int32_t priority) {
       cpus_.emplace_back(cpu);
       start_ns_.emplace_back(start_ns);
       durations_.emplace_back(duration_ns);
       utids_.emplace_back(utid);
-      end_reasons_.emplace_back(end_reason);
+      end_states_.emplace_back(end_state);
       priorities_.emplace_back(priority);
       return slice_count() - 1;
     }
@@ -204,8 +187,8 @@ class TraceStorage {
       durations_[index] = duration_ns;
     }
 
-    void set_end_reason(size_t index, SchedReason end_reason) {
-      end_reasons_[index] = end_reason;
+    void set_end_state(size_t index, ftrace_utils::TaskState end_state) {
+      end_states_[index] = end_state;
     }
 
     size_t slice_count() const { return start_ns_.size(); }
@@ -218,7 +201,9 @@ class TraceStorage {
 
     const std::deque<UniqueTid>& utids() const { return utids_; }
 
-    const std::deque<SchedReason>& end_reasons() const { return end_reasons_; }
+    const std::deque<ftrace_utils::TaskState>& end_state() const {
+      return end_states_;
+    }
 
     const std::deque<int32_t>& priorities() const { return priorities_; }
 
@@ -229,7 +214,7 @@ class TraceStorage {
     std::deque<int64_t> start_ns_;
     std::deque<int64_t> durations_;
     std::deque<UniqueTid> utids_;
-    std::deque<SchedReason> end_reasons_;
+    std::deque<ftrace_utils::TaskState> end_states_;
     std::deque<int32_t> priorities_;
   };
 
