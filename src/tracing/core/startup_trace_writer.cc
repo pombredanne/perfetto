@@ -200,7 +200,8 @@ void StartupTraceWriter::Flush(std::function<void()> callback) {
   }
 
   // Can't flush while unbound.
-  callback();
+  if (callback)
+    callback();
 }
 
 WriterID StartupTraceWriter::writer_id() const {
