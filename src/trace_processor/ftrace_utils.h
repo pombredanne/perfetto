@@ -58,32 +58,33 @@ class TaskState {
   size_t ToString(char* buffer, size_t n) const;
 
  private:
+  // The ordering and values of these fields comes from the kernel in the file
+  // https://android.googlesource.com/kernel/msm.git/+/android-msm-wahoo-4.4-pie-qpr1/include/linux/sched.h#212
   enum Atom : uint16_t {
     kRunnable = 0,
+
+    // The index of each of these in the bitset is log2(atom value).
     kInterruptibleSleep = 1,
     kUninterruptibleSleep = 2,
-    kStopped = 3,
-    kTraced = 4,
-    kZombie = 5,
-    kExitDead = 6,
-    kTaskDead = 7,
-    kWakeKill = 8,
-    kWaking = 9,
-    kParked = 10,
-    kNoLoad = 11,
+    kStopped = 4,
+    kTraced = 8,
+    kExitDead = 16,
+    kZombie = 32,
+    kTaskDead = 64,
+    kWakeKill = 128,
+    kWaking = 256,
+    kParked = 512,
+    kNoLoad = 1024,
     // If you are adding atoms here, make sure to change the constants below.
   };
+  static constexpr int16_t kRawMaxTaskState = 2048;
 
   // Store the information about preemption and validity of this struct in the
   // bitset.
   // Keep these in sync with Atom above.
-  static constexpr size_t kPreemptBitsetPos = 12;
-  static constexpr size_t kValidBitsetPos = 13;
-  static constexpr size_t kBitsetSize = 14;
-
-  // Keep these in sync with Atom above.
-  static constexpr uint16_t kAtomCount = 12;
-  static constexpr int16_t kRawMaxTaskState = 1 << (kAtomCount - 1);
+  static constexpr size_t kPreemptStateIdx = 11;
+  static constexpr size_t kValidStateIdx = 12;
+  static constexpr size_t kBitsetSize = 13;
 
   TaskState();
 

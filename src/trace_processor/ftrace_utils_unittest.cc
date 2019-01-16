@@ -53,10 +53,10 @@ TEST(TaskStateUnittest, Smoke) {
   ASSERT_STREQ(buffer, "t");
 
   ASSERT_EQ(TaskState::From(16).ToString(buffer, sizeof(buffer)), 1);
-  ASSERT_STREQ(buffer, "Z");
+  ASSERT_STREQ(buffer, "X");
 
   ASSERT_EQ(TaskState::From(32).ToString(buffer, sizeof(buffer)), 1);
-  ASSERT_STREQ(buffer, "X");
+  ASSERT_STREQ(buffer, "Z");
 
   ASSERT_EQ(TaskState::From(64).ToString(buffer, sizeof(buffer)), 1);
   ASSERT_STREQ(buffer, "x");
@@ -93,16 +93,16 @@ TEST(TaskStateUnittest, LargeStrings) {
   char buffer[22];
 
   ASSERT_EQ(TaskState::From(1184).ToString(buffer, sizeof(buffer)), 5);
-  ASSERT_STREQ(buffer, "X|K|N");
+  ASSERT_STREQ(buffer, "Z|K|N");
 
   ASSERT_EQ(TaskState::From(2044).ToString(buffer, sizeof(buffer)), 17);
-  ASSERT_STREQ(buffer, "T|t|Z|X|x|K|W|P|N");
+  ASSERT_STREQ(buffer, "T|t|X|Z|x|K|W|P|N");
 
   ASSERT_EQ(TaskState::From(2046).ToString(buffer, sizeof(buffer)), 19);
-  ASSERT_STREQ(buffer, "D|T|t|Z|X|x|K|W|P|N");
+  ASSERT_STREQ(buffer, "D|T|t|X|Z|x|K|W|P|N");
 
   ASSERT_EQ(TaskState::From(2047).ToString(buffer, sizeof(buffer)), 21);
-  ASSERT_STREQ(buffer, "S|D|T|t|Z|X|x|K|W|P|N");
+  ASSERT_STREQ(buffer, "S|D|T|t|X|Z|x|K|W|P|N");
 }
 
 TEST(TaskStateUnittest, Overflow) {
@@ -114,7 +114,7 @@ TEST(TaskStateUnittest, Overflow) {
   char buffer2[3];
 
   ASSERT_EQ(TaskState::From(1184).ToString(buffer2, sizeof(buffer2)), 5);
-  ASSERT_STREQ(buffer2, "X");
+  ASSERT_STREQ(buffer2, "Z");
 
   ASSERT_EQ(TaskState::From(2044).ToString(buffer2, sizeof(buffer2)), 17);
   ASSERT_STREQ(buffer2, "T");

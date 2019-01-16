@@ -15,6 +15,9 @@
  */
 
 #include "src/trace_processor/ftrace_utils.h"
+
+#include <math.h>
+
 #include "perfetto/base/logging.h"
 
 namespace perfetto {
@@ -27,8 +30,8 @@ TaskState TaskState::From(int16_t raw_state) {
   int16_t masked = raw_state & (kRawMaxTaskState - 1);
   TaskState state;
   state.state_ = std::bitset<kBitsetSize>(static_cast<uint16_t>(masked));
-  state.state_[TaskState::kPreemptBitsetPos] = raw_state & kRawMaxTaskState;
-  state.state_[TaskState::kValidBitsetPos] = true;
+  state.state_[TaskState::kPreemptStateIdx] = raw_state & kRawMaxTaskState;
+  state.state_[TaskState::kValidStateIdx] = true;
   return state;
 }
 
@@ -44,10 +47,10 @@ char TaskState::AtomToChar(Atom atom) {
       return 'T';
     case Atom::kTraced:
       return 't';
-    case Atom::kZombie:
-      return 'Z';
     case Atom::kExitDead:
       return 'X';
+    case Atom::kZombie:
+      return 'Z';
     case Atom::kTaskDead:
       return 'x';
     case Atom::kWakeKill:
@@ -69,8 +72,9 @@ size_t TaskState::ToString(char* buffer, size_t n) const {
   size_t avail_len = n - 1;
   size_t pos = 0;
   size_t count = 0;
-  for (size_t i = 1; i < kAtomCount; i++) {
-    if (!state_[i - 1])
+  for (size_t i = kInterruptibleSleep; i < kRawMaxTaskState; i <<= 1) {
+    size_t idx = static_cast<size_t>(log2(i));
+    if (!state_[idx])
       continue;
 
     bool has_delim = pos > 0;
@@ -100,12 +104,12 @@ size_t TaskState::ToString(char* buffer, size_t n) const {
   return count;
 }
 
-bool TaskState::IsValid() const {
-  return state_[TaskState::kValidBitsetPos];
+bool TaskState::IsPreempt() const {
+  return state_[TaskState::kPreemptStateIdx];
 }
 
-bool TaskState::IsPreempt() const {
-  return state_[TaskState::kPreemptBitsetPos];
+bool TaskState::IsValid() const {
+  return state_[TaskState::kValidStateIdx];
 }
 
 }  // namespace ftrace_utils
