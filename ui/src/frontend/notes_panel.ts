@@ -24,6 +24,11 @@ import {TRACK_SHELL_WIDTH} from './track_panel';
 
 const FLAG_WIDTH = 10;
 
+function toSummary(s: string) {
+  const newlineIndex = s.indexOf('\n') > 0 ? s.indexOf('\n') : s.length;
+  return s.slice(0, Math.min(newlineIndex, s.length, 16));
+}
+
 export class NotesPanel extends Panel {
   hoveredX: null|number = null;
 
@@ -60,6 +65,9 @@ export class NotesPanel extends Panel {
       ctx.fillRect(xAndTime[0], 0, 1, size.height);
     }
 
+    ctx.textBaseline = 'bottom';
+    ctx.font = '10px Google Sans';
+
     for (const note of Object.values(globals.state.notes)) {
       ctx.fillStyle = note.color;
       ctx.strokeStyle = note.color;
@@ -67,13 +75,13 @@ export class NotesPanel extends Panel {
       if (!timeScale.timeInBounds(timestamp)) continue;
       const x = timeScale.timeToPx(timestamp);
 
-
       const isHovered =
           this.hoveredX && x <= this.hoveredX && this.hoveredX < x + FLAG_WIDTH;
       const isSelected = globals.state.selectedNote === note.id;
       const left = Math.floor(x + TRACK_SHELL_WIDTH);
       const flagHeightPx = Math.ceil(size.height / 3);
 
+      // Draw flag.
       ctx.fillRect(left, 1, 1, size.height - 1);
       if (!noteHovered && isHovered) {
         noteHovered = true;
@@ -85,6 +93,9 @@ export class NotesPanel extends Panel {
         ctx.fillRect(left, 1, FLAG_WIDTH, flagHeightPx);
         ctx.strokeRect(left + .5, 1.5, FLAG_WIDTH, flagHeightPx);
       }
+
+      ctx.fillStyle = '#222';
+      ctx.fillText(toSummary(note.text), left + 2, size.height - 1);
     }
 
     if (this.hoveredX !== null && !noteHovered) {
@@ -118,11 +129,11 @@ interface NotesEditorPanelAttrs {
 export class NotesEditorPanel extends Panel<NotesEditorPanelAttrs> {
   view({attrs}: m.CVnode<NotesEditorPanelAttrs>) {
     const note = globals.state.notes[attrs.id];
-    console.log(timeToString(note.timestamp));
+    const startTime = note.timestamp - globals.state.traceTime.startSec;
     return m(
         '.notes-editor-panel',
         m('.notes-editor-panel-heading',
-          `Annotation at time ${timeToString(note.timestamp)} with color `,
+          `Annotation at time ${timeToString(startTime)} with color `,
           m('input[type=color]', {
             value: note.color,
             onchange: m.withAttr(
