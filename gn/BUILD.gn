@@ -105,6 +105,10 @@ group("default_deps") {
   }
 }
 
+# The config that all targets in the perfetto codebase inherit by virtue of
+# having explicit deps on //gn:default_deps. This config is NOT propagated up to
+# embedders that depend on perfetto (e.g. chrome). :public_config (see below) is
+# used for that.
 config("default_config") {
   configs = [ ":public_config" ]
 
@@ -118,8 +122,8 @@ config("default_config") {
   include_dirs = [ ".." ]
 }
 
-# This config is exposed to embedders via libperfetto. It's also included in the
-# default_config above.
+# This config is propagated to embedders via libperfetto. It's also included in
+# the default_config above.
 config("public_config") {
   include_dirs = [
     "../include",
