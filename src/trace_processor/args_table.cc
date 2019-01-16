@@ -126,20 +126,20 @@ void ArgsTable::ValueColumn::Filter(int op,
                                     FilteredRowIndex* index) const {
   switch (type_) {
     case VariadicType::kInt: {
-      bool is_op_null = sqlite_utils::IsOpIsNull(op);
+      bool op_is_null = sqlite_utils::IsOpIsNull(op);
       auto predicate = sqlite_utils::CreateNumericPredicate<int64_t>(op, value);
-      index->FilterRows([this, &predicate, is_op_null](uint32_t row) {
+      index->FilterRows([this, &predicate, op_is_null](uint32_t row) {
         const auto& arg = storage_->args().arg_values()[row];
-        return arg.type == type_ ? predicate(arg.int_value) : is_op_null;
+        return arg.type == type_ ? predicate(arg.int_value) : op_is_null;
       });
       break;
     }
     case VariadicType::kReal: {
-      bool is_op_null = sqlite_utils::IsOpIsNull(op);
+      bool op_is_null = sqlite_utils::IsOpIsNull(op);
       auto predicate = sqlite_utils::CreateNumericPredicate<double>(op, value);
-      index->FilterRows([this, &predicate, is_op_null](uint32_t row) {
+      index->FilterRows([this, &predicate, op_is_null](uint32_t row) {
         const auto& arg = storage_->args().arg_values()[row];
-        return arg.type == type_ ? predicate(arg.real_value) : is_op_null;
+        return arg.type == type_ ? predicate(arg.real_value) : op_is_null;
       });
       break;
     }
@@ -147,9 +147,9 @@ void ArgsTable::ValueColumn::Filter(int op,
       auto predicate = sqlite_utils::CreateStringPredicate(op, value);
       index->FilterRows([this, &predicate](uint32_t row) {
         const auto& arg = storage_->args().arg_values()[row];
-        return predicate(arg.type == type_
-                             ? storage_->GetString(arg.string_value).c_str()
-                             : nullptr);
+        return arg.type == type_
+                   ? predicate(storage_->GetString(arg.string_value).c_str())
+                   : predicate(nullptr);
       });
       break;
     }

@@ -177,31 +177,37 @@ inline std::function<bool(const char*)> CreateStringPredicate(
   switch (op) {
     case SQLITE_INDEX_CONSTRAINT_EQ:
     case SQLITE_INDEX_CONSTRAINT_IS:
-      return
-          [val](const char* f) { return f != nullptr && strcmp(f, val) == 0; };
+      return [val](const char* str) {
+        return str != nullptr && strcmp(str, val) == 0;
+      };
     case SQLITE_INDEX_CONSTRAINT_NE:
     case SQLITE_INDEX_CONSTRAINT_ISNOT:
-      return
-          [val](const char* f) { return f != nullptr && strcmp(f, val) != 0; };
+      return [val](const char* str) {
+        return str != nullptr && strcmp(str, val) != 0;
+      };
     case SQLITE_INDEX_CONSTRAINT_GE:
-      return
-          [val](const char* f) { return f != nullptr && strcmp(f, val) >= 0; };
+      return [val](const char* str) {
+        return str != nullptr && strcmp(str, val) >= 0;
+      };
     case SQLITE_INDEX_CONSTRAINT_GT:
-      return
-          [val](const char* f) { return f != nullptr && strcmp(f, val) > 0; };
+      return [val](const char* str) {
+        return str != nullptr && strcmp(str, val) > 0;
+      };
     case SQLITE_INDEX_CONSTRAINT_LE:
-      return
-          [val](const char* f) { return f != nullptr && strcmp(f, val) <= 0; };
+      return [val](const char* str) {
+        return str != nullptr && strcmp(str, val) <= 0;
+      };
     case SQLITE_INDEX_CONSTRAINT_LT:
-      return
-          [val](const char* f) { return f != nullptr && strcmp(f, val) < 0; };
+      return [val](const char* str) {
+        return str != nullptr && strcmp(str, val) < 0;
+      };
     case SQLITE_INDEX_CONSTRAINT_LIKE:
-      return [val](const char* f) {
-        return f != nullptr && sqlite3_strlike(val, f, 0) == 0;
+      return [val](const char* str) {
+        return str != nullptr && sqlite3_strlike(val, str, 0) == 0;
       };
     case SQLITE_INDEX_CONSTRAINT_GLOB:
-      return [val](const char* f) {
-        return f != nullptr && sqlite3_strglob(val, f) == 0;
+      return [val](const char* str) {
+        return str != nullptr && sqlite3_strglob(val, str) == 0;
       };
     default:
       PERFETTO_FATAL("For GCC");
