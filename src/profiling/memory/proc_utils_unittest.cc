@@ -69,8 +69,7 @@ TEST(ProcUtilsTest, FindProfilablePids) {
   close(pipefds[1]);
   EXPECT_THAT(pids, Contains(pid));
   EXPECT_THAT(pids, Not(Contains(getpid())));
-  int wstatus;
-  waitpid(pid, &wstatus, 0);
+  PERFETTO_CHECK(PERFETTO_EINTR(waitpid(pid, nullptr, 0)) == pid);
 }
 
 }  // namespace
