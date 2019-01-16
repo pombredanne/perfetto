@@ -63,7 +63,7 @@ int ArgsTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
 ArgsTable::IdColumn::IdColumn(std::string col_name,
                               const TraceStorage* storage,
                               const std::deque<RowId>* ids)
-    : NumericColumn(col_name, ids, false, false), storage_(storage) {}
+    : NumericColumn(col_name, ids, nullptr, false, false), storage_(storage) {}
 
 void ArgsTable::IdColumn::Filter(int op,
                                  sqlite3_value* value,

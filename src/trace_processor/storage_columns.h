@@ -76,10 +76,12 @@ class NumericColumn : public StorageColumn {
  public:
   NumericColumn(std::string col_name,
                 const std::deque<T>* deque,
+                const std::multimap<T, uint32_t>* index,
                 bool hidden,
                 bool is_naturally_ordered)
       : StorageColumn(col_name, hidden),
         deque_(deque),
+        index_(index),
         is_naturally_ordered_(is_naturally_ordered) {}
 
   void ReportResult(sqlite3_context* ctx, uint32_t row) const override {
@@ -129,6 +131,16 @@ class NumericColumn : public StorageColumn {
     auto type = sqlite3_value_type(value);
     bool is_null = type == SQLITE_NULL;
     if (std::is_integral<T>::value && (type == SQLITE_INTEGER || is_null)) {
+      if (sqlite_utils::IsOpEq(op) && index_ != nullptr) {
+        auto val = sqlite_utils::ExtractSqliteValue<T>(value);
+        auto pair = index_->equal_range(val);
+        std::vector<uint32_t> rows;
+        for (auto it = pair.first; it != pair.second; it++) {
+          rows.emplace_back(it->second);
+        }
+        index->IntersectRows(std::move(rows));
+        return;
+      }
       FilterWithCast<int64_t>(op, value, index);
     } else if (type == SQLITE_INTEGER || type == SQLITE_FLOAT || is_null) {
       FilterWithCast<double>(op, value, index);
@@ -166,6 +178,7 @@ class NumericColumn : public StorageColumn {
 
  protected:
   const std::deque<T>* deque_ = nullptr;
+  const std::multimap<T, uint32_t>* index_ = nullptr;
 
  private:
   T kTMin = std::numeric_limits<T>::lowest();
