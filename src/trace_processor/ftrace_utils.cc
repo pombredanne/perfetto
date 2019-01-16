@@ -36,6 +36,8 @@ TaskState TaskState::From(int16_t raw_state) {
 }
 
 char TaskState::AtomToChar(Atom atom) {
+  // This mapping is given by the file
+  // https://android.googlesource.com/kernel/msm.git/+/android-msm-wahoo-4.4-pie-qpr1/include/trace/events/sched.h#155
   switch (atom) {
     case Atom::kRunnable:
       return 'R';
