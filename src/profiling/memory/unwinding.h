@@ -75,31 +75,38 @@ class StackOverlayMemory : public unwindstack::Memory {
   uint8_t* stack_;
 };
 
-class Ignore {
- public:
-  template <typename T>
-  Ignore(const T&) {}
-};
-
 struct UnwindingMetadata {
   UnwindingMetadata(pid_t p, base::ScopedFile maps_fd, base::ScopedFile mem)
       : pid(p),
         maps(std::move(maps_fd)),
-        fd_mem(std::make_shared<FDMemory>(std::move(mem))),
-        jit_debug(fd_mem),
-        dex_files(fd_mem) {
+        fd_mem(std::make_shared<FDMemory>(std::move(mem)))
+#if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
+        ,
+        jit_debug(std::unique_ptr<unwindstack::JitDebug>(
+            new unwindstack::JitDebug(fd_mem))),
+        dex_files(std::unique_ptr<unwindstack::DexFiles>(
+            new unwindstack::DexFiles(fd_mem)))
+#endif
+  {
     PERFETTO_CHECK(maps.Parse());
+  }
+  void ReparseMaps() {
+    maps.Reset();
+    maps.Parse();
+#if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
+    jit_debug = std::unique_ptr<unwindstack::JitDebug>(
+        new unwindstack::JitDebug(fd_mem));
+    dex_files = std::unique_ptr<unwindstack::DexFiles>(
+        new unwindstack::DexFiles(fd_mem));
+#endif
   }
   pid_t pid;
   FileDescriptorMaps maps;
   // The API of libunwindstack expects shared_ptr for Memory.
   std::shared_ptr<unwindstack::Memory> fd_mem;
 #if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
-  unwindstack::JitDebug jit_debug;
-  unwindstack::DexFiles dex_files;
-#else
-  Ignore jit_debug;
-  Ignore dex_files;
+  std::unique_ptr<unwindstack::JitDebug> jit_debug;
+  std::unique_ptr<unwindstack::DexFiles> dex_files;
 #endif
 };
 

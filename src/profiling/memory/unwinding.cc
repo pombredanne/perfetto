@@ -183,16 +183,19 @@ bool DoUnwind(WireMessage* msg, UnwindingMetadata* metadata, AllocRecord* out) {
 
   unwindstack::Unwinder unwinder(kMaxFrames, &metadata->maps, regs.get(), mems);
 #if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
-  unwinder.SetJitDebug(metadata->jit_debug, regs->Arch());
-  unwinder.SetDexFiles(metadata->dex_files, regs->Arch());
+  unwinder.SetJitDebug(metadata->jit_debug.get(), regs->Arch());
+  unwinder.SetDexFiles(metadata->dex_files.get(), regs->Arch());
 #endif
   // Surpress incorrect "variable may be uninitialized" error for if condition
   // after this loop. error_code = LastErrorCode gets run at least once.
   uint8_t error_code = 0;
   for (int attempt = 0; attempt < 2; ++attempt) {
     if (attempt > 0) {
-      metadata->maps.Reset();
-      metadata->maps.Parse();
+      metadata->ReparseMaps();
+#if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
+      unwinder.SetJitDebug(metadata->jit_debug.get(), regs->Arch());
+      unwinder.SetDexFiles(metadata->dex_files.get(), regs->Arch());
+#endif
     }
     unwinder.Unwind(&kSkipMaps, nullptr);
     error_code = unwinder.LastErrorCode();

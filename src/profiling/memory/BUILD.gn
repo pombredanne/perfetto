@@ -52,6 +52,9 @@ source_set("daemon") {
     "../../../protos/perfetto/trace:zero",
     "../../../protos/perfetto/trace/profiling:zero",
   ]
+  if (perfetto_build_with_android) {
+    cflags = [ "-DPERFETTO_BUILD_WITH_ANDROID" ]
+  }
   sources = [
     "bookkeeping.cc",
     "bookkeeping.h",
