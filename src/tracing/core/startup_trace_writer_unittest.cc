@@ -18,13 +18,17 @@
 
 #include "gtest/gtest.h"
 #include "perfetto/tracing/core/startup_trace_writer_registry.h"
+#include "perfetto/tracing/core/trace_packet.h"
 #include "perfetto/tracing/core/tracing_service.h"
 #include "src/base/test/test_task_runner.h"
 #include "src/tracing/core/shared_memory_arbiter_impl.h"
+#include "src/tracing/core/sliced_protobuf_input_stream.h"
+#include "src/tracing/core/trace_buffer.h"
 #include "src/tracing/test/aligned_buffer_test.h"
 #include "src/tracing/test/fake_producer_endpoint.h"
 
 #include "perfetto/trace/test_event.pbzero.h"
+#include "perfetto/trace/trace_packet.pb.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 
 namespace perfetto {
@@ -49,13 +53,15 @@ class StartupTraceWriterTest : public AlignedBufferTest {
   void WritePackets(StartupTraceWriter* writer, size_t packet_count) {
     for (size_t i = 0; i < packet_count; i++) {
       auto packet = writer->NewTracePacket();
-      packet->set_for_testing()->set_str("foo");
+      packet->set_for_testing()->set_str(kPacketPayload);
     }
   }
 
-  void VerifyPacketCount(size_t expected_count) {
+  void VerifyPackets(size_t expected_count) {
     SharedMemoryABI* abi = arbiter_->shmem_abi_for_testing();
-    size_t packets_count = 0;
+    auto buffer = TraceBuffer::Create(abi->size());
+
+    size_t total_packets_count = 0;
     ChunkID current_max_chunk_id = 0;
     for (size_t page_idx = 0; page_idx < kNumPages; page_idx++) {
       uint32_t page_layout = abi->GetPageLayout(page_idx);
@@ -76,17 +82,49 @@ class StartupTraceWriterTest : public AlignedBufferTest {
         current_max_chunk_id = std::max(current_max_chunk_id, chunk_id);
 
         auto packets_header = chunk.header()->packets.load();
-        packets_count += packets_header.count;
+        total_packets_count += packets_header.count;
         if (packets_header.flags &
             SharedMemoryABI::ChunkHeader::kFirstPacketContinuesFromPrevChunk) {
           // Don't count fragmented packets twice.
-          packets_count--;
+          total_packets_count--;
         }
+
+        buffer->CopyChunkUntrusted(
+            /*producer_id_trusted=*/1, /*producer_uid_trusted=*/1,
+            chunk.header()->writer_id.load(), chunk_id, packets_header.count,
+            packets_header.flags, /*chunk_complete=*/true,
+            chunk.payload_begin(), chunk.payload_size());
         abi->ReleaseChunkAsFree(std::move(chunk));
       }
     }
     last_read_max_chunk_id_ = current_max_chunk_id;
-    EXPECT_EQ(expected_count, packets_count);
+    EXPECT_EQ(expected_count, total_packets_count);
+
+    // Now verify chunk and packet contents.
+    buffer->BeginRead();
+    size_t num_packets_read = 0;
+    while (true) {
+      TracePacket packet;
+      uid_t producer_uid = kInvalidUid;
+      if (!buffer->ReadNextTracePacket(&packet, &producer_uid))
+        break;
+      EXPECT_EQ(static_cast<uid_t>(1), producer_uid);
+
+      SlicedProtobufInputStream stream(&packet.slices());
+      size_t size = 0;
+      for (const Slice& slice : packet.slices())
+        size += slice.size;
+      protos::TracePacket parsed_packet;
+      bool success = parsed_packet.ParseFromBoundedZeroCopyStream(
+          &stream, static_cast<int>(size));
+      EXPECT_TRUE(success);
+      if (!success)
+        break;
+      EXPECT_TRUE(parsed_packet.has_for_testing());
+      EXPECT_EQ(kPacketPayload, parsed_packet.for_testing().str());
+      num_packets_read++;
+    }
+    EXPECT_EQ(expected_count, num_packets_read);
   }
 
   size_t GetUnboundWriterCount(
@@ -109,6 +147,9 @@ class StartupTraceWriterTest : public AlignedBufferTest {
     return count;
   }
 
+ protected:
+  static constexpr char kPacketPayload[] = "foo";
+
   FakeProducerEndpoint fake_producer_endpoint_;
   std::unique_ptr<base::TestTaskRunner> task_runner_;
   std::unique_ptr<SharedMemoryArbiterImpl> arbiter_;
@@ -116,6 +157,8 @@ class StartupTraceWriterTest : public AlignedBufferTest {
 
   ChunkID last_read_max_chunk_id_ = 0;
 };
+
+constexpr char StartupTraceWriterTest::kPacketPayload[];
 
 namespace {
 
@@ -137,7 +180,7 @@ TEST_P(StartupTraceWriterTest, CreateUnboundAndBind) {
   // Finalizes the last packet and returns the chunk.
   writer.reset();
 
-  VerifyPacketCount(kNumPackets);
+  VerifyPackets(kNumPackets);
 }
 
 TEST_P(StartupTraceWriterTest, CreateBound) {
@@ -151,7 +194,7 @@ TEST_P(StartupTraceWriterTest, CreateBound) {
   // Finalizes the last packet and returns the chunk.
   writer.reset();
 
-  VerifyPacketCount(kNumPackets);
+  VerifyPackets(kNumPackets);
 }
 
 TEST_P(StartupTraceWriterTest, WriteWhileUnboundAndDiscard) {
@@ -164,7 +207,7 @@ TEST_P(StartupTraceWriterTest, WriteWhileUnboundAndDiscard) {
   // Should discard the written data.
   writer.reset();
 
-  VerifyPacketCount(0);
+  VerifyPackets(0);
 }
 
 TEST_P(StartupTraceWriterTest, WriteWhileUnboundAndBind) {
@@ -179,7 +222,7 @@ TEST_P(StartupTraceWriterTest, WriteWhileUnboundAndBind) {
   const BufferID kBufId = 42;
   EXPECT_TRUE(writer->BindToArbiter(arbiter_.get(), kBufId));
 
-  VerifyPacketCount(kNumPackets);
+  VerifyPackets(kNumPackets);
 
   // Any further packets should be written to the SMB directly.
   const size_t kNumAdditionalPackets = 16;
@@ -187,7 +230,7 @@ TEST_P(StartupTraceWriterTest, WriteWhileUnboundAndBind) {
   // Finalizes the last packet and returns the chunk.
   writer.reset();
 
-  VerifyPacketCount(kNumAdditionalPackets);
+  VerifyPackets(kNumAdditionalPackets);
 }
 
 TEST_P(StartupTraceWriterTest, WriteMultipleChunksWhileUnboundAndBind) {
@@ -207,7 +250,7 @@ TEST_P(StartupTraceWriterTest, WriteMultipleChunksWhileUnboundAndBind) {
   const BufferID kBufId = 42;
   EXPECT_TRUE(writer->BindToArbiter(arbiter_.get(), kBufId));
 
-  VerifyPacketCount(kNumPackets + 1);
+  VerifyPackets(kNumPackets + 1);
 
   // Any further packets should be written to the SMB directly.
   const size_t kNumAdditionalPackets = 16;
@@ -215,7 +258,7 @@ TEST_P(StartupTraceWriterTest, WriteMultipleChunksWhileUnboundAndBind) {
   // Finalizes the last packet and returns the chunk.
   writer.reset();
 
-  VerifyPacketCount(kNumAdditionalPackets);
+  VerifyPackets(kNumAdditionalPackets);
 }
 
 TEST_P(StartupTraceWriterTest, BindingWhileWritingFails) {
@@ -226,6 +269,7 @@ TEST_P(StartupTraceWriterTest, BindingWhileWritingFails) {
   {
     // Begin a write by opening a TracePacket.
     auto packet = writer->NewTracePacket();
+    packet->set_for_testing()->set_str(kPacketPayload);
 
     // Binding while writing should fail.
     EXPECT_FALSE(writer->BindToArbiter(arbiter_.get(), kBufId));
@@ -233,7 +277,7 @@ TEST_P(StartupTraceWriterTest, BindingWhileWritingFails) {
 
   // Packet was completed, so binding should work now and emit the packet.
   EXPECT_TRUE(writer->BindToArbiter(arbiter_.get(), kBufId));
-  VerifyPacketCount(1);
+  VerifyPackets(1);
 }
 
 TEST_P(StartupTraceWriterTest, CreateAndBindViaRegistry) {

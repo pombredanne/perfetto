@@ -153,7 +153,6 @@ class PERFETTO_EXPORT StartupTraceWriter
   std::unique_ptr<protozero::ScatteredStreamWriter> memory_stream_writer_;
 
   std::vector<uint32_t> packet_sizes_;
-  size_t total_payload_size = 0;
 
   // Whether the writer thread is currently writing a TracePacket.
   bool write_in_progress_ = false;

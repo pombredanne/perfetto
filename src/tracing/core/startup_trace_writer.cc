@@ -16,7 +16,10 @@
 
 #include "perfetto/tracing/core/startup_trace_writer.h"
 
+#include <numeric>
+
 #include "perfetto/base/logging.h"
+#include "perfetto/protozero/proto_utils.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 #include "perfetto/tracing/core/shared_memory_abi.h"
 #include "perfetto/tracing/core/startup_trace_writer_registry.h"
@@ -55,9 +58,12 @@ class LocalBufferReader {
   LocalBufferReader(protozero::ScatteredHeapBuffer* buffer)
       : buffer_slices_(buffer->slices()), cur_slice_(buffer_slices_.begin()) {}
 
-  size_t ReadBytes(SharedMemoryABI::Chunk* target_chunk, size_t num_bytes) {
-    PERFETTO_CHECK(target_chunk->payload_size() >= num_bytes);
-    uint8_t* chunk_payload = target_chunk->payload_begin();
+  size_t ReadBytes(SharedMemoryABI::Chunk* target_chunk,
+                   size_t num_bytes,
+                   size_t cur_payload_size) {
+    PERFETTO_CHECK(target_chunk->payload_size() >=
+                   num_bytes + cur_payload_size);
+    uint8_t* target_ptr = target_chunk->payload_begin() + cur_payload_size;
     size_t bytes_read = 0;
     while (bytes_read < num_bytes) {
       if (cur_slice_ == buffer_slices_.end())
@@ -73,8 +79,8 @@ class LocalBufferReader {
 
       size_t read_size = std::min(num_bytes - bytes_read,
                                   cur_slice_range.size() - cur_slice_offset_);
-      memcpy(chunk_payload + bytes_read,
-             cur_slice_range.begin + cur_slice_offset_, read_size);
+      memcpy(target_ptr + bytes_read, cur_slice_range.begin + cur_slice_offset_,
+             read_size);
       cur_slice_offset_ += read_size;
       bytes_read += read_size;
 
@@ -83,6 +89,23 @@ class LocalBufferReader {
                       bytes_read == num_bytes);
     }
     return bytes_read;
+  }
+
+  size_t TotalUsedSize() {
+    size_t used_size = 0;
+    for (const auto& slice : buffer_slices_) {
+      used_size += slice.GetUsedRange().size();
+    }
+    return used_size;
+  }
+
+  bool DidReadAllData() {
+    if (cur_slice_ == buffer_slices_.end())
+      return true;
+
+    const auto next_slice = cur_slice_ + 1;
+    return next_slice == buffer_slices_.end() &&
+           cur_slice_->GetUsedRange().size() == cur_slice_offset_;
   }
 
  private:
@@ -131,17 +154,17 @@ bool StartupTraceWriter::BindToArbiter(SharedMemoryArbiterImpl* arbiter,
     PERFETTO_DCHECK(cur_packet_->is_finalized());
     cur_packet_.reset();
   }
-  memory_stream_writer_.reset();
 
   trace_writer_ = arbiter->CreateTraceWriter(target_buffer);
-
   ChunkID next_chunk_id = CommitLocalBufferChunks(
       arbiter, trace_writer_->writer_id(), target_buffer);
-  memory_buffer_.reset();
 
   // The real TraceWriter should start writing at the subsequent chunk ID.
   bool success = trace_writer_->SetFirstChunkId(next_chunk_id);
   PERFETTO_DCHECK(success);
+
+  memory_stream_writer_.reset();
+  memory_buffer_.reset();
 
   return true;
 }
@@ -251,7 +274,6 @@ void StartupTraceWriter::OnMessageFinalized(protozero::Message* message) {
   // Finalize() is a no-op because the packet is already finalized.
   uint32_t packet_size = cur_packet_->Finalize();
   packet_sizes_.push_back(packet_size);
-  total_payload_size += packet_size;
 
   // Write is complete, reset the flag to allow binding.
   std::lock_guard<std::mutex> lock(lock_);
@@ -272,7 +294,12 @@ ChunkID StartupTraceWriter::CommitLocalBufferChunks(
   if (packet_sizes_.empty() || !writer_id)
     return 0;
 
+  memory_buffer_->AdjustUsedSizeOfCurrentSlice();
   LocalBufferReader local_buffer_reader(memory_buffer_.get());
+
+  PERFETTO_DCHECK(local_buffer_reader.TotalUsedSize() ==
+                  std::accumulate(packet_sizes_.begin(), packet_sizes_.end(),
+                                  static_cast<size_t>(0u)));
 
   ChunkID next_chunk_id = 0;
   SharedMemoryABI::Chunk cur_chunk =
@@ -290,29 +317,41 @@ ChunkID StartupTraceWriter::CommitLocalBufferChunks(
     do {
       uint32_t fragment_size = static_cast<uint32_t>(
           std::min(static_cast<size_t>(remaining_packet_size),
-                   max_payload_size - cur_payload_size));
+                   max_payload_size - cur_payload_size -
+                       SharedMemoryABI::kPacketHeaderSize));
+      // Write packet header, i.e. the fragment size.
+      protozero::proto_utils::WriteRedundantVarInt(
+          fragment_size, cur_chunk.payload_begin() + cur_payload_size);
+      cur_payload_size += SharedMemoryABI::kPacketHeaderSize;
+
+      // Copy packet content into the chunk.
+      size_t bytes_read = local_buffer_reader.ReadBytes(
+          &cur_chunk, fragment_size, cur_payload_size);
+      PERFETTO_DCHECK(bytes_read == fragment_size);
+
       cur_payload_size += fragment_size;
       remaining_packet_size -= fragment_size;
 
       bool last_write =
           packet_idx == total_num_packets - 1 && remaining_packet_size == 0;
 
-      // Find num_packets that we should copy into current chunk and their
-      // payload_size.
-      bool write_chunk = cur_num_packets == ChunkHeader::Packets::kMaxCount ||
-                         cur_payload_size == max_payload_size || last_write;
+      // We should return the current chunk if we've filled its payload, reached
+      // the maximum number of packets, or wrote everything we wanted to.
+      bool return_chunk =
+          cur_payload_size >=
+              max_payload_size - SharedMemoryABI::kPacketHeaderSize ||
+          cur_num_packets == ChunkHeader::Packets::kMaxCount || last_write;
 
-      if (write_chunk) {
-        // Write chunk payload.
-        local_buffer_reader.ReadBytes(&cur_chunk, cur_payload_size);
-
+      if (return_chunk) {
         auto new_packet_count =
             cur_chunk.IncreasePacketCountTo(cur_num_packets);
         PERFETTO_DCHECK(new_packet_count == cur_num_packets);
 
         bool is_fragmenting = remaining_packet_size > 0;
-        if (is_fragmenting)
+        if (is_fragmenting) {
+          PERFETTO_DCHECK(cur_payload_size == max_payload_size);
           cur_chunk.SetFlag(ChunkHeader::kLastPacketContinuesOnNextChunk);
+        }
 
         arbiter->ReturnCompletedChunk(std::move(cur_chunk), target_buffer,
                                       &empty_patch_list);
@@ -333,6 +372,8 @@ ChunkID StartupTraceWriter::CommitLocalBufferChunks(
 
   // The last chunk should have been returned.
   PERFETTO_DCHECK(!cur_chunk.is_valid());
+  // We should have read all data from the local buffer.
+  PERFETTO_DCHECK(local_buffer_reader.DidReadAllData());
 
   return next_chunk_id;
 }
