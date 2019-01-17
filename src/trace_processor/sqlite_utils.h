@@ -173,7 +173,15 @@ inline std::function<bool(const char*)> CreateStringPredicate(
   }
 
   const char* val = reinterpret_cast<const char*>(sqlite3_value_text(value));
-  PERFETTO_CHECK(val != nullptr);
+
+  // If the value compared against is null, then to stay consistent with SQL
+  // handling, we have to return false for non-null operators.
+  if (val == nullptr) {
+    PERFETTO_CHECK(op != SQLITE_INDEX_CONSTRAINT_IS &&
+                   op != SQLITE_INDEX_CONSTRAINT_ISNOT);
+    return [](const char*) { return false; };
+  }
+
   switch (op) {
     case SQLITE_INDEX_CONSTRAINT_EQ:
     case SQLITE_INDEX_CONSTRAINT_IS:
