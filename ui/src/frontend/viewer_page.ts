@@ -27,6 +27,7 @@ import {createPage} from './pages';
 import {PanAndZoomHandler} from './pan_and_zoom_handler';
 import {Panel} from './panel';
 import {AnyAttrsVnode, PanelContainer} from './panel_container';
+import {RulerPanel} from './ruler_panel';
 import {TimeAxisPanel} from './time_axis_panel';
 import {computeZoom} from './time_scale';
 import {TrackGroupPanel} from './track_group_panel';
@@ -249,6 +250,7 @@ class TraceViewer implements m.ClassComponent {
               panels: [
                 m(OverviewTimelinePanel, {key: 'overview'}),
                 m(TimeAxisPanel, {key: 'timeaxis'}),
+                m(RulerPanel, {key: 'ruler'}),
                 m(NotesPanel, {key: 'notes'}),
                 ...globals.state.pinnedTracks.map(
                     id => m(TrackPanel, {key: id, id})),

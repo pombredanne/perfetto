@@ -24,10 +24,11 @@ import {TimeScale} from './time_scale';
  * controller. This state is updated at 60fps.
  */
 export class FrontendLocalState {
-  visibleWindowTime = new TimeSpan(0, 10);
-  timeScale = new TimeScale(this.visibleWindowTime, [0, 0]);
   private _lastUpdate = 0;
   private pendingGlobalTimeUpdate?: TimeSpan;
+  visibleWindowTime = new TimeSpan(0, 10);
+  timeScale = new TimeScale(this.visibleWindowTime, [0, 0]);
+  hoveredSpan: null|TimeSpan = null;
   perfDebug = false;
   highlightedUtid = -1;
 
@@ -73,6 +74,11 @@ export class FrontendLocalState {
 
   setHighlightedUtid(utid: number) {
     this.highlightedUtid = utid;
+    globals.rafScheduler.scheduleRedraw();
+  }
+
+  setHoveredSpan(span: TimeSpan|null) {
+    this.hoveredSpan = span;
     globals.rafScheduler.scheduleRedraw();
   }
 }

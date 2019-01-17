@@ -283,6 +283,15 @@ export const StateActions = {
     state.selectedNote = args.id;
   },
 
+  selectSpan(state: StateDraft, args: TraceTime) {
+    state.selectedSpan = args;
+  },
+
+  unselectEverything(state: StateDraft, _: {}) {
+    state.selectedSpan = null;
+    state.selectedNote = null;
+  },
+
   addNote(state: StateDraft, args: {timestamp: number}): void {
     const id = `${state.nextId++}`;
     state.notes[id] = {

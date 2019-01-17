@@ -15,6 +15,7 @@
 import {assertTrue} from '../../base/logging';
 import {Actions} from '../../common/actions';
 import {TrackState} from '../../common/state';
+import {TimeSpan} from '../../common/time';
 import {checkerboardExcept} from '../../frontend/checkerboard';
 import {globals} from '../../frontend/globals';
 import {Track} from '../../frontend/track';
@@ -281,10 +282,12 @@ class CpuSliceTrack extends Track<Config, Data> {
     if (y < MARGIN_TOP || y > MARGIN_TOP + RECT_HEIGHT) {
       this.utidHoveredInThisTrack = -1;
       globals.frontendLocalState.setHighlightedUtid(-1);
+      globals.frontendLocalState.setHoveredSpan(null);
       return;
     }
     const t = timeScale.pxToTime(x);
     let hoveredUtid = -1;
+    let hoveredSpan: null|TimeSpan = null;
 
     for (let i = 0; i < data.starts.length; i++) {
       const tStart = data.starts[i];
@@ -292,17 +295,32 @@ class CpuSliceTrack extends Track<Config, Data> {
       const utid = data.utids[i];
       if (tStart <= t && t <= tEnd) {
         hoveredUtid = utid;
+        hoveredSpan = new TimeSpan(tStart, tEnd);
         break;
       }
     }
     this.utidHoveredInThisTrack = hoveredUtid;
     globals.frontendLocalState.setHighlightedUtid(hoveredUtid);
+    globals.frontendLocalState.setHoveredSpan(hoveredSpan);
   }
 
   onMouseOut() {
     this.utidHoveredInThisTrack = -1;
     globals.frontendLocalState.setHighlightedUtid(-1);
+    globals.frontendLocalState.setHoveredSpan(null);
     this.mouseXpos = 0;
+  }
+
+  onClick(_: {x: number, y: number}) {
+    const span = globals.frontendLocalState.hoveredSpan;
+    if (span) {
+      globals.dispatch(Actions.selectSpan({
+        startSec: span.start,
+        endSec: span.end,
+      }));
+    } else {
+      globals.dispatch(Actions.unselectEverything({}));
+    }
   }
 }
 

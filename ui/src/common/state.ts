@@ -148,6 +148,7 @@ export interface State {
   notes: ObjectById<Note>;
   status: Status;
   selectedNote: string|null;
+  selectedSpan: TraceTime|null;
 
   /**
    * This state is updated on the frontend at 60Hz and eventually syncronised to
@@ -187,6 +188,7 @@ export function createEmptyState(): State {
 
     status: {msg: '', timestamp: 0},
     selectedNote: null,
+    selectedSpan: null,
   };
 }
 
