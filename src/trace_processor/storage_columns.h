@@ -129,18 +129,16 @@ class NumericColumn : public StorageColumn {
               sqlite3_value* value,
               FilteredRowIndex* index) const override {
     auto type = sqlite3_value_type(value);
+
+    // If we are doing equality filtering on integers, try and use the index.
+    bool is_int_compare = std::is_integral<T>::value && type == SQLITE_INTEGER;
+    if (sqlite_utils::IsOpEq(op) && is_int_compare && index != nullptr) {
+      FilterIntegerIndexEq(value, index);
+      return;
+    }
+
     bool is_null = type == SQLITE_NULL;
     if (std::is_integral<T>::value && (type == SQLITE_INTEGER || is_null)) {
-      if (sqlite_utils::IsOpEq(op) && index_ != nullptr) {
-        auto val = sqlite_utils::ExtractSqliteValue<T>(value);
-        auto pair = index_->equal_range(val);
-        std::vector<uint32_t> rows;
-        for (auto it = pair.first; it != pair.second; it++) {
-          rows.emplace_back(it->second);
-        }
-        index->IntersectRows(std::move(rows));
-        return;
-      }
       FilterWithCast<int64_t>(op, value, index);
     } else if (type == SQLITE_INTEGER || type == SQLITE_FLOAT || is_null) {
       FilterWithCast<double>(op, value, index);
@@ -184,11 +182,30 @@ class NumericColumn : public StorageColumn {
   T kTMin = std::numeric_limits<T>::lowest();
   T kTMax = std::numeric_limits<T>::max();
 
+  void FilterIntegerIndexEq(sqlite3_value* value,
+                            FilteredRowIndex* index) const {
+    auto raw = sqlite_utils::ExtractSqliteValue<int64_t>(value);
+    if (raw < kTMin || raw > kTMax) {
+      // If the compared value is out of bounds for T, we will never match any
+      // rows. Just return an empty result set.
+      index->IntersectRows({});
+      return;
+    }
+
+    // Otherwise, lookup the cast value in the index and return the results.
+    std::vector<uint32_t> rows;
+    auto pair = index_->equal_range(static_cast<T>(raw));
+    for (auto it = pair.first; it != pair.second; it++) {
+      rows.emplace_back(it->second);
+    }
+    index->IntersectRows(std::move(rows));
+  }
+
   template <typename C>
   void FilterWithCast(int op,
                       sqlite3_value* value,
                       FilteredRowIndex* index) const {
-    auto predicate = sqlite_utils::CreatePredicate<C>(op, value);
+    auto predicate = sqlite_utils::CreateNumericPredicate<C>(op, value);
     index->FilterRows([this, &predicate](uint32_t row) {
       return predicate(static_cast<C>((*deque_)[row]));
     });
@@ -297,7 +314,7 @@ class IdColumn final : public StorageColumn {
   void Filter(int op,
               sqlite3_value* value,
               FilteredRowIndex* index) const override {
-    auto predicate = sqlite_utils::CreatePredicate<RowId>(op, value);
+    auto predicate = sqlite_utils::CreateNumericPredicate<RowId>(op, value);
     index->FilterRows([this, &predicate](uint32_t row) {
       return predicate(TraceStorage::CreateRowId(table_id_, row));
     });
@@ -327,39 +344,6 @@ class IdColumn final : public StorageColumn {
  private:
   TableId table_id_;
 };
-
-template <typename T>
-inline std::unique_ptr<TsEndColumn> TsEndPtr(std::string column_name,
-                                             const std::deque<T>* ts_start,
-                                             const std::deque<T>* ts_end) {
-  return std::unique_ptr<TsEndColumn>(
-      new TsEndColumn(column_name, ts_start, ts_end));
-}
-
-template <typename T>
-inline std::unique_ptr<NumericColumn<T>> NumericColumnPtr(
-    std::string column_name,
-    const std::deque<T>* deque,
-    bool hidden = false,
-    bool is_naturally_ordered = false) {
-  return std::unique_ptr<NumericColumn<T>>(
-      new NumericColumn<T>(column_name, deque, hidden, is_naturally_ordered));
-}
-
-template <typename Id>
-inline std::unique_ptr<StringColumn<Id>> StringColumnPtr(
-    std::string column_name,
-    const std::deque<Id>* deque,
-    const std::deque<std::string>* lookup_map,
-    bool hidden = false) {
-  return std::unique_ptr<StringColumn<Id>>(
-      new StringColumn<Id>(column_name, deque, lookup_map, hidden));
-}
-
-inline std::unique_ptr<IdColumn> IdColumnPtr(std::string column_name,
-                                             TableId table_id) {
-  return std::unique_ptr<IdColumn>(new IdColumn(column_name, table_id));
-}
 
 }  // namespace trace_processor
 }  // namespace perfetto
