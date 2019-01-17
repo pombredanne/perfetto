@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,89 +35,25 @@ TEST(TaskStateUnittest, Smoke) {
   auto state = TaskState::From(0);
   ASSERT_TRUE(state.IsValid());
 
-  char buffer[4];
-
-  ASSERT_EQ(TaskState::From(0).ToString(buffer, sizeof(buffer)), 1);
-  ASSERT_STREQ(buffer, "R");
-
-  ASSERT_EQ(TaskState::From(1).ToString(buffer, sizeof(buffer)), 1);
-  ASSERT_STREQ(buffer, "S");
-
-  ASSERT_EQ(TaskState::From(2).ToString(buffer, sizeof(buffer)), 1);
-  ASSERT_STREQ(buffer, "D");
-
-  ASSERT_EQ(TaskState::From(4).ToString(buffer, sizeof(buffer)), 1);
-  ASSERT_STREQ(buffer, "T");
-
-  ASSERT_EQ(TaskState::From(8).ToString(buffer, sizeof(buffer)), 1);
-  ASSERT_STREQ(buffer, "t");
-
-  ASSERT_EQ(TaskState::From(16).ToString(buffer, sizeof(buffer)), 1);
-  ASSERT_STREQ(buffer, "X");
-
-  ASSERT_EQ(TaskState::From(32).ToString(buffer, sizeof(buffer)), 1);
-  ASSERT_STREQ(buffer, "Z");
-
-  ASSERT_EQ(TaskState::From(64).ToString(buffer, sizeof(buffer)), 1);
-  ASSERT_STREQ(buffer, "x");
-
-  ASSERT_EQ(TaskState::From(128).ToString(buffer, sizeof(buffer)), 1);
-  ASSERT_STREQ(buffer, "K");
-
-  ASSERT_EQ(TaskState::From(256).ToString(buffer, sizeof(buffer)), 1);
-  ASSERT_STREQ(buffer, "W");
-
-  ASSERT_EQ(TaskState::From(512).ToString(buffer, sizeof(buffer)), 1);
-  ASSERT_STREQ(buffer, "P");
-
-  ASSERT_EQ(TaskState::From(1024).ToString(buffer, sizeof(buffer)), 1);
-  ASSERT_STREQ(buffer, "N");
+  ASSERT_STREQ(TaskState::From(0).ToString().data(), "R");
+  ASSERT_STREQ(TaskState::From(1).ToString().data(), "S");
+  ASSERT_STREQ(TaskState::From(2).ToString().data(), "D");
+  ASSERT_STREQ(TaskState::From(4).ToString().data(), "T");
+  ASSERT_STREQ(TaskState::From(8).ToString().data(), "t");
+  ASSERT_STREQ(TaskState::From(16).ToString().data(), "X");
+  ASSERT_STREQ(TaskState::From(32).ToString().data(), "Z");
+  ASSERT_STREQ(TaskState::From(64).ToString().data(), "x");
+  ASSERT_STREQ(TaskState::From(128).ToString().data(), "K");
+  ASSERT_STREQ(TaskState::From(256).ToString().data(), "W");
+  ASSERT_STREQ(TaskState::From(512).ToString().data(), "P");
+  ASSERT_STREQ(TaskState::From(1024).ToString().data(), "N");
 }
 
-TEST(TaskStateUnittest, CommonMultipleState) {
-  char buffer[3];
-
-  ASSERT_EQ(TaskState::From(2048).ToString(buffer, sizeof(buffer)), 2);
-  ASSERT_STREQ(buffer, "R+");
-
-  char buffer2[4];
-
-  ASSERT_EQ(TaskState::From(130).ToString(buffer2, sizeof(buffer2)), 3);
-  ASSERT_STREQ(buffer2, "D|K");
-
-  ASSERT_EQ(TaskState::From(258).ToString(buffer2, sizeof(buffer2)), 3);
-  ASSERT_STREQ(buffer2, "D|W");
-}
-
-TEST(TaskStateUnittest, LargeStrings) {
-  char buffer[22];
-
-  ASSERT_EQ(TaskState::From(1184).ToString(buffer, sizeof(buffer)), 5);
-  ASSERT_STREQ(buffer, "Z|K|N");
-
-  ASSERT_EQ(TaskState::From(2044).ToString(buffer, sizeof(buffer)), 17);
-  ASSERT_STREQ(buffer, "T|t|X|Z|x|K|W|P|N");
-
-  ASSERT_EQ(TaskState::From(2046).ToString(buffer, sizeof(buffer)), 19);
-  ASSERT_STREQ(buffer, "D|T|t|X|Z|x|K|W|P|N");
-
-  ASSERT_EQ(TaskState::From(2047).ToString(buffer, sizeof(buffer)), 21);
-  ASSERT_STREQ(buffer, "S|D|T|t|X|Z|x|K|W|P|N");
-}
-
-TEST(TaskStateUnittest, Overflow) {
-  char buffer[2];
-
-  ASSERT_EQ(TaskState::From(2048).ToString(buffer, sizeof(buffer)), 2);
-  ASSERT_STREQ(buffer, "R");
-
-  char buffer2[3];
-
-  ASSERT_EQ(TaskState::From(1184).ToString(buffer2, sizeof(buffer2)), 5);
-  ASSERT_STREQ(buffer2, "Z");
-
-  ASSERT_EQ(TaskState::From(2044).ToString(buffer2, sizeof(buffer2)), 17);
-  ASSERT_STREQ(buffer2, "T");
+TEST(TaskStateUnittest, MultipleState) {
+  ASSERT_STREQ(TaskState::From(2048).ToString().data(), "R+");
+  ASSERT_STREQ(TaskState::From(130).ToString().data(), "DK");
+  ASSERT_STREQ(TaskState::From(258).ToString().data(), "DW");
+  ASSERT_STREQ(TaskState::From(1184).ToString().data(), "ZKN");
 }
 
 }  // namespace

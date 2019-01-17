@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
 
 #include <stddef.h>
 
-#include <bitset>
+#include <array>
 
 #include "perfetto/base/optional.h"
 
@@ -31,31 +31,21 @@ namespace ftrace_utils {
 // events.
 class TaskState {
  public:
+  using String = std::array<char, 4>;
+
   // Returns a TaskState struct parsed from the raw state integer given.
-  static TaskState From(int16_t raw_state);
+  static TaskState From(uint16_t raw_state);
 
   // Returns an invalid TaskState struct.
   static TaskState Unknown() { return TaskState(); }
 
   // Returns if this TaskState has a valid representation.
-  bool IsValid() const;
+  bool IsValid() const { return state_ & kValidBitMask; }
 
-  // Writes the string representation of this (valid) TaskState into |buffer|
-  // with |n| the size of the buffer (including space for null terminator). If
-  // the buffer does not have enough space to write the full string, the largest
-  // possible valid string is written (valid in the sense of e.g. no hanging
-  // delimiters). The written string is always null terminated; therefore the
-  // max number of characters is n - 1.
-  //
-  // The return value is the number of bytes written (excluding the null term.)
-  // or, if the buffer was too small, the number of bytes that would have been
-  // written, had there been enough space in buffer (excluding the null
-  // terminator).
-  //
-  // Note 1: This function CHECKs that |IsValid()| is true.
-  // Note 2: The full string was written iff <return value> < n.
-  // Note 3: the semantics of this function matches that of snprintf.
-  size_t ToString(char* buffer, size_t n) const;
+  // Returns the string representation of this (valid) TaskState. This array
+  // is null terminated.
+  // Note: This function CHECKs that |IsValid()| is true.
+  TaskState::String ToString() const;
 
  private:
   // The ordering and values of these fields comes from the kernel in the file
@@ -69,7 +59,7 @@ class TaskState {
     kStopped = 4,
     kTraced = 8,
     kExitDead = 16,
-    kZombie = 32,
+    kExitZombie = 32,
     kTaskDead = 64,
     kWakeKill = 128,
     kWaking = 256,
@@ -77,21 +67,49 @@ class TaskState {
     kNoLoad = 1024,
     // If you are adding atoms here, make sure to change the constants below.
   };
-  static constexpr int16_t kRawMaxTaskState = 2048;
-
-  // Store the information about preemption and validity of this struct in the
-  // bitset.
-  // Keep these in sync with Atom above.
-  static constexpr size_t kPreemptStateIdx = 11;
-  static constexpr size_t kValidStateIdx = 12;
-  static constexpr size_t kBitsetSize = 13;
+  static constexpr uint16_t kRawMaxTaskState = 2048;
+  static constexpr uint16_t kValidBitMask = 0x8000;
 
   TaskState();
 
-  bool IsPreempt() const;
-  static char AtomToChar(Atom);
+  bool IsRunnable() const { return (state_ & (kRawMaxTaskState - 1)) == 0; }
 
-  std::bitset<TaskState::kBitsetSize> state_;
+  // Returns whether kernel preemption caused the exit state.
+  bool IsKernelPreempt() const { return state_ & kRawMaxTaskState; }
+
+  static char AtomToChar(Atom atom) {
+    // This mapping is given by the file
+    // https://android.googlesource.com/kernel/msm.git/+/android-msm-wahoo-4.4-pie-qpr1/include/trace/events/sched.h#155
+    switch (atom) {
+      case Atom::kRunnable:
+        return 'R';
+      case Atom::kInterruptibleSleep:
+        return 'S';
+      case Atom::kUninterruptibleSleep:
+        return 'D';  // D for (D)isk sleep
+      case Atom::kStopped:
+        return 'T';
+      case Atom::kTraced:
+        return 't';
+      case Atom::kExitDead:
+        return 'X';
+      case Atom::kExitZombie:
+        return 'Z';
+      case Atom::kTaskDead:
+        return 'x';
+      case Atom::kWakeKill:
+        return 'K';
+      case Atom::kWaking:
+        return 'W';
+      case Atom::kParked:
+        return 'P';
+      case Atom::kNoLoad:
+        return 'N';
+    }
+    PERFETTO_FATAL("For GCC");
+  }
+
+  uint16_t state_;
 };
 
 }  // namespace ftrace_utils
