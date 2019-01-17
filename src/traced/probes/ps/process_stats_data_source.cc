@@ -335,19 +335,19 @@ void ProcessStatsDataSource::WriteAllProcessStats() {
     if (!oom_score_adj.empty())
       GetOrCreateStatsProcess(pid)->set_oom_score_adj(ToInt(oom_score_adj));
 
-    if (pids_to_skip_mem_ctrs_.size() > pid_u && pids_to_skip_mem_ctrs_[pid_u])
+    if (skip_counters_for_pid_.size() > pid_u && skip_counters_for_pid_[pid_u])
       continue;
     std::string proc_status = ReadProcPidFile(pid, "status");
     if (proc_status.empty())
       continue;
 
     if (!WriteMemCounters(pid, proc_status)) {
-      // If WriteProcessStats() fails the pid is very likely a kernel thread
+      // If WriteMemCounters() fails the pid is very likely a kernel thread
       // that has a valid /proc/[pid]/status but no memory values. In this
       // case avoid keep polling it over and over.
-      if (pids_to_skip_mem_ctrs_.size() <= pid_u)
-        pids_to_skip_mem_ctrs_.resize(pid_u + 1);
-      pids_to_skip_mem_ctrs_[pid_u] = true;
+      if (skip_counters_for_pid_.size() <= pid_u)
+        skip_counters_for_pid_.resize(pid_u + 1);
+      skip_counters_for_pid_[pid_u] = true;
       continue;
     }
     pids.push_back(pid);

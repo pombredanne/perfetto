@@ -109,7 +109,7 @@ class ProcessStatsDataSource : public ProbesDataSource {
   uint32_t poll_period_ms_ = 0;
   protos::pbzero::ProcessStats* cur_ps_stats_ = nullptr;
   protos::pbzero::ProcessStats_Process* cur_ps_stats_process_ = nullptr;
-  std::vector<bool> pids_to_skip_mem_ctrs_;
+  std::vector<bool> skip_counters_for_pid_;
 
   base::WeakPtrFactory<ProcessStatsDataSource> weak_factory_;  // Keep last.
 };
