@@ -25,7 +25,9 @@ namespace perfetto {
 namespace profiling {
 namespace {
 
-const char* __attribute__((unused)) FindChar(const char* s, char c, size_t n) {
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
+
+const char* FindChar(const char* s, char c, size_t n) {
   std::string str(s, n);
   auto idx = str.rfind(c);
   if (idx == std::string::npos)
@@ -33,12 +35,11 @@ const char* __attribute__((unused)) FindChar(const char* s, char c, size_t n) {
   return s + n;
 }
 
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
-// Only conditionally compile this to have less platform specific code.
 void* memrchr(const void* s, int c, size_t n) {
   return static_cast<void*>(const_cast<char*>(
       FindChar(static_cast<const char*>(s), static_cast<char>(c), n)));
 }
+
 #endif
 
 bool GetProcFile(pid_t pid, const char* file, char* filename_buf, size_t size) {
