@@ -28,8 +28,6 @@
 #include "perfetto/tracing/core/trace_writer.h"
 #include "src/traced/probes/probes_data_source.h"
 
-#include "perfetto/trace/ps/process_stats.pbzero.h"
-
 namespace perfetto {
 
 namespace base {
@@ -39,6 +37,8 @@ class TaskRunner;
 namespace protos {
 namespace pbzero {
 class ProcessTree;
+class ProcessStats;
+class ProcessStats_Process;
 }  // namespace pbzero
 }  // namespace protos
 
@@ -75,6 +75,8 @@ class ProcessStatsDataSource : public ProbesDataSource {
   void FinalizeCurPacket();
   protos::pbzero::ProcessTree* GetOrCreatePsTree();
   protos::pbzero::ProcessStats* GetOrCreateStats();
+  protos::pbzero::ProcessStats_Process* GetOrCreateStatsProcess(int32_t pid);
+  void FinalizeStatsProcess();
 
   // Functions for snapshotting process/thread long-term info and relationships.
   void WriteProcess(int32_t pid, const std::string& proc_status);
@@ -85,9 +87,7 @@ class ProcessStatsDataSource : public ProbesDataSource {
   // Functions for periodically sampling process stats/counters.
   static void Tick(base::WeakPtr<ProcessStatsDataSource>);
   void WriteAllProcessStats();
-  bool WriteMemCounters(int32_t pid,
-                        const std::string& proc_status,
-                        protos::pbzero::ProcessStats::Process** process);
+  bool WriteMemCounters(int32_t pid, const std::string& proc_status);
 
   // Common fields used for both process/tree relationships and stats/counters.
   base::TaskRunner* const task_runner_;
@@ -108,7 +108,8 @@ class ProcessStatsDataSource : public ProbesDataSource {
   // Fields for keeping track of the periodic stats/counters.
   uint32_t poll_period_ms_ = 0;
   protos::pbzero::ProcessStats* cur_ps_stats_ = nullptr;
-  std::vector<bool> pids_to_skip_;
+  protos::pbzero::ProcessStats_Process* cur_ps_stats_process_ = nullptr;
+  std::vector<bool> pids_to_skip_mem_ctrs_;
 
   base::WeakPtrFactory<ProcessStatsDataSource> weak_factory_;  // Keep last.
 };
