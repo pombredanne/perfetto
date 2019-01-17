@@ -331,11 +331,8 @@ void ProcessStatsDataSource::WriteAllProcessStats() {
     FinalizeStatsProcess();
 
     uint32_t pid_u = static_cast<uint32_t>(pid);
-    std::string oom_score_adj = ReadProcPidFile(pid, "oom_score_adj");
-    if (!oom_score_adj.empty())
-      GetOrCreateStatsProcess(pid)->set_oom_score_adj(ToInt(oom_score_adj));
 
-    if (skip_counters_for_pid_.size() > pid_u && skip_counters_for_pid_[pid_u])
+    if (skip_stats_for_pids_.size() > pid_u && skip_stats_for_pids_[pid_u])
       continue;
     std::string proc_status = ReadProcPidFile(pid, "status");
     if (proc_status.empty())
@@ -345,11 +342,16 @@ void ProcessStatsDataSource::WriteAllProcessStats() {
       // If WriteMemCounters() fails the pid is very likely a kernel thread
       // that has a valid /proc/[pid]/status but no memory values. In this
       // case avoid keep polling it over and over.
-      if (skip_counters_for_pid_.size() <= pid_u)
-        skip_counters_for_pid_.resize(pid_u + 1);
-      skip_counters_for_pid_[pid_u] = true;
+      if (skip_stats_for_pids_.size() <= pid_u)
+        skip_stats_for_pids_.resize(pid_u + 1);
+      skip_stats_for_pids_[pid_u] = true;
       continue;
     }
+
+    std::string oom_score_adj = ReadProcPidFile(pid, "oom_score_adj");
+    if (!oom_score_adj.empty())
+      GetOrCreateStatsProcess(pid)->set_oom_score_adj(ToInt(oom_score_adj));
+
     pids.push_back(pid);
   }
   FinalizeCurPacket();

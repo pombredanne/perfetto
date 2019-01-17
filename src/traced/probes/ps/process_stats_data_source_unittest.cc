@@ -153,23 +153,24 @@ TEST_F(ProcessStatsDataSourceTest, ProcessStats) {
   const int kNumIters = 4;
   int iter = 0;
   for (int pid : kPids) {
-    EXPECT_CALL(*data_source, ReadProcPidFile(pid, "oom_score_adj"))
-        .WillRepeatedly(Invoke([checkpoint](int32_t p, const std::string&) {
-          return std::to_string(p);
-        }));
-
     EXPECT_CALL(*data_source, ReadProcPidFile(pid, "status"))
-        .WillRepeatedly(Invoke([checkpoint, kPids, &iter](int32_t p,
-                                                          const std::string&) {
+        .WillRepeatedly(Invoke([checkpoint, &iter](int32_t p,
+                                                   const std::string&) {
           char ret[1024];
           sprintf(ret, "Name:	pid_10\nVmSize:	 %d kB\nVmRSS:\t%d  kB\n",
                   p * 100 + iter * 10 + 1, p * 100 + iter * 10 + 2);
-          if (p == kPids[base::ArraySize(kPids) - 1]) {
-            if (++iter == kNumIters)
-              checkpoint();
-          }
           return std::string(ret);
         }));
+
+    EXPECT_CALL(*data_source, ReadProcPidFile(pid, "oom_score_adj"))
+        .WillRepeatedly(
+            Invoke([checkpoint, kPids, &iter](int32_t p, const std::string&) {
+              if (p == kPids[base::ArraySize(kPids) - 1]) {
+                if (++iter == kNumIters)
+                  checkpoint();
+              }
+              return std::to_string(p);
+            }));
   }
 
   data_source->Start();
