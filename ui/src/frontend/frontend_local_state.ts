@@ -28,7 +28,8 @@ export class FrontendLocalState {
   private _visibleTimeLastUpdate = 0;
   private pendingGlobalTimeUpdate?: TimeSpan;
   perfDebug = false;
-  highlightedUtid = -1;
+  hoveredUtid = -1;
+  hoveredPid = -1;
 
   // TODO: there is some redundancy in the fact that both |visibleWindowTime|
   // and a |timeScale| have a notion of time range. That should live in one
@@ -64,8 +65,9 @@ export class FrontendLocalState {
     globals.rafScheduler.scheduleFullRedraw();
   }
 
-  setHighlightedUtid(utid: number) {
-    this.highlightedUtid = utid;
+  setHoveredUtidAndPid(utid: number, pid: number) {
+    this.hoveredUtid = utid;
+    this.hoveredPid = pid;
     globals.rafScheduler.scheduleRedraw();
   }
 }
