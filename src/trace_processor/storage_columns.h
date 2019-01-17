@@ -132,7 +132,7 @@ class NumericColumn : public StorageColumn {
 
     // If we are doing equality filtering on integers, try and use the index.
     bool is_int_compare = std::is_integral<T>::value && type == SQLITE_INTEGER;
-    if (sqlite_utils::IsOpEq(op) && is_int_compare && index != nullptr) {
+    if (sqlite_utils::IsOpEq(op) && is_int_compare && index_ != nullptr) {
       FilterIntegerIndexEq(value, index);
       return;
     }
