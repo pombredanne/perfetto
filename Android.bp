@@ -88,6 +88,7 @@ cc_binary {
     "src/tracing/core/shared_memory_abi.cc",
     "src/tracing/core/shared_memory_arbiter_impl.cc",
     "src/tracing/core/sliced_protobuf_input_stream.cc",
+    "src/tracing/core/startup_trace_writer.cc",
     "src/tracing/core/sys_stats_config.cc",
     "src/tracing/core/test_config.cc",
     "src/tracing/core/trace_buffer.cc",
@@ -136,6 +137,7 @@ cc_binary {
   cflags: [
     "-DGOOGLE_PROTOBUF_NO_RTTI",
     "-DGOOGLE_PROTOBUF_NO_STATIC_INITIALIZER",
+    "-DPERFETTO_BUILD_WITH_ANDROID",
   ],
 }
 
@@ -173,6 +175,9 @@ cc_library_shared {
   ],
   defaults: [
     "perfetto_defaults",
+  ],
+  cflags: [
+    "-DPERFETTO_BUILD_WITH_ANDROID",
   ],
   include_dirs: [
     "bionic/libc",
@@ -273,6 +278,7 @@ cc_library_shared {
     "src/tracing/core/shared_memory_abi.cc",
     "src/tracing/core/shared_memory_arbiter_impl.cc",
     "src/tracing/core/sliced_protobuf_input_stream.cc",
+    "src/tracing/core/startup_trace_writer.cc",
     "src/tracing/core/sys_stats_config.cc",
     "src/tracing/core/test_config.cc",
     "src/tracing/core/trace_buffer.cc",
@@ -315,6 +321,7 @@ cc_library_shared {
   cflags: [
     "-DGOOGLE_PROTOBUF_NO_RTTI",
     "-DGOOGLE_PROTOBUF_NO_STATIC_INITIALIZER",
+    "-DPERFETTO_BUILD_WITH_ANDROID",
   ],
 }
 
@@ -335,6 +342,9 @@ cc_library_shared {
   ],
   defaults: [
     "perfetto_defaults",
+  ],
+  cflags: [
+    "-DPERFETTO_BUILD_WITH_ANDROID",
   ],
   static_libs: [
     "libhealthhalutils",
@@ -412,6 +422,7 @@ cc_binary {
     "src/tracing/core/shared_memory_abi.cc",
     "src/tracing/core/shared_memory_arbiter_impl.cc",
     "src/tracing/core/sliced_protobuf_input_stream.cc",
+    "src/tracing/core/startup_trace_writer.cc",
     "src/tracing/core/sys_stats_config.cc",
     "src/tracing/core/test_config.cc",
     "src/tracing/core/trace_buffer.cc",
@@ -608,6 +619,7 @@ cc_test {
     "src/tracing/core/shared_memory_abi.cc",
     "src/tracing/core/shared_memory_arbiter_impl.cc",
     "src/tracing/core/sliced_protobuf_input_stream.cc",
+    "src/tracing/core/startup_trace_writer.cc",
     "src/tracing/core/sys_stats_config.cc",
     "src/tracing/core/test_config.cc",
     "src/tracing/core/trace_buffer.cc",
@@ -1955,6 +1967,7 @@ cc_binary_host {
   cflags: [
     "-DGOOGLE_PROTOBUF_NO_RTTI",
     "-DGOOGLE_PROTOBUF_NO_STATIC_INITIALIZER",
+    "-DPERFETTO_BUILD_WITH_ANDROID",
   ],
 }
 
@@ -2093,6 +2106,7 @@ cc_binary_host {
   cflags: [
     "-DGOOGLE_PROTOBUF_NO_RTTI",
     "-DGOOGLE_PROTOBUF_NO_STATIC_INITIALIZER",
+    "-DPERFETTO_BUILD_WITH_ANDROID",
   ],
 }
 
@@ -2320,6 +2334,7 @@ cc_library_static {
     "src/tracing/core/shared_memory_abi.cc",
     "src/tracing/core/shared_memory_arbiter_impl.cc",
     "src/tracing/core/sliced_protobuf_input_stream.cc",
+    "src/tracing/core/startup_trace_writer.cc",
     "src/tracing/core/sys_stats_config.cc",
     "src/tracing/core/test_config.cc",
     "src/tracing/core/trace_buffer.cc",
@@ -2390,6 +2405,7 @@ cc_library_static {
   cflags: [
     "-DGOOGLE_PROTOBUF_NO_RTTI",
     "-DGOOGLE_PROTOBUF_NO_STATIC_INITIALIZER",
+    "-DPERFETTO_BUILD_WITH_ANDROID",
   ],
 }
 
@@ -2649,6 +2665,8 @@ cc_test {
     "src/tracing/core/shared_memory_arbiter_impl_unittest.cc",
     "src/tracing/core/sliced_protobuf_input_stream.cc",
     "src/tracing/core/sliced_protobuf_input_stream_unittest.cc",
+    "src/tracing/core/startup_trace_writer.cc",
+    "src/tracing/core/startup_trace_writer_unittest.cc",
     "src/tracing/core/sys_stats_config.cc",
     "src/tracing/core/test_config.cc",
     "src/tracing/core/trace_buffer.cc",
@@ -2680,11 +2698,14 @@ cc_test {
   shared_libs: [
     "libandroid",
     "libbase",
+    "libbinder",
     "liblog",
     "libprocinfo",
     "libprotobuf-cpp-full",
     "libprotobuf-cpp-lite",
+    "libservices",
     "libunwindstack",
+    "libutils",
   ],
   static_libs: [
     "libgmock",
@@ -2731,6 +2752,7 @@ cc_test {
   cflags: [
     "-DGOOGLE_PROTOBUF_NO_RTTI",
     "-DGOOGLE_PROTOBUF_NO_STATIC_INITIALIZER",
+    "-DPERFETTO_BUILD_WITH_ANDROID",
   ],
   product_variables: {
     pdk: {
@@ -2770,7 +2792,6 @@ cc_binary_host {
     "src/base/virtual_destructors.cc",
     "src/base/watchdog_posix.cc",
     "tools/trace_to_text/ftrace_event_formatter.cc",
-    "tools/trace_to_text/ftrace_inode_handler.cc",
     "tools/trace_to_text/main.cc",
     "tools/trace_to_text/proto_full_utils.cc",
     "tools/trace_to_text/trace_to_profile.cc",
@@ -2807,6 +2828,7 @@ cc_binary_host {
   cflags: [
     "-DGOOGLE_PROTOBUF_NO_RTTI",
     "-DGOOGLE_PROTOBUF_NO_STATIC_INITIALIZER",
+    "-DPERFETTO_BUILD_WITH_ANDROID",
   ],
 }
 
@@ -2826,6 +2848,9 @@ cc_binary {
   defaults: [
     "perfetto_defaults",
   ],
+  cflags: [
+    "-DPERFETTO_BUILD_WITH_ANDROID",
+  ],
 }
 
 // GN target: //:traced_probes
@@ -2840,6 +2865,9 @@ cc_binary {
   ],
   defaults: [
     "perfetto_defaults",
+  ],
+  cflags: [
+    "-DPERFETTO_BUILD_WITH_ANDROID",
   ],
   required: [
     "libperfetto_android_internal",
@@ -2871,6 +2899,7 @@ cc_library_static {
     "libprotobuf-cpp-lite",
   ],
   static_libs: [
+    "libgmock",
     "libgtest",
     "perfetto_src_tracing_ipc",
     "perfetto_trace_protos",

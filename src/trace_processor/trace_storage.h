@@ -51,6 +51,7 @@ enum TableId : uint8_t {
   // invalid row id.
   kCounters = 1,
   kRawEvents = 2,
+  kInstants = 3,
 };
 
 // The top 8 bits are set to the TableId and the bottom 32 to the row of the
@@ -317,17 +318,17 @@ class TraceStorage {
 
   class Instants {
    public:
-    inline size_t AddInstantEvent(int64_t timestamp,
-                                  StringId name_id,
-                                  double value,
-                                  int64_t ref,
-                                  RefType type) {
+    inline uint32_t AddInstantEvent(int64_t timestamp,
+                                    StringId name_id,
+                                    double value,
+                                    int64_t ref,
+                                    RefType type) {
       timestamps_.emplace_back(timestamp);
       name_ids_.emplace_back(name_id);
       values_.emplace_back(value);
       refs_.emplace_back(ref);
       types_.emplace_back(type);
-      return instant_count() - 1;
+      return static_cast<uint32_t>(instant_count() - 1);
     }
 
     size_t instant_count() const { return timestamps_.size(); }
@@ -354,9 +355,11 @@ class TraceStorage {
    public:
     inline RowId AddRawEvent(int64_t timestamp,
                              StringId name_id,
+                             uint32_t cpu,
                              UniqueTid utid) {
       timestamps_.emplace_back(timestamp);
       name_ids_.emplace_back(name_id);
+      cpus_.emplace_back(cpu);
       utids_.emplace_back(utid);
       return CreateRowId(TableId::kRawEvents,
                          static_cast<uint32_t>(raw_event_count() - 1));
@@ -368,11 +371,14 @@ class TraceStorage {
 
     const std::deque<StringId>& name_ids() const { return name_ids_; }
 
+    const std::deque<uint32_t>& cpus() const { return cpus_; }
+
     const std::deque<UniqueTid>& utids() const { return utids_; }
 
    private:
     std::deque<int64_t> timestamps_;
     std::deque<StringId> name_ids_;
+    std::deque<uint32_t> cpus_;
     std::deque<UniqueTid> utids_;
   };
 
@@ -514,11 +520,11 @@ class TraceStorage {
 
   // |unique_processes_| always contains at least 1 element becuase the 0th ID
   // is reserved to indicate an invalid process.
-  size_t process_count() const { return unique_processes_.size() - 1; }
+  size_t process_count() const { return unique_processes_.size(); }
 
   // |unique_threads_| always contains at least 1 element becuase the 0th ID
   // is reserved to indicate an invalid thread.
-  size_t thread_count() const { return unique_threads_.size() - 1; }
+  size_t thread_count() const { return unique_threads_.size(); }
 
   // Number of interned strings in the pool. Includes the empty string w/ ID=0.
   size_t string_count() const { return string_pool_.size(); }

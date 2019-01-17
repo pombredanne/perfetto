@@ -26,31 +26,22 @@ void AndroidLogsTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
   Table::Register<AndroidLogsTable>(db, storage, "android_logs");
 }
 
-base::Optional<Table::Schema> AndroidLogsTable::Init(int, const char* const*) {
+StorageSchema AndroidLogsTable::CreateStorageSchema() {
   const auto& alog = storage_->android_logs();
-  std::unique_ptr<StorageColumn> cols[] = {
-      // Note: the logs in the storage are NOT sorted by timestamp. We delegate
-      // that to the on-demand sorter by leaving is_naturally_ordered=false
-      // (default value) when calling NumericColumnPtr().
-      NumericColumnPtr("ts", &alog.timestamps()),
-      NumericColumnPtr("utid", &alog.utids()),
-      NumericColumnPtr("prio", &alog.prios()),
-      StringColumnPtr("tag", &alog.tag_ids(), &storage_->string_pool()),
-      StringColumnPtr("msg", &alog.msg_ids(), &storage_->string_pool())};
-  schema_ = StorageSchema({
-      std::make_move_iterator(std::begin(cols)),
-      std::make_move_iterator(std::end(cols)),
-  });
-  return schema_.ToTableSchema({"ts", "utid", "msg"});
+  // Note: the logs in the storage are NOT sorted by timestamp. We delegate
+  // that to the on-demand sorter by calling AddNumericColumn (instead of
+  // AddSortedNumericColumn).
+  return StorageSchema::Builder()
+      .AddNumericColumn("ts", &alog.timestamps())
+      .AddNumericColumn("utid", &alog.utids())
+      .AddNumericColumn("prio", &alog.prios())
+      .AddStringColumn("tag", &alog.tag_ids(), &storage_->string_pool())
+      .AddStringColumn("msg", &alog.msg_ids(), &storage_->string_pool())
+      .Build({"ts", "utid", "msg"});
 }
 
-std::unique_ptr<Table::Cursor> AndroidLogsTable::CreateCursor(
-    const QueryConstraints& qc,
-    sqlite3_value** argv) {
-  uint32_t count = static_cast<uint32_t>(storage_->android_logs().size());
-  auto it = CreateBestRowIteratorForGenericSchema(count, qc, argv);
-  return std::unique_ptr<Table::Cursor>(
-      new Cursor(std::move(it), schema_.mutable_columns()));
+uint32_t AndroidLogsTable::RowCount() {
+  return static_cast<uint32_t>(storage_->android_logs().size());
 }
 
 int AndroidLogsTable::BestIndex(const QueryConstraints& qc,
@@ -60,8 +51,8 @@ int AndroidLogsTable::BestIndex(const QueryConstraints& qc,
   info->order_by_consumed = true;
 
   // Only the string columns are handled by SQLite.
-  size_t tag_index = schema_.ColumnIndexFromName("tag");
-  size_t msg_index = schema_.ColumnIndexFromName("msg");
+  size_t tag_index = schema().ColumnIndexFromName("tag");
+  size_t msg_index = schema().ColumnIndexFromName("msg");
   for (size_t i = 0; i < qc.constraints().size(); i++) {
     info->omit[i] =
         qc.constraints()[i].iColumn != static_cast<int>(tag_index) &&

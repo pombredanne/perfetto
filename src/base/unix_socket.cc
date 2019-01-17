@@ -163,6 +163,14 @@ void UnixSocketRaw::SetBlocking(bool is_blocking) {
   PERFETTO_CHECK(fcntl_res == 0);
 }
 
+void UnixSocketRaw::RetainOnExec() {
+  PERFETTO_DCHECK(fd_);
+  int flags = fcntl(*fd_, F_GETFD, 0);
+  flags &= ~static_cast<int>(FD_CLOEXEC);
+  bool fcntl_res = fcntl(*fd_, F_SETFD, flags);
+  PERFETTO_CHECK(fcntl_res == 0);
+}
+
 bool UnixSocketRaw::IsBlocking() const {
   PERFETTO_DCHECK(fd_);
   return (fcntl(*fd_, F_GETFL, 0) & O_NONBLOCK) == 0;
@@ -176,7 +184,7 @@ bool UnixSocketRaw::Bind(const std::string& socket_name) {
     return false;
 
   if (bind(*fd_, reinterpret_cast<sockaddr*>(&addr), addr_size)) {
-    PERFETTO_DPLOG("bind()");
+    PERFETTO_DPLOG("bind(%s)", socket_name.c_str());
     return false;
   }
 
@@ -184,6 +192,8 @@ bool UnixSocketRaw::Bind(const std::string& socket_name) {
 }
 
 bool UnixSocketRaw::Listen() {
+  PERFETTO_DCHECK(fd_);
+  PERFETTO_DCHECK(type_ == SockType::kStream || type_ == SockType::kSeqPacket);
   return listen(*fd_, SOMAXCONN) == 0;
 }
 
@@ -285,7 +295,7 @@ ssize_t UnixSocketRaw::Receive(void* msg,
         static_cast<CBufLenType>(CMSG_SPACE(max_files * sizeof(int)));
     PERFETTO_CHECK(msg_hdr.msg_controllen <= sizeof(control_buf));
   }
-  const ssize_t sz = PERFETTO_EINTR(recvmsg(*fd_, &msg_hdr, kNoSigPipe));
+  const ssize_t sz = PERFETTO_EINTR(recvmsg(*fd_, &msg_hdr, 0));
   if (sz <= 0) {
     return sz;
   }
@@ -355,7 +365,7 @@ std::unique_ptr<UnixSocket> UnixSocket::Listen(const std::string& socket_name,
     return nullptr;
 
   // Forward the call to the Listen() overload below.
-  return Listen(sock_raw.ReleaseFd(), event_listener, task_runner);
+  return Listen(sock_raw.ReleaseFd(), event_listener, task_runner, sock_type);
 }
 
 // static
@@ -379,6 +389,17 @@ std::unique_ptr<UnixSocket> UnixSocket::Connect(const std::string& socket_name,
   return sock;
 }
 
+// static
+std::unique_ptr<UnixSocket> UnixSocket::AdoptConnected(
+    ScopedFile fd,
+    EventListener* event_listener,
+    TaskRunner* task_runner,
+    SockType sock_type) {
+  return std::unique_ptr<UnixSocket>(
+      new UnixSocket(event_listener, task_runner, std::move(fd),
+                     State::kConnected, sock_type));
+}
+
 UnixSocket::UnixSocket(EventListener* event_listener,
                        TaskRunner* task_runner,
                        SockType sock_type)
@@ -398,7 +419,6 @@ UnixSocket::UnixSocket(EventListener* event_listener,
       weak_ptr_factory_(this) {
   state_ = State::kDisconnected;
   if (adopt_state == State::kDisconnected) {
-    // We get here from the default ctor().
     PERFETTO_DCHECK(!adopt_fd);
     sock_raw_ = UnixSocketRaw::CreateMayFail(sock_type);
     if (!sock_raw_) {
@@ -406,7 +426,6 @@ UnixSocket::UnixSocket(EventListener* event_listener,
       return;
     }
   } else if (adopt_state == State::kConnected) {
-    // We get here from OnNewIncomingConnection().
     PERFETTO_DCHECK(adopt_fd);
     sock_raw_ = UnixSocketRaw(std::move(adopt_fd), sock_type);
     state_ = State::kConnected;

@@ -17,6 +17,8 @@
 #ifndef SRC_TRACE_PROCESSOR_STATS_H_
 #define SRC_TRACE_PROCESSOR_STATS_H_
 
+#include <stddef.h>
+
 namespace perfetto {
 namespace trace_processor {
 namespace stats {
@@ -55,7 +57,9 @@ namespace stats {
   F(sched_switch_out_of_order,                  kSingle,  kError, kAnalysis), \
   F(traced_buf_bytes_written,                   kIndexed, kInfo,  kTrace),    \
   F(traced_buf_chunks_overwritten,              kIndexed, kInfo,  kTrace),    \
+  F(traced_buf_chunks_rewritten,                kIndexed, kInfo,  kTrace),    \
   F(traced_buf_chunks_written,                  kIndexed, kInfo,  kTrace),    \
+  F(traced_buf_chunks_committed_out_of_order,   kIndexed, kInfo,  kTrace),    \
   F(traced_buf_patches_failed,                  kIndexed, kInfo,  kTrace),    \
   F(traced_buf_patches_succeeded,               kIndexed, kInfo,  kTrace),    \
   F(traced_buf_readaheads_failed,               kIndexed, kInfo,  kTrace),    \

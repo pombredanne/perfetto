@@ -59,7 +59,8 @@ class HeapprofdDelegate : public ThreadDelegate {
   ~HeapprofdDelegate() override = default;
 
   void Initialize(base::TaskRunner* task_runner) override {
-    producer_.reset(new HeapprofdProducer(task_runner));
+    producer_.reset(
+        new HeapprofdProducer(HeapprofdMode::kCentral, task_runner));
     producer_->ConnectWithRetries(producer_socket_.c_str());
   }
 
@@ -146,7 +147,8 @@ class HeapprofdEndToEnd : public ::testing::Test {
 #endif
 };
 
-TEST_F(HeapprofdEndToEnd, Smoke) {
+// TODO(b/121352331): deflake and re-enable this test.
+TEST_F(HeapprofdEndToEnd, DISABLED_Smoke) {
   constexpr size_t kAllocSize = 1024;
 
   pid_t pid = ForkContinousMalloc(kAllocSize);
@@ -173,11 +175,14 @@ TEST_F(HeapprofdEndToEnd, Smoke) {
   helper.WaitForReadData();
 
   PERFETTO_CHECK(kill(pid, SIGKILL) == 0);
+  PERFETTO_CHECK(waitpid(pid, nullptr, 0) == pid);
 
   const auto& packets = helper.trace();
   ASSERT_GT(packets.size(), 0u);
   size_t profile_packets = 0;
   size_t samples = 0;
+  uint64_t last_allocated = 0;
+  uint64_t last_freed = 0;
   for (const protos::TracePacket& packet : packets) {
     if (packet.has_profile_packet() &&
         packet.profile_packet().process_dumps().size() > 0) {
@@ -185,18 +190,25 @@ TEST_F(HeapprofdEndToEnd, Smoke) {
       ASSERT_EQ(dumps.size(), 1);
       const protos::ProfilePacket_ProcessHeapSamples& dump = dumps.Get(0);
       EXPECT_EQ(dump.pid(), pid);
+      EXPECT_EQ(dump.samples().size(), 1);
       for (const auto& sample : dump.samples()) {
         samples++;
         EXPECT_EQ(sample.cumulative_allocated() % kAllocSize, 0);
+        EXPECT_EQ(sample.cumulative_freed() % kAllocSize, 0);
+        last_allocated = sample.cumulative_allocated();
+        last_freed = sample.cumulative_freed();
       }
       profile_packets++;
     }
   }
   EXPECT_GT(profile_packets, 0);
   EXPECT_GT(samples, 0);
+  EXPECT_GT(last_allocated, 0);
+  EXPECT_GT(last_freed, 0);
 }
 
-TEST_F(HeapprofdEndToEnd, FinalFlush) {
+// TODO(b/121352331): deflake and re-enable this test.
+TEST_F(HeapprofdEndToEnd, DISABLED_FinalFlush) {
   constexpr size_t kAllocSize = 1024;
 
   pid_t pid = ForkContinousMalloc(kAllocSize);
@@ -221,11 +233,14 @@ TEST_F(HeapprofdEndToEnd, FinalFlush) {
   helper.WaitForReadData();
 
   PERFETTO_CHECK(kill(pid, SIGKILL) == 0);
+  PERFETTO_CHECK(waitpid(pid, nullptr, 0) == pid);
 
   const auto& packets = helper.trace();
   ASSERT_GT(packets.size(), 0u);
   size_t profile_packets = 0;
   size_t samples = 0;
+  uint64_t last_allocated = 0;
+  uint64_t last_freed = 0;
   for (const protos::TracePacket& packet : packets) {
     if (packet.has_profile_packet() &&
         packet.profile_packet().process_dumps().size() > 0) {
@@ -233,15 +248,97 @@ TEST_F(HeapprofdEndToEnd, FinalFlush) {
       ASSERT_EQ(dumps.size(), 1);
       const protos::ProfilePacket_ProcessHeapSamples& dump = dumps.Get(0);
       EXPECT_EQ(dump.pid(), pid);
+      EXPECT_EQ(dump.samples().size(), 1);
       for (const auto& sample : dump.samples()) {
         samples++;
         EXPECT_EQ(sample.cumulative_allocated() % kAllocSize, 0);
+        EXPECT_EQ(sample.cumulative_freed() % kAllocSize, 0);
+        last_allocated = sample.cumulative_allocated();
+        last_freed = sample.cumulative_freed();
       }
       profile_packets++;
     }
   }
   EXPECT_EQ(profile_packets, 1);
   EXPECT_GT(samples, 0);
+  EXPECT_GT(last_allocated, 0);
+  EXPECT_GT(last_freed, 0);
+}
+
+// TODO(b/121352331): deflake and re-enable this test.
+TEST_F(HeapprofdEndToEnd, DISABLED_NativeStartup) {
+  TraceConfig trace_config;
+  trace_config.add_buffers()->set_size_kb(10 * 1024);
+  trace_config.set_duration_ms(5000);
+
+  auto* ds_config = trace_config.add_data_sources()->mutable_config();
+  ds_config->set_name("android.heapprofd");
+
+  auto* heapprofd_config = ds_config->mutable_heapprofd_config();
+  heapprofd_config->set_sampling_interval_bytes(1);
+  *heapprofd_config->add_process_cmdline() = "find";
+  heapprofd_config->set_all(false);
+
+  helper.StartTracing(trace_config);
+
+  // Wait to guarantee that the process forked below is hooked by the profiler
+  // by virtue of the startup check, and not by virtue of being seen as a
+  // runnning process. This sleep is here to prevent that, accidentally, the
+  // test gets to the fork()+exec() too soon, before the heap profiling daemon
+  // has received the trace config.
+  sleep(1);
+
+  pid_t pid = fork();
+  switch (pid) {
+    case -1:
+      PERFETTO_FATAL("Failed to fork.");
+    case 0: {
+      int null = open("/dev/null", O_RDWR);
+      dup2(null, STDIN_FILENO);
+      dup2(null, STDOUT_FILENO);
+      dup2(null, STDERR_FILENO);
+      // TODO(fmayer): Use a dedicated test binary rather than relying on find
+      // doing allocations.
+      PERFETTO_CHECK(execl("/system/bin/find", "find", "/", nullptr) == 0);
+      break;
+    }
+    default:
+      break;
+  }
+
+  helper.WaitForTracingDisabled(10000);
+
+  helper.ReadData();
+  helper.WaitForReadData();
+
+  PERFETTO_CHECK(kill(pid, SIGKILL) == 0);
+  PERFETTO_CHECK(waitpid(pid, nullptr, 0) == pid);
+
+  const auto& packets = helper.trace();
+  ASSERT_GT(packets.size(), 0u);
+  size_t profile_packets = 0;
+  size_t samples = 0;
+  uint64_t total_allocated = 0;
+  uint64_t total_freed = 0;
+  for (const protos::TracePacket& packet : packets) {
+    if (packet.has_profile_packet() &&
+        packet.profile_packet().process_dumps().size() > 0) {
+      const auto& dumps = packet.profile_packet().process_dumps();
+      ASSERT_EQ(dumps.size(), 1);
+      const protos::ProfilePacket_ProcessHeapSamples& dump = dumps.Get(0);
+      EXPECT_EQ(dump.pid(), pid);
+      profile_packets++;
+      for (const auto& sample : dump.samples()) {
+        samples++;
+        total_allocated += sample.cumulative_allocated();
+        total_freed += sample.cumulative_freed();
+      }
+    }
+  }
+  EXPECT_EQ(profile_packets, 1);
+  EXPECT_GT(samples, 0);
+  EXPECT_GT(total_allocated, 0);
+  EXPECT_GT(total_freed, 0);
 }
 
 }  // namespace

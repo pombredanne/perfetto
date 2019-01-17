@@ -34,39 +34,30 @@ void InstantsTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
   Table::Register<InstantsTable>(db, storage, "instants");
 }
 
-base::Optional<Table::Schema> InstantsTable::Init(int, const char* const*) {
+StorageSchema InstantsTable::CreateStorageSchema() {
   const auto& instants = storage_->instants();
-  std::unique_ptr<StorageColumn> cols[] = {
-      NumericColumnPtr("ts", &instants.timestamps(), false /* hidden */,
-                       true /* ordered */),
-      StringColumnPtr("name", &instants.name_ids(), &storage_->string_pool()),
-      NumericColumnPtr("value", &instants.values()),
-      NumericColumnPtr("ref", &instants.refs()),
-      StringColumnPtr("ref_type", &instants.types(), &ref_types_)};
-  schema_ = StorageSchema({
-      std::make_move_iterator(std::begin(cols)),
-      std::make_move_iterator(std::end(cols)),
-  });
-  return schema_.ToTableSchema({"name", "ts", "ref"});
+  return StorageSchema::Builder()
+      .AddColumn<IdColumn>("id", TableId::kInstants)
+      .AddOrderedNumericColumn("ts", &instants.timestamps())
+      .AddStringColumn("name", &instants.name_ids(), &storage_->string_pool())
+      .AddNumericColumn("value", &instants.values())
+      .AddNumericColumn("ref", &instants.refs())
+      .AddStringColumn("ref_type", &instants.types(), &ref_types_)
+      .Build({"name", "ts", "ref"});
 }
 
-std::unique_ptr<Table::Cursor> InstantsTable::CreateCursor(
-    const QueryConstraints& qc,
-    sqlite3_value** argv) {
-  uint32_t count = static_cast<uint32_t>(storage_->instants().instant_count());
-  auto it = CreateBestRowIteratorForGenericSchema(count, qc, argv);
-  return std::unique_ptr<Table::Cursor>(
-      new Cursor(std::move(it), schema_.mutable_columns()));
+uint32_t InstantsTable::RowCount() {
+  return static_cast<uint32_t>(storage_->instants().instant_count());
 }
 
 int InstantsTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
   info->estimated_cost =
-      static_cast<uint32_t>(storage_->counters().counter_count());
+      static_cast<uint32_t>(storage_->instants().instant_count());
 
   // Only the string columns are handled by SQLite
   info->order_by_consumed = true;
-  size_t name_index = schema_.ColumnIndexFromName("name");
-  size_t ref_type_index = schema_.ColumnIndexFromName("ref_type");
+  size_t name_index = schema().ColumnIndexFromName("name");
+  size_t ref_type_index = schema().ColumnIndexFromName("ref_type");
   for (size_t i = 0; i < qc.constraints().size(); i++) {
     info->omit[i] =
         qc.constraints()[i].iColumn != static_cast<int>(name_index) &&

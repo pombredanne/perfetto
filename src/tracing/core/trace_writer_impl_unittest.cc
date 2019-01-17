@@ -24,32 +24,13 @@
 #include "src/base/test/test_task_runner.h"
 #include "src/tracing/core/shared_memory_arbiter_impl.h"
 #include "src/tracing/test/aligned_buffer_test.h"
+#include "src/tracing/test/fake_producer_endpoint.h"
 
 #include "perfetto/trace/test_event.pbzero.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 
 namespace perfetto {
 namespace {
-
-class FakeProducerEndpoint : public TracingService::ProducerEndpoint {
- public:
-  void RegisterDataSource(const DataSourceDescriptor&) override {}
-  void UnregisterDataSource(const std::string&) override {}
-  void RegisterTraceWriter(uint32_t, uint32_t) override {}
-  void UnregisterTraceWriter(uint32_t) override {}
-  void CommitData(const CommitDataRequest& req, CommitDataCallback) override {
-    last_commit_data_request = req;
-  }
-  void NotifyFlushComplete(FlushRequestID) override {}
-  void NotifyDataSourceStopped(DataSourceInstanceID) override {}
-  SharedMemory* shared_memory() const override { return nullptr; }
-  size_t shared_buffer_page_size_kb() const override { return 0; }
-  std::unique_ptr<TraceWriter> CreateTraceWriter(BufferID) override {
-    return nullptr;
-  }
-
-  CommitDataRequest last_commit_data_request;
-};
 
 class TraceWriterImplTest : public AlignedBufferTest {
  public:
@@ -97,7 +78,7 @@ TEST_P(TraceWriterImplTest, SingleWriter) {
   SharedMemoryABI* abi = arbiter_->shmem_abi_for_testing();
   size_t packets_count = 0;
   for (size_t page_idx = 0; page_idx < kNumPages; page_idx++) {
-    uint32_t page_layout = abi->page_layout_dbg(page_idx);
+    uint32_t page_layout = abi->GetPageLayout(page_idx);
     size_t num_chunks = SharedMemoryABI::GetNumChunksForLayout(page_layout);
     for (size_t chunk_idx = 0; chunk_idx < num_chunks; chunk_idx++) {
       auto chunk_state = abi->GetChunkState(page_idx, chunk_idx);

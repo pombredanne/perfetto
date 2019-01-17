@@ -70,6 +70,7 @@ class UnixSocketRaw {
   void Shutdown();
   void SetBlocking(bool);
   bool IsBlocking() const;
+  void RetainOnExec();
   SockType type() const { return type_; }
   int fd() const { return *fd_; }
   explicit operator bool() const { return !!fd_; }
@@ -201,6 +202,13 @@ class UnixSocket {
                                              EventListener*,
                                              TaskRunner*,
                                              SockType = SockType::kStream);
+
+  // Constructs a UnixSocket using the given connected socket.
+  static std::unique_ptr<UnixSocket> AdoptConnected(
+      ScopedFile fd,
+      EventListener* event_listener,
+      TaskRunner* task_runner,
+      SockType sock_type);
 
   // This class gives the hard guarantee that no callback is called on the
   // passed EventListener immediately after the object has been destroyed.

@@ -37,10 +37,9 @@ class SliceTable : public StorageTable {
 
   static void RegisterTable(sqlite3* db, const TraceStorage* storage);
 
-  // Table implementation.
-  base::Optional<Table::Schema> Init(int, const char* const*) override;
-  std::unique_ptr<Table::Cursor> CreateCursor(const QueryConstraints&,
-                                              sqlite3_value**) override;
+  // StorageTable implementation.
+  StorageSchema CreateStorageSchema() override;
+  uint32_t RowCount() override;
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
 
  private:

@@ -60,14 +60,14 @@ constexpr size_t kDefaultShmPageSize = base::kPageSize;
 constexpr int kMaxBuffersPerConsumer = 128;
 constexpr base::TimeMillis kSnapshotsInterval(10 * 1000);
 constexpr int kDefaultWriteIntoFilePeriodMs = 5000;
-constexpr int kFlushTimeoutMs = 5000;
 constexpr int kMaxConcurrentTracingSessions = 5;
 
-constexpr uint64_t kMillisPerHour = 3600000;
+constexpr uint32_t kMillisPerHour = 3600000;
+constexpr uint32_t kMaxTracingDurationMillis = 7 * 24 * kMillisPerHour;
 
 // These apply only if enable_extra_guardrails is true.
-constexpr uint64_t kMaxTracingDurationMillis = 24 * kMillisPerHour;
-constexpr uint64_t kMaxTracingBufferSizeKb = 32 * 1024;
+constexpr uint32_t kGuardrailsMaxTracingBufferSizeKb = 32 * 1024;
+constexpr uint32_t kGuardrailsMaxTracingDurationMillis = 24 * kMillisPerHour;
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 struct iovec {
@@ -165,6 +165,12 @@ void TracingServiceImpl::DisconnectProducer(ProducerID id) {
   PERFETTO_DLOG("Producer %" PRIu16 " disconnected", id);
   PERFETTO_DCHECK(producers_.count(id));
 
+  // Scrape remaining chunks for this producer to ensure we don't lose data.
+  if (auto* producer = GetProducer(id)) {
+    for (auto& session_id_and_session : tracing_sessions_)
+      ScrapeSharedMemoryBuffers(&session_id_and_session.second, producer);
+  }
+
   for (auto it = data_sources_.begin(); it != data_sources_.end();) {
     auto next = it;
     next++;
@@ -209,14 +215,12 @@ void TracingServiceImpl::DisconnectConsumer(ConsumerEndpointImpl* consumer) {
     FreeBuffers(consumer->tracing_session_id_);  // Will also DisableTracing().
   consumers_.erase(consumer);
 
-// At this point no more pointers to |consumer| should be around.
-#if PERFETTO_DCHECK_IS_ON()
+  // At this point no more pointers to |consumer| should be around.
   PERFETTO_DCHECK(!std::any_of(
       tracing_sessions_.begin(), tracing_sessions_.end(),
       [consumer](const std::pair<const TracingSessionID, TracingSession>& kv) {
         return kv.second.consumer_maybe_null == consumer;
       }));
-#endif
 }
 
 bool TracingServiceImpl::DetachConsumer(ConsumerEndpointImpl* consumer,
@@ -291,25 +295,28 @@ bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
     return false;
   }
 
+  const uint32_t max_duration_ms = cfg.enable_extra_guardrails()
+                                       ? kGuardrailsMaxTracingDurationMillis
+                                       : kMaxTracingDurationMillis;
+  if (cfg.duration_ms() > max_duration_ms) {
+    PERFETTO_ELOG("Requested too long trace (%" PRIu32 "ms  > %" PRIu32 " ms)",
+                  cfg.duration_ms(), max_duration_ms);
+    return false;
+  }
+
   if (cfg.enable_extra_guardrails()) {
     if (cfg.deferred_start()) {
       PERFETTO_ELOG(
           "deferred_start=true is not supported in unsupervised traces");
       return false;
     }
-    if (cfg.duration_ms() > kMaxTracingDurationMillis) {
-      PERFETTO_ELOG("Requested too long trace (%" PRIu32 "ms  > %" PRIu64
-                    " ms)",
-                    cfg.duration_ms(), kMaxTracingDurationMillis);
-      return false;
-    }
     uint64_t buf_size_sum = 0;
     for (const auto& buf : cfg.buffers())
       buf_size_sum += buf.size_kb();
-    if (buf_size_sum > kMaxTracingBufferSizeKb) {
+    if (buf_size_sum > kGuardrailsMaxTracingBufferSizeKb) {
       PERFETTO_ELOG("Requested too large trace buffer (%" PRIu64
-                    "kB  > %" PRIu64 " kB)",
-                    buf_size_sum, kMaxTracingBufferSizeKb);
+                    "kB  > %" PRIu32 " kB)",
+                    buf_size_sum, kGuardrailsMaxTracingBufferSizeKb);
       return false;
     }
   }
@@ -621,6 +628,10 @@ void TracingServiceImpl::DisableTracingNotifyConsumerAndFlushFile(
   tracing_session->pending_stop_acks.clear();
   tracing_session->state = TracingSession::DISABLED;
 
+  // Scrape any remaining chunks that weren't flushed by the producers.
+  for (auto& producer_id_and_producer : producers_)
+    ScrapeSharedMemoryBuffers(tracing_session, producer_id_and_producer.second);
+
   if (tracing_session->write_into_file) {
     tracing_session->write_period_ms = 0;
     ReadBuffers(tracing_session->id, nullptr);
@@ -639,6 +650,9 @@ void TracingServiceImpl::Flush(TracingSessionID tsid,
     PERFETTO_DLOG("Flush() failed, invalid session ID %" PRIu64, tsid);
     return;
   }
+
+  if (!timeout_ms)
+    timeout_ms = tracing_session->flush_timeout_ms();
 
   if (tracing_session->pending_flushes.size() > 1000) {
     PERFETTO_ELOG("Too many flushes (%zu) pending for the tracing session",
@@ -672,6 +686,11 @@ void TracingServiceImpl::Flush(TracingSessionID tsid,
     pending_flush.producers.insert(producer_id);
   }
 
+  // If there are no producers to flush (realistically this happens only in
+  // some tests) fire  OnFlushTimeout() straight away, without waiting.
+  if (flush_map.empty())
+    timeout_ms = 0;
+
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
   task_runner_->PostDelayedTask(
       [weak_this, tsid, flush_request_id] {
@@ -692,8 +711,15 @@ void TracingServiceImpl::NotifyFlushDoneForProducer(
       PendingFlush& pending_flush = it->second;
       pending_flush.producers.erase(producer_id);
       if (pending_flush.producers.empty()) {
-        task_runner_->PostTask(
-            std::bind(std::move(pending_flush.callback), /*success=*/true));
+        auto weak_this = weak_ptr_factory_.GetWeakPtr();
+        TracingSessionID tsid = kv.first;
+        auto callback = std::move(pending_flush.callback);
+        task_runner_->PostTask([weak_this, tsid, callback]() {
+          if (weak_this) {
+            weak_this->CompleteFlush(tsid, std::move(callback),
+                                     /*success=*/true);
+          }
+        });
         it = pending_flushes.erase(it);
       } else {
         it++;
@@ -710,15 +736,153 @@ void TracingServiceImpl::OnFlushTimeout(TracingSessionID tsid,
   auto it = tracing_session->pending_flushes.find(flush_request_id);
   if (it == tracing_session->pending_flushes.end())
     return;  // Nominal case: flush was completed and acked on time.
+
+  // If there were no producers to flush, consider it a success.
+  bool success = it->second.producers.empty();
+
   auto callback = std::move(it->second.callback);
   tracing_session->pending_flushes.erase(it);
-  callback(/*success=*/false);
+  CompleteFlush(tsid, std::move(callback), success);
+}
+
+void TracingServiceImpl::CompleteFlush(TracingSessionID tsid,
+                                       ConsumerEndpoint::FlushCallback callback,
+                                       bool success) {
+  TracingSession* tracing_session = GetTracingSession(tsid);
+  if (tracing_session) {
+    // Producers may not have been able to flush all their data, even if they
+    // indicated flush completion. If possible, also collect uncommitted chunks
+    // to make sure we have everything they wrote so far.
+    for (auto& producer_id_and_producer : producers_) {
+      ScrapeSharedMemoryBuffers(tracing_session,
+                                producer_id_and_producer.second);
+    }
+  }
+  callback(success);
+}
+
+void TracingServiceImpl::ScrapeSharedMemoryBuffers(
+    TracingSession* tracing_session,
+    ProducerEndpointImpl* producer) {
+  if (!smb_scraping_enabled_)
+    return;
+
+  // Can't copy chunks if we don't know about any trace writers.
+  if (producer->writers_.empty())
+    return;
+
+  // Performance optimization: On flush or session disconnect, this method is
+  // called for each producer. If the producer doesn't participate in the
+  // session, there's no need to scape its chunks right now. We can tell if a
+  // producer participates in the session by checking if the producer is allowed
+  // to write into the session's log buffers.
+  const auto& session_buffers = tracing_session->buffers_index;
+  bool producer_in_session =
+      std::any_of(session_buffers.begin(), session_buffers.end(),
+                  [producer](BufferID buffer_id) {
+                    return producer->allowed_target_buffers_.count(buffer_id);
+                  });
+  if (!producer_in_session)
+    return;
+
+  PERFETTO_DLOG("Scraping SMB for producer %" PRIu16, producer->id_);
+
+  // Find and copy any uncommitted chunks from the SMB.
+  //
+  // In nominal conditions, the page layout of the used SMB pages should never
+  // change because the service is the only one who is supposed to modify used
+  // pages (to make them free again).
+  //
+  // However, the code here needs to deal with the case of a malicious producer
+  // altering the SMB in unpredictable ways. Thankfully the SMB size is
+  // immutable, so a chunk will always point to some valid memory, even if the
+  // producer alters the intended layout and chunk header concurrently.
+  // Ultimately a malicious producer altering the SMB's chunk layout while we
+  // are iterating in this function is not any different from the case of a
+  // malicious producer asking to commit a chunk made of random data, which is
+  // something this class has to deal with regardless.
+  //
+  // The only legitimate mutations that can happen from sane producers,
+  // concurrently to this function, are:
+  //   A. free pages being partitioned,
+  //   B. free chunks being migrated to kChunkBeingWritten,
+  //   C. kChunkBeingWritten chunks being migrated to kChunkCompleted.
+
+  SharedMemoryABI* abi = &producer->shmem_abi_;
+  // num_pages() is immutable after the SMB is initialized and cannot be changed
+  // even by a producer even if malicious.
+  for (size_t page_idx = 0; page_idx < abi->num_pages(); page_idx++) {
+    uint32_t layout = abi->GetPageLayout(page_idx);
+
+    uint32_t used_chunks = abi->GetUsedChunks(layout);  // Returns a bitmap.
+    // Skip empty pages.
+    if (used_chunks == 0)
+      continue;
+
+    // Scrape the chunks that are currently used. These should be either in
+    // state kChunkBeingWritten or kChunkComplete.
+    for (uint32_t chunk_idx = 0; used_chunks; chunk_idx++, used_chunks >>= 1) {
+      if (!(used_chunks & 1))
+        continue;
+
+      SharedMemoryABI::ChunkState state =
+          SharedMemoryABI::GetChunkStateFromLayout(layout, chunk_idx);
+      PERFETTO_DCHECK(state == SharedMemoryABI::kChunkBeingWritten ||
+                      state == SharedMemoryABI::kChunkComplete);
+      bool chunk_complete = state == SharedMemoryABI::kChunkComplete;
+
+      SharedMemoryABI::Chunk chunk =
+          abi->GetChunkUnchecked(page_idx, layout, chunk_idx);
+
+      uint16_t packet_count;
+      uint8_t flags;
+      // GetPacketCountAndFlags has acquire_load semantics.
+      std::tie(packet_count, flags) = chunk.GetPacketCountAndFlags();
+
+      // It only makes sense to copy an incomplete chunk if there's at least
+      // one full packet available. (The producer may not have completed the
+      // last packet in it yet, so we need at least 2.)
+      if (!chunk_complete && packet_count < 2)
+        continue;
+
+      // At this point, it is safe to access the remaining header fields of
+      // the chunk. Even if the chunk was only just transferred from
+      // kChunkFree into kChunkBeingWritten state, the header should be
+      // written completely once the packet count increased above 1 (it was
+      // reset to 0 by the service when the chunk was freed).
+
+      WriterID writer_id = chunk.writer_id();
+      base::Optional<BufferID> target_buffer_id =
+          producer->buffer_id_for_writer(writer_id);
+
+      // We can only scrape this chunk if we know which log buffer to copy it
+      // into.
+      if (!target_buffer_id)
+        continue;
+
+      // Skip chunks that don't belong to the requested tracing session.
+      bool target_buffer_belongs_to_session =
+          std::find(session_buffers.begin(), session_buffers.end(),
+                    *target_buffer_id) != session_buffers.end();
+      if (!target_buffer_belongs_to_session)
+        continue;
+
+      uint32_t chunk_id =
+          chunk.header()->chunk_id.load(std::memory_order_relaxed);
+
+      CopyProducerPageIntoLogBuffer(
+          producer->id_, producer->uid_, writer_id, chunk_id, *target_buffer_id,
+          packet_count, flags, chunk_complete, chunk.payload_begin(),
+          chunk.payload_size());
+    }
+  }
 }
 
 void TracingServiceImpl::FlushAndDisableTracing(TracingSessionID tsid) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
+  PERFETTO_DLOG("Triggering final flush for %" PRIu64, tsid);
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
-  Flush(tsid, kFlushTimeoutMs, [weak_this, tsid](bool success) {
+  Flush(tsid, 0, [weak_this, tsid](bool success) {
     PERFETTO_DLOG("Flush done (success: %d), disabling trace session %" PRIu64,
                   success, tsid);
     if (!weak_this)
@@ -757,7 +921,8 @@ void TracingServiceImpl::PeriodicFlushTask(TracingSessionID tsid,
   if (post_next_only)
     return;
 
-  Flush(tsid, kFlushTimeoutMs, [](bool success) {
+  PERFETTO_DLOG("Triggering periodic flush for %" PRIu64, tsid);
+  Flush(tsid, 0, [](bool success) {
     if (!success)
       PERFETTO_ELOG("Periodic flush timed out");
   });
@@ -1326,7 +1491,7 @@ TraceBuffer* TracingServiceImpl::GetBufferByID(BufferID buffer_id) {
 }
 
 void TracingServiceImpl::UpdateMemoryGuardrail() {
-#if !PERFETTO_BUILDFLAG(PERFETTO_CHROMIUM_BUILD) && \
+#if !PERFETTO_BUILDFLAG(PERFETTO_EMBEDDER_BUILD) && \
     !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
   uint64_t total_buffer_bytes = 0;
 
@@ -1453,7 +1618,10 @@ void TracingServiceImpl::SnapshotStats(TracingSession* tracing_session,
     const TraceBuffer::Stats& buf_stats = buf->stats();
     buf_stats_proto->set_bytes_written(buf_stats.bytes_written);
     buf_stats_proto->set_chunks_written(buf_stats.chunks_written);
+    buf_stats_proto->set_chunks_rewritten(buf_stats.chunks_rewritten);
     buf_stats_proto->set_chunks_overwritten(buf_stats.chunks_overwritten);
+    buf_stats_proto->set_chunks_committed_out_of_order(
+        buf_stats.chunks_committed_out_of_order);
     buf_stats_proto->set_write_wrap_count(buf_stats.write_wrap_count);
     buf_stats_proto->set_patches_succeeded(buf_stats.patches_succeeded);
     buf_stats_proto->set_patches_failed(buf_stats.patches_failed);
