@@ -29,11 +29,11 @@ const char* __attribute__((unused))
 FindChar(const char* s, unsigned char c, size_t n) {
   const char* ret = s;
   const char* end = s + n;
-  for (;;) {
+  while (ret != end) {
     const char* next = static_cast<const char*>(
         memchr(ret, c, static_cast<size_t>(end - ret)));
     if (next)
-      ret = next;
+      ret = next + 1;
     else
       break;
   };
@@ -42,6 +42,8 @@ FindChar(const char* s, unsigned char c, size_t n) {
       return ret;
     return nullptr;
   }
+  if (ret == end)
+    return nullptr;
   return ret;
 }
 

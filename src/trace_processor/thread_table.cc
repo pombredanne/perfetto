@@ -59,11 +59,10 @@ int ThreadTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
   // If the query has a constraint on the |utid| field, return a reduced cost
   // because we can do that filter efficiently.
   const auto& constraints = qc.constraints();
-  for (const auto& cs : qc.constraints()) {
-    if (cs.iColumn == Column::kUtid) {
-      info->estimated_cost = IsOpEq(constraints.front().op) ? 1 : 10;
-    }
+  if (constraints.size() == 1 && constraints.front().iColumn == Column::kUtid) {
+    info->estimated_cost = IsOpEq(constraints.front().op) ? 1 : 10;
   }
+
   return SQLITE_OK;
 }
 
