@@ -193,10 +193,12 @@ class NumericColumn : public StorageColumn {
     }
 
     // Otherwise, lookup the cast value in the index and return the results.
-    std::vector<uint32_t> rows;
     auto pair = index_->equal_range(static_cast<T>(raw));
+    auto size = static_cast<size_t>(std::distance(pair.first, pair.second));
+    std::vector<uint32_t> rows(size);
+    size_t i = 0;
     for (auto it = pair.first; it != pair.second; it++) {
-      rows.emplace_back(it->second);
+      rows[i++] = it->second;
     }
     index->IntersectRows(std::move(rows));
   }
