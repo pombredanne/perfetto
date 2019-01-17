@@ -248,8 +248,7 @@ void ProtoTraceTokenizer::ParseFtraceEvent(uint32_t cpu, TraceBlobView event) {
     return;
   }
 
-  int64_t timestamp =
-      timestamp_found ? static_cast<int64_t>(raw_timestamp) : latest_timestamp_;
+  int64_t timestamp = static_cast<int64_t>(raw_timestamp);
   latest_timestamp_ = std::max(timestamp, latest_timestamp_);
 
   // We don't need to parse this packet, just push it to be sorted with
