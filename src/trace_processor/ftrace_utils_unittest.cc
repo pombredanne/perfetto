@@ -28,12 +28,12 @@ using ::testing::ElementsAre;
 
 TEST(TaskStateUnittest, Invalid) {
   TaskState state;
-  ASSERT_FALSE(state.IsValid());
+  ASSERT_FALSE(state.is_valid());
 }
 
 TEST(TaskStateUnittest, Smoke) {
   auto state = TaskState(0);
-  ASSERT_TRUE(state.IsValid());
+  ASSERT_TRUE(state.is_valid());
 
   ASSERT_STREQ(TaskState(0).ToString().data(), "R");
   ASSERT_STREQ(TaskState(1).ToString().data(), "S");
