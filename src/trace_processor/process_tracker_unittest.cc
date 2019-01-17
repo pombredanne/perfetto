@@ -104,7 +104,7 @@ TEST_F(ProcessTrackerTest, UpdateThreadCreate) {
   ASSERT_EQ(thread.upid.value(), 1);
   auto pid_it = context.process_tracker->UpidsForPid(2);
   ASSERT_NE(pid_it.first, pid_it.second);
-  ASSERT_EQ(context.storage->process_count(), 1);
+  ASSERT_EQ(context.storage->process_count(), 2);
 }
 
 }  // namespace
