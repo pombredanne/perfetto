@@ -61,7 +61,7 @@ class ProtoTraceTokenizer : public ChunkedTraceReader {
 
   // Temporary. Currently trace packets do not have a timestamp, so the
   // timestamp given is last_timestamp.
-  int64_t last_timestamp_ = 0;
+  int64_t latest_timestamp_ = 0;
 };
 
 }  // namespace trace_processor
