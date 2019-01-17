@@ -28,6 +28,8 @@
 #include "perfetto/tracing/core/trace_writer.h"
 #include "src/traced/probes/probes_data_source.h"
 
+#include "perfetto/trace/ps/process_stats.pbzero.h"
+
 namespace perfetto {
 
 namespace base {
@@ -37,7 +39,6 @@ class TaskRunner;
 namespace protos {
 namespace pbzero {
 class ProcessTree;
-class ProcessStats;
 }  // namespace pbzero
 }  // namespace protos
 
@@ -84,7 +85,9 @@ class ProcessStatsDataSource : public ProbesDataSource {
   // Functions for periodically sampling process stats/counters.
   static void Tick(base::WeakPtr<ProcessStatsDataSource>);
   void WriteAllProcessStats();
-  bool WriteProcessStats(int32_t pid, const std::string& proc_status);
+  bool WriteMemCounters(int32_t pid,
+                        const std::string& proc_status,
+                        protos::pbzero::ProcessStats::Process** process);
 
   // Common fields used for both process/tree relationships and stats/counters.
   base::TaskRunner* const task_runner_;

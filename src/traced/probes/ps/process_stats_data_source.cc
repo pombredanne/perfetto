@@ -318,7 +318,9 @@ void ProcessStatsDataSource::WriteAllProcessStats() {
     std::string proc_status = ReadProcPidFile(pid, "status");
     if (proc_status.empty())
       continue;
-    if (!WriteProcessStats(pid, proc_status)) {
+
+    protos::pbzero::ProcessStats::Process* process = nullptr;
+    if (!WriteMemCounters(pid, proc_status, &process)) {
       // If WriteProcessStats() fails the pid is very likely a kernel thread
       // that has a valid /proc/[pid]/status but no memory values. In this
       // case avoid keep polling it over and over.
@@ -327,6 +329,12 @@ void ProcessStatsDataSource::WriteAllProcessStats() {
       pids_to_skip_[pid_u] = true;
       continue;
     }
+
+    std::string oom_score_adj = ReadProcPidFile(pid, "oom_score_adj");
+    PERFETTO_CHECK(process != nullptr);
+    if (!oom_score_adj.empty())
+      process->set_oom_score_adj(ToInt(oom_score_adj));
+
     pids.push_back(pid);
   }
   FinalizeCurPacket();
@@ -339,20 +347,21 @@ void ProcessStatsDataSource::WriteAllProcessStats() {
 // Returns true if the stats for the given |pid| have been written, false it
 // it failed (e.g., |pid| was a kernel thread and, as such, didn't report any
 // memory counters).
-bool ProcessStatsDataSource::WriteProcessStats(int32_t pid,
-                                               const std::string& proc_status) {
-  // The MemCounters entry for a process is created lazily on the first call.
+bool ProcessStatsDataSource::WriteMemCounters(
+    int32_t pid,
+    const std::string& proc_status,
+    protos::pbzero::ProcessStats::Process** process) {
+  // The Process entry for a process is created lazily on the first call.
   // This is to prevent creating empty entries that have only a pid for
   // kernel threads and other /proc/[pid] entries that have no counters
   // associated.
   bool proc_status_has_mem_counters = false;
-  protos::pbzero::ProcessStats::MemCounters* mem_counters = nullptr;
-  auto get_counters_lazy = [this, &mem_counters, pid] {
-    if (!mem_counters) {
-      mem_counters = GetOrCreateStats()->add_mem_counters();
-      mem_counters->set_pid(pid);
+  auto get_process_lazy = [this, process, pid] {
+    if (!(*process)) {
+      *process = GetOrCreateStats()->add_processes();
+      (*process)->set_pid(pid);
     }
-    return mem_counters;
+    return *process;
   };
 
   // Parse /proc/[pid]/status, which looks like this:
@@ -378,21 +387,21 @@ bool ProcessStatsDataSource::WriteProcessStats(int32_t pid,
       if (strcmp(key.data(), "VmSize") == 0) {
         // Assume that if we see VmSize we'll see also the others.
         proc_status_has_mem_counters = true;
-        get_counters_lazy()->set_vm_size_kb(ToU32(value.data()));
+        get_process_lazy()->set_vm_size_kb(ToU32(value.data()));
       } else if (strcmp(key.data(), "VmLck") == 0) {
-        get_counters_lazy()->set_vm_locked_kb(ToU32(value.data()));
+        get_process_lazy()->set_vm_locked_kb(ToU32(value.data()));
       } else if (strcmp(key.data(), "VmHWM") == 0) {
-        get_counters_lazy()->set_vm_hwm_kb(ToU32(value.data()));
+        get_process_lazy()->set_vm_hwm_kb(ToU32(value.data()));
       } else if (strcmp(key.data(), "VmRSS") == 0) {
-        get_counters_lazy()->set_vm_rss_kb(ToU32(value.data()));
+        get_process_lazy()->set_vm_rss_kb(ToU32(value.data()));
       } else if (strcmp(key.data(), "RssAnon") == 0) {
-        get_counters_lazy()->set_rss_anon_kb(ToU32(value.data()));
+        get_process_lazy()->set_rss_anon_kb(ToU32(value.data()));
       } else if (strcmp(key.data(), "RssFile") == 0) {
-        get_counters_lazy()->set_rss_file_kb(ToU32(value.data()));
+        get_process_lazy()->set_rss_file_kb(ToU32(value.data()));
       } else if (strcmp(key.data(), "RssShmem") == 0) {
-        get_counters_lazy()->set_rss_shmem_kb(ToU32(value.data()));
+        get_process_lazy()->set_rss_shmem_kb(ToU32(value.data()));
       } else if (strcmp(key.data(), "VmSwap") == 0) {
-        get_counters_lazy()->set_vm_swap_kb(ToU32(value.data()));
+        get_process_lazy()->set_vm_swap_kb(ToU32(value.data()));
       }
 
       key.clear();
