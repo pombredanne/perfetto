@@ -34,14 +34,20 @@ const MD_PALETTE: Color[] = [
   {c: 'green', h: 122, s: 39, l: 49},
   {c: 'light green', h: 88, s: 50, l: 53},
   {c: 'lime', h: 66, s: 70, l: 54},
-  {c: 'yellow', h: 54, s: 100, l: 62},
   {c: 'amber', h: 45, s: 100, l: 51},
   {c: 'orange', h: 36, s: 100, l: 50},
-  {c: 'deep organge', h: 14, s: 100, l: 57},
+  {c: 'deep orange', h: 14, s: 100, l: 57},
   {c: 'brown', h: 16, s: 25, l: 38},
-  {c: 'grey', h: 0, s: 0, l: 62},
   {c: 'blue gray', h: 200, s: 18, l: 46},
+  {c: 'yellow', h: 54, s: 100, l: 62},
 ];
+
+const GREY_COLOR: Color = {
+  c: 'grey',
+  h: 0,
+  s: 0,
+  l: 62
+};
 
 function hash(s: string, max: number): number {
   let hash = 0x811c9dc5 & 0xfffffff;
@@ -58,9 +64,9 @@ export function hueForCpu(cpu: number): number {
 
 export function colorForThread(thread: ThreadDesc|undefined): Color {
   if (thread === undefined) {
-    return Object.assign({}, MD_PALETTE[14]);
+    return Object.assign({}, GREY_COLOR);
   }
   const hashKey = thread.pid ? thread.pid : thread.tid;
-  const colorIdx = hash(hashKey.toString(), 16);
+  const colorIdx = hash(hashKey.toString(), MD_PALETTE.length);
   return Object.assign({}, MD_PALETTE[colorIdx]);
 }
