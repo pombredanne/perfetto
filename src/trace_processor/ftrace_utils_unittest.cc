@@ -26,34 +26,34 @@ namespace {
 
 using ::testing::ElementsAre;
 
-TEST(TaskStateUnittest, Unknown) {
-  TaskState state = TaskState::Unknown();
+TEST(TaskStateUnittest, Invalid) {
+  TaskState state;
   ASSERT_FALSE(state.IsValid());
 }
 
 TEST(TaskStateUnittest, Smoke) {
-  auto state = TaskState::From(0);
+  auto state = TaskState(0);
   ASSERT_TRUE(state.IsValid());
 
-  ASSERT_STREQ(TaskState::From(0).ToString().data(), "R");
-  ASSERT_STREQ(TaskState::From(1).ToString().data(), "S");
-  ASSERT_STREQ(TaskState::From(2).ToString().data(), "D");
-  ASSERT_STREQ(TaskState::From(4).ToString().data(), "T");
-  ASSERT_STREQ(TaskState::From(8).ToString().data(), "t");
-  ASSERT_STREQ(TaskState::From(16).ToString().data(), "X");
-  ASSERT_STREQ(TaskState::From(32).ToString().data(), "Z");
-  ASSERT_STREQ(TaskState::From(64).ToString().data(), "x");
-  ASSERT_STREQ(TaskState::From(128).ToString().data(), "K");
-  ASSERT_STREQ(TaskState::From(256).ToString().data(), "W");
-  ASSERT_STREQ(TaskState::From(512).ToString().data(), "P");
-  ASSERT_STREQ(TaskState::From(1024).ToString().data(), "N");
+  ASSERT_STREQ(TaskState(0).ToString().data(), "R");
+  ASSERT_STREQ(TaskState(1).ToString().data(), "S");
+  ASSERT_STREQ(TaskState(2).ToString().data(), "D");
+  ASSERT_STREQ(TaskState(4).ToString().data(), "T");
+  ASSERT_STREQ(TaskState(8).ToString().data(), "t");
+  ASSERT_STREQ(TaskState(16).ToString().data(), "X");
+  ASSERT_STREQ(TaskState(32).ToString().data(), "Z");
+  ASSERT_STREQ(TaskState(64).ToString().data(), "x");
+  ASSERT_STREQ(TaskState(128).ToString().data(), "K");
+  ASSERT_STREQ(TaskState(256).ToString().data(), "W");
+  ASSERT_STREQ(TaskState(512).ToString().data(), "P");
+  ASSERT_STREQ(TaskState(1024).ToString().data(), "N");
 }
 
 TEST(TaskStateUnittest, MultipleState) {
-  ASSERT_STREQ(TaskState::From(2048).ToString().data(), "R+");
-  ASSERT_STREQ(TaskState::From(130).ToString().data(), "DK");
-  ASSERT_STREQ(TaskState::From(258).ToString().data(), "DW");
-  ASSERT_STREQ(TaskState::From(1184).ToString().data(), "ZKN");
+  ASSERT_STREQ(TaskState(2048).ToString().data(), "R+");
+  ASSERT_STREQ(TaskState(130).ToString().data(), "DK");
+  ASSERT_STREQ(TaskState(258).ToString().data(), "DW");
+  ASSERT_STREQ(TaskState(1184).ToString().data(), "ZKN");
 }
 
 }  // namespace

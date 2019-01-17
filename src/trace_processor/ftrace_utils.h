@@ -33,14 +33,11 @@ class TaskState {
  public:
   using TaskStateStr = std::array<char, 4>;
 
-  // Returns a TaskState struct parsed from the raw state integer given.
-  static TaskState From(uint16_t raw_state);
-
-  // Returns an invalid TaskState struct.
-  static TaskState Unknown() { return TaskState(); }
+  TaskState();
+  TaskState(uint16_t raw_state);
 
   // Returns if this TaskState has a valid representation.
-  bool IsValid() const { return state_ & kValidBitMask; }
+  bool IsValid() const { return state_ & kValid; }
 
   // Returns the string representation of this (valid) TaskState. This array
   // is null terminated.
@@ -63,17 +60,15 @@ class TaskState {
     kWaking = 256,
     kParked = 512,
     kNoLoad = 1024,
-    // If you are adding atoms here, make sure to change the constants below.
+
+    kMaxState = 2048,
+    kValid = 0x8000,
   };
-  static constexpr uint16_t kRawMaxTaskState = 2048;
-  static constexpr uint16_t kValidBitMask = 0x8000;
 
-  TaskState();
-
-  bool IsRunnable() const { return (state_ & (kRawMaxTaskState - 1)) == 0; }
+  bool IsRunnable() const { return (state_ & (kMaxState - 1)) == 0; }
 
   // Returns whether kernel preemption caused the exit state.
-  bool IsKernelPreempt() const { return state_ & kRawMaxTaskState; }
+  bool IsKernelPreempt() const { return state_ & kMaxState; }
 
   uint16_t state_ = 0;
 };

@@ -25,22 +25,7 @@ namespace trace_processor {
 namespace ftrace_utils {
 
 TaskState::TaskState() = default;
-
-TaskState TaskState::From(uint16_t raw_state) {
-  uint16_t masked = raw_state & (kRawMaxTaskState - 1);
-  TaskState state;
-
-  // Set the main state bits.
-  state.state_ = masked;
-
-  // Set the preemption bit.
-  state.state_ |= raw_state & kRawMaxTaskState;
-
-  // Set the valid bit.
-  state.state_ |= kValidBitMask;
-
-  return state;
-}
+TaskState::TaskState(uint16_t raw_state) : state_(raw_state | kValid) {}
 
 TaskState::TaskStateStr TaskState::ToString() const {
   PERFETTO_CHECK(IsValid());
