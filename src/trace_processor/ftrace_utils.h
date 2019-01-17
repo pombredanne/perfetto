@@ -33,11 +33,11 @@ class TaskState {
  public:
   using TaskStateStr = std::array<char, 4>;
 
-  TaskState();
-  TaskState(uint16_t raw_state);
+  TaskState() = default;
+  TaskState(uint16_t raw_state) : state_(raw_state | kValid) {}
 
   // Returns if this TaskState has a valid representation.
-  bool IsValid() const { return state_ & kValid; }
+  bool is_valid() const { return state_ & kValid; }
 
   // Returns the string representation of this (valid) TaskState. This array
   // is null terminated.
@@ -65,10 +65,10 @@ class TaskState {
     kValid = 0x8000,
   };
 
-  bool IsRunnable() const { return (state_ & (kMaxState - 1)) == 0; }
+  bool is_runnable() const { return (state_ & (kMaxState - 1)) == 0; }
 
   // Returns whether kernel preemption caused the exit state.
-  bool IsKernelPreempt() const { return state_ & kMaxState; }
+  bool is_kernel_preempt() const { return state_ & kMaxState; }
 
   uint16_t state_ = 0;
 };

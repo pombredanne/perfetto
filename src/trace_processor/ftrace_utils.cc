@@ -24,18 +24,15 @@ namespace perfetto {
 namespace trace_processor {
 namespace ftrace_utils {
 
-TaskState::TaskState() = default;
-TaskState::TaskState(uint16_t raw_state) : state_(raw_state | kValid) {}
-
 TaskState::TaskStateStr TaskState::ToString() const {
-  PERFETTO_CHECK(IsValid());
+  PERFETTO_CHECK(is_valid());
 
   char buffer[32];
   size_t pos = 0;
 
   // This mapping is given by the file
   // https://android.googlesource.com/kernel/msm.git/+/android-msm-wahoo-4.4-pie-qpr1/include/trace/events/sched.h#155
-  if (IsRunnable()) {
+  if (is_runnable()) {
     buffer[pos++] = 'R';
   } else {
     if (state_ & Atom::kInterruptibleSleep)
@@ -62,7 +59,7 @@ TaskState::TaskStateStr TaskState::ToString() const {
       buffer[pos++] = 'N';
   }
 
-  if (IsKernelPreempt())
+  if (is_kernel_preempt())
     buffer[pos++] = '+';
 
   // It is very unlikely that we have used more than the size of the string
