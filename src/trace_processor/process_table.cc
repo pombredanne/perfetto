@@ -107,13 +107,8 @@ int ProcessTable::Cursor::Column(sqlite3_context* context, int N) {
     }
     case Column::kName: {
       const auto& process = storage_->GetProcess(current);
-      if (process.name_id == kNullStringId) {
-        sqlite3_result_null(context);
-      } else {
-        const auto& name = storage_->GetString(process.name_id);
-        sqlite3_result_text(context, name.c_str(),
-                            static_cast<int>(name.length()), kSqliteStatic);
-      }
+      const auto& name = storage_->GetString(process.name_id);
+      sqlite_utils::ReportSqliteResult(context, name);
       break;
     }
     case Column::kPid: {

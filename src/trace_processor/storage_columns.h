@@ -189,20 +189,14 @@ class StringColumn final : public StorageColumn {
  public:
   StringColumn(std::string col_name,
                const std::deque<Id>* deque,
-               const std::deque<std::string>* string_map,
+               const std::deque<const char*>* string_map,
                bool hidden = false)
       : StorageColumn(col_name, hidden),
         deque_(deque),
         string_map_(string_map) {}
 
   void ReportResult(sqlite3_context* ctx, uint32_t row) const override {
-    auto idx = (*deque_)[row];
-    if (idx == kNullStringId) {
-      sqlite3_result_null(ctx);
-    } else {
-      const auto& str = (*string_map_)[idx];
-      sqlite3_result_text(ctx, str.c_str(), -1, sqlite_utils::kSqliteStatic);
-    }
+    sqlite_utils::ReportSqliteResult(ctx, (*string_map_)[(*deque_)[row]]);
   }
 
   Bounds BoundFilter(int, sqlite3_value*) const override {
@@ -216,28 +210,14 @@ class StringColumn final : public StorageColumn {
   Comparator Sort(const QueryConstraints::OrderBy& ob) const override {
     if (ob.desc) {
       return [this](uint32_t f, uint32_t s) {
-        auto f_idx = (*deque_)[f];
-        auto s_idx = (*deque_)[s];
-        if (f_idx == kNullStringId) {
-          return s_idx == kNullStringId ? 0 : -1;
-        } else if (s_idx == kNullStringId) {
-          return 1;
-        }
-        const std::string& a = (*string_map_)[f_idx];
-        const std::string& b = (*string_map_)[s_idx];
+        const char* a = (*string_map_)[(*deque_)[f]];
+        const char* b = (*string_map_)[(*deque_)[s]];
         return sqlite_utils::CompareValuesDesc(a, b);
       };
     }
     return [this](uint32_t f, uint32_t s) {
-      auto f_idx = (*deque_)[f];
-      auto s_idx = (*deque_)[s];
-      if (f_idx == kNullStringId) {
-        return s_idx == 0 ? 0 : 1;
-      } else if (s_idx == kNullStringId) {
-        return -1;
-      }
-      const std::string& a = (*string_map_)[f_idx];
-      const std::string& b = (*string_map_)[s_idx];
+      const char* a = (*string_map_)[(*deque_)[f]];
+      const char* b = (*string_map_)[(*deque_)[s]];
       return sqlite_utils::CompareValuesAsc(a, b);
     };
   }
@@ -250,7 +230,7 @@ class StringColumn final : public StorageColumn {
 
  private:
   const std::deque<Id>* deque_ = nullptr;
-  const std::deque<std::string>* string_map_ = nullptr;
+  const std::deque<const char*>* string_map_ = nullptr;
 };
 
 // Column which represents the "ts_end" column present in all time based
