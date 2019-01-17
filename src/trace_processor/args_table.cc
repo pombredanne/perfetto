@@ -147,8 +147,9 @@ void ArgsTable::ValueColumn::Filter(int op,
       auto predicate = sqlite_utils::CreateStringPredicate(op, value);
       index->FilterRows([this, &predicate](uint32_t row) {
         const auto& arg = storage_->args().arg_values()[row];
-        const auto& str = storage_->GetString(arg.string_value);
-        return arg.type == type_ ? predicate(str.c_str()) : predicate(nullptr);
+        return arg.type == type_
+                   ? predicate(storage_->GetString(arg.string_value).c_str())
+                   : predicate(nullptr);
       });
       break;
     }
