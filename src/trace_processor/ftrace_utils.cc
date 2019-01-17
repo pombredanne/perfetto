@@ -42,28 +42,50 @@ TaskState TaskState::From(uint16_t raw_state) {
   return state;
 }
 
-TaskState::String TaskState::ToString() const {
+TaskState::TaskStateStr TaskState::ToString() const {
   PERFETTO_CHECK(IsValid());
 
   char buffer[32];
-  uint32_t pos = 0;
-  for (size_t i = kInterruptibleSleep; i < kRawMaxTaskState; i <<= 1) {
-    if (state_ & i)
-      buffer[pos++] = AtomToChar(static_cast<Atom>(i));
-  }
+  size_t pos = 0;
 
-  if (IsRunnable())
-    buffer[pos++] = AtomToChar(Atom::kRunnable);
+  // This mapping is given by the file
+  // https://android.googlesource.com/kernel/msm.git/+/android-msm-wahoo-4.4-pie-qpr1/include/trace/events/sched.h#155
+  if (IsRunnable()) {
+    buffer[pos++] = 'R';
+  } else {
+    if (state_ & Atom::kInterruptibleSleep)
+      buffer[pos++] = 'S';
+    if (state_ & Atom::kUninterruptibleSleep)
+      buffer[pos++] = 'D';  // D for (D)isk sleep
+    if (state_ & Atom::kStopped)
+      buffer[pos++] = 'T';
+    if (state_ & Atom::kTraced)
+      buffer[pos++] = 't';
+    if (state_ & Atom::kExitDead)
+      buffer[pos++] = 'X';
+    if (state_ & Atom::kExitZombie)
+      buffer[pos++] = 'Z';
+    if (state_ & Atom::kTaskDead)
+      buffer[pos++] = 'x';
+    if (state_ & Atom::kWakeKill)
+      buffer[pos++] = 'K';
+    if (state_ & Atom::kWaking)
+      buffer[pos++] = 'W';
+    if (state_ & Atom::kParked)
+      buffer[pos++] = 'P';
+    if (state_ & Atom::kNoLoad)
+      buffer[pos++] = 'N';
+  }
 
   if (IsKernelPreempt())
     buffer[pos++] = '+';
 
   // It is very unlikely that we have used more than the size of the string
   // array. Double check that belief on debug builds.
-  PERFETTO_DCHECK(pos < std::tuple_size<TaskState::String>() - 1);
+  PERFETTO_DCHECK(pos < std::tuple_size<TaskStateStr>() - 1);
 
-  TaskState::String output{};
-  memcpy(output.data(), buffer, std::min(pos, 3u));
+  TaskStateStr output{};
+  memcpy(output.data(), buffer, std::min(pos, output.size() - 1));
   return output;
 }
 

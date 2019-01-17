@@ -31,7 +31,7 @@ namespace ftrace_utils {
 // events.
 class TaskState {
  public:
-  using String = std::array<char, 4>;
+  using TaskStateStr = std::array<char, 4>;
 
   // Returns a TaskState struct parsed from the raw state integer given.
   static TaskState From(uint16_t raw_state);
@@ -45,15 +45,13 @@ class TaskState {
   // Returns the string representation of this (valid) TaskState. This array
   // is null terminated.
   // Note: This function CHECKs that |IsValid()| is true.
-  TaskState::String ToString() const;
+  TaskStateStr ToString() const;
 
  private:
   // The ordering and values of these fields comes from the kernel in the file
   // https://android.googlesource.com/kernel/msm.git/+/android-msm-wahoo-4.4-pie-qpr1/include/linux/sched.h#212
   enum Atom : uint16_t {
     kRunnable = 0,
-
-    // The index of each of these in the bitset is log2(atom value).
     kInterruptibleSleep = 1,
     kUninterruptibleSleep = 2,
     kStopped = 4,
@@ -77,39 +75,7 @@ class TaskState {
   // Returns whether kernel preemption caused the exit state.
   bool IsKernelPreempt() const { return state_ & kRawMaxTaskState; }
 
-  static char AtomToChar(Atom atom) {
-    // This mapping is given by the file
-    // https://android.googlesource.com/kernel/msm.git/+/android-msm-wahoo-4.4-pie-qpr1/include/trace/events/sched.h#155
-    switch (atom) {
-      case Atom::kRunnable:
-        return 'R';
-      case Atom::kInterruptibleSleep:
-        return 'S';
-      case Atom::kUninterruptibleSleep:
-        return 'D';  // D for (D)isk sleep
-      case Atom::kStopped:
-        return 'T';
-      case Atom::kTraced:
-        return 't';
-      case Atom::kExitDead:
-        return 'X';
-      case Atom::kExitZombie:
-        return 'Z';
-      case Atom::kTaskDead:
-        return 'x';
-      case Atom::kWakeKill:
-        return 'K';
-      case Atom::kWaking:
-        return 'W';
-      case Atom::kParked:
-        return 'P';
-      case Atom::kNoLoad:
-        return 'N';
-    }
-    PERFETTO_FATAL("For GCC");
-  }
-
-  uint16_t state_;
+  uint16_t state_ = 0;
 };
 
 }  // namespace ftrace_utils
