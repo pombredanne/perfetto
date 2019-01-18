@@ -244,16 +244,18 @@ class HeapTracker {
                     uint64_t address,
                     uint64_t size,
                     uint64_t sequence_number);
-  void RecordFree(uint64_t address, uint64_t sequence_number);
   void Dump(pid_t pid, DumpState* dump_state);
+  void RecordFree(uint64_t address, uint64_t sequence_number) {
+    RecordOperation(address, sequence_number);
+  }
 
   uint64_t GetSizeForTesting(const std::vector<unwindstack::FrameData>& stack);
 
  private:
-  static constexpr uint64_t kNoopFree = 0;
-
   struct CallstackAllocations {
     CallstackAllocations(GlobalCallstackTrie::Node* n) : node(n) {}
+
+    uint64_t allocs = 0;
 
     uint64_t allocated = 0;
     uint64_t freed = 0;
@@ -275,8 +277,7 @@ class HeapTracker {
   struct Allocation {
     Allocation(uint64_t size, uint64_t seq, CallstackAllocations* csa)
         : total_size(size), sequence_number(seq), callstack_allocations(csa) {
-      callstack_allocations->allocation_count++;
-      callstack_allocations->allocated += total_size;
+      callstack_allocations->allocs++;
     }
 
     Allocation() = default;
@@ -288,17 +289,42 @@ class HeapTracker {
       other.callstack_allocations = nullptr;
     }
 
-    ~Allocation() {
+    void AddToCallstackAllocations() {
+      if (callstack_allocations) {
+        callstack_allocations->allocation_count++;
+        callstack_allocations->allocated += total_size;
+      }
+    }
+
+    void SubtractFromCallstackAllocations() {
       if (callstack_allocations) {
         callstack_allocations->free_count++;
         callstack_allocations->freed += total_size;
       }
     }
 
+    ~Allocation() {
+      if (callstack_allocations)
+        callstack_allocations->allocs--;
+    }
+
     uint64_t total_size;
     uint64_t sequence_number;
     CallstackAllocations* callstack_allocations;
   };
+
+  CallstackAllocations* MaybeCreateCallstackAllocations(
+      GlobalCallstackTrie::Node* node) {
+    auto callstack_allocations_it = callstack_allocations_.find(node);
+    if (callstack_allocations_it == callstack_allocations_.end()) {
+      GlobalCallstackTrie::IncrementNode(node);
+      bool inserted;
+      std::tie(callstack_allocations_it, inserted) =
+          callstack_allocations_.emplace(node, node);
+      PERFETTO_DCHECK(inserted);
+    }
+    return &callstack_allocations_it->second;
+  }
 
   // Sequencing logic works as following:
   // * mallocs are immediately commited to |allocations_|. They are rejected if
@@ -321,8 +347,8 @@ class HeapTracker {
   // Commits a free operation into |allocations_|.
   // This must be  called after all operations up to sequence_number have been
   // commited to |allocations_|.
-  void CommitFree(uint64_t sequence_number, uint64_t address);
-
+  void CommitOperation(uint64_t sequence_number, uint64_t address);
+  void RecordOperation(uint64_t address, uint64_t sequence_number);
   // We cannot use an interner here, because after the last allocation goes
   // away, we still need to keep the CallstackAllocations around until the next
   // dump.
@@ -335,13 +361,8 @@ class HeapTracker {
   // Address -> (size, sequence_number, code location)
   std::map<uint64_t, Allocation> allocations_;
 
-  // if allocation address != 0, there is pending free of the address.
-  // if == 0, the pending operation is a no-op.
-  // No-op operations come from allocs that have already been commited to
-  // |allocations_|. It is important to keep track of them in the list of
-  // pending to maintain the contiguity of the sequence.
   std::map<uint64_t /* seq_id */, uint64_t /* allocation address */>
-      pending_frees_;
+      pending_operations_;
 
   // The sequence number all mallocs and frees have been handled up to.
   uint64_t sequence_number_ = 0;

@@ -51,65 +51,59 @@ void HeapTracker::RecordMalloc(
     uint64_t sequence_number) {
   auto it = allocations_.find(address);
   if (it != allocations_.end()) {
-    if (it->second.sequence_number > sequence_number) {
-      return;
-    } else {
-      // Clean up previous allocation by pretending a free happened just after
-      // it.
-      // CommitFree only uses the sequence number to check whether the
-      // currently active allocation is newer than the free, so we can make
-      // up a sequence_number here.
-      CommitFree(it->second.sequence_number + 1, address);
+    Allocation& alloc = it->second;
+    PERFETTO_DCHECK(alloc.sequence_number != sequence_number);
+    if (alloc.sequence_number < sequence_number) {
+      if (alloc.sequence_number <= sequence_number_)
+        alloc.SubtractFromCallstackAllocations();
+      GlobalCallstackTrie::Node* node = callsites_->CreateCallsite(callstack);
+      alloc.total_size = size;
+      alloc.sequence_number = sequence_number;
+      alloc.callstack_allocations = MaybeCreateCallstackAllocations(node);
     }
+  } else {
+    GlobalCallstackTrie::Node* node = callsites_->CreateCallsite(callstack);
+    allocations_.emplace(address,
+                         Allocation(size, sequence_number,
+                                    MaybeCreateCallstackAllocations(node)));
   }
 
-  GlobalCallstackTrie::Node* node = callsites_->CreateCallsite(callstack);
-
-  auto callstack_allocations_it = callstack_allocations_.find(node);
-  if (callstack_allocations_it == callstack_allocations_.end()) {
-    GlobalCallstackTrie::IncrementNode(node);
-    bool inserted;
-    std::tie(callstack_allocations_it, inserted) =
-        callstack_allocations_.emplace(node, node);
-    PERFETTO_DCHECK(inserted);
-  }
-  allocations_.emplace(
-      address,
-      Allocation(size, sequence_number, &(callstack_allocations_it->second)));
-
-  // Keep the sequence tracker consistent.
-  RecordFree(kNoopFree, sequence_number);
+  RecordOperation(address, sequence_number);
 }
 
-void HeapTracker::RecordFree(uint64_t address, uint64_t sequence_number) {
+void HeapTracker::RecordOperation(uint64_t address, uint64_t sequence_number) {
   if (sequence_number != sequence_number_ + 1) {
-    pending_frees_.emplace(sequence_number, address);
+    pending_operations_.emplace(sequence_number, address);
     return;
   }
 
-  if (address != kNoopFree)
-    CommitFree(sequence_number, address);
+  CommitOperation(sequence_number, address);
   sequence_number_++;
 
-  // At this point some other pending frees might be eligible to be committed.
-  auto it = pending_frees_.begin();
-  while (it != pending_frees_.end() && it->first == sequence_number_ + 1) {
-    if (it->second != kNoopFree)
-      CommitFree(it->first, it->second);
+  // At this point some other pending operations might be eligible to be
+  // committed.
+  auto it = pending_operations_.begin();
+  while (it != pending_operations_.end() && it->first == sequence_number_ + 1) {
+    CommitOperation(it->first, it->second);
     sequence_number_++;
-    it = pending_frees_.erase(it);
+    it = pending_operations_.erase(it);
   }
 }
 
-void HeapTracker::CommitFree(uint64_t sequence_number, uint64_t address) {
+void HeapTracker::CommitOperation(uint64_t sequence_number, uint64_t address) {
   auto leaf_it = allocations_.find(address);
   if (leaf_it == allocations_.end())
     return;
 
-  const Allocation& value = leaf_it->second;
+  Allocation& value = leaf_it->second;
   if (value.sequence_number > sequence_number)
     return;
-  allocations_.erase(leaf_it);
+  if (value.sequence_number == sequence_number) {
+    value.AddToCallstackAllocations();
+  } else {  // value.sequence_number < sequence_number
+    value.SubtractFromCallstackAllocations();
+    allocations_.erase(leaf_it);
+  }
 }
 
 void HeapTracker::Dump(pid_t pid, DumpState* dump_state) {
@@ -122,7 +116,7 @@ void HeapTracker::Dump(pid_t pid, DumpState* dump_state) {
     auto& it = it_and_alloc.first;
     uint64_t allocated = it_and_alloc.second;
     const CallstackAllocations& alloc = it->second;
-    if (alloc.allocation_count == allocated && alloc.free_count == allocated)
+    if (alloc.allocs == 0 && alloc.allocation_count == allocated)
       callstack_allocations_.erase(it);
   }
   dead_callstack_allocations_.clear();
@@ -150,7 +144,7 @@ void HeapTracker::Dump(pid_t pid, DumpState* dump_state) {
     sample->set_alloc_count(alloc.allocation_count);
     sample->set_free_count(alloc.free_count);
 
-    if (alloc.allocation_count == alloc.free_count)
+    if (alloc.allocs == 0)
       dead_callstack_allocations_.emplace_back(it, alloc.allocation_count);
   }
 }
