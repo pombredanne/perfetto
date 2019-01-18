@@ -120,8 +120,10 @@ class LocalBufferReader {
 
 }  // namespace
 
-StartupTraceWriter::StartupTraceWriter()
-    : memory_buffer_(new protozero::ScatteredHeapBuffer()),
+StartupTraceWriter::StartupTraceWriter(
+    std::shared_ptr<StartupTraceWriterRegistry> registry)
+    : registry_(std::move(registry)),
+      memory_buffer_(new protozero::ScatteredHeapBuffer()),
       memory_stream_writer_(
           new protozero::ScatteredStreamWriter(memory_buffer_.get())) {
   memory_buffer_->set_writer(memory_stream_writer_.get());
@@ -133,7 +135,6 @@ StartupTraceWriter::StartupTraceWriter(
     : was_bound_(true), trace_writer_(std::move(trace_writer)) {}
 
 StartupTraceWriter::~StartupTraceWriter() {
-  std::lock_guard<std::mutex> lock(lock_);
   if (registry_)
     registry_->OnStartupTraceWriterDestroyed(this);
 }
