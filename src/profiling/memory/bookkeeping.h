@@ -320,33 +320,16 @@ class HeapTracker {
     return &callstack_allocations_it->second;
   }
 
-  // Sequencing logic works as following:
-  // * mallocs are immediately commited to |allocations_|. They are ignored if
-  //   the current malloc for the address has a higher sequence number.
-  //
-  //   If all operations with sequence numbers lower than the malloc have been
-  //   commited to |allocations_|, commited_sequence_number_ is advanced and all
-  //   unblocked pending operations after the current id are commited to
-  //   |allocations_|. Otherwise, a no-op record is added to the pending
-  //   operations queue to maintain the contiguity of the sequence.
-
-  // * for frees:
-  //   if all operations with sequence numbers lower than the free have
-  //     been commited to |allocations_| (i.e commited_sequence_number_ ==
-  //     sequence_number - 1) the free is commited to |allocations_| and
-  //     commited_sequence_number_ is advanced. All unblocked pending operations
-  //     are commited to |allocations_|.
-  //   otherwise: the free is added to the queue of pending operations.
-
   void RecordOperation(uint64_t address, uint64_t sequence_number);
 
   // Commits a malloc or free operation.
-  // This must be  called after all operations up to sequence_number have been
-  // commited to |allocations_|.
+  // See comment of pending_operations_ for encoding of malloc and free
+  // operations.
   //
-  // An operation is
-  //  * ignored if sequence number of the allocation at address is higher than
-  //    sequence number.
+  // Committing a malloc operation: Add the allocations size to
+  // CallstackAllocation::allocated.
+  // Committing a free operation: Add the allocation's size to
+  // CallstackAllocation::freed and delete the allocation.
   void CommitOperation(uint64_t sequence_number, uint64_t address);
 
   // We cannot use an interner here, because after the last allocation goes
@@ -360,6 +343,13 @@ class HeapTracker {
 
   std::map<uint64_t /* allocation address */, Allocation> allocations_;
 
+  // An operation is either a commit of an allocation or freeing of an
+  // allocation. An operation is a free if its seq_id is larger than
+  // the sequence_number of the corresponding allocation. It is a commit if its
+  // seq_id is equal to the sequence_number of the corresponding allocation.
+  //
+  // If its seq_id is less than the sequence_number of the corresponding
+  // allocation it could be either, but is ignored either way.
   std::map<uint64_t /* seq_id */, uint64_t /* allocation address */>
       pending_operations_;
 
