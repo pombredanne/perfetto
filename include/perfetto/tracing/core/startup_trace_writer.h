@@ -105,10 +105,10 @@ class PERFETTO_EXPORT StartupTraceWriter
   friend class StartupTraceWriterRegistry;
   friend class StartupTraceWriterTest;
 
-  // Create an unbound StartupTraceWriter that can later be bound by calling
-  // BindToTraceWriter().
-  StartupTraceWriter(
-      std::shared_ptr<StartupTraceWriterRegistryHandle> registry_handle);
+  // Create an unbound StartupTraceWriter associated with the registry pointed
+  // to by the handle. The writer can later be bound by calling
+  // BindToTraceWriter(). The registry handle may be nullptr in tests.
+  StartupTraceWriter(std::shared_ptr<StartupTraceWriterRegistryHandle>);
 
   StartupTraceWriter(const StartupTraceWriter&) = delete;
   StartupTraceWriter& operator=(const StartupTraceWriter&) = delete;
