@@ -297,8 +297,7 @@ TEST_F(MessageTest, DestructInvalidMessageHandle) {
       {
         MessageHandle<FakeRootMessage> handle(msg);
         ResetMessage(msg);
-      },
-      "");
+      });
 }
 
 TEST_F(MessageTest, MessageHandle) {
