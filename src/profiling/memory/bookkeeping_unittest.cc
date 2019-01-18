@@ -139,11 +139,19 @@ TEST(BookkeepingTest, ArbitraryOrder) {
     bool operator<(const Operation& other) const {
       return sequence_number < other.sequence_number;
     }
-  } operations[] = {{1, 1, 5, &s}, {2, 1, 10, &s2}, {3, 1, 0, nullptr}};
+  } operations[] = {
+      {1, 1, 5, &s},       //
+      {2, 1, 10, &s2},     //
+      {3, 1, 0, nullptr},  //
+      {4, 2, 0, nullptr},  //
+      {5, 3, 0, nullptr},  //
+      {6, 3, 2, &s},       //
+      {7, 4, 3, &s2},      //
+  };
 
   bool sizes_inited = false;
-  uint64_t s_size;
-  uint64_t s2_size;
+  uint64_t s_size = 20;
+  uint64_t s2_size = 20;
 
   do {
     GlobalCallstackTrie c;
@@ -168,6 +176,7 @@ TEST(BookkeepingTest, ArbitraryOrder) {
     ASSERT_EQ(hd.GetSizeForTesting(s), s_size);
     ASSERT_EQ(hd.GetSizeForTesting(s2), s2_size);
   } while (std::next_permutation(std::begin(operations), std::end(operations)));
+  PERFETTO_DLOG("s_size=%" PRIu64 "s2_size=%" PRIu64 "\n", s_size, s2_size);
 }
 
 }  // namespace
