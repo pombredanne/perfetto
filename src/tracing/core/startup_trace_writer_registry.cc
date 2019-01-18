@@ -55,14 +55,17 @@ void StartupTraceWriterRegistry::ReturnUnboundTraceWriter(
   unbound_owned_writers_.push_back(std::move(trace_writer));
 }
 
-void StartupTraceWriterRegistry::BindToArbiter(SharedMemoryArbiterImpl* arbiter,
-                                               BufferID target_buffer,
-                                               base::TaskRunner* task_runner) {
+void StartupTraceWriterRegistry::BindToArbiter(
+    SharedMemoryArbiterImpl* arbiter,
+    BufferID target_buffer,
+    base::TaskRunner* task_runner,
+    std::function<void(StartupTraceWriterRegistry*)> on_bound_callback) {
   {
     std::lock_guard<std::mutex> lock(lock_);
     PERFETTO_DCHECK(!arbiter_);
     arbiter_ = arbiter;
     target_buffer_ = target_buffer;
+    on_bound_callback_ = std::move(on_bound_callback);
 
     // Bind the owned writers immediately since they should not be written to
     // concurrently.
@@ -105,8 +108,21 @@ void StartupTraceWriterRegistry::OnStartupTraceWriterDestroyed(
 }
 
 void StartupTraceWriterRegistry::OnUnboundWritersRemovedLocked() {
-  if (arbiter_ && unbound_writers_.empty())
-    arbiter_->OnStartupTraceWriterRegistryBound(this);
+  if (unbound_writers_.empty()) {
+    auto weak_this = weak_ptr_factory_.GetWeakPtr();
+    // Run callback in PostTask() since the callback may delete |this| and thus
+    // might otherwise cause a deadlock.
+    task_runner_->PostTask([weak_this]() {
+      if (!weak_this)
+        return;
+      if (weak_this->on_bound_callback_) {
+        weak_this->on_bound_callback_(weak_this.get());
+        // We may have been deleted by the callback.
+        if (weak_this)
+          weak_this->on_bound_callback_ = nullptr;
+      }
+    });
+  }
 }
 
 }  // namespace perfetto

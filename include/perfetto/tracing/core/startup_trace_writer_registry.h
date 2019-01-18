@@ -59,9 +59,13 @@ class PERFETTO_EXPORT StartupTraceWriterRegistry {
   // Note that the writers may not be bound synchronously if they are
   // concurrently being written to. The registry will retry on the passed
   // TaskRunner until all writers were bound successfully.
-  void BindToArbiter(SharedMemoryArbiterImpl*,
-                     BufferID target_buffer,
-                     base::TaskRunner*);
+  //
+  // Calls |on_bound_callback| asynchronously once all writers were bound.
+  void BindToArbiter(
+      SharedMemoryArbiterImpl*,
+      BufferID target_buffer,
+      base::TaskRunner*,
+      std::function<void(StartupTraceWriterRegistry*)> on_bound_callback);
 
  private:
   friend class StartupTraceWriter;
@@ -85,6 +89,7 @@ class PERFETTO_EXPORT StartupTraceWriterRegistry {
   std::vector<std::unique_ptr<StartupTraceWriter>> unbound_owned_writers_;
   SharedMemoryArbiterImpl* arbiter_ = nullptr;  // |nullptr| while unbound.
   BufferID target_buffer_ = 0;
+  std::function<void(StartupTraceWriterRegistry*)> on_bound_callback_ = nullptr;
   // End lock-protected members.
 
   // Keep at the end.

@@ -57,10 +57,9 @@ class PERFETTO_EXPORT SharedMemoryArbiter {
   // want to rebind all the writers created in the early startup phase.
   //
   // All StartupTraceWriters created by the registry are bound to the arbiter
-  // and the given target buffer. Should only be called once for each registry.
-  // The writers may not be bound immediately if they are concurrently being
-  // written to. The registry will retry on the arbiter's TaskRunner until all
-  // writers were bound successfully.
+  // and the given target buffer. The writers may not be bound immediately if
+  // they are concurrently being written to. The registry will retry on the
+  // arbiter's TaskRunner until all writers were bound successfully.
   //
   // By calling this method, the registry's ownership is transferred to the
   // arbiter. The arbiter will delete the registry once all writers were bound.

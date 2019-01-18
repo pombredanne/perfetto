@@ -135,12 +135,12 @@ class StartupTraceWriterTest : public AlignedBufferTest {
 
   size_t GetBindingRegistriesCount(
       const SharedMemoryArbiterImpl& arbiter) const {
-    return arbiter.binding_startup_trace_writer_registries_.size();
+    return arbiter.startup_trace_writer_registries_.size();
   }
 
   size_t GetUnboundWriterCount(const SharedMemoryArbiterImpl& arbiter) const {
     size_t count = 0u;
-    for (const auto& reg : arbiter.binding_startup_trace_writer_registries_) {
+    for (const auto& reg : arbiter.startup_trace_writer_registries_) {
       count += reg->unbound_writers_.size();
       count += reg->unbound_owned_writers_.size();
     }
