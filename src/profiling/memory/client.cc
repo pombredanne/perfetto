@@ -205,17 +205,10 @@ Client::Client(std::vector<base::UnixSocketRaw> socks)
   // processes on user builds), in which case the /proc/self/mem will be chown'd
   // to root:root, and will not be accessible even to the process itself (see
   // man 5 proc). In such situations, temporarily mark the process dumpable to
-  // be able to open the files, restoring dumpability immediately afterwards.
+  // be able to open the files, unsetting dumpability immediately afterwards.
   int orig_dumpable = prctl(PR_GET_DUMPABLE);
-  if (orig_dumpable == -1)
-    PERFETTO_PLOG(
-        "Could not read dumpability of the process, continuing without "
-        "changing it even if necessary.");
-
-  if (orig_dumpable == 0 && prctl(PR_SET_DUMPABLE, 1) == -1) {
-    PERFETTO_PLOG("Failed to set dumpable (when necessary), giving up.");
-    return;
-  }
+  if (orig_dumpable == 0)
+    prctl(PR_SET_DUMPABLE, 1);
 
   base::ScopedFile maps(base::OpenFile("/proc/self/maps", O_RDONLY));
   if (!maps) {
@@ -227,11 +220,9 @@ Client::Client(std::vector<base::UnixSocketRaw> socks)
     PERFETTO_DFATAL("Failed to open /proc/self/mem");
     return;
   }
-
   // Restore original dumpability value if we overrode it.
-  if (orig_dumpable == 0 && prctl(PR_SET_DUMPABLE, orig_dumpable) == -1)
-    PERFETTO_PLOG(
-        "Failed to restore dumpable, continuing as profiling will still work.");
+  if (orig_dumpable == 0)
+    prctl(PR_SET_DUMPABLE, 0);
 
   int fds[2];
   fds[0] = *maps;
