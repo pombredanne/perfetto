@@ -1773,6 +1773,7 @@ message FtraceEvent {
     SignalGenerateFtraceEvent signal_generate = 325;
     // removed field with id 326
     GenericFtraceEvent generic = 327;
+    // removed field with id 328
   }
 }
 
