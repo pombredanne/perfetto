@@ -17,6 +17,7 @@
 #include "src/profiling/memory/client.h"
 
 #include <inttypes.h>
+#include <sys/prctl.h>
 #include <sys/syscall.h>
 #include <unistd.h>
 
@@ -200,13 +201,38 @@ Client::Client(std::vector<base::UnixSocketRaw> socks)
       main_thread_stack_base_(FindMainThreadStack()) {
   PERFETTO_DCHECK(pthread_key_.valid());
 
-  uint64_t size = 0;
-  base::ScopedFile maps(base::OpenFile("/proc/self/maps", O_RDONLY));
-  base::ScopedFile mem(base::OpenFile("/proc/self/mem", O_RDONLY));
-  if (!maps || !mem) {
-    PERFETTO_DFATAL("Failed to open /proc/self/{maps,mem}");
+  // We might be running in a process that is not dumpable (such as app
+  // processes on user builds), in which case the /proc/self/mem will be chown'd
+  // to root:root, and will not be accessible even to the process itself (see
+  // man 5 proc). In such situations, temporarily mark the process dumpable to
+  // be able to open the files, restoring dumpability immediately afterwards.
+  int orig_dumpable = prctl(PR_GET_DUMPABLE);
+  if (orig_dumpable == -1)
+    PERFETTO_PLOG(
+        "Could not read dumpability of the process, continuing without "
+        "changing it even if necessary.");
+
+  if (orig_dumpable == 0 && prctl(PR_SET_DUMPABLE, 1) == -1) {
+    PERFETTO_PLOG("Failed to set dumpable (when necessary), giving up.");
     return;
   }
+
+  base::ScopedFile maps(base::OpenFile("/proc/self/maps", O_RDONLY));
+  if (!maps) {
+    PERFETTO_DFATAL("Failed to open /proc/self/maps");
+    return;
+  }
+  base::ScopedFile mem(base::OpenFile("/proc/self/mem", O_RDONLY));
+  if (!mem) {
+    PERFETTO_DFATAL("Failed to open /proc/self/mem");
+    return;
+  }
+
+  // Restore original dumpability value if we overrode it.
+  if (orig_dumpable == 0 && prctl(PR_SET_DUMPABLE, orig_dumpable) == -1)
+    PERFETTO_PLOG(
+        "Failed to restore dumpable, continuing as profiling will still work.");
+
   int fds[2];
   fds[0] = *maps;
   fds[1] = *mem;
@@ -215,6 +241,7 @@ Client::Client(std::vector<base::UnixSocketRaw> socks)
     return;
   // Send an empty record to transfer fds for /proc/self/maps and
   // /proc/self/mem.
+  uint64_t size = 0;
   if (sock->Send(&size, sizeof(size), fds, 2) != sizeof(size)) {
     PERFETTO_DFATAL("Failed to send file descriptors.");
     return;
