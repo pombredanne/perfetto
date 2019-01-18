@@ -125,6 +125,52 @@ TEST(BookkeepingTest, ManyAllocations) {
   }
 }
 
+TEST(BookkeepingTest, ArbitraryOrder) {
+  std::vector<unwindstack::FrameData> s = stack();
+  std::vector<unwindstack::FrameData> s2 = stack2();
+
+  struct Operation {
+    uint64_t sequence_number;
+    uint64_t address;
+    uint64_t bytes;                                    // 0 for free
+    const std::vector<unwindstack::FrameData>* stack;  // nullptr for free
+
+    // For std::next_permutation.
+    bool operator<(const Operation& other) const {
+      return sequence_number < other.sequence_number;
+    }
+  } operations[] = {
+      {1, 1, 5, &s},       //
+      {2, 1, 10, &s2},     //
+      {3, 1, 0, nullptr},  //
+      {4, 2, 0, nullptr},  //
+      {5, 3, 0, nullptr},  //
+      {6, 3, 2, &s},       //
+      {7, 4, 3, &s2},      //
+  };
+
+  uint64_t s_size = 2;
+  uint64_t s2_size = 3;
+
+  do {
+    GlobalCallstackTrie c;
+    HeapTracker hd(&c);
+
+    for (auto it = std::begin(operations); it != std::end(operations); ++it) {
+      const Operation& operation = *it;
+
+      if (operation.bytes == 0) {
+        hd.RecordFree(operation.address, operation.sequence_number);
+      } else {
+        hd.RecordMalloc(*operation.stack, operation.address, operation.bytes,
+                        operation.sequence_number);
+      }
+    }
+    ASSERT_EQ(hd.GetSizeForTesting(s), s_size);
+    ASSERT_EQ(hd.GetSizeForTesting(s2), s2_size);
+  } while (std::next_permutation(std::begin(operations), std::end(operations)));
+}
+
 }  // namespace
 }  // namespace profiling
 }  // namespace perfetto

@@ -95,20 +95,20 @@ void HeapTracker::RecordOperation(uint64_t address, uint64_t sequence_number) {
 }
 
 void HeapTracker::CommitOperation(uint64_t sequence_number, uint64_t address) {
+  commited_sequence_number_++;
+
+  // We will see many frees for addresses we do not know about.
   auto leaf_it = allocations_.find(address);
   if (leaf_it == allocations_.end())
     return;
 
   Allocation& value = leaf_it->second;
-  if (value.sequence_number > sequence_number)
-    return;
   if (value.sequence_number == sequence_number) {
     value.AddToCallstackAllocations();
-  } else {  // value.sequence_number < sequence_number
+  } else if (value.sequence_number < sequence_number) {
     value.SubtractFromCallstackAllocations();
     allocations_.erase(leaf_it);
   }
-  commited_sequence_number_++;
 }
 
 void HeapTracker::Dump(pid_t pid, DumpState* dump_state) {
