@@ -86,7 +86,6 @@ class PERFETTO_EXPORT StartupTraceWriterRegistry {
   // concurrently being written to. The registry will retry on the passed
   // TaskRunner until all writers were bound successfully.
   //
-  // Should only be called on the task sequence of the passed TaskRunner.
   // Calls |on_bound_callback| asynchronously once all writers were bound.
   void BindToArbiter(
       SharedMemoryArbiterImpl*,
