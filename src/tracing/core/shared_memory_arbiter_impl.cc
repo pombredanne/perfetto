@@ -277,11 +277,26 @@ std::unique_ptr<TraceWriter> SharedMemoryArbiterImpl::CreateTraceWriter(
 }
 
 void SharedMemoryArbiterImpl::BindStartupTraceWriterRegistry(
-    std::shared_ptr<StartupTraceWriterRegistry>&& registry,
+    std::unique_ptr<StartupTraceWriterRegistry> registry,
     BufferID target_buffer) {
-  PERFETTO_DCHECK_THREAD(thread_checker_);
-  registry->BindToArbiter(weak_ptr_factory_.GetWeakPtr(), target_buffer,
-                          task_runner_);
+  registry->BindToArbiter(
+      this, target_buffer, task_runner_,
+      [this](StartupTraceWriterRegistry* bound_registry) {
+        std::lock_guard<std::mutex> scoped_lock(lock_);
+
+        for (auto it = startup_trace_writer_registries_.begin();
+             it != startup_trace_writer_registries_.end(); it++) {
+          if (it->get() == bound_registry) {
+            startup_trace_writer_registries_.erase(it);
+            return;
+          }
+        }
+
+        // The registry should have been in |startup_trace_writer_registries_|.
+        PERFETTO_DCHECK(false);
+      });
+  std::lock_guard<std::mutex> scoped_lock(lock_);
+  startup_trace_writer_registries_.push_back(std::move(registry));
 }
 
 void SharedMemoryArbiterImpl::NotifyFlushComplete(FlushRequestID req_id) {

@@ -50,6 +50,17 @@ class StartupTraceWriterTest : public AlignedBufferTest {
     task_runner_.reset();
   }
 
+  std::unique_ptr<StartupTraceWriter> CreateUnboundWriter() {
+    std::shared_ptr<StartupTraceWriterRegistryHandle> registry;
+    return std::unique_ptr<StartupTraceWriter>(
+        new StartupTraceWriter(registry));
+  }
+
+  bool BindWriter(StartupTraceWriter* writer) {
+    const BufferID kBufId = 42;
+    return writer->BindToArbiter(arbiter_.get(), kBufId);
+  }
+
   void WritePackets(StartupTraceWriter* writer, size_t packet_count) {
     for (size_t i = 0; i < packet_count; i++) {
       auto packet = writer->NewTracePacket();
@@ -133,6 +144,20 @@ class StartupTraceWriterTest : public AlignedBufferTest {
            registry.unbound_owned_writers_.size();
   }
 
+  size_t GetBindingRegistriesCount(
+      const SharedMemoryArbiterImpl& arbiter) const {
+    return arbiter.startup_trace_writer_registries_.size();
+  }
+
+  size_t GetUnboundWriterCount(const SharedMemoryArbiterImpl& arbiter) const {
+    size_t count = 0u;
+    for (const auto& reg : arbiter.startup_trace_writer_registries_) {
+      count += reg->unbound_writers_.size();
+      count += reg->unbound_owned_writers_.size();
+    }
+    return count;
+  }
+
  protected:
   static constexpr char kPacketPayload[] = "foo";
 
@@ -154,13 +179,10 @@ INSTANTIATE_TEST_CASE_P(PageSize,
                         ::testing::ValuesIn(kPageSizes));
 
 TEST_P(StartupTraceWriterTest, CreateUnboundAndBind) {
-  // Create an unbound writer.
-  auto writer = std::make_shared<StartupTraceWriter>(
-      std::shared_ptr<StartupTraceWriterRegistry>());
+  auto writer = CreateUnboundWriter();
 
-  // Bind it right away without having written any data before.
-  const BufferID kBufId = 42;
-  EXPECT_TRUE(writer->BindToArbiter(arbiter_.get(), kBufId));
+  // Bind writer right away without having written any data before.
+  EXPECT_TRUE(BindWriter(writer.get()));
 
   const size_t kNumPackets = 32;
   WritePackets(writer.get(), kNumPackets);
@@ -185,9 +207,7 @@ TEST_P(StartupTraceWriterTest, CreateBound) {
 }
 
 TEST_P(StartupTraceWriterTest, WriteWhileUnboundAndDiscard) {
-  // Create an unbound writer.
-  auto writer = std::make_shared<StartupTraceWriter>(
-      std::shared_ptr<StartupTraceWriterRegistry>());
+  auto writer = CreateUnboundWriter();
 
   const size_t kNumPackets = 32;
   WritePackets(writer.get(), kNumPackets);
@@ -199,17 +219,14 @@ TEST_P(StartupTraceWriterTest, WriteWhileUnboundAndDiscard) {
 }
 
 TEST_P(StartupTraceWriterTest, WriteWhileUnboundAndBind) {
-  // Create an unbound writer.
-  auto writer = std::make_shared<StartupTraceWriter>(
-      std::shared_ptr<StartupTraceWriterRegistry>());
+  auto writer = CreateUnboundWriter();
 
   const size_t kNumPackets = 32;
   WritePackets(writer.get(), kNumPackets);
 
   // Binding the writer should cause the previously written packets to be
   // written to the SMB and committed.
-  const BufferID kBufId = 42;
-  EXPECT_TRUE(writer->BindToArbiter(arbiter_.get(), kBufId));
+  EXPECT_TRUE(BindWriter(writer.get()));
 
   VerifyPackets(kNumPackets);
 
@@ -223,9 +240,7 @@ TEST_P(StartupTraceWriterTest, WriteWhileUnboundAndBind) {
 }
 
 TEST_P(StartupTraceWriterTest, WriteMultipleChunksWhileUnboundAndBind) {
-  // Create an unbound writer.
-  auto writer = std::make_shared<StartupTraceWriter>(
-      std::shared_ptr<StartupTraceWriterRegistry>());
+  auto writer = CreateUnboundWriter();
 
   // Write a single packet to determine its size in the buffer.
   WritePackets(writer.get(), 1);
@@ -237,8 +252,7 @@ TEST_P(StartupTraceWriterTest, WriteMultipleChunksWhileUnboundAndBind) {
 
   // Binding the writer should cause the previously written packets to be
   // written to the SMB and committed.
-  const BufferID kBufId = 42;
-  EXPECT_TRUE(writer->BindToArbiter(arbiter_.get(), kBufId));
+  EXPECT_TRUE(BindWriter(writer.get()));
 
   VerifyPackets(kNumPackets + 1);
 
@@ -252,27 +266,25 @@ TEST_P(StartupTraceWriterTest, WriteMultipleChunksWhileUnboundAndBind) {
 }
 
 TEST_P(StartupTraceWriterTest, BindingWhileWritingFails) {
-  // Create an unbound writer.
-  auto writer = std::make_shared<StartupTraceWriter>(
-      std::shared_ptr<StartupTraceWriterRegistry>());
+  auto writer = CreateUnboundWriter();
 
-  const BufferID kBufId = 42;
   {
     // Begin a write by opening a TracePacket.
     auto packet = writer->NewTracePacket();
     packet->set_for_testing()->set_str(kPacketPayload);
 
     // Binding while writing should fail.
-    EXPECT_FALSE(writer->BindToArbiter(arbiter_.get(), kBufId));
+    EXPECT_FALSE(BindWriter(writer.get()));
   }
 
   // Packet was completed, so binding should work now and emit the packet.
-  EXPECT_TRUE(writer->BindToArbiter(arbiter_.get(), kBufId));
+  EXPECT_TRUE(BindWriter(writer.get()));
   VerifyPackets(1);
 }
 
 TEST_P(StartupTraceWriterTest, CreateAndBindViaRegistry) {
-  auto registry = StartupTraceWriterRegistry::Create();
+  std::unique_ptr<StartupTraceWriterRegistry> registry(
+      new StartupTraceWriterRegistry());
 
   // Create unbound writers.
   auto writer1 = registry->CreateUnboundTraceWriter();

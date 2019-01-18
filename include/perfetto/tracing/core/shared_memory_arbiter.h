@@ -61,14 +61,13 @@ class PERFETTO_EXPORT SharedMemoryArbiter {
   // they are concurrently being written to. The registry will retry on the
   // arbiter's TaskRunner until all writers were bound successfully.
   //
-  // Should only be called on the arbiter's task sequence, and only once per
-  // registry. The producer should relinquish its reference to the registry in
-  // calling this method by moving its std::shared_ptr to the registry.
+  // By calling this method, the registry's ownership is transferred to the
+  // arbiter. The arbiter will delete the registry once all writers were bound.
   //
   // TODO(eseckler): Make target buffer assignment more flexible (i.e. per
   // writer). For now, embedders can use multiple registries instead.
   virtual void BindStartupTraceWriterRegistry(
-      std::shared_ptr<StartupTraceWriterRegistry>&&,
+      std::unique_ptr<StartupTraceWriterRegistry>,
       BufferID target_buffer) = 0;
 
   // Notifies the service that all data for the given FlushRequestID has been

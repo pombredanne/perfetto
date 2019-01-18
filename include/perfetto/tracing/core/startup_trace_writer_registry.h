@@ -31,22 +31,39 @@ namespace perfetto {
 
 class SharedMemoryArbiterImpl;
 class StartupTraceWriter;
+class StartupTraceWriterRegistry;
 
 namespace base {
 class TaskRunner;
 }  // namespace base
 
+// Notifies the registry about the destruction of a TraceWriter, provided the
+// registry itself wasn't deleted yet.
+class StartupTraceWriterRegistryHandle {
+ public:
+  explicit StartupTraceWriterRegistryHandle(StartupTraceWriterRegistry*);
+
+  // Called by StartupTraceWriter destructor.
+  void OnWriterDestroyed(StartupTraceWriter*);
+
+  // Called by StartupTraceWriterRegistry destructor.
+  void OnRegistryDestroyed();
+
+ private:
+  std::mutex lock_;
+  StartupTraceWriterRegistry* registry_;
+
+  StartupTraceWriterRegistryHandle(const StartupTraceWriterRegistryHandle&) =
+      delete;
+  StartupTraceWriterRegistryHandle& operator=(
+      const StartupTraceWriterRegistryHandle&) = delete;
+};
+
 // Embedders can use this registry to create unbound StartupTraceWriters during
 // startup, and later bind them all safely to an arbiter and target buffer.
-class PERFETTO_EXPORT StartupTraceWriterRegistry
-    : public std::enable_shared_from_this<StartupTraceWriterRegistry> {
+class PERFETTO_EXPORT StartupTraceWriterRegistry {
  public:
-  // Creates a new registry. The registry is refcounted because each writer it
-  // creates holds a reference to it. It will be destroyed once the producer
-  // releases its reference to the registry (e.g. after binding it to an
-  // arbiter) and all its associated writers have been destroyed.
-  static std::shared_ptr<StartupTraceWriterRegistry> Create();
-
+  StartupTraceWriterRegistry();
   ~StartupTraceWriterRegistry();
 
   // Returns a new unbound StartupTraceWriter. Should only be called while
@@ -70,34 +87,41 @@ class PERFETTO_EXPORT StartupTraceWriterRegistry
   // TaskRunner until all writers were bound successfully.
   //
   // Should only be called on the task sequence of the passed TaskRunner.
-  void BindToArbiter(base::WeakPtr<SharedMemoryArbiterImpl> arbiter,
-                     BufferID target_buffer,
-                     base::TaskRunner*);
+  // Calls |on_bound_callback| asynchronously once all writers were bound.
+  void BindToArbiter(
+      SharedMemoryArbiterImpl*,
+      BufferID target_buffer,
+      base::TaskRunner*,
+      std::function<void(StartupTraceWriterRegistry*)> on_bound_callback);
 
  private:
-  friend class StartupTraceWriter;
+  friend class StartupTraceWriterRegistryHandle;
   friend class StartupTraceWriterTest;
 
-  StartupTraceWriterRegistry();
+  StartupTraceWriterRegistry(const StartupTraceWriterRegistry&) = delete;
+  StartupTraceWriterRegistry& operator=(const StartupTraceWriterRegistry&) =
+      delete;
 
-  // Called by StartupTraceWriter.
+  // Called by StartupTraceWriterRegistryHandle.
   void OnStartupTraceWriterDestroyed(StartupTraceWriter*);
 
   // Try to bind the remaining unbound writers and post a continuation to
   // |task_runner_| if any writers could not be bound.
   void TryBindWriters();
 
-  base::TaskRunner* task_runner_;
+  // Notifies the arbiter when we have bound all writers. May delete |this|.
+  void OnUnboundWritersRemovedLocked();
 
-  // Can only be accessed on |task_runner_|.
-  base::WeakPtr<SharedMemoryArbiterImpl> arbiter_;
+  std::shared_ptr<StartupTraceWriterRegistryHandle> handle_;
+  base::TaskRunner* task_runner_;
 
   // Begin lock-protected members.
   std::mutex lock_;
   std::set<StartupTraceWriter*> unbound_writers_;
   std::vector<std::unique_ptr<StartupTraceWriter>> unbound_owned_writers_;
-  bool is_bound_ = false;
+  SharedMemoryArbiterImpl* arbiter_ = nullptr;  // |nullptr| while unbound.
   BufferID target_buffer_ = 0;
+  std::function<void(StartupTraceWriterRegistry*)> on_bound_callback_ = nullptr;
   // End lock-protected members.
 
   // Keep at the end.

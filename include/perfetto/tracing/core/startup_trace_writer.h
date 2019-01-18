@@ -34,7 +34,7 @@
 namespace perfetto {
 
 class SharedMemoryArbiterImpl;
-class StartupTraceWriterRegistry;
+class StartupTraceWriterRegistryHandle;
 
 namespace protos {
 namespace pbzero {
@@ -105,13 +105,16 @@ class PERFETTO_EXPORT StartupTraceWriter
   friend class StartupTraceWriterRegistry;
   friend class StartupTraceWriterTest;
 
-  // Create an unbound StartupTraceWriter associated with the given registry.
-  // The writer can later be bound by calling BindToTraceWriter(). |registry|
-  // may be nullptr in tests.
-  StartupTraceWriter(std::shared_ptr<StartupTraceWriterRegistry> registry);
+  // Create an unbound StartupTraceWriter that can later be bound by calling
+  // BindToTraceWriter().
+  StartupTraceWriter(
+      std::shared_ptr<StartupTraceWriterRegistryHandle> registry_handle);
+
+  StartupTraceWriter(const StartupTraceWriter&) = delete;
+  StartupTraceWriter& operator=(const StartupTraceWriter&) = delete;
 
   // Bind this StartupTraceWriter to the provided SharedMemoryArbiterImpl.
-  // Called by SharedMemoryArbiterImpl::BindStartupTraceWriter().
+  // Called by StartupTraceWriterRegistry::BindToArbiter().
   //
   // This method can be called on any thread. If any data was written locally
   // before the writer was bound, BindToArbiter() will copy this data into
@@ -132,7 +135,7 @@ class PERFETTO_EXPORT StartupTraceWriter
 
   PERFETTO_THREAD_CHECKER(writer_thread_checker_)
 
-  std::shared_ptr<StartupTraceWriterRegistry> registry_ = nullptr;
+  std::shared_ptr<StartupTraceWriterRegistryHandle> registry_handle_;
 
   // Only set and accessed from the writer thread. The writer thread flips this
   // bit when it sees that trace_writer_ is set (while holding the lock).

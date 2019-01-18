@@ -121,8 +121,8 @@ class LocalBufferReader {
 }  // namespace
 
 StartupTraceWriter::StartupTraceWriter(
-    std::shared_ptr<StartupTraceWriterRegistry> registry)
-    : registry_(std::move(registry)),
+    std::shared_ptr<StartupTraceWriterRegistryHandle> registry_handle)
+    : registry_handle_(std::move(registry_handle)),
       memory_buffer_(new protozero::ScatteredHeapBuffer()),
       memory_stream_writer_(
           new protozero::ScatteredStreamWriter(memory_buffer_.get())) {
@@ -135,8 +135,8 @@ StartupTraceWriter::StartupTraceWriter(
     : was_bound_(true), trace_writer_(std::move(trace_writer)) {}
 
 StartupTraceWriter::~StartupTraceWriter() {
-  if (registry_)
-    registry_->OnStartupTraceWriterDestroyed(this);
+  if (registry_handle_)
+    registry_handle_->OnWriterDestroyed(this);
 }
 
 bool StartupTraceWriter::BindToArbiter(SharedMemoryArbiterImpl* arbiter,
