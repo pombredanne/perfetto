@@ -54,12 +54,20 @@ void HeapTracker::RecordMalloc(
     Allocation& alloc = it->second;
     PERFETTO_DCHECK(alloc.sequence_number != sequence_number);
     if (alloc.sequence_number < sequence_number) {
+      // As we are overwriting the previous allocation, the previous allocation
+      // must have been freed.
+      //
       // This makes the sequencing a bit incorrect. We are overwriting this
       // allocation, so we prentend both the alloc and the free for this have
-      // already happened to make sure the total numbers for this callstack are
-      // correct.
-      if (alloc.sequence_number > commited_sequence_number_)
+      // already happened at committed_sequence_number_, while in fact the free
+      // might not have happened until right before this operation.
+
+      if (alloc.sequence_number > commited_sequence_number_) {
+        // Only count the previous allocation if it hasn't already been
+        // committed to avoid double counting it.
         alloc.AddToCallstackAllocations();
+      }
+
       alloc.SubtractFromCallstackAllocations();
       GlobalCallstackTrie::Node* node = callsites_->CreateCallsite(callstack);
       alloc.total_size = size;
@@ -73,10 +81,10 @@ void HeapTracker::RecordMalloc(
                                     MaybeCreateCallstackAllocations(node)));
   }
 
-  RecordOperation(address, sequence_number);
+  RecordOperation(sequence_number, address);
 }
 
-void HeapTracker::RecordOperation(uint64_t address, uint64_t sequence_number) {
+void HeapTracker::RecordOperation(uint64_t sequence_number, uint64_t address) {
   if (sequence_number != commited_sequence_number_ + 1) {
     pending_operations_.emplace(sequence_number, address);
     return;
@@ -109,6 +117,12 @@ void HeapTracker::CommitOperation(uint64_t sequence_number, uint64_t address) {
     value.SubtractFromCallstackAllocations();
     allocations_.erase(leaf_it);
   }
+  // else (value.sequence_number > sequence_number:
+  //  This allocation has been replaced by a newer one in RecordMalloc.
+  //  This code commits ther previous allocation's malloc (and implicit free
+  //  that must have happened, as there is now a new allocation at the same
+  //  address). This means that this operation, be it a malloc or a free, must
+  //  be treated as a no-op.
 }
 
 void HeapTracker::Dump(pid_t pid, DumpState* dump_state) {

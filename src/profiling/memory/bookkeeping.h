@@ -246,7 +246,7 @@ class HeapTracker {
                     uint64_t sequence_number);
   void Dump(pid_t pid, DumpState* dump_state);
   void RecordFree(uint64_t address, uint64_t sequence_number) {
-    RecordOperation(address, sequence_number);
+    RecordOperation(sequence_number, address);
   }
 
   uint64_t GetSizeForTesting(const std::vector<unwindstack::FrameData>& stack);
@@ -320,7 +320,7 @@ class HeapTracker {
     return &callstack_allocations_it->second;
   }
 
-  void RecordOperation(uint64_t address, uint64_t sequence_number);
+  void RecordOperation(uint64_t sequence_number, uint64_t address);
 
   // Commits a malloc or free operation.
   // See comment of pending_operations_ for encoding of malloc and free
