@@ -77,7 +77,7 @@ HeapprofdProducer::HeapprofdProducer(HeapprofdMode mode,
                                      base::TaskRunner* task_runner)
     : mode_(mode),
       task_runner_(task_runner),
-      bookkeeping_queue_(kBookkeepingQueueSize),
+      bookkeeping_queue_("Bookkeeping", kBookkeepingQueueSize),
       bookkeeping_th_([this] { bookkeeping_thread_.Run(&bookkeeping_queue_); }),
       unwinder_queues_(MakeUnwinderQueues(kUnwinderThreads)),
       unwinding_threads_(MakeUnwindingThreads(kUnwinderThreads)),
@@ -100,15 +100,10 @@ HeapprofdProducer::~HeapprofdProducer() {
   }
 }
 
-void HeapprofdProducer::SetTargetProcess(pid_t target_pid) {
+void HeapprofdProducer::SetTargetProcess(pid_t target_pid,
+                                         std::string target_cmdline) {
   target_pid_ = target_pid;
-  target_cmdline_.clear();
-  if (!GetCmdlineForPID(target_pid, &target_cmdline_)) {
-    PERFETTO_ELOG(
-        "Failed to look up cmdline for target pid [%d], cmdline-based "
-        "configurations will not work. Proceeding.",
-        static_cast<int>(target_pid));
-  }
+  target_cmdline_ = target_cmdline;
 }
 
 bool HeapprofdProducer::SourceMatchesTarget(const HeapprofdConfig& cfg) {
@@ -145,7 +140,13 @@ void HeapprofdProducer::AdoptConnectedSockets(
           base::ScopedFile(fd), &weak_producer->socket_listener_,
           weak_producer->task_runner_, base::SockType::kStream);
 
-      weak_producer->socket_listener_.HandleClientConnection(std::move(socket));
+      // The forked heapprofd will not normally be able to read the target's
+      // cmdline under procfs, so pass peer's description explicitly.
+      Process process{weak_producer->target_pid_,
+                      weak_producer->target_cmdline_};
+
+      weak_producer->socket_listener_.HandleClientConnection(
+          std::move(socket), std::move(process));
     });
   }
 }
@@ -416,8 +417,10 @@ HeapprofdProducer::MakeSocketListenerCallback() {
 std::vector<BoundedQueue<UnwindingRecord>>
 HeapprofdProducer::MakeUnwinderQueues(size_t n) {
   std::vector<BoundedQueue<UnwindingRecord>> ret(n);
-  for (size_t i = 0; i < n; ++i)
+  for (size_t i = 0; i < n; ++i) {
     ret[i].SetCapacity(kUnwinderQueueSize);
+    ret[i].SetName("Unwinder " + std::to_string(n));
+  }
   return ret;
 }
 
