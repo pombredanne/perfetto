@@ -3518,7 +3518,7 @@ std::vector<Event> GetStaticEventInfo() {
     Event* event = &events.back();
     event->name = "mm_event_record";
     event->group = "mm_event";
-    event->proto_field_id = 327;
+    event->proto_field_id = 328;
     event->fields.push_back(MakeField("avg_lat", 1, ProtoSchemaType::kUint32));
     event->fields.push_back(MakeField("count", 2, ProtoSchemaType::kUint32));
     event->fields.push_back(MakeField("max_lat", 3, ProtoSchemaType::kUint32));
