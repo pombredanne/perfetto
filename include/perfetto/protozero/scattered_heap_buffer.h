@@ -20,16 +20,14 @@
 #include <memory>
 #include <vector>
 
-#include "perfetto/base/export.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/protozero/scattered_stream_writer.h"
 
 namespace protozero {
 
-class PERFETTO_EXPORT ScatteredHeapBuffer
-    : public protozero::ScatteredStreamWriter::Delegate {
+class ScatteredHeapBuffer : public protozero::ScatteredStreamWriter::Delegate {
  public:
-  class PERFETTO_EXPORT Slice {
+  class Slice {
    public:
     explicit Slice(size_t size);
     Slice(Slice&& slice) noexcept;

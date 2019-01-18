@@ -105,10 +105,6 @@ export interface RecordConfig {
 export interface TraceTime {
   startSec: number;
   endSec: number;
-}
-
-export interface FrontendLocalState {
-  visibleTraceTime: TraceTime;
   lastUpdate: number;  // Epoch in seconds (Date.now() / 1000).
 }
 
@@ -132,6 +128,7 @@ export interface State {
    */
   engines: ObjectById<EngineConfig>;
   traceTime: TraceTime;
+  visibleTraceTime: TraceTime;
   trackGroups: ObjectById<TrackGroupState>;
   tracks: ObjectById<TrackState>;
   scrollingTracks: string[];
@@ -139,19 +136,12 @@ export interface State {
   queries: ObjectById<QueryConfig>;
   permalink: PermalinkConfig;
   status: Status;
-
-  /**
-   * This state is updated on the frontend at 60Hz and eventually syncronised to
-   * the controller at 10Hz. When the controller sends state updates to the
-   * frontend the frontend has special logic to pick whichever version of this
-   * key is most up to date.
-   */
-  frontendLocalState: FrontendLocalState;
 }
 
 export const defaultTraceTime = {
   startSec: 0,
   endSec: 10,
+  lastUpdate: 0
 };
 
 export function createEmptyState(): State {
@@ -160,6 +150,7 @@ export function createEmptyState(): State {
     nextId: 0,
     engines: {},
     traceTime: {...defaultTraceTime},
+    visibleTraceTime: {...defaultTraceTime},
     tracks: {},
     trackGroups: {},
     pinnedTracks: [],
@@ -169,11 +160,6 @@ export function createEmptyState(): State {
 
     recordConfig: createEmptyRecordConfig(),
     displayConfigAsPbtxt: false,
-
-    frontendLocalState: {
-      visibleTraceTime: {...defaultTraceTime},
-      lastUpdate: 0,
-    },
 
     status: {msg: '', timestamp: 0},
   };

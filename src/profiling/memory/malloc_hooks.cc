@@ -215,11 +215,9 @@ std::unique_ptr<perfetto::profiling::Client> CreateClientAndPrivateDaemon() {
     return nullptr;
   }
 
-  using perfetto::profiling::Client;
-  std::vector<perfetto::base::UnixSocketRaw> client_sockets;
-  client_sockets.emplace_back(std::move(parent_sock));
-  return std::unique_ptr<Client>(new (std::nothrow)
-                                     Client(std::move(client_sockets)));
+  PERFETTO_ELOG(
+      "Fork mode profiling not implemented yet. Not creating a client.");
+  return nullptr;
 }
 
 }  // namespace
@@ -238,10 +236,8 @@ bool HEAPPROFD_ADD_PREFIX(_initialize)(const MallocDispatch* malloc_dispatch,
       ShouldForkPrivateDaemon() ? CreateClientAndPrivateDaemon()
                                 : CreateClientForCentralDaemon();
 
-  if (!client || !client->inited()) {
-    PERFETTO_LOG("Client not initialized, not installing hooks.");
+  if (!client || !client->inited())
     return false;
-  }
 
   g_client.store(client.release());
   return true;

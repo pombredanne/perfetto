@@ -849,17 +849,16 @@ void ProtoTraceParser::ParseSchedSwitch(uint32_t cpu,
   ProtoDecoder decoder(sswitch.data(), sswitch.length());
 
   uint32_t prev_pid = 0;
-  int64_t prev_state = 0;
+  uint32_t prev_state = 0;
   base::StringView next_comm;
   uint32_t next_pid = 0;
-  int32_t next_prio = 0;
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
       case protos::SchedSwitchFtraceEvent::kPrevPidFieldNumber:
         prev_pid = fld.as_uint32();
         break;
       case protos::SchedSwitchFtraceEvent::kPrevStateFieldNumber:
-        prev_state = fld.as_int64();
+        prev_state = fld.as_uint32();
         break;
       case protos::SchedSwitchFtraceEvent::kNextPidFieldNumber:
         next_pid = fld.as_uint32();
@@ -867,15 +866,12 @@ void ProtoTraceParser::ParseSchedSwitch(uint32_t cpu,
       case protos::SchedSwitchFtraceEvent::kNextCommFieldNumber:
         next_comm = fld.as_string();
         break;
-      case protos::SchedSwitchFtraceEvent::kNextPrioFieldNumber:
-        next_prio = fld.as_int32();
-        break;
       default:
         break;
     }
   }
   context_->event_tracker->PushSchedSwitch(cpu, timestamp, prev_pid, prev_state,
-                                           next_pid, next_comm, next_prio);
+                                           next_pid, next_comm);
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 
@@ -1361,19 +1357,9 @@ void ProtoTraceParser::ParseTraceStats(TraceBlobView packet) {
               storage->SetIndexedStats(stats::traced_buf_chunks_written,
                                        buf_num, fld2.as_int64());
               break;
-            case protos::TraceStats::BufferStats::kChunksRewrittenFieldNumber:
-              storage->SetIndexedStats(stats::traced_buf_chunks_rewritten,
-                                       buf_num, fld2.as_int64());
-              break;
             case protos::TraceStats::BufferStats::kChunksOverwrittenFieldNumber:
               storage->SetIndexedStats(stats::traced_buf_chunks_overwritten,
                                        buf_num, fld2.as_int64());
-              break;
-            case protos::TraceStats::BufferStats::
-                kChunksCommittedOutOfOrderFieldNumber:
-              storage->SetIndexedStats(
-                  stats::traced_buf_chunks_committed_out_of_order, buf_num,
-                  fld2.as_int64());
               break;
             case protos::TraceStats::BufferStats::kWriteWrapCountFieldNumber:
               storage->SetIndexedStats(stats::traced_buf_write_wrap_count,

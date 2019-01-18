@@ -44,10 +44,9 @@ class EventTracker {
   virtual void PushSchedSwitch(uint32_t cpu,
                                int64_t timestamp,
                                uint32_t prev_pid,
-                               int64_t prev_state,
+                               uint32_t prev_state,
                                uint32_t next_pid,
-                               base::StringView next_comm,
-                               int32_t next_priority);
+                               base::StringView next_comm);
 
   // This method is called when a cpu freq event is seen in the trace.
   virtual RowId PushCounter(int64_t timestamp,

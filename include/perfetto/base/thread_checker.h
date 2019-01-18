@@ -24,7 +24,6 @@
 #endif
 #include <atomic>
 
-#include "perfetto/base/export.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/utils.h"
 
@@ -37,7 +36,7 @@ using ThreadID = unsigned long;
 using ThreadID = pthread_t;
 #endif
 
-class PERFETTO_EXPORT ThreadChecker {
+class ThreadChecker {
  public:
   ThreadChecker();
   ~ThreadChecker();

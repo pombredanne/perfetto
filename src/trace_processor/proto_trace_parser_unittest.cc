@@ -43,14 +43,13 @@ class MockEventTracker : public EventTracker {
   MockEventTracker(TraceProcessorContext* context) : EventTracker(context) {}
   virtual ~MockEventTracker() = default;
 
-  MOCK_METHOD7(PushSchedSwitch,
+  MOCK_METHOD6(PushSchedSwitch,
                void(uint32_t cpu,
                     int64_t timestamp,
                     uint32_t prev_pid,
-                    int64_t prev_state,
+                    uint32_t prev_state,
                     uint32_t next_pid,
-                    base::StringView next_comm,
-                    int32_t next_priority));
+                    base::StringView next_comm));
 
   MOCK_METHOD5(PushCounter,
                RowId(int64_t timestamp,
@@ -129,10 +128,9 @@ TEST_F(ProtoTraceParserTest, LoadSingleEvent) {
   sched_switch->set_prev_state(32);
   sched_switch->set_next_comm(kProcName);
   sched_switch->set_next_pid(100);
-  sched_switch->set_next_prio(1024);
 
   EXPECT_CALL(*event_, PushSchedSwitch(10, 1000, 10, 32, 100,
-                                       base::StringView(kProcName), 1024));
+                                       base::StringView(kProcName)));
   Tokenize(trace);
 }
 
@@ -274,7 +272,6 @@ TEST_F(ProtoTraceParserTest, LoadMultipleEvents) {
   sched_switch->set_prev_state(32);
   sched_switch->set_next_comm(kProcName1);
   sched_switch->set_next_pid(100);
-  sched_switch->set_next_prio(1024);
 
   event = bundle->add_event();
   event->set_timestamp(1001);
@@ -286,13 +283,12 @@ TEST_F(ProtoTraceParserTest, LoadMultipleEvents) {
   sched_switch->set_prev_state(32);
   sched_switch->set_next_comm(kProcName2);
   sched_switch->set_next_pid(10);
-  sched_switch->set_next_prio(512);
 
   EXPECT_CALL(*event_, PushSchedSwitch(10, 1000, 10, 32, 100,
-                                       base::StringView(kProcName1), 1024));
+                                       base::StringView(kProcName1)));
 
   EXPECT_CALL(*event_, PushSchedSwitch(10, 1001, 100, 32, 10,
-                                       base::StringView(kProcName2), 512));
+                                       base::StringView(kProcName2)));
 
   Tokenize(trace);
 }
@@ -313,7 +309,6 @@ TEST_F(ProtoTraceParserTest, LoadMultiplePackets) {
   sched_switch->set_prev_state(32);
   sched_switch->set_next_comm(kProcName1);
   sched_switch->set_next_pid(100);
-  sched_switch->set_next_prio(1024);
 
   bundle = trace.add_packet()->mutable_ftrace_events();
   bundle->set_cpu(10);
@@ -328,13 +323,12 @@ TEST_F(ProtoTraceParserTest, LoadMultiplePackets) {
   sched_switch->set_prev_state(32);
   sched_switch->set_next_comm(kProcName2);
   sched_switch->set_next_pid(10);
-  sched_switch->set_next_prio(512);
 
   EXPECT_CALL(*event_, PushSchedSwitch(10, 1000, 10, 32, 100,
-                                       base::StringView(kProcName1), 1024));
+                                       base::StringView(kProcName1)));
 
   EXPECT_CALL(*event_, PushSchedSwitch(10, 1001, 100, 32, 10,
-                                       base::StringView(kProcName2), 512));
+                                       base::StringView(kProcName2)));
   Tokenize(trace);
 }
 
@@ -351,7 +345,6 @@ TEST_F(ProtoTraceParserTest, RepeatedLoadSinglePacket) {
   sched_switch->set_prev_state(32);
   sched_switch->set_next_comm(kProcName1);
   sched_switch->set_next_pid(100);
-  sched_switch->set_next_prio(1024);
 
   protos::Trace trace_2;
   bundle = trace_2.add_packet()->mutable_ftrace_events();
@@ -365,14 +358,13 @@ TEST_F(ProtoTraceParserTest, RepeatedLoadSinglePacket) {
   sched_switch->set_prev_state(32);
   sched_switch->set_next_comm(kProcName2);
   sched_switch->set_next_pid(10);
-  sched_switch->set_next_prio(512);
 
   EXPECT_CALL(*event_, PushSchedSwitch(10, 1000, 10, 32, 100,
-                                       base::StringView(kProcName1), 1024));
+                                       base::StringView(kProcName1)));
   Tokenize(trace_1);
 
   EXPECT_CALL(*event_, PushSchedSwitch(10, 1001, 100, 32, 10,
-                                       base::StringView(kProcName2), 512));
+                                       base::StringView(kProcName2)));
   Tokenize(trace_2);
 }
 
