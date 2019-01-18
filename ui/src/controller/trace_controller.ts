@@ -26,9 +26,12 @@ import {SCROLLING_TRACK_GROUP} from '../common/state';
 import {TimeSpan} from '../common/time';
 import {QuantizedLoad, ThreadDesc} from '../frontend/globals';
 import {SLICE_TRACK_KIND} from '../tracks/chrome_slices/common';
-import {CPU_SLICE_TRACK_KIND} from '../tracks/cpu_slices/common';
 import {CPU_FREQ_TRACK_KIND} from '../tracks/cpu_freq/common';
-import {PROCESS_SUMMARY_TRACK} from '../tracks/process_summary/common';
+import {CPU_SLICE_TRACK_KIND} from '../tracks/cpu_slices/common';
+// import {PROCESS_SUMMARY_TRACK} from '../tracks/process_summary/common';
+import {
+  PROCESS_SCHEDULING_TRACK_KIND
+} from '../tracks/process_scheduling/common';
 
 import {Child, Children, Controller} from './controller';
 import {globals} from './globals';
@@ -322,9 +325,8 @@ export class TraceController extends Controller<States> {
       utidToMaxDepth.set(utid, maxDepth);
     }
 
-    const threadQuery = await engine.query(
-        'select utid, tid, upid, pid, thread.name, process.name ' +
-        'from thread inner join process using(upid)');
+    const threadQuery = await engine.query(`
+      select utid, tid, upid, pid, thread.name, process.name, sum(dur) as total_dur from thread inner join process using(upid) left join sched using(utid) group by utid, upid order by total_dur desc, upid, utid`);
 
     const upidToUuid = new Map<number, string>();
     const addSummaryTrackActions: DeferredAction[] = [];
@@ -351,7 +353,7 @@ export class TraceController extends Controller<States> {
         addSummaryTrackActions.push(Actions.addTrack({
           id: summaryTrackId,
           engineId: this.engineId,
-          kind: PROCESS_SUMMARY_TRACK,
+          kind: PROCESS_SCHEDULING_TRACK_KIND,
           name: `${pid} summary`,
           config: {upid, pid, maxDepth, utid},
         }));

@@ -20,16 +20,17 @@ import {
 
 import {
   Config,
-  CPU_SLICE_TRACK_KIND,
   Data,
+  PROCESS_SCHEDULING_TRACK_KIND,
   SliceData,
   SummaryData
 } from './common';
 
-class CpuSliceTrackController extends TrackController<Config, Data> {
-  static readonly kind = CPU_SLICE_TRACK_KIND;
+class ProcessSchedulingTrackController extends TrackController<Config, Data> {
+  static readonly kind = PROCESS_SCHEDULING_TRACK_KIND;
   private busy = false;
   private setup = false;
+  // private utids: number[] = [];
 
   onBoundsChange(start: number, end: number, resolution: number): void {
     this.update(start, end, resolution);
@@ -47,8 +48,14 @@ class CpuSliceTrackController extends TrackController<Config, Data> {
     if (this.setup === false) {
       await this.query(
           `create virtual table ${this.tableName('window')} using window;`);
+      // const threadQuery = await this.query(
+      //    `select utid from thread where upid=${this.config.upid}`);
+      // this.utids = threadQuery.columns[0].longValues! as number[];
+      await this.query(`create view ${this.tableName('process')} as
+          select ts, dur, cpu, utid, upid from sched join (select utid, upid from
+            thread where upid = ${this.config.upid}) using(utid);`);
       await this.query(`create virtual table ${this.tableName('span')}
-              using span_join(sched PARTITIONED cpu,
+              using span_join(${this.tableName('process')} PARTITIONED cpu,
                               ${this.tableName('window')} PARTITIONED cpu);`);
       this.setup = true;
     }
@@ -89,10 +96,10 @@ class CpuSliceTrackController extends TrackController<Config, Data> {
 
     const query = `select
         quantum_ts as bucket,
-        sum(dur)/cast(${bucketSizeNs} as float) as utilization
+        sum(dur)/cast(${bucketSizeNs * 8} as float) as utilization
         from ${this.tableName('span')}
-        where cpu = ${this.config.cpu}
-        and utid != 0
+        where upid = ${this.config.upid}
+        and cpu < 8
         group by quantum_ts`;
 
     const rawResult = await this.query(query);
@@ -120,8 +127,10 @@ class CpuSliceTrackController extends TrackController<Config, Data> {
     const LIMIT = 10000;
 
     const query = `select ts,dur,utid from ${this.tableName('span')}
-        where cpu = ${this.config.cpu}
-        and utid != 0
+        join
+        (select utid from thread where upid = ${this.config.upid})
+        using(utid)
+        where cpu = 0
         limit ${LIMIT};`;
     const rawResult = await this.query(query);
 
@@ -167,4 +176,4 @@ class CpuSliceTrackController extends TrackController<Config, Data> {
   }
 }
 
-trackControllerRegistry.register(CpuSliceTrackController);
+trackControllerRegistry.register(ProcessSchedulingTrackController);

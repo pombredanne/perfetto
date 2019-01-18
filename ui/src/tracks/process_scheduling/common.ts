@@ -12,12 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Import all currently implemented tracks. After implemeting a new track, an
-// import statement for it needs to be added here.
-import './chrome_slices/controller';
-import './counter/controller';
-import './cpu_freq/controller';
-import './cpu_slices/controller';
-import './process_scheduling/controller';
-import './process_summary/controller';
-import './vsync/controller';
+export const PROCESS_SCHEDULING_TRACK_KIND = 'ProcessSchedulingTrack';
+
+
+export interface SummaryData {
+  kind: 'summary';
+
+  start: number;
+  end: number;
+  resolution: number;
+
+  bucketSizeSeconds: number;
+  utilizations: Float64Array;
+}
+
+export interface SliceData {
+  kind: 'slice';
+
+  start: number;
+  end: number;
+  resolution: number;
+
+  // Slices are stored in a columnar fashion. All fields have the same length.
+  starts: Float64Array;
+  ends: Float64Array;
+  utids: Uint32Array;
+}
+
+export type Data = SummaryData | SliceData;
+
+
+export interface Config { upid: number; }
