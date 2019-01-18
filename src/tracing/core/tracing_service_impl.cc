@@ -1491,7 +1491,7 @@ TraceBuffer* TracingServiceImpl::GetBufferByID(BufferID buffer_id) {
 }
 
 void TracingServiceImpl::UpdateMemoryGuardrail() {
-#if !PERFETTO_BUILDFLAG(PERFETTO_CHROMIUM_BUILD) && \
+#if !PERFETTO_BUILDFLAG(PERFETTO_EMBEDDER_BUILD) && \
     !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
   uint64_t total_buffer_bytes = 0;
 
@@ -1618,7 +1618,10 @@ void TracingServiceImpl::SnapshotStats(TracingSession* tracing_session,
     const TraceBuffer::Stats& buf_stats = buf->stats();
     buf_stats_proto->set_bytes_written(buf_stats.bytes_written);
     buf_stats_proto->set_chunks_written(buf_stats.chunks_written);
+    buf_stats_proto->set_chunks_rewritten(buf_stats.chunks_rewritten);
     buf_stats_proto->set_chunks_overwritten(buf_stats.chunks_overwritten);
+    buf_stats_proto->set_chunks_committed_out_of_order(
+        buf_stats.chunks_committed_out_of_order);
     buf_stats_proto->set_write_wrap_count(buf_stats.write_wrap_count);
     buf_stats_proto->set_patches_succeeded(buf_stats.patches_succeeded);
     buf_stats_proto->set_patches_failed(buf_stats.patches_failed);
