@@ -54,8 +54,13 @@ void HeapTracker::RecordMalloc(
     Allocation& alloc = it->second;
     PERFETTO_DCHECK(alloc.sequence_number != sequence_number);
     if (alloc.sequence_number < sequence_number) {
-      if (alloc.sequence_number <= sequence_number_)
-        alloc.SubtractFromCallstackAllocations();
+      // This makes the sequencing a bit incorrect. We are overwriting this
+      // allocation, so we prentend both the alloc and the free for this have
+      // already happened to make sure the total numbers for this callstack are
+      // correct.
+      if (alloc.sequence_number > commited_sequence_number_)
+        alloc.AddToCallstackAllocations();
+      alloc.SubtractFromCallstackAllocations();
       GlobalCallstackTrie::Node* node = callsites_->CreateCallsite(callstack);
       alloc.total_size = size;
       alloc.sequence_number = sequence_number;
@@ -72,20 +77,21 @@ void HeapTracker::RecordMalloc(
 }
 
 void HeapTracker::RecordOperation(uint64_t address, uint64_t sequence_number) {
-  if (sequence_number != sequence_number_ + 1) {
+  if (sequence_number != commited_sequence_number_ + 1) {
     pending_operations_.emplace(sequence_number, address);
     return;
   }
 
   CommitOperation(sequence_number, address);
-  sequence_number_++;
+  commited_sequence_number_++;
 
   // At this point some other pending operations might be eligible to be
   // committed.
   auto it = pending_operations_.begin();
-  while (it != pending_operations_.end() && it->first == sequence_number_ + 1) {
+  while (it != pending_operations_.end() &&
+         it->first == commited_sequence_number_ + 1) {
     CommitOperation(it->first, it->second);
-    sequence_number_++;
+    commited_sequence_number_++;
     it = pending_operations_.erase(it);
   }
 }

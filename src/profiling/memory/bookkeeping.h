@@ -252,6 +252,7 @@ class HeapTracker {
   uint64_t GetSizeForTesting(const std::vector<unwindstack::FrameData>& stack);
 
  private:
+  // Sum of all the allocations for a given callstack.
   struct CallstackAllocations {
     CallstackAllocations(GlobalCallstackTrie::Node* n) : node(n) {}
 
@@ -262,12 +263,9 @@ class HeapTracker {
     uint64_t allocation_count = 0;
     uint64_t free_count = 0;
 
-    GlobalCallstackTrie::Node* node;
+    GlobalCallstackTrie::Node* const node;
 
-    ~CallstackAllocations() {
-      if (node)
-        GlobalCallstackTrie::DecrementNode(node);
-    }
+    ~CallstackAllocations() { GlobalCallstackTrie::DecrementNode(node); }
 
     bool operator<(const CallstackAllocations& other) const {
       return node < other.node;
@@ -323,28 +321,34 @@ class HeapTracker {
   }
 
   // Sequencing logic works as following:
-  // * mallocs are immediately commited to |allocations_|. They are rejected if
+  // * mallocs are immediately commited to |allocations_|. They are ignored if
   //   the current malloc for the address has a higher sequence number.
   //
   //   If all operations with sequence numbers lower than the malloc have been
-  //   commited to |allocations_|, sequence_number_ is advanced and all
+  //   commited to |allocations_|, commited_sequence_number_ is advanced and all
   //   unblocked pending operations after the current id are commited to
   //   |allocations_|. Otherwise, a no-op record is added to the pending
   //   operations queue to maintain the contiguity of the sequence.
 
   // * for frees:
   //   if all operations with sequence numbers lower than the free have
-  //     been commited to |allocations_| (i.e sequence_number_ ==
+  //     been commited to |allocations_| (i.e commited_sequence_number_ ==
   //     sequence_number - 1) the free is commited to |allocations_| and
-  //     sequence_number_ is advanced. All unblocked pending operations are
-  //     commited to |allocations_|.
+  //     commited_sequence_number_ is advanced. All unblocked pending operations
+  //     are commited to |allocations_|.
   //   otherwise: the free is added to the queue of pending operations.
 
-  // Commits a free operation into |allocations_|.
+  void RecordOperation(uint64_t address, uint64_t sequence_number);
+
+  // Commits a malloc or free operation.
   // This must be  called after all operations up to sequence_number have been
   // commited to |allocations_|.
+  //
+  // An operation is
+  //  * ignored if sequence number of the allocation at address is higher than
+  //    sequence number.
   void CommitOperation(uint64_t sequence_number, uint64_t address);
-  void RecordOperation(uint64_t address, uint64_t sequence_number);
+
   // We cannot use an interner here, because after the last allocation goes
   // away, we still need to keep the CallstackAllocations around until the next
   // dump.
@@ -354,14 +358,13 @@ class HeapTracker {
   std::vector<std::pair<decltype(callstack_allocations_)::iterator, uint64_t>>
       dead_callstack_allocations_;
 
-  // Address -> (size, sequence_number, code location)
-  std::map<uint64_t, Allocation> allocations_;
+  std::map<uint64_t /* allocation address */, Allocation> allocations_;
 
   std::map<uint64_t /* seq_id */, uint64_t /* allocation address */>
       pending_operations_;
 
   // The sequence number all mallocs and frees have been handled up to.
-  uint64_t sequence_number_ = 0;
+  uint64_t commited_sequence_number_ = 0;
   GlobalCallstackTrie* const callsites_;
 };
 
