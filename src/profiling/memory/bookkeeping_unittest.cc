@@ -23,6 +23,9 @@ namespace perfetto {
 namespace profiling {
 namespace {
 
+using ::testing::AnyOf;
+using ::testing::Eq;
+
 std::vector<unwindstack::FrameData> stack() {
   std::vector<unwindstack::FrameData> res;
   unwindstack::FrameData data{};
@@ -73,7 +76,7 @@ TEST(BookkeepingTest, TwoHeapTrackers) {
   {
     HeapTracker hd2(&c);
 
-    hd.RecordMalloc(stack(), 1, 5, sequence_number++);
+    hd.RecordMalloc(stack(), 1, 5, sequence_number);
     hd2.RecordMalloc(stack(), 2, 2, sequence_number++);
     ASSERT_EQ(hd2.GetSizeForTesting(stack()), 2);
     ASSERT_EQ(hd.GetSizeForTesting(stack()), 5);
@@ -100,6 +103,26 @@ TEST(BookkeepingTest, OutOfOrder) {
   hd.RecordMalloc(stack2(), 1, 2, 0);
   EXPECT_EQ(hd.GetSizeForTesting(stack()), 5);
   EXPECT_EQ(hd.GetSizeForTesting(stack2()), 0);
+}
+
+TEST(BookkeepingTest, ManyAllocations) {
+  GlobalCallstackTrie c;
+  HeapTracker hd(&c);
+
+  std::vector<std::pair<uint64_t, uint64_t>> batch_frees;
+
+  for (uint64_t sequence_number = 1; sequence_number < 1000;) {
+    if (batch_frees.size() > 10) {
+      for (const auto& p : batch_frees)
+        hd.RecordFree(p.first, p.second);
+      batch_frees.clear();
+    }
+
+    uint64_t addr = sequence_number;
+    hd.RecordMalloc(stack(), addr, 5, sequence_number++);
+    batch_frees.emplace_back(addr, sequence_number++);
+    ASSERT_THAT(hd.GetSizeForTesting(stack()), AnyOf(Eq(0), Eq(5)));
+  }
 }
 
 }  // namespace
