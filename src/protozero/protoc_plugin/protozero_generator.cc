@@ -289,13 +289,6 @@ class GeneratorJob {
     }
     stub_h_->Print("\n");
 
-    // Print includes for private imports to .cc file.
-    for (const FileDescriptor* dependency : private_imports_) {
-      stub_h_->Print("#include \"$name$.h\"\n", "name",
-                     ProtoStubName(dependency));
-    }
-    stub_h_->Print("\n");
-
     // Print namespaces.
     for (const std::string& ns : namespaces_) {
       stub_h_->Print("namespace $ns$ {\n", "ns", ns);
@@ -454,8 +447,8 @@ class GeneratorJob {
     std::string action = field->is_repeated() ? "add" : "set";
     std::string inner_class = GetCppClassName(field->message_type());
     stub_h_->Print(
-        "inline $inner_class$* $action$_$name$() {\n"
-        "  return BeginNestedMessage<$inner_class$>($id$);\n"
+        "template <typename T = $inner_class$> T* $action$_$name$() {\n"
+        "  return BeginNestedMessage<T>($id$);\n"
         "}\n\n",
         "id", std::to_string(field->number()), "name", field->name(), "action",
         action, "inner_class", inner_class);
