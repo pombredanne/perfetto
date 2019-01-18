@@ -290,17 +290,13 @@ class HeapTracker {
     }
 
     void AddToCallstackAllocations() {
-      if (callstack_allocations) {
-        callstack_allocations->allocation_count++;
-        callstack_allocations->allocated += total_size;
-      }
+      callstack_allocations->allocation_count++;
+      callstack_allocations->allocated += total_size;
     }
 
     void SubtractFromCallstackAllocations() {
-      if (callstack_allocations) {
-        callstack_allocations->free_count++;
-        callstack_allocations->freed += total_size;
-      }
+      callstack_allocations->free_count++;
+      callstack_allocations->freed += total_size;
     }
 
     ~Allocation() {
