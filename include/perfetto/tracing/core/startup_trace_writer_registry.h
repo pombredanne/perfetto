@@ -50,13 +50,13 @@ class StartupTraceWriterRegistryHandle {
   void OnRegistryDestroyed();
 
  private:
-  std::mutex lock_;
-  StartupTraceWriterRegistry* registry_;
-
   StartupTraceWriterRegistryHandle(const StartupTraceWriterRegistryHandle&) =
       delete;
   StartupTraceWriterRegistryHandle& operator=(
       const StartupTraceWriterRegistryHandle&) = delete;
+
+  std::mutex lock_;
+  StartupTraceWriterRegistry* registry_;
 };
 
 // Embedders can use this registry to create unbound StartupTraceWriters during
