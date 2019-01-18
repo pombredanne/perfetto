@@ -24,6 +24,7 @@
 
 #include "gtest/gtest.h"
 #include "perfetto/base/logging.h"
+#include "src/base/test/util.h"
 #include "src/protozero/test/fake_scattered_buffer.h"
 
 namespace protozero {
@@ -292,7 +293,7 @@ TEST_F(MessageTest, StressTest) {
 
 TEST_F(MessageTest, DestructInvalidMessageHandle) {
   FakeRootMessage* msg = NewMessage();
-  EXPECT_DEBUG_DEATH(
+  EXPECT_DCHECK_DEATH(
       {
         MessageHandle<FakeRootMessage> handle(msg);
         ResetMessage(msg);
