@@ -93,6 +93,11 @@ char* FindMainThreadStack() {
   return nullptr;
 }
 
+int UnsetDumpable(int) {
+  prctl(PR_SET_DUMPABLE, 0);
+  return 0;
+}
+
 }  // namespace
 
 bool FreePage::Add(const uint64_t addr,
@@ -207,8 +212,13 @@ Client::Client(std::vector<base::UnixSocketRaw> socks)
   // man 5 proc). In such situations, temporarily mark the process dumpable to
   // be able to open the files, unsetting dumpability immediately afterwards.
   int orig_dumpable = prctl(PR_GET_DUMPABLE);
-  if (orig_dumpable == 0)
+
+  enum { kNop, kDoUnset };
+  base::ScopedResource<int, UnsetDumpable, kNop, false> unset_dumpable(kNop);
+  if (orig_dumpable == 0) {
+    unset_dumpable.reset(kDoUnset);
     prctl(PR_SET_DUMPABLE, 1);
+  }
 
   base::ScopedFile maps(base::OpenFile("/proc/self/maps", O_RDONLY));
   if (!maps) {
@@ -221,8 +231,7 @@ Client::Client(std::vector<base::UnixSocketRaw> socks)
     return;
   }
   // Restore original dumpability value if we overrode it.
-  if (orig_dumpable == 0)
-    prctl(PR_SET_DUMPABLE, 0);
+  unset_dumpable.reset();
 
   int fds[2];
   fds[0] = *maps;
