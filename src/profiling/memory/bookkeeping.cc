@@ -83,7 +83,6 @@ void HeapTracker::RecordOperation(uint64_t address, uint64_t sequence_number) {
   }
 
   CommitOperation(sequence_number, address);
-  commited_sequence_number_++;
 
   // At this point some other pending operations might be eligible to be
   // committed.
@@ -91,7 +90,6 @@ void HeapTracker::RecordOperation(uint64_t address, uint64_t sequence_number) {
   while (it != pending_operations_.end() &&
          it->first == commited_sequence_number_ + 1) {
     CommitOperation(it->first, it->second);
-    commited_sequence_number_++;
     it = pending_operations_.erase(it);
   }
 }
@@ -110,6 +108,7 @@ void HeapTracker::CommitOperation(uint64_t sequence_number, uint64_t address) {
     value.SubtractFromCallstackAllocations();
     allocations_.erase(leaf_it);
   }
+  commited_sequence_number_++;
 }
 
 void HeapTracker::Dump(pid_t pid, DumpState* dump_state) {
