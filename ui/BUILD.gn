@@ -28,8 +28,8 @@ group("ui") {
   deps = [
     ":assets_dist",
     ":catapult_dist",
-    ":controller_bundle_dist",
-    ":engine_bundle_dist",
+    # ":controller_bundle_dist",
+    # ":engine_bundle_dist",
     ":frontend_bundle_dist",
     ":index_dist",
     ":scss",
@@ -319,6 +319,10 @@ copy("assets_dist") {
   sources = [
               "src/assets/logo-3d.png",
               "src/assets/logo.png",
+              "src/assets/rec_ring_buf.png",
+              "src/assets/rec_long_trace.png",
+              "src/assets/rec_cpu_coarse.png",
+              "src/assets/rec_cpu_fine.png",
             ] + [ scss_root ] + scss_srcs
   outputs = [
     "$ui_dir/assets/{{source_file_part}}",

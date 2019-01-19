@@ -109,6 +109,8 @@ function main() {
         '/': HomePage,
         '/viewer': ViewerPage,
         '/record': RecordPage,
+        '/record/buffers': RecordPage,
+        '/record/cpu': RecordPage,
       },
       dispatch);
   forwardRemoteCalls(channel.port2, new FrontendApi(router));
