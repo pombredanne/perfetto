@@ -229,15 +229,17 @@ function CpuSettings(cssClass: string) {
         setEnabled: (cfg, val) => cfg.cpuSched = val,
         isEnabled: (cfg) => cfg.cpuSched
       } as ProbeAttrs),
-      m(Probe, {
-        title: 'Scheduling chains / latency analysis',
-        img: 'rec_cpu_wakeup.png',
-        descr: `Tracks causality of scheduling transitions. When a task
-                X transitions from blocked -> runnable, keeps track of the
-                task Y that X's transition (e.g. posting a semaphore).`,
-        setEnabled: (cfg, val) => cfg.cpuLatency = val,
-        isEnabled: (cfg) => cfg.cpuLatency
-      } as ProbeAttrs));
+      // TODO(primiano): commented out until we really have this feature.
+      // m(Probe, {
+      //   title: 'Scheduling chains / latency analysis',
+      //   img: 'rec_cpu_wakeup.png',
+      //   descr: `Tracks causality of scheduling transitions. When a task
+      //           X transitions from blocked -> runnable, keeps track of the
+      //           task Y that X's transition (e.g. posting a semaphore).`,
+      //   setEnabled: (cfg, val) => cfg.cpuLatency = val,
+      //   isEnabled: (cfg) => cfg.cpuLatency
+      // } as ProbeAttrs)
+      );
 }
 
 function MemorySettings(cssClass: string) {
@@ -524,7 +526,7 @@ export const RecordPage = createPage({
 
     const pages: m.Children = [];
     let routePage = Router.param('p');
-    if (Object.keys(SECTIONS).indexOf(routePage) < 0) {
+    if (!Object.keys(SECTIONS).includes(routePage)) {
       routePage = 'buffers';
     }
     for (const key of Object.keys(SECTIONS)) {

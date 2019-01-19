@@ -111,13 +111,13 @@ export class Slider implements m.ClassComponent<SliderAttrs> {
         type: 'text',
         pattern: '(0[0-9]|1[0-9]|2[0-3])(:[0-5][0-9]){2}',  // hh:mm:ss
         value: new Date(val).toISOString().substr(11, 8),
-        oninput: m.withAttr('value', (v) => this.onTimeValueChange(attrs, v))
+        oninput: m.withAttr('value', v => this.onTimeValueChange(attrs, v))
       };
     } else {
       spinnerCfg = {
         type: 'number',
         value: val,
-        oninput: m.withAttr('value', (v) => this.onValueChange(attrs, v))
+        oninput: m.withAttr('value', v => this.onValueChange(attrs, v))
       };
     }
     return m(
@@ -125,7 +125,7 @@ export class Slider implements m.ClassComponent<SliderAttrs> {
         m('header', attrs.title),
         attrs.icon !== undefined ? m('i.material-icons', attrs.icon) : [],
         m(`input[id="${id}"][type=range][min=0][max=${maxIdx}][value=${idx}]`,
-          {oninput: m.withAttr('value', (v) => this.onSliderChange(attrs, v))}),
+          {oninput: m.withAttr('value', v => this.onSliderChange(attrs, v))}),
         m(`input.spinner[min=1][for=${id}]`, spinnerCfg),
         m('.unit', attrs.unit));
   }
@@ -171,7 +171,7 @@ export class Dropdown implements m.ClassComponent<DropdownAttrs> {
     let numSelected = 0;
     for (const [key, label] of attrs.options) {
       const opts = {value: key, selected: false};
-      if (selItems.indexOf(key) >= 0) {
+      if (selItems.includes(key)) {
         opts.selected = true;
         numSelected++;
       }
