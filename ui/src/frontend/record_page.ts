@@ -125,6 +125,56 @@ function CpuSettings() {
             'Enables sched_wakeup events, which allow to determine causality of task wakeups'), ), ), );
 }
 
+function MemorySettings() {
+  return m(
+      'div',
+      m('.container',
+        m('header', 'OS-wide counters'),
+        m('.g2',
+          m('div',
+            m('img.logo[src=assets/meminfo.png]'),
+            m('label', 'Kernel meminfo')),
+          m('div',
+            m('img.logo[src=assets/vmstat.png]'),
+            m('label', 'Virtual memory stats'))),
+        m('.checkboxes',
+          m('label', m('input[type=checkbox]'), m('.ui', 'MEM_TOTAL')),
+          m('label', m('input[type=checkbox]'), m('.ui', 'MEM_FREE')),
+          m('label', m('input[type=checkbox]'), m('.ui', 'MEM_AVAILABLE')),
+          m('label', m('input[type=checkbox]'), m('.ui', 'BUFFERS')),
+          m('label', m('input[type=checkbox]'), m('.ui', 'CACHED')),
+          m('label', m('input[type=checkbox]'), m('.ui', 'SWAP_CACHED')),
+          m('label', m('input[type=checkbox]'), m('.ui', 'ACTIVE')),
+          m('label', m('input[type=checkbox]'), m('.ui', 'INACTIVE')),
+          m('label', m('input[type=checkbox]'), m('.ui', 'ACTIVE_ANON')),
+          m('label', m('input[type=checkbox]'), m('.ui', 'INACTIVE_ANON')),
+          m('label', m('input[type=checkbox]'), m('.ui', 'ACTIVE_FILE')),
+          m('label', m('input[type=checkbox]'), m('.ui', 'INACTIVE_FILE')),
+          m('label', m('input[type=checkbox]'), m('.ui', 'UNEVICTABLE')),
+          m('label', m('input[type=checkbox]'), m('.ui', 'MLOCKED')),
+          m('label', m('input[type=checkbox]'), m('.ui', 'SWAP_TOTAL')),
+          m('label', m('input[type=checkbox]'), m('.ui', 'SWAP_FREE')),
+          m('label', m('input[type=checkbox]'), m('.ui', 'DIRTY')),
+          m('label', m('input[type=checkbox]'), m('.ui', 'WRITEBACK')),
+          m('label', m('input[type=checkbox]'), m('.ui', 'ANON_PAGES')),
+          m('label', m('input[type=checkbox]'), m('.ui', 'MAPPED')),
+          m('label', m('input[type=checkbox]'), m('.ui', 'SHMEM')),
+          m('label', m('input[type=checkbox]'), m('.ui', 'SLAB')),
+          m('label', m('input[type=checkbox]'), m('.ui', 'SLAB_RECLAIMABLE')),
+          m('label', m('input[type=checkbox]'), m('.ui', 'SLAB_UNRECLAIMABLE')),
+          m('label', m('input[type=checkbox]'), m('.ui', 'KERNEL_STACK')),
+          m('label', m('input[type=checkbox]'), m('.ui', 'PAGE_TABLES')),
+          m('label', m('input[type=checkbox]'), m('.ui', 'COMMIT_LIMIT')),
+          m('label', m('input[type=checkbox]'), m('.ui', 'COMMITED_AS')),
+          m('label', m('input[type=checkbox]'), m('.ui', 'VMALLOC_TOTAL')),
+          m('label', m('input[type=checkbox]'), m('.ui', 'VMALLOC_USED')),
+          m('label', m('input[type=checkbox]'), m('.ui', 'VMALLOC_CHUNK')),
+          m('label', m('input[type=checkbox]'), m('.ui', 'CMA_TOTAL')),
+          m('label', m('input[type=checkbox]'), m('.ui', 'CMA_FREE')),
+          //
+          )));
+}
+
 export const RecordPage = createPage({
   view() {
     let routePage = '';
@@ -138,6 +188,9 @@ export const RecordPage = createPage({
         break;
       case 'power':
         page = PowerSettings();
+        break;
+      case 'memory':
+        page = MemorySettings();
         break;
       default:
         page = RecSettings();
@@ -155,23 +208,23 @@ export const RecordPage = createPage({
                   m('i.material-icons', 'tune'),
                   m('.title', 'Recording settings'),
                   m('.sub', 'Trace duration, buffer sizes'), ), ), ),
-            m('header', 'Operating system'),
+            m('header', 'Platform probes'),
             m('ul',
               m('a[href="#!/record/cpu"]',
                 m(`li${routePage === 'cpu' ? '.active' : ''}`,
                   m('i.material-icons', 'subtitles'),
                   m('.title', 'CPU'),
                   m('.sub', 'CPU usage, scheduling, wakeups'))),
-              m('a[href="#!/record/memory"]',
-                m(`li${routePage === 'memory' ? '.active' : ''}`,
-                  m('i.material-icons', 'memory'),
-                  m('.title', 'Memory'),
-                  m('.sub', 'TODO'))),
               m('a[href="#!/record/power"]',
                 m(`li${routePage === 'power' ? '.active' : ''}`,
                   m('i.material-icons', 'battery_charging_full'),
                   m('.title', 'Power'),
                   m('.sub', 'Battery and other energy counters'))),
+              m('a[href="#!/record/memory"]',
+                m(`li${routePage === 'memory' ? '.active' : ''}`,
+                  m('i.material-icons', 'memory'),
+                  m('.title', 'Memory'),
+                  m('.sub', 'TODO'))),
               m('a[href="#!/record/io"]',
                 m(`li${routePage === 'io' ? '.active' : ''}`,
                   m('i.material-icons', 'sd_storage'),
@@ -182,7 +235,7 @@ export const RecordPage = createPage({
                   m('i.material-icons', 'developer_board'),
                   m('.title', 'Peripherals'),
                   m('.sub', 'I2C, radio and other stuff'))), ),
-            m('header', 'Platform'),
+            m('header', 'Android'),
             m('li',
               m('i.material-icons', 'android'),
               m('.title', 'Android framework'),
