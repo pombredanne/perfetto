@@ -82,6 +82,29 @@ function RecSettings() {
           m('label[for="rec_period"]', `${SIZES[+siz]} MB`))));
 }
 
+function PowerSettings() {
+  return m(
+      'div',
+      m('.container',
+        m('.g2',
+          m('div',
+            m('img.logo[src=assets/battery_counters.png]'),
+            m('label', 'Battery drain'), ),
+          m('div',
+            m('img.logo[src=assets/cpu_freq.png]'),
+            m('label', 'CPU freq & idle'), ), ),
+        m('.g2',
+          m('div',
+            m('img.logo[src=assets/board_voltage.png]'),
+            m('label', 'Board volt & clocks'), ),
+          m('div'), ),
+        m('.wakeups',
+          m('input[type=checkbox][id=cpu_wakeups]'),
+          m('label[for=cpu_wakeups].button', m('i.material-icons', 'repeat')),
+          m('.title', 'TODO'),
+          m('.sub',
+            'Enables sched_wakeup events, which allow to determine causality of task wakeups'), ), ), );
+}
 
 function CpuSettings() {
   return m(
@@ -93,16 +116,13 @@ function CpuSettings() {
             m('label', 'Coarse counters'), ),
           m('div',
             m('img.logo[src=assets/rec_cpu_fine.png]'),
-            m('label', 'Scheduling details'), ), ), ),
-      m('.wizard',
-        m('.slider',
-          m('header', 'Flush on disk every'),
-          m('i.material-icons', 'av_timer'),
-          m(`input[id="rec_period"][type=range][min=0][max=${
-                                                             SIZES.length - 1
-                                                           }][value=${siz}]`,
-            {oninput: m.withAttr('value', setSiz)}),
-          m('label[for="rec_period"]', `${SIZES[+siz]} MB`))));
+            m('label', 'Scheduling details'), ), ),
+        m('.wakeups',
+          m('input[type=checkbox][id=cpu_wakeups]'),
+          m('label[for=cpu_wakeups].button', m('i.material-icons', 'repeat')),
+          m('.title', 'Track wakeup sources'),
+          m('.sub',
+            'Enables sched_wakeup events, which allow to determine causality of task wakeups'), ), ), );
 }
 
 export const RecordPage = createPage({
@@ -115,6 +135,9 @@ export const RecordPage = createPage({
     switch (routePage) {
       case 'cpu':
         page = CpuSettings();
+        break;
+      case 'power':
+        page = PowerSettings();
         break;
       default:
         page = RecSettings();
@@ -137,25 +160,37 @@ export const RecordPage = createPage({
               m('a[href="#!/record/cpu"]',
                 m(`li${routePage === 'cpu' ? '.active' : ''}`,
                   m('i.material-icons', 'subtitles'),
-                  m('.title', 'CPU & Scheduling'),
-                  m('.sub', 'Process execution, blockages'))),
-              m('li', m('i.material-icons', 'memory'), m('.title', 'Memory')),
-              m('li',
-                m('i.material-icons', 'battery_charging_full'),
-                m('.title', 'Power')),
-              m('li',
-                m('i.material-icons', 'sd_storage'),
-                m('.title', 'Disk I/O')),
-              m('li',
-                m('i.material-icons', 'developer_board'),
-                m('.title', 'Peripherals')), ),
+                  m('.title', 'CPU'),
+                  m('.sub', 'CPU usage, scheduling, wakeups'))),
+              m('a[href="#!/record/memory"]',
+                m(`li${routePage === 'memory' ? '.active' : ''}`,
+                  m('i.material-icons', 'memory'),
+                  m('.title', 'Memory'),
+                  m('.sub', 'TODO'))),
+              m('a[href="#!/record/power"]',
+                m(`li${routePage === 'power' ? '.active' : ''}`,
+                  m('i.material-icons', 'battery_charging_full'),
+                  m('.title', 'Power'),
+                  m('.sub', 'Battery and other energy counters'))),
+              m('a[href="#!/record/io"]',
+                m(`li${routePage === 'io' ? '.active' : ''}`,
+                  m('i.material-icons', 'sd_storage'),
+                  m('.title', 'Disk I/O'),
+                  m('.sub', 'TODO'))),
+              m('a[href="#!/record/peripherals"]',
+                m(`li${routePage === 'peripherals' ? '.active' : ''}`,
+                  m('i.material-icons', 'developer_board'),
+                  m('.title', 'Peripherals'),
+                  m('.sub', 'I2C, radio and other stuff'))), ),
             m('header', 'Platform'),
             m('li',
               m('i.material-icons', 'android'),
-              m('.title', 'Android framework')),
+              m('.title', 'Android framework'),
+              m('.sub', 'TODO'), ),
             m('li',
               m('i.material-icons', 'receipt'),
-              m('.title', 'Event logs')), ),
+              m('.title', 'Event logs'),
+              m('.sub', 'App & sys logs seen in logcat'), ), ),
           m('.content', page)));
   }
 });

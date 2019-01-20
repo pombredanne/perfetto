@@ -323,6 +323,10 @@ copy("assets_dist") {
               "src/assets/rec_long_trace.png",
               "src/assets/rec_cpu_coarse.png",
               "src/assets/rec_cpu_fine.png",
+              "src/assets/battery_counters.png",
+              "src/assets/cpu_freq.png",
+              "src/assets/cpu_voltage.png",
+              "src/assets/board_voltage.png",
             ] + [ scss_root ] + scss_srcs
   outputs = [
     "$ui_dir/assets/{{source_file_part}}",

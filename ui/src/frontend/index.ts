@@ -111,6 +111,8 @@ function main() {
         '/record': RecordPage,
         '/record/buffers': RecordPage,
         '/record/cpu': RecordPage,
+        '/record/memory': RecordPage,
+        '/record/power': RecordPage,
       },
       dispatch);
   forwardRemoteCalls(channel.port2, new FrontendApi(router));
