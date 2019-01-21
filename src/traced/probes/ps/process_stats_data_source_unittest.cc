@@ -163,13 +163,13 @@ TEST_F(ProcessStatsDataSourceTest, ProcessStats) {
         }));
 
     EXPECT_CALL(*data_source, ReadProcPidFile(pid, "oom_score_adj"))
-        .WillRepeatedly(
-            Invoke([checkpoint, kPids, &iter](int32_t pid, const std::string&) {
-              if (pid == kPids[base::ArraySize(kPids) - 1]) {
+        .WillRepeatedly(Invoke(
+            [checkpoint, kPids, &iter](int32_t inner_pid, const std::string&) {
+              if (inner_pid == kPids[base::ArraySize(kPids) - 1]) {
                 if (++iter == kNumIters)
                   checkpoint();
               }
-              return std::to_string(pid * 100);
+              return std::to_string(inner_pid * 100);
             }));
   }
 
