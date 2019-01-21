@@ -28,7 +28,7 @@ TraceStorage::TraceStorage() {
   unique_threads_.emplace_back(0);
 
   // Reserve StringId == 0 for null.
-  InternString(nullptr);
+  string_pool_.emplace_back(nullptr);
 
   // Reserve StringId == 1 for the empty string.
   InternString("");
@@ -54,10 +54,6 @@ StringId TraceStorage::InternString(base::StringView str) {
   StringId string_id = static_cast<uint32_t>(string_pool_.size() - 1);
   string_index_.emplace(hash, string_id);
   return string_id;
-}
-
-void TraceStorage::ResetStorage() {
-  *this = TraceStorage();
 }
 
 void TraceStorage::SqlStats::RecordQueryBegin(const std::string& query,
