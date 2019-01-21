@@ -55,8 +55,6 @@ class ThreadTableUnittest : public ::testing::Test {
     return reinterpret_cast<const char*>(sqlite3_column_text(*stmt_, colId));
   }
 
-  ~ThreadTableUnittest() override { context_.storage->ResetStorage(); }
-
  protected:
   TraceProcessorContext context_;
   ScopedDb db_;
