@@ -116,6 +116,13 @@ void DumpProfilePacket(std::vector<ProfilePacket>& packet_fragments,
       std::tie(it, std::ignore) =
           string_table.emplace(filename, string_table.size());
       gmapping->set_filename(static_cast<int64_t>(it->second));
+
+      auto str_it = string_lookup.find(mapping.build_id());
+      if (str_it != string_lookup.end()) {
+        std::tie(it, std::ignore) =
+            string_table.emplace(str_it->second, string_table.size());
+        gmapping->set_build_id(static_cast<int64_t>(it->second));
+      }
     }
   }
 
