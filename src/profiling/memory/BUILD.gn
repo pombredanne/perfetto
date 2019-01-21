@@ -108,6 +108,7 @@ source_set("unittests") {
   deps = [
     ":client",
     ":daemon",
+    ":proc_utils",
     ":wire_protocol",
     "../../../gn:default_deps",
     "../../../gn:gtest_deps",
@@ -156,6 +157,7 @@ source_set("end_to_end_tests") {
 source_set("malloc_hooks") {
   deps = [
     ":client",
+    ":proc_utils",
     ":wire_protocol",
     "../../../gn:default_deps",
     "../../base",

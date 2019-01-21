@@ -140,7 +140,13 @@ void HeapprofdProducer::AdoptConnectedSockets(
           base::ScopedFile(fd), &weak_producer->socket_listener_,
           weak_producer->task_runner_, base::SockType::kStream);
 
-      weak_producer->socket_listener_.HandleClientConnection(std::move(socket));
+      // The forked heapprofd will not normally be able to read the target's
+      // cmdline under procfs, so pass peer's description explicitly.
+      Process process{weak_producer->target_pid_,
+                      weak_producer->target_cmdline_};
+
+      weak_producer->socket_listener_.HandleClientConnection(
+          std::move(socket), std::move(process));
     });
   }
 }
