@@ -114,4 +114,28 @@ std::vector<protos::TracePacket> MockConsumer::ReadBuffers() {
   return decoded_packets;
 }
 
+void MockConsumer::GetTraceStats() {
+  service_endpoint_->GetTraceStats();
+}
+
+void MockConsumer::WaitForTraceStats(bool success) {
+  static int i = 0;
+  auto checkpoint_name = "on_trace_stats_" + std::to_string(i++);
+  auto on_trace_stats = task_runner_->CreateCheckpoint(checkpoint_name);
+  auto result_callback = [on_trace_stats](bool, const protos::TraceStats&) {
+    on_trace_stats();
+  };
+  if (success) {
+    EXPECT_CALL(
+        *this,
+        OnTraceStats(true, testing::Property(&protos::TraceStats::total_buffers,
+                                             testing::Gt(0))))
+        .WillOnce(Invoke(result_callback));
+  } else {
+    EXPECT_CALL(*this, OnTraceStats(false, _))
+        .WillOnce(Invoke(result_callback));
+  }
+  task_runner_->RunUntilCheckpoint(checkpoint_name);
+}
+
 }  // namespace perfetto

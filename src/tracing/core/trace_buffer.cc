@@ -192,6 +192,13 @@ void TraceBuffer::CopyChunkUntrusted(ProducerID producer_id_trusted,
                     (chunk_complete && prev->num_fragments == num_fragments));
     if (prev->num_fragments == num_fragments) {
       TRACE_BUFFER_DLOG("  skipping recommit of identical chunk");
+      // If we're marking the previous record as complete and already read it,
+      // we should track it as fully read.
+      if (!record_meta->is_complete &&
+          record_meta->num_fragments == record_meta->num_fragments_read) {
+        stats_.chunks_read++;
+        stats_.bytes_read += prev->size;
+      }
       return;
     }
 
@@ -257,7 +264,7 @@ void TraceBuffer::CopyChunkUntrusted(ProducerID producer_id_trusted,
 
   // Now first insert the new chunk. At the end, if necessary, add the padding.
   stats_.chunks_written++;
-  stats_.bytes_written += size;
+  stats_.bytes_written += record_size;
   auto it_and_inserted = index_.emplace(
       key, ChunkMeta(GetChunkRecordAt(wptr_), num_fragments, chunk_complete,
                      chunk_flags, producer_uid_trusted));
@@ -335,8 +342,10 @@ size_t TraceBuffer::DeleteNextChunksFor(size_t bytes_to_clear) {
       bool removed = false;
       if (PERFETTO_LIKELY(it != index_.end())) {
         const ChunkMeta& meta = it->second;
-        if (PERFETTO_UNLIKELY(meta.num_fragments_read < meta.num_fragments))
+        if (PERFETTO_UNLIKELY(meta.num_fragments_read < meta.num_fragments)) {
           stats_.chunks_overwritten++;
+          stats_.bytes_overwritten += next_chunk.size;
+        }
         index_.erase(it);
         removed = true;
       }
@@ -346,6 +355,8 @@ size_t TraceBuffer::DeleteNextChunksFor(size_t bytes_to_clear) {
                         next_chunk_ptr - begin(),
                         next_chunk_ptr - begin() + next_chunk.size, removed);
       PERFETTO_DCHECK(removed);
+    } else {
+      stats_.padding_bytes_cleared += next_chunk.size;
     }
 
     next_chunk_ptr += next_chunk.size;
@@ -367,6 +378,7 @@ void TraceBuffer::AddPaddingRecord(size_t size) {
   TRACE_BUFFER_DLOG("AddPaddingRecord @ [%lu - %lu] %zu", wptr_ - begin(),
                     wptr_ - begin() + size, size);
   WriteChunkRecord(wptr_, record, nullptr, size - sizeof(ChunkRecord));
+  stats_.padding_bytes_written += size;
   // |wptr_| is deliberately not advanced when writing a padding record.
 }
 
@@ -771,11 +783,22 @@ bool TraceBuffer::ReadNextPacketInChunk(ChunkMeta* chunk_meta,
     PERFETTO_DCHECK(suppress_sanity_dchecks_for_testing_);
     chunk_meta->cur_fragment_offset = 0;
     chunk_meta->num_fragments_read = chunk_meta->num_fragments;
+    if (PERFETTO_LIKELY(chunk_meta->is_complete)) {
+      stats_.chunks_read++;
+      stats_.bytes_read += chunk_meta->chunk_record->size;
+    }
     return false;
   }
   chunk_meta->cur_fragment_offset =
       static_cast<uint16_t>(next_packet - packets_begin);
   chunk_meta->num_fragments_read++;
+
+  if (PERFETTO_UNLIKELY(chunk_meta->num_fragments_read ==
+                            chunk_meta->num_fragments &&
+                        chunk_meta->is_complete)) {
+    stats_.chunks_read++;
+    stats_.bytes_read += chunk_meta->chunk_record->size;
+  }
 
   if (PERFETTO_UNLIKELY(packet_size == 0)) {
     stats_.abi_violations++;

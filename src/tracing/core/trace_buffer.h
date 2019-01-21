@@ -131,10 +131,17 @@ class TraceBuffer {
   // Maintain these fields consistent with trace_stats.proto. See comments in
   // the .proto for the semantic of these fields.
   struct Stats {
+    // Use TraceBuffer::size() instead to obtain the buffer size.
+    // uint64_t buffer_size = 0;
     uint64_t bytes_written = 0;
+    uint64_t bytes_overwritten = 0;
+    uint64_t bytes_read = 0;
+    uint64_t padding_bytes_written = 0;
+    uint64_t padding_bytes_cleared = 0;
     uint64_t chunks_written = 0;
     uint64_t chunks_rewritten = 0;
     uint64_t chunks_overwritten = 0;
+    uint64_t chunks_read = 0;
     uint64_t chunks_committed_out_of_order = 0;
     uint64_t write_wrap_count = 0;
     uint64_t patches_succeeded = 0;

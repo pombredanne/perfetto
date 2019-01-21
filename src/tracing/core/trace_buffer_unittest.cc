@@ -159,6 +159,14 @@ TEST_F(TraceBufferTest, ReadWrite_Simple) {
     trace_buffer()->BeginRead();
     ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(42, seed)));
     ASSERT_THAT(ReadPacket(), IsEmpty());
+    EXPECT_EQ(trace_buffer()->stats().chunks_written, chunk_id + 1);
+    EXPECT_EQ(trace_buffer()->stats().chunks_written,
+              trace_buffer()->stats().chunks_read);
+    EXPECT_GT(trace_buffer()->stats().bytes_written, 0);
+    EXPECT_EQ(trace_buffer()->stats().bytes_written,
+              trace_buffer()->stats().bytes_read);
+    EXPECT_EQ(trace_buffer()->stats().padding_bytes_written, 0);
+    EXPECT_EQ(trace_buffer()->stats().padding_bytes_cleared, 0);
   }
 }
 
@@ -250,6 +258,21 @@ TEST_F(TraceBufferTest, ReadWrite_Padding) {
   ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(2048 - 16, 'e')));
   ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(512 - 16, 'f')));
   ASSERT_THAT(ReadPacket(), IsEmpty());
+
+  EXPECT_EQ(trace_buffer()->stats().chunks_written, 6);
+  EXPECT_EQ(trace_buffer()->stats().chunks_overwritten, 3);
+  EXPECT_EQ(trace_buffer()->stats().chunks_read, 3);
+  EXPECT_EQ(trace_buffer()->stats().bytes_written, 4480);
+  EXPECT_EQ(trace_buffer()->stats().bytes_overwritten, 896);
+  EXPECT_EQ(trace_buffer()->stats().bytes_read, 3584);
+  EXPECT_EQ(trace_buffer()->stats().padding_bytes_written, 512);
+  EXPECT_EQ(trace_buffer()->stats().padding_bytes_cleared, 0);
+
+  // Adding another chunk should clear some of the padding.
+  ASSERT_EQ(128u, CreateChunk(ProducerID(1), WriterID(1), ChunkID(6))
+                      .AddPacket(128 - 16, 'g')
+                      .CopyIntoTraceBuffer());
+  EXPECT_EQ(trace_buffer()->stats().padding_bytes_cleared, 384);
 }
 
 // Like ReadWrite_Padding, but this time the padding introduced is the minimum
