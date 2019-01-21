@@ -15,9 +15,10 @@
 import {TimeSpan} from '../common/time';
 
 import {TimeScale} from './time_scale';
-import {TRACK_SHELL_WIDTH} from './track_panel';
 
 export const DESIRED_PX_PER_STEP = 80;
+// TODO(hjd): Deduplicate.
+export const TRACK_SHELL_WIDTH = 250;
 
 /**
  * Returns the step size of a grid line in seconds.
