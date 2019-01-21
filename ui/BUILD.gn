@@ -329,6 +329,7 @@ copy("assets_dist") {
               "src/assets/board_voltage.png",
               "src/assets/meminfo.png",
               "src/assets/vmstat.png",
+              "src/assets/lmk.png",
             ] + [ scss_root ] + scss_srcs
   outputs = [
     "$ui_dir/assets/{{source_file_part}}",
