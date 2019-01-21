@@ -194,8 +194,8 @@ bool JsonTraceParser::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
         value.isMember("cat") ? value["cat"].asCString() : nullptr;
     const char* name =
         value.isMember("name") ? value["name"].asCString() : nullptr;
-    StringId cat_id = cat ? storage->InternString(cat) : kNullStringId;
-    StringId name_id = name ? storage->InternString(name) : kNullStringId;
+    StringId cat_id = storage->InternString(cat);
+    StringId name_id = storage->InternString(name);
     UniqueTid utid = procs->UpdateThread(tid, pid);
 
     switch (phase) {
