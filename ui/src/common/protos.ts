@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import {assertTrue} from '../base/logging';
 import * as protos from '../gen/protos';
 
 // Aliases protos to avoid the super nested namespaces.
@@ -85,6 +86,63 @@ export function* rawQueryResultIter(result: RawQueryResult) {
       row[name] = cell === null ? '[NULL]' : cell;
     }
     yield row;
+  }
+}
+
+export const NULL: null = null;
+export const NUM: number = 0;
+export const NUM_NULL: number|null = 1;
+export const STR: string = 'str';
+export const STR_NULL: string|null = 'str_null';
+export const STR_NUM: string|number = 'str_num';
+export const STR_NUM_NULL: string|number|null = 'str_num_null';
+
+/**
+ * This function allows for type safe use of RawQueryResults.
+ * The input is a RawQueryResult (|raw|) and a "spec".
+ * A spec is an object where the keys are column names and the values
+ * are constants representing the types. For example:
+ * {
+ *   upid: NUM,
+ *   pid: NUM_NULL,
+ *   processName: STR_NULL,
+ * }
+ * The output is a iterable of rows each row looks like the given spec:
+ * {
+ *   upid: 1,
+ *   pid: 42,
+ *   processName: null,
+ * }
+ * Each row has an appropriate typescript type based on the spec so there
+ * is no need to use ! or cast when using the result of rawQueryToRows.
+ * Note: type checking to ensure that the RawQueryResult matches the spec
+ * happens at runtime, so if a query can return null and this is not reflected
+ * in the spec this will still crash at runtime.
+ */
+export function*
+    rawQueryToRows<T>(raw: RawQueryResult, spec: T): IterableIterator<T> {
+  const allColumns = rawQueryResultColumns(raw);
+  const columns: Array<[string, number, boolean, boolean, boolean]> = [];
+  for (const [key, value] of Object.entries(spec)) {
+    const index = allColumns.indexOf(key);
+    assertTrue(
+        index !== -1, `Expected column "${key}" (result cols ${allColumns})`);
+    const nullOk = [NULL, NUM_NULL, STR_NULL, STR_NUM_NULL].includes(value);
+    const numOk = [NUM, NUM_NULL, STR_NUM, STR_NUM_NULL].includes(value);
+    const strOk = [STR, STR_NULL, STR_NUM, STR_NUM_NULL].includes(value);
+    columns.push([key, index, nullOk, numOk, strOk]);
+  }
+
+  for (let i = 0; i < raw.numRecords; i++) {
+    const row: {[_: string]: number | string | null} = {};
+    for (const [name, col, nullOk, numOk, strOk] of columns) {
+      const cell = getCell(raw, col, i);
+      if (cell === null) assertTrue(nullOk);
+      if (typeof cell === 'number') assertTrue(numOk);
+      if (typeof cell === 'string') assertTrue(strOk);
+      row[name] = cell;
+    }
+    yield row as {} as T;
   }
 }
 
