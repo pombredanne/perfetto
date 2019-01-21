@@ -61,8 +61,9 @@ class PERFETTO_EXPORT SharedMemoryArbiter {
   // they are concurrently being written to. The registry will retry on the
   // arbiter's TaskRunner until all writers were bound successfully.
   //
-  // By calling this method, the registry's ownership is transferred to the
-  // arbiter. The arbiter will delete the registry once all writers were bound.
+  // Should only be called on the passed TaskRunner's sequence. By calling this
+  // method, the registry's ownership is transferred to the arbiter. The arbiter
+  // will delete the registry once all writers were bound.
   //
   // TODO(eseckler): Make target buffer assignment more flexible (i.e. per
   // writer). For now, embedders can use multiple registries instead.

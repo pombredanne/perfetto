@@ -37,8 +37,11 @@ namespace base {
 class TaskRunner;
 }  // namespace base
 
-// Notifies the registry about the destruction of a TraceWriter, provided the
-// registry itself wasn't deleted yet.
+// Notifies the registry about the destruction of a StartupTraceWriter, provided
+// the registry itself wasn't deleted yet. The indirection via the handle is
+// necessary to avoid potential deadlocks caused by lock order inversion. These
+// issues are avoided by locking on the handle's common lock in the destructors
+// of the registry and writer.
 class StartupTraceWriterRegistryHandle {
  public:
   explicit StartupTraceWriterRegistryHandle(StartupTraceWriterRegistry*);
@@ -67,7 +70,7 @@ class PERFETTO_EXPORT StartupTraceWriterRegistry {
   ~StartupTraceWriterRegistry();
 
   // Returns a new unbound StartupTraceWriter. Should only be called while
-  // unbound and only on the writer thread.
+  // unbound. Usually called on a writer thread.
   std::unique_ptr<StartupTraceWriter> CreateUnboundTraceWriter();
 
   // Return an unbound StartupTraceWriter back to the registry before it could
@@ -79,7 +82,8 @@ class PERFETTO_EXPORT StartupTraceWriterRegistry {
   void ReturnUnboundTraceWriter(std::unique_ptr<StartupTraceWriter>);
 
   // Binds all StartupTraceWriters created by this registry to the given arbiter
-  // and target buffer. Should only be called once. See
+  // and target buffer. Should only be called once and on the passed
+  // TaskRunner's sequence. See
   // SharedMemoryArbiter::BindStartupTraceWriterRegistry() for details.
   //
   // Note that the writers may not be bound synchronously if they are
@@ -112,7 +116,6 @@ class PERFETTO_EXPORT StartupTraceWriterRegistry {
   void OnUnboundWritersRemovedLocked();
 
   std::shared_ptr<StartupTraceWriterRegistryHandle> handle_;
-  base::TaskRunner* task_runner_;
 
   // Begin lock-protected members.
   std::mutex lock_;
@@ -120,11 +123,14 @@ class PERFETTO_EXPORT StartupTraceWriterRegistry {
   std::vector<std::unique_ptr<StartupTraceWriter>> unbound_owned_writers_;
   SharedMemoryArbiterImpl* arbiter_ = nullptr;  // |nullptr| while unbound.
   BufferID target_buffer_ = 0;
+  base::TaskRunner* task_runner_;
   std::function<void(StartupTraceWriterRegistry*)> on_bound_callback_ = nullptr;
-  // End lock-protected members.
 
-  // Keep at the end.
-  base::WeakPtrFactory<StartupTraceWriterRegistry> weak_ptr_factory_;
+  // Keep at the end. Initialized during |BindToArbiter()|, like |task_runner_|.
+  // Weak pointers are only valid on |task_runner_|'s thread/sequence.
+  std::unique_ptr<base::WeakPtrFactory<StartupTraceWriterRegistry>>
+      weak_ptr_factory_;
+  // End lock-protected members.
 };
 
 }  // namespace perfetto

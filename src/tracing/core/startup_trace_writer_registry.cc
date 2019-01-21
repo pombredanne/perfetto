@@ -44,8 +44,7 @@ void StartupTraceWriterRegistryHandle::OnRegistryDestroyed() {
 }
 
 StartupTraceWriterRegistry::StartupTraceWriterRegistry()
-    : handle_(std::make_shared<StartupTraceWriterRegistryHandle>(this)),
-      weak_ptr_factory_(this) {}
+    : handle_(std::make_shared<StartupTraceWriterRegistryHandle>(this)) {}
 
 StartupTraceWriterRegistry::~StartupTraceWriterRegistry() {
   handle_->OnRegistryDestroyed();
@@ -81,6 +80,9 @@ void StartupTraceWriterRegistry::BindToArbiter(
     PERFETTO_DCHECK(!arbiter_);
     arbiter_ = arbiter;
     target_buffer_ = target_buffer;
+    task_runner_ = task_runner;
+    weak_ptr_factory_.reset(
+        new base::WeakPtrFactory<StartupTraceWriterRegistry>(this));
     on_bound_callback_ = std::move(on_bound_callback);
     // We can't destroy the writers while holding |lock_|, so we swap them out
     // here instead. After we are bound, no more writers can be added to the
@@ -96,7 +98,6 @@ void StartupTraceWriterRegistry::BindToArbiter(
   }
   unbound_owned_writers.clear();
 
-  task_runner_ = task_runner;
   TryBindWriters();
 }
 
@@ -110,7 +111,7 @@ void StartupTraceWriterRegistry::TryBindWriters() {
     }
   }
   if (!unbound_writers_.empty()) {
-    auto weak_this = weak_ptr_factory_.GetWeakPtr();
+    auto weak_this = weak_ptr_factory_->GetWeakPtr();
     task_runner_->PostTask([weak_this] {
       if (weak_this)
         weak_this->TryBindWriters();
@@ -122,24 +123,23 @@ void StartupTraceWriterRegistry::TryBindWriters() {
 void StartupTraceWriterRegistry::OnStartupTraceWriterDestroyed(
     StartupTraceWriter* trace_writer) {
   std::lock_guard<std::mutex> lock(lock_);
-  unbound_writers_.erase(trace_writer);
-  OnUnboundWritersRemovedLocked();
+  if (unbound_writers_.erase(trace_writer) > 0)
+    OnUnboundWritersRemovedLocked();
 }
 
 void StartupTraceWriterRegistry::OnUnboundWritersRemovedLocked() {
-  if (unbound_writers_.empty()) {
-    auto weak_this = weak_ptr_factory_.GetWeakPtr();
+  if (unbound_writers_.empty() && task_runner_ && on_bound_callback_) {
+    PERFETTO_DCHECK(weak_ptr_factory_);
+    auto weak_this = weak_ptr_factory_->GetWeakPtr();
     // Run callback in PostTask() since the callback may delete |this| and thus
     // might otherwise cause a deadlock.
-    task_runner_->PostTask([weak_this]() {
+    auto callback = on_bound_callback_;
+    on_bound_callback_ = nullptr;
+    task_runner_->PostTask([weak_this, callback]() {
       if (!weak_this)
         return;
-      if (weak_this->on_bound_callback_) {
-        weak_this->on_bound_callback_(weak_this.get());
-        // We may have been deleted by the callback.
-        if (weak_this)
-          weak_this->on_bound_callback_ = nullptr;
-      }
+      // Note: callback may delete |this|.
+      callback(weak_this.get());
     });
   }
 }

@@ -282,16 +282,16 @@ void SharedMemoryArbiterImpl::BindStartupTraceWriterRegistry(
   registry->BindToArbiter(
       this, target_buffer, task_runner_,
       [this](StartupTraceWriterRegistry* bound_registry) {
-        std::unique_ptr<StartupTraceWriterRegistry> owned_registry;
+        std::unique_ptr<StartupTraceWriterRegistry> registry_to_delete;
         {
           std::lock_guard<std::mutex> scoped_lock(lock_);
 
           for (auto it = startup_trace_writer_registries_.begin();
                it != startup_trace_writer_registries_.end(); it++) {
             if (it->get() == bound_registry) {
-              // We can't delete the registry while the writer lock is held (to
-              // avoid lock inversion).
-              owned_registry = std::move(*it);
+              // We can't delete the registry while the arbiter's lock is held
+              // (to avoid lock inversion).
+              registry_to_delete = std::move(*it);
               startup_trace_writer_registries_.erase(it);
               break;
             }
@@ -299,8 +299,8 @@ void SharedMemoryArbiterImpl::BindStartupTraceWriterRegistry(
         }
 
         // The registry should have been in |startup_trace_writer_registries_|.
-        PERFETTO_DCHECK(owned_registry);
-        owned_registry.reset();
+        PERFETTO_DCHECK(registry_to_delete);
+        registry_to_delete.reset();
       });
   std::lock_guard<std::mutex> scoped_lock(lock_);
   startup_trace_writer_registries_.push_back(std::move(registry));
