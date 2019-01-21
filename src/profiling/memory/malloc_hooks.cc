@@ -178,6 +178,7 @@ std::unique_ptr<perfetto::profiling::Client> CreateClientAndPrivateDaemon() {
   std::string target_cmdline;
   if (!perfetto::profiling::GetCmdlineForPID(target_pid, &target_cmdline)) {
     PERFETTO_ELOG("Failed to read own cmdline.");
+    return nullptr;
   }
 
   child_sock.RetainOnExec();
