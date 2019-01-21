@@ -76,7 +76,6 @@ class ProcessStatsDataSource : public ProbesDataSource {
   protos::pbzero::ProcessTree* GetOrCreatePsTree();
   protos::pbzero::ProcessStats* GetOrCreateStats();
   protos::pbzero::ProcessStats_Process* GetOrCreateStatsProcess(int32_t pid);
-  void FinalizeStatsProcess();
 
   // Functions for snapshotting process/thread long-term info and relationships.
   void WriteProcess(int32_t pid, const std::string& proc_status);

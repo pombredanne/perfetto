@@ -164,12 +164,12 @@ TEST_F(ProcessStatsDataSourceTest, ProcessStats) {
 
     EXPECT_CALL(*data_source, ReadProcPidFile(pid, "oom_score_adj"))
         .WillRepeatedly(
-            Invoke([checkpoint, kPids, &iter](int32_t p, const std::string&) {
-              if (p == kPids[base::ArraySize(kPids) - 1]) {
+            Invoke([checkpoint, kPids, &iter](int32_t pid, const std::string&) {
+              if (pid == kPids[base::ArraySize(kPids) - 1]) {
                 if (++iter == kNumIters)
                   checkpoint();
               }
-              return std::to_string(p);
+              return std::to_string(pid * 100);
             }));
   }
 
@@ -188,7 +188,7 @@ TEST_F(ProcessStatsDataSourceTest, ProcessStats) {
     int32_t pid = proc_counters.pid();
     ASSERT_EQ(proc_counters.vm_size_kb(), pid * 100 + iter * 10 + 1);
     ASSERT_EQ(proc_counters.vm_rss_kb(), pid * 100 + iter * 10 + 2);
-    ASSERT_EQ(proc_counters.oom_score_adj(), pid);
+    ASSERT_EQ(proc_counters.oom_score_adj(), pid * 100);
     if (pid == kPids[base::ArraySize(kPids) - 1])
       iter++;
   }

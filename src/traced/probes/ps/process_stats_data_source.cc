@@ -175,6 +175,7 @@ void ProcessStatsDataSource::Flush(FlushRequestID,
   // We shouldn't get this in the middle of WriteAllProcesses() or OnPids().
   PERFETTO_DCHECK(!cur_ps_tree_);
   PERFETTO_DCHECK(!cur_ps_stats_);
+  PERFETTO_DCHECK(!cur_ps_stats_process_);
   writer_->Flush(callback);
 }
 
@@ -269,7 +270,7 @@ protos::pbzero::ProcessTree* ProcessStatsDataSource::GetOrCreatePsTree() {
   if (!cur_ps_tree_)
     cur_ps_tree_ = cur_packet_->set_process_tree();
   cur_ps_stats_ = nullptr;
-  FinalizeStatsProcess();
+  cur_ps_stats_process_ = nullptr;
   return cur_ps_tree_;
 }
 
@@ -278,7 +279,7 @@ protos::pbzero::ProcessStats* ProcessStatsDataSource::GetOrCreateStats() {
   if (!cur_ps_stats_)
     cur_ps_stats_ = cur_packet_->set_process_stats();
   cur_ps_tree_ = nullptr;
-  FinalizeStatsProcess();
+  cur_ps_stats_process_ = nullptr;
   return cur_ps_stats_;
 }
 
@@ -289,10 +290,6 @@ ProcessStatsDataSource::GetOrCreateStatsProcess(int32_t pid) {
   cur_ps_stats_process_ = GetOrCreateStats()->add_processes();
   cur_ps_stats_process_->set_pid(pid);
   return cur_ps_stats_process_;
-}
-
-void ProcessStatsDataSource::FinalizeStatsProcess() {
-  cur_ps_stats_process_ = nullptr;
 }
 
 void ProcessStatsDataSource::FinalizeCurPacket() {
@@ -328,12 +325,12 @@ void ProcessStatsDataSource::WriteAllProcessStats() {
     return;
   std::vector<int32_t> pids;
   while (int32_t pid = ReadNextNumericDir(*proc_dir)) {
-    FinalizeStatsProcess();
+    cur_ps_stats_process_ = nullptr;
 
     uint32_t pid_u = static_cast<uint32_t>(pid);
-
     if (skip_stats_for_pids_.size() > pid_u && skip_stats_for_pids_[pid_u])
       continue;
+
     std::string proc_status = ReadProcPidFile(pid, "status");
     if (proc_status.empty())
       continue;
