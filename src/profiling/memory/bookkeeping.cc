@@ -223,12 +223,11 @@ void GlobalCallstackTrie::DecrementNode(Node* node) {
 }
 
 Interned<Frame> GlobalCallstackTrie::InternCodeLocation(const FrameData& loc) {
-  Mapping map{};
+  Mapping map(string_interner_.Intern(loc.build_id));
   map.offset = loc.frame.map_elf_start_offset;
   map.start = loc.frame.map_start;
   map.end = loc.frame.map_end;
   map.load_bias = loc.frame.map_load_bias;
-  map.build_id = loc.build_id;
   base::StringSplitter sp(loc.frame.map_name, '/');
   while (sp.Next())
     map.path_components.emplace_back(string_interner_.Intern(sp.cur_token()));
@@ -241,7 +240,7 @@ Interned<Frame> GlobalCallstackTrie::InternCodeLocation(const FrameData& loc) {
 }
 
 Interned<Frame> GlobalCallstackTrie::MakeRootFrame() {
-  Mapping map{};
+  Mapping map(string_interner_.Intern(""));
 
   Frame frame(mapping_interner_.Intern(std::move(map)),
               string_interner_.Intern(""), 0);
@@ -255,6 +254,8 @@ void DumpState::WriteMap(const Interned<Mapping> map) {
     for (const Interned<std::string>& str : map->path_components)
       WriteString(str);
 
+    WriteString(map->build_id);
+
     if (currently_written() > kPacketSizeThreshold)
       NewProfilePacket();
 
@@ -264,6 +265,7 @@ void DumpState::WriteMap(const Interned<Mapping> map) {
     mapping->set_start(map->start);
     mapping->set_end(map->end);
     mapping->set_load_bias(map->load_bias);
+    mapping->set_build_id(map->build_id.id());
     for (const Interned<std::string>& str : map->path_components)
       mapping->add_path_string_ids(str.id());
   }

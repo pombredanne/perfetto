@@ -96,7 +96,9 @@ namespace profiling {
 class HeapTracker;
 
 struct Mapping {
-  std::string build_id;
+  Mapping(Interned<std::string> b) : build_id(std::move(b)) {}
+
+  Interned<std::string> build_id;
   uint64_t offset;
   uint64_t start;
   uint64_t end;
