@@ -166,9 +166,7 @@ void FileDescriptorMaps::Reset() {
   maps_.clear();
 }
 
-bool UnwindingThread::DoUnwind(WireMessage* msg,
-                               UnwindingMetadata* metadata,
-                               AllocRecord* out) {
+bool DoUnwind(WireMessage* msg, UnwindingMetadata* metadata, AllocRecord* out) {
   AllocMetadata* alloc_metadata = msg->alloc_header;
   std::unique_ptr<unwindstack::Regs> regs(
       CreateFromRawData(alloc_metadata->arch, alloc_metadata->register_data));
@@ -207,18 +205,9 @@ bool UnwindingThread::DoUnwind(WireMessage* msg,
   for (unwindstack::FrameData fd : unwinder.frames()) {
     std::string build_id;
     if (fd.map_name != "") {
-      auto it = build_id_cache_.find(fd.map_name);
-      if (it == build_id_cache_.end()) {
-        unwindstack::MapInfo* map_info = metadata->maps.Find(fd.pc);
-        if (map_info) {
-          auto elf = map_info->elf;
-
-          elf->GetBuildID(&build_id);
-          build_id_cache_.emplace(fd.map_name, std::move(build_id));
-        }
-      } else {
-        build_id = it->second;
-      }
+      unwindstack::MapInfo* map_info = metadata->maps.Find(fd.pc);
+      if (map_info)
+        build_id = map_info->GetBuildID();
     }
 
     if (base::EndsWith(fd.map_name, ".so"))
@@ -238,8 +227,7 @@ bool UnwindingThread::DoUnwind(WireMessage* msg,
   return true;
 }
 
-bool UnwindingThread::HandleUnwindingRecord(UnwindingRecord* rec,
-                                            BookkeepingRecord* out) {
+bool HandleUnwindingRecord(UnwindingRecord* rec, BookkeepingRecord* out) {
   WireMessage msg;
   if (!ReceiveWireMessage(reinterpret_cast<char*>(rec->data.get()), rec->size,
                           &msg))
@@ -268,9 +256,8 @@ bool UnwindingThread::HandleUnwindingRecord(UnwindingRecord* rec,
   }
 }
 
-void UnwindingThread::UnwindingMainLoop(
-    BoundedQueue<UnwindingRecord>* input_queue,
-    BoundedQueue<BookkeepingRecord>* output_queue) {
+void UnwindingMainLoop(BoundedQueue<UnwindingRecord>* input_queue,
+                       BoundedQueue<BookkeepingRecord>* output_queue) {
   for (;;) {
     UnwindingRecord rec;
     if (!input_queue->Get(&rec))
