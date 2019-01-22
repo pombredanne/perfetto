@@ -98,6 +98,15 @@ int UnsetDumpable(int) {
   return 0;
 }
 
+void LogWireMessageError() {
+  if (errno == EAGAIN)
+    PERFETTO_ELOG("Socket buffer overflowed.");
+  else if (errno == EPIPE)
+    PERFETTO_PLOG("Heapprofd disconnected.");
+  else
+    PERFETTO_PLOG("Failed to send wire message.");
+}
+
 }  // namespace
 
 bool FreePage::Add(const uint64_t addr,
@@ -125,7 +134,8 @@ bool FreePage::FlushLocked(SocketPool* pool) {
   msg.free_header = &free_page_;
   BorrowedSocket sock(pool->Borrow());
   if (!sock || !SendWireMessage(sock.get(), msg)) {
-    PERFETTO_PLOG("Failed to send wire message");
+    LogWireMessageError();
+
     sock.Shutdown();
     return false;
   }
@@ -315,7 +325,8 @@ void Client::RecordMalloc(uint64_t alloc_size,
 
   BorrowedSocket sock = socket_pool_.Borrow();
   if (!sock || !SendWireMessage(sock.get(), msg)) {
-    PERFETTO_PLOG("Failed to send wire message.");
+    LogWireMessageError();
+
     sock.Shutdown();
     Shutdown();
   }
