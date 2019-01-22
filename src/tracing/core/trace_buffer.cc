@@ -193,13 +193,6 @@ void TraceBuffer::CopyChunkUntrusted(ProducerID producer_id_trusted,
                     (chunk_complete && prev->num_fragments == num_fragments));
     if (prev->num_fragments == num_fragments) {
       TRACE_BUFFER_DLOG("  skipping recommit of identical chunk");
-      // If we're marking the previous record as complete and already read it,
-      // we should track it as fully read.
-      if (!record_meta->is_complete &&
-          record_meta->num_fragments == record_meta->num_fragments_read) {
-        stats_.set_chunks_read(stats_.chunks_read() + 1);
-        stats_.set_bytes_read(stats_.bytes_read() + prev->size);
-      }
       return;
     }
 
