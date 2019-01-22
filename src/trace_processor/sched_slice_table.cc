@@ -19,8 +19,6 @@
 namespace perfetto {
 namespace trace_processor {
 
-namespace {}
-
 SchedSliceTable::SchedSliceTable(sqlite3*, const TraceStorage* storage)
     : storage_(storage) {}
 
