@@ -166,23 +166,23 @@ ProtoTraceParser::ProtoTraceParser(TraceProcessorContext* context)
       context->storage->InternString("mem.rss.unknown"));  // Keep this last.
 
   using ProcessStats = protos::ProcessStats;
-  proc_mem_counter_names_[ProcessStats::Process::kVmSizeKbFieldNumber] =
+  proc_stats_process_names_[ProcessStats::Process::kVmSizeKbFieldNumber] =
       context->storage->InternString("mem.virt");
-  proc_mem_counter_names_[ProcessStats::Process::kVmRssKbFieldNumber] =
+  proc_stats_process_names_[ProcessStats::Process::kVmRssKbFieldNumber] =
       context->storage->InternString("mem.rss");
-  proc_mem_counter_names_[ProcessStats::Process::kRssAnonKbFieldNumber] =
+  proc_stats_process_names_[ProcessStats::Process::kRssAnonKbFieldNumber] =
       context->storage->InternString("mem.rss.anon");
-  proc_mem_counter_names_[ProcessStats::Process::kRssFileKbFieldNumber] =
+  proc_stats_process_names_[ProcessStats::Process::kRssFileKbFieldNumber] =
       context->storage->InternString("mem.rss.file");
-  proc_mem_counter_names_[ProcessStats::Process::kRssShmemKbFieldNumber] =
+  proc_stats_process_names_[ProcessStats::Process::kRssShmemKbFieldNumber] =
       context->storage->InternString("mem.rss.shmem");
-  proc_mem_counter_names_[ProcessStats::Process::kVmSwapKbFieldNumber] =
+  proc_stats_process_names_[ProcessStats::Process::kVmSwapKbFieldNumber] =
       context->storage->InternString("mem.swap");
-  proc_mem_counter_names_[ProcessStats::Process::kVmLockedKbFieldNumber] =
+  proc_stats_process_names_[ProcessStats::Process::kVmLockedKbFieldNumber] =
       context->storage->InternString("mem.locked");
-  proc_mem_counter_names_[ProcessStats::Process::kVmHwmKbFieldNumber] =
+  proc_stats_process_names_[ProcessStats::Process::kVmHwmKbFieldNumber] =
       context->storage->InternString("mem.rss.watermark");
-  proc_mem_counter_names_[ProcessStats::Process::kOomScoreAdjFieldNumber] =
+  proc_stats_process_names_[ProcessStats::Process::kOomScoreAdjFieldNumber] =
       oom_score_adj_id_;
 }
 
@@ -513,8 +513,8 @@ void ProtoTraceParser::ParseProcessStatsProcess(int64_t ts,
       continue;
 
     // Lookup the interned string id from the field name using the
-    // pre-cached |proc_mem_counter_names_| map.
-    StringId name = proc_mem_counter_names_[field_id];
+    // pre-cached |proc_stats_process_names_| map.
+    StringId name = proc_stats_process_names_[field_id];
     uint64_t value = counter_values[field_id];
     auto row_id = context_->event_tracker->PushCounter(
         ts, value, name, utid, RefType::kRefUtidLookupUpid);

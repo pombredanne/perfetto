@@ -139,7 +139,7 @@ class ProtoTraceParser {
   // StringId. Keep kProcStatsProcessSize equal to 1 + max proto field id of
   // ProcessStats::process.
   static constexpr size_t kProcStatsProcessSize = 11;
-  std::array<StringId, kProcStatsProcessSize> proc_mem_counter_names_{};
+  std::array<StringId, kProcStatsProcessSize> proc_stats_process_names_{};
 };
 
 }  // namespace trace_processor
