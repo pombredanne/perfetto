@@ -59,6 +59,15 @@ using GValueType = ::perftools::profiles::ValueType;
 using GFunction = ::perftools::profiles::Function;
 using GSample = ::perftools::profiles::Sample;
 
+std::string ToHex(const std::string& build_id) {
+  std::string hex_build_id(2 * build_id.size() + 1, ' ');
+  for (size_t i = 0; i < build_id.size(); ++i)
+    snprintf(&(hex_build_id[2 * i]), 3, "%02hhx", build_id[i]);
+  // Remove the trailing nullbyte.
+  hex_build_id.resize(2 * build_id.size());
+  return hex_build_id;
+}
+
 void DumpProfilePacket(std::vector<ProfilePacket>& packet_fragments,
                        const std::string& file_prefix) {
   std::map<uint64_t, std::string> string_lookup;
@@ -120,14 +129,8 @@ void DumpProfilePacket(std::vector<ProfilePacket>& packet_fragments,
       auto str_it = string_lookup.find(mapping.build_id());
       if (str_it != string_lookup.end()) {
         const std::string& build_id = str_it->second;
-        // We need +1 to store the nullbyte that snprintf will write below.
-        std::string hex_build_id(2 * build_id.size() + 1, ' ');
-        for (size_t i = 0; i < build_id.size(); ++i)
-          snprintf(&(hex_build_id[2 * i]), 3, "%02hhx", build_id[i]);
-        // Remove the trailing nullbyte.
-        hex_build_id.resize(2 * build_id.size());
         std::tie(it, std::ignore) =
-            string_table.emplace(std::move(hex_build_id), string_table.size());
+            string_table.emplace(ToHex(build_id), string_table.size());
         gmapping->set_build_id(static_cast<int64_t>(it->second));
       }
     }
