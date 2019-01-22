@@ -19,6 +19,8 @@
 namespace perfetto {
 namespace trace_processor {
 
+namespace {}
+
 SchedSliceTable::SchedSliceTable(sqlite3*, const TraceStorage* storage)
     : storage_(storage) {}
 
@@ -33,7 +35,13 @@ StorageSchema SchedSliceTable::CreateStorageSchema() {
       .AddNumericColumn("cpu", &slices.cpus())
       .AddNumericColumn("dur", &slices.durations())
       .AddColumn<TsEndColumn>("ts_end", &slices.start_ns(), &slices.durations())
+<<<<<<< HEAD
       .AddNumericColumn("utid", &slices.utids(), &slices.rows_for_utids())
+=======
+      .AddNumericColumn("utid", &slices.utids())
+      .AddColumn<EndReasonColumn>("end_reason", &slices.end_state())
+      .AddNumericColumn("priority", &slices.priorities())
+>>>>>>> 00430b68... Test
       .Build({"cpu", "ts"});
 }
 
@@ -67,6 +75,7 @@ uint32_t SchedSliceTable::EstimateQueryCost(const QueryConstraints& qc) {
     return 10;
   }
 
+<<<<<<< HEAD
   size_t utid_idx = schema().ColumnIndexFromName("utid");
   auto has_utid_eq_cs = [utid_idx](const QueryConstraints::Constraint& c) {
     return c.iColumn == static_cast<int>(utid_idx) &&
@@ -85,6 +94,52 @@ uint32_t SchedSliceTable::EstimateQueryCost(const QueryConstraints& qc) {
   // If we get to this point, we do not have any special filter logic so
   // simply return the number of rows.
   return RowCount();
+=======
+  // We should be able to handle any constraint and any order by clause given
+  // to us.
+  // TODO(lalitm): add support for ordering by and filtering end_reason.
+  info->order_by_consumed = false;
+  size_t end_reason_index = schema().ColumnIndexFromName("end_reason");
+  for (size_t i = 0; i < qc.constraints().size(); i++) {
+    info->omit[i] =
+        qc.constraints()[i].iColumn != static_cast<int>(end_reason_index);
+  }
+  return SQLITE_OK;
+>>>>>>> a7de7f3c... Test
+}
+
+SchedSliceTable::EndReasonColumn::EndReasonColumn(
+    std::string col_name,
+    const std::deque<ftrace_utils::TaskState>* deque)
+    : StorageColumn(col_name, false), deque_(deque) {}
+SchedSliceTable::EndReasonColumn::~EndReasonColumn() = default;
+
+void SchedSliceTable::EndReasonColumn::ReportResult(sqlite3_context* ctx,
+                                                    uint32_t row) const {
+  const auto& state = (*deque_)[row];
+  if (state.IsValid()) {
+    sqlite3_result_null(ctx);
+  } else {
+    char buffer[4];
+    state.ToString(buffer, sizeof(buffer));
+    sqlite3_result_text(ctx, buffer, -1, sqlite_utils::kSqliteTransient);
+  }
+}
+
+void SchedSliceTable::EndReasonColumn::Filter(int,
+                                              sqlite3_value*,
+                                              FilteredRowIndex*) const {
+  // TODO(lalitm): implement this.
+}
+
+StorageColumn::Comparator SchedSliceTable::EndReasonColumn::Sort(
+    const QueryConstraints::OrderBy&) const {
+  // TODO(lalitm): implement this.
+  return [](uint32_t, uint32_t) { return false; };
+}
+
+Table::ColumnType SchedSliceTable::EndReasonColumn::GetType() const {
+  return Table::ColumnType::kString;
 }
 
 }  // namespace trace_processor
