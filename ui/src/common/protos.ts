@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {assertTrue} from '../base/logging';
+import {assertFalse, assertTrue} from '../base/logging';
 import * as protos from '../gen/protos';
 
 // Aliases protos to avoid the super nested namespaces.
@@ -35,16 +35,20 @@ import VmstatCounters = protos.perfetto.protos.VmstatCounters;
 // TODO(hjd): Maybe these should go in their own file.
 export interface Row { [key: string]: number|string; }
 
+const COLUMN_TYPE_STR = RawQueryResult.ColumnDesc.Type.STRING;
+const COLUMN_TYPE_DOUBLE = RawQueryResult.ColumnDesc.Type.DOUBLE;
+const COLUMN_TYPE_LONG = RawQueryResult.ColumnDesc.Type.LONG;
+
 function getCell(result: RawQueryResult, column: number, row: number): number|
     string|null {
   const values = result.columns[column];
   if (values.isNulls![row]) return null;
   switch (result.columnDescriptors[column].type) {
-    case RawQueryResult.ColumnDesc.Type.LONG:
+    case COLUMN_TYPE_LONG:
       return +values.longValues![row];
-    case RawQueryResult.ColumnDesc.Type.DOUBLE:
+    case COLUMN_TYPE_DOUBLE:
       return +values.doubleValues![row];
-    case RawQueryResult.ColumnDesc.Type.STRING:
+    case COLUMN_TYPE_STR:
       return values.stringValues![row];
     default:
       throw new Error('Unhandled type!');
@@ -89,13 +93,10 @@ export function* rawQueryResultIter(result: RawQueryResult) {
   }
 }
 
-export const NULL: null = null;
 export const NUM: number = 0;
-export const NUM_NULL: number|null = 1;
 export const STR: string = 'str';
+export const NUM_NULL: number|null = 1;
 export const STR_NULL: string|null = 'str_null';
-export const STR_NUM: string|number = 'str_num';
-export const STR_NUM_NULL: string|number|null = 'str_num_null';
 
 /**
  * This function allows for type safe use of RawQueryResults.
@@ -122,25 +123,61 @@ export const STR_NUM_NULL: string|number|null = 'str_num_null';
 export function*
     rawQueryToRows<T>(raw: RawQueryResult, spec: T): IterableIterator<T> {
   const allColumns = rawQueryResultColumns(raw);
-  const columns: Array<[string, number, boolean, boolean, boolean]> = [];
-  for (const [key, value] of Object.entries(spec)) {
-    const index = allColumns.indexOf(key);
-    assertTrue(
-        index !== -1, `Expected column "${key}" (result cols ${allColumns})`);
-    const nullOk = [NULL, NUM_NULL, STR_NULL, STR_NUM_NULL].includes(value);
-    const numOk = [NUM, NUM_NULL, STR_NUM, STR_NUM_NULL].includes(value);
-    const strOk = [STR, STR_NULL, STR_NUM, STR_NUM_NULL].includes(value);
-    columns.push([key, index, nullOk, numOk, strOk]);
+  const columns: Array<[string, (row: number) => string | number | null]> = [];
+  for (const [key, columnSpec] of Object.entries(spec)) {
+    const i = allColumns.indexOf(key);
+    assertTrue(i !== -1, `Expected column "${key}" (cols ${allColumns})`);
+
+    const column = raw.columns[i];
+    const isNulls = column.isNulls!;
+    const columnType = raw.columnDescriptors[i].type;
+
+    if (columnSpec === NUM || columnSpec === STR) {
+      for (let j = 0; j < raw.numRecords; j++) {
+        assertFalse(column.isNulls![i], `Unexpected null in ${key} row ${j}`);
+      }
+    }
+
+    if (columnSpec === NUM || columnSpec === NUM_NULL) {
+      if (columnType === COLUMN_TYPE_STR) {
+        throw new Error(`Expected numbers in column ${key} found strings`);
+      }
+    } else if (columnSpec === STR || columnSpec === STR_NULL) {
+      if (columnType === COLUMN_TYPE_LONG ||
+          columnType === COLUMN_TYPE_DOUBLE) {
+        throw new Error(`Expected strings in column ${key} found numbers`);
+      }
+    }
+
+    let accessor;
+    switch (columnType) {
+      case COLUMN_TYPE_LONG: {
+        const values = column.longValues!;
+        accessor = (i: number) => isNulls[i] ? null : +values[i];
+        break;
+      }
+      case COLUMN_TYPE_DOUBLE: {
+        const values = column.doubleValues!;
+        accessor = (i: number) => isNulls[i] ? null : values[i];
+        break;
+      }
+      case COLUMN_TYPE_STR: {
+        const values = column.stringValues!;
+        accessor = (i: number) => isNulls[i] ? null : values[i];
+        break;
+      }
+      default:
+        // We can only reach here if the column is completely null.
+        accessor = (_: number) => null;
+        break;
+    }
+    columns.push([key, accessor]);
   }
 
   for (let i = 0; i < raw.numRecords; i++) {
     const row: {[_: string]: number | string | null} = {};
-    for (const [name, col, nullOk, numOk, strOk] of columns) {
-      const cell = getCell(raw, col, i);
-      if (cell === null) assertTrue(nullOk);
-      if (typeof cell === 'number') assertTrue(numOk);
-      if (typeof cell === 'string') assertTrue(strOk);
-      row[name] = cell;
+    for (const [name, accessor] of columns) {
+      row[name] = accessor(i);
     }
     yield row as {} as T;
   }

@@ -441,7 +441,7 @@ export class TraceController extends Controller<States> {
         addToTrackActions.push(Actions.addTrack({
           engineId: this.engineId,
           kind: SLICE_TRACK_KIND,
-          name:`${threadName} [${tid}]`,
+          name: `${threadName} [${tid}]`,
           trackGroup: pUuid,
           config: {upid, utid, maxDepth},
         }));
