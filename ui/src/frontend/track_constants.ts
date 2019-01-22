@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-function readCssVar(prop: string, defaultValue: string): string {
+function readCssVarSlow(prop: string, defaultValue: string): string {
+  // This code can be used in unittests where we can't read CSS variables.
   if (typeof window === 'undefined') {
     return defaultValue;
   } else {
@@ -22,11 +23,15 @@ function readCssVar(prop: string, defaultValue: string): string {
 }
 
 function getTrackShellWidth(): number {
-  const width = readCssVar('--track-shell-width', '100px');
+  const width = readCssVarSlow('--track-shell-width', '100px');
   const match = width.match(/^\W(\d+)px$/);
   if (!match) throw Error(`Could not parse shell width as number (${width})`);
   return Number(match[1]);
 }
 
+function getTrackBorderColor(): string {
+  return readCssVarSlow('--track-border-color', '#ffc0cb');
+}
+
 export const TRACK_SHELL_WIDTH = getTrackShellWidth();
-export const TRACK_BORDER_COLOR = readCssVar('--track-border-color', '#ffc0cb');
+export const TRACK_BORDER_COLOR = getTrackBorderColor();
