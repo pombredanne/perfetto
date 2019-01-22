@@ -173,6 +173,8 @@ std::unique_ptr<perfetto::profiling::Client> CreateClientAndPrivateDaemon() {
     return nullptr;
   }
 
+  child_sock.RetainOnExec();
+
   // Record own pid and cmdline, to pass down to the forked heapprofd.
   pid_t target_pid = getpid();
   std::string target_cmdline;
@@ -181,7 +183,6 @@ std::unique_ptr<perfetto::profiling::Client> CreateClientAndPrivateDaemon() {
     return nullptr;
   }
 
-  child_sock.RetainOnExec();
   pid_t fork_pid = fork();
   if (fork_pid == -1) {
     PERFETTO_PLOG("Failed to fork.");
