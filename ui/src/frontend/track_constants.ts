@@ -24,7 +24,7 @@ function readCssVarSlow(prop: string, defaultValue: string): string {
 
 function getTrackShellWidth(): number {
   const width = readCssVarSlow('--track-shell-width', '100px');
-  const match = width.match(/^\W(\d+)px$/);
+  const match = width.match(/^\W*(\d+)px$/);
   if (!match) throw Error(`Could not parse shell width as number (${width})`);
   return Number(match[1]);
 }
