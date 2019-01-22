@@ -74,6 +74,8 @@ class StorageColumn {
 template <typename T>
 class NumericColumn : public StorageColumn {
  public:
+  // |index| is an optional multimap which maps the values in deque
+  // to the rows they are located at.
   NumericColumn(std::string col_name,
                 const std::deque<T>* deque,
                 const std::multimap<T, uint32_t>* index,
