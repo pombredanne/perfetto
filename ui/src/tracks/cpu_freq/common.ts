@@ -21,8 +21,11 @@ export interface Data {
   maximumValue: number;
   minimumValue: number;
 
-  timestamps: Float64Array;
-  valuesKHz: Uint32Array;
+  tsStarts: Float64Array;
+  tsEnds:Float64Array;
+  freqKHz: Uint32Array;
+  idleValues: Float64Array;
+  idles: Uint8Array;
 }
 
 export interface Config {
