@@ -93,20 +93,17 @@ class CpuFreqTrack extends Track<Config, Data> {
 
     const startPx = Math.floor(timeScale.timeToPx(visibleWindowTime.start));
     const endPx = Math.floor(timeScale.timeToPx(visibleWindowTime.end));
-    const zeroY = MARGIN_TOP + RECT_HEIGHT / (data.minimumValue < 0 ? 2 : 1);
+    const zeroY = MARGIN_TOP + RECT_HEIGHT;
 
     let lastX = startPx;
     let lastY = zeroY;
 
     // Quantize the Y axis to quarters of powers of tens (7.5K, 10K, 12.5K).
-    const maxValue = Math.max(data.maximumValue, 0);
-
-    let yMax = Math.max(Math.abs(data.minimumValue), maxValue);
+    let yMax = data.maximumValue;
     const kUnits = ['', 'K', 'M', 'G', 'T', 'E'];
     const exp = Math.ceil(Math.log10(Math.max(yMax, 1)));
     const pow10 = Math.pow(10, exp);
     yMax = Math.ceil(yMax / (pow10 / 4)) * (pow10 / 4);
-    const yRange = data.minimumValue < 0 ? yMax * 2 : yMax;
     const unitGroup = Math.floor(exp / 3);
     const num = yMax / Math.pow(10, unitGroup * 3);
     // The values we have for cpufreq are in kHz so +1 to unitGroup.
@@ -122,7 +119,7 @@ class CpuFreqTrack extends Track<Config, Data> {
     for (let i = 0; i < data.freqKHz.length; i++) {
       const value = data.freqKHz[i];
       const startTime = data.tsStarts[i];
-      const nextY = zeroY - Math.round((value / yRange) * RECT_HEIGHT);
+      const nextY = zeroY - Math.round((value / yMax) * RECT_HEIGHT);
       if (nextY === lastY) continue;
 
       lastX = Math.floor(timeScale.timeToPx(startTime));
@@ -150,7 +147,7 @@ class CpuFreqTrack extends Track<Config, Data> {
         const value = data.freqKHz[i];
         const firstX = Math.floor(timeScale.timeToPx(data.tsStarts[i]));
         const secondX = Math.floor(timeScale.timeToPx(data.tsEnds[i]));
-        const lastY = zeroY - Math.round((value / yRange) * RECT_HEIGHT);
+        const lastY = zeroY - Math.round((value / yMax) * RECT_HEIGHT);
         ctx.fillRect(firstX, bottomY, secondX - firstX, lastY - bottomY);
       }
     }
@@ -168,7 +165,7 @@ class CpuFreqTrack extends Track<Config, Data> {
       const xEnd = this.hoveredTsEnd === undefined ?
           endPx :
           Math.floor(timeScale.timeToPx(this.hoveredTsEnd));
-      const y = zeroY - Math.round((this.hoveredValue / yRange) * RECT_HEIGHT);
+      const y = zeroY - Math.round((this.hoveredValue / yMax) * RECT_HEIGHT);
 
       // Highlight line.
       ctx.beginPath();
