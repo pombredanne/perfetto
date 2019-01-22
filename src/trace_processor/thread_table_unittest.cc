@@ -55,8 +55,6 @@ class ThreadTableUnittest : public ::testing::Test {
     return reinterpret_cast<const char*>(sqlite3_column_text(*stmt_, colId));
   }
 
-  ~ThreadTableUnittest() override { context_.storage->ResetStorage(); }
-
  protected:
   TraceProcessorContext context_;
   ScopedDb db_;
@@ -156,7 +154,7 @@ TEST_F(ThreadTableUnittest, JoinWithProcess) {
   ASSERT_EQ(sqlite3_column_int(*stmt_, 1), 2 /* tid */);
   ASSERT_EQ(sqlite3_column_int(*stmt_, 4), 2 /* pid */);
   ASSERT_EQ(sqlite3_column_int(*stmt_, 3), 2 /* upid */);
-  ASSERT_STREQ(GetColumnAsText(2), "");  // No name seen for main thread.
+  ASSERT_EQ(GetColumnAsText(2), nullptr);  // No name seen for main thread.
   ASSERT_STREQ(GetColumnAsText(5), "pid2");
 
   // (2) A thread with tid=4.

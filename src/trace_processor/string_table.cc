@@ -58,7 +58,7 @@ int StringTable::BestIndex(const QueryConstraints&, BestIndexInfo* info) {
 }
 
 StringTable::Cursor::Cursor(const TraceStorage* storage) : storage_(storage) {
-  num_rows_ = storage->string_count();
+  num_rows_ = static_cast<uint32_t>(storage->string_count());
 }
 
 StringTable::Cursor::~Cursor() = default;
@@ -76,11 +76,10 @@ int StringTable::Cursor::Column(sqlite3_context* context, int col) {
   StringId string_id = static_cast<StringId>(row_);
   switch (col) {
     case Column::kStringId:
-      sqlite3_result_int64(context, static_cast<sqlite3_int64>(row_));
+      sqlite_utils::ReportSqliteResult(context, row_);
       break;
     case Column::kString:
-      sqlite3_result_text(context, storage_->GetString(string_id).c_str(), -1,
-                          sqlite_utils::kSqliteStatic);
+      sqlite_utils::ReportSqliteResult(context, storage_->GetString(string_id));
       break;
   }
   return SQLITE_OK;

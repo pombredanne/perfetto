@@ -36,9 +36,8 @@ class SchedSliceTable : public StorageTable {
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
 
  private:
-<<<<<<< HEAD
   uint32_t EstimateQueryCost(const QueryConstraints& cs);
-=======
+
   class EndReasonColumn : public StorageColumn {
    public:
     EndReasonColumn(std::string col_name,
@@ -56,7 +55,6 @@ class SchedSliceTable : public StorageTable {
    private:
     const std::deque<ftrace_utils::TaskState>* deque_ = nullptr;
   };
->>>>>>> a7de7f3c... Test
 
   const TraceStorage* const storage_;
 };

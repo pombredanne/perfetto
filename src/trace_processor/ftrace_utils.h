@@ -34,7 +34,7 @@ class TaskState {
   using TaskStateStr = std::array<char, 4>;
 
   TaskState() = default;
-  TaskState(uint16_t raw_state) : state_(raw_state | kValid) {}
+  explicit TaskState(uint16_t raw_state) : state_(raw_state | kValid) {}
 
   // Returns if this TaskState has a valid representation.
   bool is_valid() const { return state_ & kValid; }

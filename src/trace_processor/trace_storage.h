@@ -59,7 +59,6 @@ enum TableId : uint8_t {
 // The top 8 bits are set to the TableId and the bottom 32 to the row of the
 // table.
 using RowId = int64_t;
-
 static const RowId kInvalidRowId = 0;
 
 enum RefType {
@@ -88,7 +87,7 @@ class TraceStorage {
     explicit Process(uint32_t p) : pid(p) {}
     int64_t start_ns = 0;
     int64_t end_ns = 0;
-    StringId name_id = 0;
+    StringId name_id = kNullStringId;
     uint32_t pid = 0;
   };
 
@@ -97,7 +96,7 @@ class TraceStorage {
     explicit Thread(uint32_t t) : tid(t) {}
     int64_t start_ns = 0;
     int64_t end_ns = 0;
-    StringId name_id = 0;
+    StringId name_id = kNullStringId;
     base::Optional<UniquePid> upid;
     uint32_t tid = 0;
   };
@@ -178,12 +177,9 @@ class TraceStorage {
       start_ns_.emplace_back(start_ns);
       durations_.emplace_back(duration_ns);
       utids_.emplace_back(utid);
-<<<<<<< HEAD
-      rows_for_utids_.emplace(utid, slice_count() - 1);
-=======
       end_states_.emplace_back(end_state);
       priorities_.emplace_back(priority);
->>>>>>> 00430b68... Test
+      rows_for_utids_.emplace(utid, slice_count() - 1);
       return slice_count() - 1;
     }
 
@@ -205,19 +201,15 @@ class TraceStorage {
 
     const std::deque<UniqueTid>& utids() const { return utids_; }
 
-<<<<<<< HEAD
-    const std::multimap<UniqueTid, uint32_t>& rows_for_utids() const {
-      return rows_for_utids_;
-    }
-
-=======
     const std::deque<ftrace_utils::TaskState>& end_state() const {
       return end_states_;
     }
 
     const std::deque<int32_t>& priorities() const { return priorities_; }
 
->>>>>>> 00430b68... Test
+    const std::multimap<UniqueTid, uint32_t>& rows_for_utids() const {
+      return rows_for_utids_;
+    }
 
    private:
     // Each deque below has the same number of entries (the number of slices
@@ -226,12 +218,9 @@ class TraceStorage {
     std::deque<int64_t> start_ns_;
     std::deque<int64_t> durations_;
     std::deque<UniqueTid> utids_;
-<<<<<<< HEAD
-    std::multimap<UniqueTid, uint32_t> rows_for_utids_;
-=======
     std::deque<ftrace_utils::TaskState> end_states_;
     std::deque<int32_t> priorities_;
->>>>>>> 00430b68... Test
+    std::multimap<UniqueTid, uint32_t> rows_for_utids_;
   };
 
   class NestableSlices {
@@ -454,8 +443,6 @@ class TraceStorage {
   };
   using StatsMap = std::array<Stats, stats::kNumKeys>;
 
-  void ResetStorage();
-
   UniqueTid AddEmptyThread(uint32_t tid) {
     unique_threads_.emplace_back(tid);
     return static_cast<UniqueTid>(unique_threads_.size() - 1);
@@ -503,7 +490,7 @@ class TraceStorage {
   }
 
   // Reading methods.
-  const std::string& GetString(StringId id) const {
+  const char* GetString(StringId id) const {
     PERFETTO_DCHECK(id < string_pool_.size());
     return string_pool_[id];
   }
@@ -550,7 +537,7 @@ class TraceStorage {
   const RawEvents& raw_events() const { return raw_events_; }
   RawEvents* mutable_raw_events() { return &raw_events_; }
 
-  const std::deque<std::string>& string_pool() const { return string_pool_; }
+  const std::deque<const char*>& string_pool() const { return string_pool_; }
 
   // |unique_processes_| always contains at least 1 element becuase the 0th ID
   // is reserved to indicate an invalid process.
@@ -568,6 +555,8 @@ class TraceStorage {
 
   using StringHash = uint64_t;
 
+  static constexpr StringId kNullStringId = 0;
+
   // Stats about parsing the trace.
   StatsMap stats_{};
 
@@ -578,7 +567,7 @@ class TraceStorage {
   Args args_;
 
   // One entry for each unique string in the trace.
-  std::deque<std::string> string_pool_;
+  std::deque<const char*> string_pool_;
 
   // One entry for each unique string in the trace.
   std::unordered_map<StringHash, StringId> string_index_;
