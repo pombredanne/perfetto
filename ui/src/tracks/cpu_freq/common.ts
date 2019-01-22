@@ -19,10 +19,9 @@ export interface Data {
   end: number;
   resolution: number;
   maximumValue: number;
-  minimumValue: number;
 
   tsStarts: Float64Array;
-  tsEnds:Float64Array;
+  tsEnds: Float64Array;
   freqKHz: Uint32Array;
   idleValues: Float64Array;
   idles: Uint8Array;

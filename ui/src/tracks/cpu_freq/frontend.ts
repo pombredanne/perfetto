@@ -68,7 +68,7 @@ class CpuFreqTrack extends Track<Config, Data> {
       resolution: reqRes
     }));
   }
-  
+
   renderCanvas(ctx: CanvasRenderingContext2D): void {
     // TODO: fonts and colors should come from the CSS and not hardcoded here.
     const {timeScale, visibleWindowTime} = globals.frontendLocalState;
@@ -112,7 +112,6 @@ class CpuFreqTrack extends Track<Config, Data> {
     // The values we have for cpufreq are in kHz so +1 to unitGroup.
     const yLabel = `${num} ${kUnits[unitGroup + 1]}Hz`;
 
-
     // Draw the CPU frequency graph.
     const hue = hueForCpu(this.config.cpu); 
     ctx.fillStyle = `hsl(${hue}, 45%, 70%)`;
@@ -147,7 +146,7 @@ class CpuFreqTrack extends Track<Config, Data> {
     const bottomY = MARGIN_TOP + RECT_HEIGHT;
 
     for (let i = 0; i < data.freqKHz.length; i++) {
-      if(data.idles[i]) {
+      if (data.idles[i]) {
         const value = data.freqKHz[i];
         const firstX = Math.floor(timeScale.timeToPx(data.tsStarts[i]));
         const secondX = Math.floor(timeScale.timeToPx(data.tsEnds[i]));
@@ -159,10 +158,9 @@ class CpuFreqTrack extends Track<Config, Data> {
     ctx.font = '10px Google Sans';
 
     if (this.hoveredValue !== undefined && this.hoveredTs !== undefined) {
-      const text = `value: ${this.hoveredValue.toLocaleString()}kHz`;
+      const text = `freq: ${this.hoveredValue.toLocaleString()}kHz`;
 
       const width = ctx.measureText(text).width;
-      const hue = hueForCpu(this.config.cpu); 
       ctx.fillStyle = `hsl(${hue}, 45%, 75%)`;
       ctx.strokeStyle = `hsl(${hue}, 45%, 45%)`;
 

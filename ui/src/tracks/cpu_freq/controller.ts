@@ -29,7 +29,6 @@ class CpuFreqTrackController extends TrackController<Config, Data> {
   private busy = false;
   private setup = false;
   private maximumValueSeen = 0;
-  private minimumValueSeen = 0;
 
   onBoundsChange(start: number, end: number, resolution: number): void {
     this.update(start, end, resolution);
@@ -46,11 +45,10 @@ class CpuFreqTrackController extends TrackController<Config, Data> {
     this.busy = true;
     if (!this.setup) {
       const result = await this.query(`
-      select max(value), min(value) from
+      select max(value) from
         counters where name = 'cpufreq'
         and ref = ${this.config.cpu}`);
       this.maximumValueSeen = +result.columns[0].doubleValues![0];
-      this.minimumValueSeen = +result.columns[1].doubleValues![0];
 
       await this.query(
         `create virtual table ${this.tableName('window')} using window;`);
@@ -124,7 +122,6 @@ class CpuFreqTrackController extends TrackController<Config, Data> {
       start,
       end,
       maximumValue: this.maximumValue(),
-      minimumValue: this.minimumValue(),
       resolution,
       tsStarts: new Float64Array(numRows),
       tsEnds: new Float64Array(numRows),
@@ -149,10 +146,6 @@ class CpuFreqTrackController extends TrackController<Config, Data> {
 
   private maximumValue() {
     return Math.max(this.config.maximumValue || 0, this.maximumValueSeen);
-  }
-
-  private minimumValue() {
-    return Math.min(this.config.minimumValue || 0, this.minimumValueSeen);
   }
 
   private async query(query: string) {
