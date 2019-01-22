@@ -85,7 +85,7 @@ class CpuFreqTrackController extends TrackController<Config, Data> {
       await this.query(`create virtual table ${this.tableName('span_activity')}
       using span_join(${this.tableName('freq_idle')} PARTITIONED cpu,
                       ${this.tableName('window')} PARTITIONED cpu);`);
-      
+
       await this.query(`create view ${this.tableName('activity')}
       as select
         ts,
@@ -100,12 +100,12 @@ class CpuFreqTrackController extends TrackController<Config, Data> {
         idle_value
         from ${this.tableName('span_activity')};
       `);
-    
+
       this.setup = true;
     }
 
-    const query = `select ts, dur, idle, freq_value, idle_value from 
-      ${this.tableName('activity')}`;
+    const query = `select ts, dur, idle, freq_value, idle_value
+      from ${this.tableName('activity')}`;
 
     const freqResult = await this.query(query);
 
@@ -154,5 +154,6 @@ class CpuFreqTrackController extends TrackController<Config, Data> {
     return result;
   }
 }
+
 
 trackControllerRegistry.register(CpuFreqTrackController);

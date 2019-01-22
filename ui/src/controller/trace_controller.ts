@@ -243,7 +243,7 @@ export class TraceController extends Controller<States> {
       // Only add a cpu freq track if we have
       // cpu freq data.
       // TODO(taylori): Find a way to display cpu idle
-      // events even if there are no cpu freq events. 
+      // events even if there are no cpu freq events.
       const freqExists = await engine.query(`
         select value
         from counters
