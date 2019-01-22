@@ -493,8 +493,10 @@ void ProtoTraceParser::ParseProcessStatsProcess(int64_t ts,
       case protos::ProcessStats::Process::kPidFieldNumber:
         // Ignore field.
         break;
-      default:
-        if (fld.id < counter_values.size() && counter_values[fld.id] != 0) {
+      default: {
+        bool is_counter_field = fld.id < has_counter.size() &&
+                                proc_stats_process_names_[fld.id] != 0;
+        if (is_counter_field) {
           // Memory counters are in KB, keep values in bytes in the trace
           // processor.
           counter_values[fld.id] = fld.as_uint64() * 1024;
@@ -505,11 +507,12 @@ void ProtoTraceParser::ParseProcessStatsProcess(int64_t ts,
           context_->storage->IncrementStats(stats::proc_stat_unknown_counters);
         }
         break;
+      }
     }
   }
 
   for (size_t field_id = 0; field_id < counter_values.size(); field_id++) {
-    if (counter_values[field_id] == 0 || !has_counter[field_id])
+    if (!has_counter[field_id])
       continue;
 
     // Lookup the interned string id from the field name using the
