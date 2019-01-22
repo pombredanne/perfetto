@@ -182,6 +182,8 @@ ProtoTraceParser::ProtoTraceParser(TraceProcessorContext* context)
       context->storage->InternString("mem.locked");
   proc_mem_counter_names_[ProcessStats::Process::kVmHwmKbFieldNumber] =
       context->storage->InternString("mem.rss.watermark");
+  proc_mem_counter_names_[ProcessStats::Process::kOomScoreAdjFieldNumber] =
+      oom_score_adj_id_;
 }
 
 ProtoTraceParser::~ProtoTraceParser() = default;
@@ -457,7 +459,7 @@ void ProtoTraceParser::ParseProcessStats(int64_t ts, TraceBlobView stats) {
     const size_t fld_off = stats.offset_of(fld.data());
     switch (fld.id) {
       case protos::ProcessStats::kProcessesFieldNumber: {
-        ParseProcMemCounters(ts, stats.slice(fld_off, fld.size()));
+        ParseProcessStatsProcess(ts, stats.slice(fld_off, fld.size()));
         break;
       }
       default:
@@ -467,38 +469,47 @@ void ProtoTraceParser::ParseProcessStats(int64_t ts, TraceBlobView stats) {
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 
-void ProtoTraceParser::ParseProcMemCounters(int64_t ts,
-                                            TraceBlobView proc_stat) {
+void ProtoTraceParser::ParseProcessStatsProcess(int64_t ts,
+                                                TraceBlobView proc_stat) {
   ProtoDecoder decoder(proc_stat.data(), proc_stat.length());
-  uint32_t pid = 0;
+  uint64_t raw_pid = 0;
+  constexpr auto kPidFieldNumber =
+      protos::ProcessStats::Process::kPidFieldNumber;
+  if (!decoder.FindIntField<kPidFieldNumber>(&raw_pid)) {
+    PERFETTO_ELOG("Skipping procstats process with no pid");
+    // TODO(lalitm): add a stat for this.
+    return;
+  }
+  uint32_t pid = static_cast<uint32_t>(raw_pid);
+  UniqueTid utid = context_->process_tracker->UpdateThread(ts, pid, 0);
+
   // Maps a process counter field it to its value.
   // E.g., 4 := 1024 -> "mem.rss.anon" := 1024.
-  std::array<uint64_t, kProcMemCounterSize> counter_values{};
-  std::array<uint8_t, kProcMemCounterSize> has_counter{};
+  std::array<uint64_t, kProcStatsProcessSize> counter_values{};
+  std::array<uint8_t, kProcStatsProcessSize> has_counter{};
 
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
       case protos::ProcessStats::Process::kPidFieldNumber:
-        pid = fld.as_uint32();
+        // Ignore field.
         break;
       default:
-        if (fld.id < counter_values.size()) {
+        if (fld.id < counter_values.size() && counter_values[fld.id] != 0) {
           // Memory counters are in KB, keep values in bytes in the trace
           // processor.
           counter_values[fld.id] = fld.as_uint64() * 1024;
           has_counter[fld.id] = 1;
         } else {
-          PERFETTO_ELOG("Skipping unknown process counters %" PRIu32, fld.id);
+          PERFETTO_ELOG("Skipping unknown process stats field %" PRIu32,
+                        fld.id);
           context_->storage->IncrementStats(stats::proc_stat_unknown_counters);
         }
+        break;
     }
   }
 
-  UniqueTid utid = context_->process_tracker->UpdateThread(ts, pid, 0);
-
-  // Skip field_id 0 (invalid) and 1 (pid).
-  for (size_t field_id = 2; field_id < counter_values.size(); field_id++) {
-    if (!has_counter[field_id])
+  for (size_t field_id = 0; field_id < counter_values.size(); field_id++) {
+    if (counter_values[field_id] == 0 || !has_counter[field_id])
       continue;
 
     // Lookup the interned string id from the field name using the
