@@ -46,7 +46,6 @@
 #include "src/tracing/core/trace_buffer.h"
 
 #include "perfetto/trace/clock_snapshot.pb.h"
-#include "perfetto/trace/trace_stats.pb.h"
 #include "perfetto/trace/trusted_packet.pb.h"
 
 // General note: this class must assume that Producers are malicious and will
@@ -57,7 +56,6 @@
 namespace perfetto {
 
 namespace {
-
 constexpr size_t kDefaultShmPageSize = base::kPageSize;
 constexpr int kMaxBuffersPerConsumer = 128;
 constexpr base::TimeMillis kSnapshotsInterval(10 * 1000);
@@ -101,28 +99,6 @@ uid_t geteuid() {
   return 0;
 }
 #endif  // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
-
-void SnapshotBufferStats(const TraceBuffer& buf,
-                         protos::TraceStats::BufferStats* buf_stats_proto) {
-  const TraceBuffer::Stats& buf_stats = buf.stats();
-  buf_stats_proto->set_buffer_size(buf.size());
-  buf_stats_proto->set_bytes_written(buf_stats.bytes_written);
-  buf_stats_proto->set_bytes_overwritten(buf_stats.bytes_overwritten);
-  buf_stats_proto->set_bytes_read(buf_stats.bytes_read);
-  buf_stats_proto->set_chunks_written(buf_stats.chunks_written);
-  buf_stats_proto->set_chunks_rewritten(buf_stats.chunks_rewritten);
-  buf_stats_proto->set_chunks_overwritten(buf_stats.chunks_overwritten);
-  buf_stats_proto->set_chunks_read(buf_stats.chunks_read);
-  buf_stats_proto->set_chunks_committed_out_of_order(
-      buf_stats.chunks_committed_out_of_order);
-  buf_stats_proto->set_write_wrap_count(buf_stats.write_wrap_count);
-  buf_stats_proto->set_patches_succeeded(buf_stats.patches_succeeded);
-  buf_stats_proto->set_patches_failed(buf_stats.patches_failed);
-  buf_stats_proto->set_readaheads_succeeded(buf_stats.readaheads_succeeded);
-  buf_stats_proto->set_readaheads_failed(buf_stats.readaheads_failed);
-  buf_stats_proto->set_abi_violations(buf_stats.abi_violations);
-}
-
 }  // namespace
 
 // These constants instead are defined in the header because are used by tests.
@@ -1622,24 +1598,24 @@ void TracingServiceImpl::SnapshotStats(TracingSession* tracing_session,
   packet.set_trusted_uid(static_cast<int32_t>(uid_));
 
   protos::TraceStats* trace_stats = packet.mutable_trace_stats();
-  SnapshotTraceStats(tracing_session, trace_stats);
+  SnapshotTraceStats(tracing_session).ToProto(trace_stats);
   Slice slice = Slice::Allocate(static_cast<size_t>(packet.ByteSize()));
   PERFETTO_CHECK(packet.SerializeWithCachedSizesToArray(slice.own_data()));
   packets->emplace_back();
   packets->back().AddSlice(std::move(slice));
 }
 
-void TracingServiceImpl::SnapshotTraceStats(TracingSession* tracing_session,
-                                            protos::TraceStats* trace_stats) {
-  trace_stats->set_producers_connected(
-      static_cast<uint32_t>(producers_.size()));
-  trace_stats->set_producers_seen(last_producer_id_);
-  trace_stats->set_data_sources_registered(
+TraceStats TracingServiceImpl::SnapshotTraceStats(
+    TracingSession* tracing_session) {
+  TraceStats trace_stats;
+  trace_stats.set_producers_connected(static_cast<uint32_t>(producers_.size()));
+  trace_stats.set_producers_seen(last_producer_id_);
+  trace_stats.set_data_sources_registered(
       static_cast<uint32_t>(data_sources_.size()));
-  trace_stats->set_data_sources_seen(last_data_source_instance_id_);
-  trace_stats->set_tracing_sessions(
+  trace_stats.set_data_sources_seen(last_data_source_instance_id_);
+  trace_stats.set_tracing_sessions(
       static_cast<uint32_t>(tracing_sessions_.size()));
-  trace_stats->set_total_buffers(static_cast<uint32_t>(buffers_.size()));
+  trace_stats.set_total_buffers(static_cast<uint32_t>(buffers_.size()));
 
   for (BufferID buf_id : tracing_session->buffers_index) {
     TraceBuffer* buf = GetBufferByID(buf_id);
@@ -1647,9 +1623,9 @@ void TracingServiceImpl::SnapshotTraceStats(TracingSession* tracing_session,
       PERFETTO_DFATAL("Buffer not found.");
       continue;
     }
-    auto* buf_stats_proto = trace_stats->add_buffer_stats();
-    SnapshotBufferStats(*buf, buf_stats_proto);
+    *trace_stats.add_buffer_stats() = buf->stats();
   }  // for (buf in session).
+  return trace_stats;
 }
 
 void TracingServiceImpl::MaybeEmitTraceConfig(
@@ -1782,11 +1758,11 @@ void TracingServiceImpl::ConsumerEndpointImpl::Attach(const std::string& key) {
 void TracingServiceImpl::ConsumerEndpointImpl::GetTraceStats() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   bool success = false;
-  protos::TraceStats stats;
+  TraceStats stats;
   TracingSession* session = service_->GetTracingSession(tracing_session_id_);
   if (session) {
     success = true;
-    service_->SnapshotTraceStats(session, &stats);
+    stats = service_->SnapshotTraceStats(session);
   }
   auto weak_this = GetWeakPtr();
   task_runner_->PostTask([weak_this, success, stats] {

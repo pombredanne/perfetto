@@ -27,9 +27,8 @@
 #include "perfetto/tracing/core/slice.h"
 #include "perfetto/tracing/core/trace_config.h"
 #include "perfetto/tracing/core/trace_packet.h"
+#include "perfetto/tracing/core/trace_stats.h"
 #include "perfetto/tracing/core/tracing_service.h"
-
-#include "perfetto/trace/trace_stats.pb.h"
 
 namespace perfetto {
 
@@ -258,15 +257,14 @@ void ConsumerIPCService::RemoteConsumer::OnAttach(
   std::move(attach_response).Resolve(std::move(response));
 }
 
-void ConsumerIPCService::RemoteConsumer::OnTraceStats(
-    bool success,
-    const protos::TraceStats& stats) {
+void ConsumerIPCService::RemoteConsumer::OnTraceStats(bool success,
+                                                      const TraceStats& stats) {
   if (!success) {
     std::move(get_trace_stats_response).Reject();
     return;
   }
   auto response = ipc::AsyncResult<protos::GetTraceStatsResponse>::Create();
-  *response->mutable_trace_stats() = stats;
+  stats.ToProto(response->mutable_trace_stats());
   std::move(get_trace_stats_response).Resolve(std::move(response));
 }
 

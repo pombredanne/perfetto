@@ -32,6 +32,7 @@
 #include "perfetto/tracing/core/data_source_descriptor.h"
 #include "perfetto/tracing/core/shared_memory_abi.h"
 #include "perfetto/tracing/core/trace_config.h"
+#include "perfetto/tracing/core/trace_stats.h"
 #include "perfetto/tracing/core/tracing_service.h"
 #include "src/tracing/core/id_allocator.h"
 
@@ -40,10 +41,6 @@ namespace perfetto {
 namespace base {
 class TaskRunner;
 }  // namespace base
-
-namespace protos {
-class TraceStats;
-}  // namespace protos
 
 class Consumer;
 class DataSourceConfig;
@@ -382,8 +379,7 @@ class TracingServiceImpl : public TracingService {
   void SnapshotSyncMarker(std::vector<TracePacket>*);
   void SnapshotClocks(std::vector<TracePacket>*);
   void SnapshotStats(TracingSession*, std::vector<TracePacket>*);
-  void SnapshotTraceStats(TracingSession* tracing_session,
-                          protos::TraceStats* trace_stats);
+  TraceStats SnapshotTraceStats(TracingSession* tracing_session);
   void MaybeEmitTraceConfig(TracingSession*, std::vector<TracePacket>*);
   void OnFlushTimeout(TracingSessionID, FlushRequestID);
   void OnDisableTracingTimeout(TracingSessionID);

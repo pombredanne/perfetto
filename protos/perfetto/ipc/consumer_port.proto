@@ -17,8 +17,8 @@
 syntax = "proto2";
 option optimize_for = LITE_RUNTIME;
 
+import "perfetto/common/trace_stats.proto";
 import "perfetto/config/trace_config.proto";
-import "perfetto/trace/trace_stats.proto";
 
 package perfetto.protos;
 
@@ -183,5 +183,5 @@ message AttachResponse {
 message GetTraceStatsRequest {}
 
 message GetTraceStatsResponse {
-  optional protos.TraceStats trace_stats = 1;
+  optional TraceStats trace_stats = 1;
 }

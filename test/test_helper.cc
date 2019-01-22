@@ -175,7 +175,7 @@ void TestHelper::OnAttach(bool success, const TraceConfig&) {
     std::move(on_attach_callback_)(success);
 }
 
-void TestHelper::OnTraceStats(bool, const protos::TraceStats&) {}
+void TestHelper::OnTraceStats(bool, const TraceStats&) {}
 
 // static
 const char* TestHelper::GetConsumerSocketName() {

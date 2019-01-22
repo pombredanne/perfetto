@@ -28,7 +28,7 @@ message TraceStats {
     // Size of the circular buffer in bytes.
     optional uint64 buffer_size = 12;
 
-    // Num. bytes written into the circular buffer.
+    // Num. bytes written into the circular buffer, including chunk headers.
     optional uint64 bytes_written = 1;
 
     // Num. bytes overwritten before they have been read (i.e. loss of data).
@@ -36,7 +36,10 @@ message TraceStats {
 
     // Total size of chunks that were fully read from the circular buffer by the
     // consumer. This may not be equal to |bytes_written| either in the middle
-    // of tracing, or if |chunks_overwritten| is non-zero.
+    // of tracing, or if |chunks_overwritten| is non-zero. Note that this is the
+    // size of the chunks read from the buffer, including chunk headers, which
+    // will be different from the total size of packets returned to the
+    // consumer.
     //
     // The current utilization of the trace buffer (mid-tracing) can be obtained
     // by subtracting |bytes_read| and |bytes_overwritten| from |bytes_written|,

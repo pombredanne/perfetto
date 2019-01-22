@@ -25,12 +25,9 @@
 
 namespace perfetto {
 
-namespace protos {
-class TraceStats;
-}  // namespace protos
-
 class TraceConfig;
 class TracePacket;
+class TraceStats;
 
 class PERFETTO_EXPORT Consumer {
  public:
@@ -75,7 +72,7 @@ class PERFETTO_EXPORT Consumer {
 
   // Called back by the Service (or transport layer) after invoking
   // TracingService::ConsumerEndpoint::GetTraceStats().
-  virtual void OnTraceStats(bool success, const protos::TraceStats&) = 0;
+  virtual void OnTraceStats(bool success, const TraceStats&) = 0;
 };
 
 }  // namespace perfetto

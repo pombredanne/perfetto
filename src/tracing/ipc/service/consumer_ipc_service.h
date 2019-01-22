@@ -78,7 +78,7 @@ class ConsumerIPCService : public protos::ConsumerPort {
     void OnTraceData(std::vector<TracePacket>, bool has_more) override;
     void OnDetach(bool) override;
     void OnAttach(bool, const TraceConfig&) override;
-    void OnTraceStats(bool, const protos::TraceStats&) override;
+    void OnTraceStats(bool, const TraceStats&) override;
 
     // The interface obtained from the core service business logic through
     // TracingService::ConnectConsumer(this). This allows to invoke methods for

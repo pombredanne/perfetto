@@ -69,7 +69,7 @@ class MockConsumer : public Consumer {
                void(std::vector<TracePacket>* /*packets*/, bool /*has_more*/));
   MOCK_METHOD1(OnDetach, void(bool));
   MOCK_METHOD2(OnAttach, void(bool, const TraceConfig&));
-  MOCK_METHOD2(OnTraceStats, void(bool, const protos::TraceStats&));
+  MOCK_METHOD2(OnTraceStats, void(bool, const TraceStats&));
 
   // gtest doesn't support move-only types. This wrapper is here jut to pass
   // a pointer to the vector (rather than the vector itself) to the mock method.

@@ -707,7 +707,7 @@ void PerfettoCmd::OnAttach(bool success, const TraceConfig& trace_config) {
 }
 
 void PerfettoCmd::OnTraceStats(bool /*success*/,
-                               const protos::TraceStats& /*trace_config*/) {
+                               const TraceStats& /*trace_config*/) {
   // TODO(eseckler): Support GetTraceStats().
 }
 
