@@ -99,11 +99,11 @@ struct Mapping {
   Mapping(Interned<std::string> b) : build_id(std::move(b)) {}
 
   Interned<std::string> build_id;
-  uint64_t offset;
-  uint64_t start;
-  uint64_t end;
-  uint64_t load_bias;
-  std::vector<Interned<std::string>> path_components;
+  uint64_t offset = 0;
+  uint64_t start = 0;
+  uint64_t end = 0;
+  uint64_t load_bias = 0;
+  std::vector<Interned<std::string>> path_components{};
 
   bool operator<(const Mapping& other) const {
     return std::tie(build_id, offset, start, end, load_bias, path_components) <
