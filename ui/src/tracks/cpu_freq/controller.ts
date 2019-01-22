@@ -40,6 +40,9 @@ class CpuFreqTrackController extends TrackController<Config, Data> {
     // TODO: we should really call TraceProcessor.Interrupt() at this point.
     if (this.busy) return;
 
+    const startNs = Math.round(start * 1e9);
+    const endNs = Math.round(end * 1e9);
+
     this.busy = true;
     if (!this.setup) {
       const result = await this.query(`
@@ -103,6 +106,13 @@ class CpuFreqTrackController extends TrackController<Config, Data> {
 
       this.setup = true;
     }
+
+    const windowDur = Math.max(1, endNs - startNs);
+
+    this.query(`update ${this.tableName('window')} set
+      window_start = ${startNs},
+      window_dur = ${windowDur},
+      quantum = 0`);
 
     const query = `select ts, dur, idle, freq_value, idle_value
       from ${this.tableName('activity')}`;
