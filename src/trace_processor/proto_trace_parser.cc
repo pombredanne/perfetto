@@ -182,6 +182,35 @@ ProtoTraceParser::ProtoTraceParser(TraceProcessorContext* context)
       context->storage->InternString("mem.locked");
   proc_mem_counter_names_[ProcessStats::Process::kVmHwmKbFieldNumber] =
       context->storage->InternString("mem.rss.watermark");
+
+  mm_event_counter_names_.emplace_back(
+      context->storage->InternString("mm.min_flt.count"),
+      context->storage->InternString("mm.min_flt.max_lat"),
+      context->storage->InternString("mm.min_flt.avg_lat"));
+  mm_event_counter_names_.emplace_back(
+      context->storage->InternString("mm.maj_flt.count"),
+      context->storage->InternString("mm.maj_flt.max_lat"),
+      context->storage->InternString("mm.maj_flt.avg_lat"));
+  mm_event_counter_names_.emplace_back(
+      context->storage->InternString("mm.read_io.count"),
+      context->storage->InternString("mm.read_io.max_lat"),
+      context->storage->InternString("mm.read_io.avg_lat"));
+  mm_event_counter_names_.emplace_back(
+      context->storage->InternString("mm.compaction.count"),
+      context->storage->InternString("mm.compaction.max_lat"),
+      context->storage->InternString("mm.compaction.avg_lat"));
+  mm_event_counter_names_.emplace_back(
+      context->storage->InternString("mm.reclaim.count"),
+      context->storage->InternString("mm.reclaim.max_lat"),
+      context->storage->InternString("mm.reclaim.avg_lat"));
+  mm_event_counter_names_.emplace_back(
+      context->storage->InternString("mm.swp_flt.count"),
+      context->storage->InternString("mm.swp_flt.max_lat"),
+      context->storage->InternString("mm.swp_flt.avg_lat"));
+  mm_event_counter_names_.emplace_back(
+      context->storage->InternString("mm.kern_alloc.count"),
+      context->storage->InternString("mm.kern_alloc.max_lat"),
+      context->storage->InternString("mm.kern_alloc.avg_lat"));
 }
 
 ProtoTraceParser::~ProtoTraceParser() = default;
@@ -634,6 +663,11 @@ void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
         ParseOOMScoreAdjUpdate(timestamp, ftrace.slice(fld_off, fld.size()));
         break;
       }
+      case protos::FtraceEvent::kMmEventRecordFieldNumber: {
+        ParseMmEventRecordField(timestamp, pid,
+                                ftrace.slice(fld_off, fld.size()));
+        break;
+      }
       default:
         break;
     }
@@ -987,6 +1021,55 @@ void ProtoTraceParser::ParseOOMScoreAdjUpdate(int64_t ts,
   UniquePid upid = context_->process_tracker->UpdateProcess(pid);
   context_->event_tracker->PushCounter(ts, oom_adj, oom_score_adj_id_, upid,
                                        RefType::kRefUpid);
+}
+
+void ProtoTraceParser::ParseMmEventRecordField(int64_t ts,
+                                               uint32_t pid,
+                                               TraceBlobView view) {
+  ProtoDecoder decoder(view.data(), view.length());
+
+  constexpr auto kTypeFieldNumber =
+      protos::MmEventRecordFtraceEvent::kTypeFieldNumber;
+  uint64_t type = 0;
+  if (!decoder.FindIntField<kTypeFieldNumber>(&type)) {
+    // TODO(lalitm): add a counter for this.
+    PERFETTO_ELOG("Type field not found in mm_event packet");
+    return;
+  } else if (type >= mm_event_counter_names_.size()) {
+    // TODO(lalitm): add a counter for this.
+    PERFETTO_ELOG("Unknown mm_event counter type");
+    return;
+  }
+
+  UniquePid utid = context_->process_tracker->UpdateProcess(pid);
+  auto mm_event_names = mm_event_counter_names_[type];
+  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    if (fld.id == kTypeFieldNumber)
+      continue;
+
+    StringId counter_string_id = 0;
+    switch (fld.id) {
+      case protos::MmEventRecordFtraceEvent::kCountFieldNumber:
+        counter_string_id = mm_event_names.count;
+        break;
+      case protos::MmEventRecordFtraceEvent::kMaxLatFieldNumber:
+        counter_string_id = mm_event_names.max_lat;
+        break;
+      case protos::MmEventRecordFtraceEvent::kAvgLatFieldNumber:
+        counter_string_id = mm_event_names.avg_lat;
+        break;
+    }
+
+    if (counter_string_id == 0) {
+      PERFETTO_ELOG("Unknown field for counter found in mm_event");
+      // TODO(lalitm): add a counter for this.
+      continue;
+    }
+
+    context_->event_tracker->PushCounter(ts, fld.as_uint32(), counter_string_id,
+                                         utid, RefType::kRefUtid);
+  }
+  PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 
 void ProtoTraceParser::ParseGenericFtrace(int64_t timestamp,
