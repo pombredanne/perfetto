@@ -59,6 +59,7 @@ echo ""
 OLD_URL="https://\(.*/perfetto\)/test-data-.*.zip"
 NEW_URL="https://\1/$NEW_TEST_DATA"
 OLD_SHA="\w*"
-cat tools/install-build-deps | sed -z -e "s|'$OLD_URL',\n\(\s*\)'$OLD_SHA'|'$NEW_URL',\n\2'$NEW_SHA'|g" | head -n 200
+SED_MAGIC="s|'$OLD_URL',\n\(\s*\)'$OLD_SHA'|'$NEW_URL',\n\2'$NEW_SHA'|g"
+cat tools/install-build-deps | sed -z -e "$SED_MAGIC" > tools/install-build-deps
 
 echo "All done!"
