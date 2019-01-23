@@ -486,7 +486,7 @@ void ProtoTraceParser::ParseProcessStatsProcess(int64_t ts,
   // Maps a process counter field it to its value.
   // E.g., 4 := 1024 -> "mem.rss.anon" := 1024.
   std::array<uint64_t, kProcStatsProcessSize> counter_values{};
-  std::array<uint8_t, kProcStatsProcessSize> has_counter{};
+  std::array<bool, kProcStatsProcessSize> has_counter{};
 
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
@@ -500,7 +500,7 @@ void ProtoTraceParser::ParseProcessStatsProcess(int64_t ts,
           // Memory counters are in KB, keep values in bytes in the trace
           // processor.
           counter_values[fld.id] = fld.as_uint64() * 1024;
-          has_counter[fld.id] = 1;
+          has_counter[fld.id] = true;
         } else {
           PERFETTO_ELOG("Skipping unknown process stats field %" PRIu32,
                         fld.id);
@@ -519,10 +519,16 @@ void ProtoTraceParser::ParseProcessStatsProcess(int64_t ts,
     // pre-cached |proc_stats_process_names_| map.
     StringId name = proc_stats_process_names_[field_id];
     uint64_t value = counter_values[field_id];
-    auto row_id = context_->event_tracker->PushCounter(
-        ts, value, name, utid, RefType::kRefUtidLookupUpid);
-    context_->storage->mutable_args()->AddArg(
-        row_id, utid_name_id_, utid_name_id_, Variadic::Integer(utid));
+
+    if (field_id == protos::ProcessStats::Process::kOomScoreAdjFieldNumber) {
+      context_->event_tracker->PushCounter(ts, value, name, upid,
+                                           RefType::kRefUpid);
+    } else {
+      auto row_id = context_->event_tracker->PushCounter(
+          ts, value, name, utid, RefType::kRefUtidLookupUpid);
+      context_->storage->mutable_args()->AddArg(
+          row_id, utid_name_id_, utid_name_id_, Variadic::Integer(utid));
+    }
   }
 
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
