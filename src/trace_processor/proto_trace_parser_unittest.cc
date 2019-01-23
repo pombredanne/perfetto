@@ -237,12 +237,15 @@ TEST_F(ProtoTraceParserTest, LoadGenericFtrace) {
   Tokenize(trace);
 
   const auto& events = storage_->raw_events();
-  const auto& args = storage_->args();
 
   ASSERT_EQ(events.raw_event_count(), 1);
   ASSERT_EQ(events.timestamps().back(), 100);
   ASSERT_EQ(storage_->GetThread(events.utids().back()).tid, 10);
 
+  // TODO(b/123252504) disable this code to stop blow-ups in ingestion time
+  // and memory.
+  /*
+  const auto& args = storage_->args();
   auto row_id = TraceStorage::CreateRowId(TableId::kRawEvents, 0);
   auto id_it = args.args_for_id().equal_range(row_id);
 
@@ -256,6 +259,7 @@ TEST_F(ProtoTraceParserTest, LoadGenericFtrace) {
   ++it;
   row = it->second;
   ASSERT_EQ(args.arg_values()[row].int_value, 3);
+  */
 }
 
 TEST_F(ProtoTraceParserTest, LoadMultipleEvents) {
