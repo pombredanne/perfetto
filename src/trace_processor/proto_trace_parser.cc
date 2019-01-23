@@ -515,6 +515,7 @@ void ProtoTraceParser::ParseProcessStatsProcess(int64_t ts,
     uint64_t value = counter_values[field_id];
 
     if (field_id == protos::ProcessStats::Process::kOomScoreAdjFieldNumber) {
+      UniquePid upid = context_->process_tracker->UpdateProcess(pid);
       context_->event_tracker->PushCounter(ts, value, name, upid,
                                            RefType::kRefUpid);
     } else {
