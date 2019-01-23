@@ -22,10 +22,12 @@ import {
   DeferredAction,
 } from '../common/actions';
 import {Engine} from '../common/engine';
+import {NUM, NUM_NULL, rawQueryToRows, STR_NULL} from '../common/protos';
 import {SCROLLING_TRACK_GROUP} from '../common/state';
 import {TimeSpan} from '../common/time';
 import {QuantizedLoad, ThreadDesc} from '../frontend/globals';
 import {SLICE_TRACK_KIND} from '../tracks/chrome_slices/common';
+import {CPU_FREQ_TRACK_KIND} from '../tracks/cpu_freq/common';
 import {CPU_SLICE_TRACK_KIND} from '../tracks/cpu_slices/common';
 import {PROCESS_SUMMARY_TRACK} from '../tracks/process_summary/common';
 
@@ -222,6 +224,11 @@ export class TraceController extends Controller<States> {
     //    }
     //  }));
     //}
+    const maxFreq = await engine.query(`
+     select max(value)
+     from counters
+     where name = 'cpufreq';
+    `);
 
     for (let cpu = 0; cpu < numCpus; cpu++) {
       addToTrackActions.push(Actions.addTrack({
@@ -233,6 +240,27 @@ export class TraceController extends Controller<States> {
           cpu,
         }
       }));
+
+      // Only add a cpu freq track if we have
+      // cpu freq data.
+      const freqExists = await engine.query(`
+        select value
+        from counters
+        where name = 'cpufreq' and ref = ${cpu}
+        limit 1;
+      `);
+      if (freqExists.numRecords > 0) {
+        addToTrackActions.push(Actions.addTrack({
+          engineId: this.engineId,
+          kind: CPU_FREQ_TRACK_KIND,
+          name: `Cpu ${cpu} frequency`,
+          trackGroup: SCROLLING_TRACK_GROUP,
+          config: {
+            cpu,
+            maximumValue: maxFreq.columns[0].longValues![0],
+          }
+        }));
+      }
     }
 
     const counters = await engine.query(`
@@ -295,44 +323,80 @@ export class TraceController extends Controller<States> {
       utidToMaxDepth.set(utid, maxDepth);
     }
 
-    const threadQuery = await engine.query(
-        'select utid, tid, upid, pid, thread.name, process.name ' +
-        'from thread inner join process using(upid)');
+    // Return all threads
+    // sorted by:
+    //  total cpu time *for the whole parent process*
+    //  upid
+    //  utid
+    const threadQuery = await engine.query(`
+        select
+          utid,
+          tid,
+          upid,
+          pid,
+          thread.name as threadName,
+          process.name as processName,
+          total_dur
+        from
+          thread
+          left join process using(upid)
+          left join (select upid, sum(dur) as total_dur
+              from sched join thread using(utid)
+              group by upid
+            ) using(upid) group by utid, upid
+        order by total_dur desc, upid, utid`);
 
     const upidToUuid = new Map<number, string>();
+    const utidToUuid = new Map<number, string>();
     const addSummaryTrackActions: DeferredAction[] = [];
     const addTrackGroupActions: DeferredAction[] = [];
-    for (let i = 0; i < threadQuery.numRecords; i++) {
-      const utid = threadQuery.columns[0].longValues![i] as number;
-      const tid = threadQuery.columns[1].longValues![i] as number;
-      const upid = threadQuery.columns[2].longValues![i] as number;
-      const pid = threadQuery.columns[3].longValues![i] as number;
-      const threadName = threadQuery.columns[4].stringValues![i];
-      const processName = threadQuery.columns[5].stringValues![i];
 
-      const maxDepth = utidToMaxDepth.get(utid);
-      if (maxDepth === undefined && !counterUpids.has(upid) &&
+
+    for (const row of rawQueryToRows(threadQuery, {
+           utid: NUM,
+           upid: NUM_NULL,
+           tid: NUM_NULL,
+           pid: NUM_NULL,
+           threadName: STR_NULL,
+           processName: STR_NULL,
+         })) {
+      const utid = row.utid;
+      const tid = row.tid;
+      const upid = row.upid;
+      const pid = row.pid;
+      const threadName = row.threadName;
+      const processName = row.threadName;
+
+      const maxDepth = utid === null ? undefined : utidToMaxDepth.get(utid);
+      if (maxDepth === undefined &&
+          (upid === null || !counterUpids.has(upid)) &&
           !counterUtids.has(utid)) {
         continue;
       }
 
-      let pUuid = upidToUuid.get(upid);
+      // Group by upid if present else by utid.
+      let pUuid = upid === null ? utidToUuid.get(utid) : upidToUuid.get(upid);
       if (pUuid === undefined) {
         pUuid = uuidv4();
         const summaryTrackId = uuidv4();
-        upidToUuid.set(upid, pUuid);
+        if (upid === null) {
+          utidToUuid.set(utid, pUuid);
+        } else {
+          upidToUuid.set(upid, pUuid);
+        }
         addSummaryTrackActions.push(Actions.addTrack({
           id: summaryTrackId,
           engineId: this.engineId,
           kind: PROCESS_SUMMARY_TRACK,
-          name: `${pid} summary`,
+          name: `${upid === null ? pid : tid} summary`,
           config: {upid, pid, maxDepth, utid},
         }));
 
         addTrackGroupActions.push(Actions.addTrackGroup({
           engineId: this.engineId,
           summaryTrackId,
-          name: `${processName} ${pid}`,
+          name: upid === null ? `${threadName} ${tid}` :
+                                `${processName} ${pid}`,
           id: pUuid,
           collapsed: true,
         }));
@@ -377,7 +441,7 @@ export class TraceController extends Controller<States> {
         addToTrackActions.push(Actions.addTrack({
           engineId: this.engineId,
           kind: SLICE_TRACK_KIND,
-          name: threadName + `[${tid}]`,
+          name: `${threadName} [${tid}]`,
           trackGroup: pUuid,
           config: {upid, utid, maxDepth},
         }));
