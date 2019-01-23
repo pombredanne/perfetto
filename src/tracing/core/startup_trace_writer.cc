@@ -91,7 +91,7 @@ class LocalBufferReader {
     return bytes_read;
   }
 
-  size_t TotalUsedSize() {
+  size_t TotalUsedSize() const {
     size_t used_size = 0;
     for (const auto& slice : buffer_slices_) {
       used_size += slice.GetUsedRange().size();
@@ -99,7 +99,7 @@ class LocalBufferReader {
     return used_size;
   }
 
-  bool DidReadAllData() {
+  bool DidReadAllData() const {
     if (cur_slice_ == buffer_slices_.end())
       return true;
 

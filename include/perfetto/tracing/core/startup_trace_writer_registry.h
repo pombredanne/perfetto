@@ -74,11 +74,12 @@ class PERFETTO_EXPORT StartupTraceWriterRegistry {
   std::unique_ptr<StartupTraceWriter> CreateUnboundTraceWriter();
 
   // Return an unbound StartupTraceWriter back to the registry before it could
-  // be bound. The registry will keep this writer alive until the registry is
-  // bound to an arbiter (or destroyed itself). This way, its buffered data is
-  // retained. Should only be called while unbound. All packets written to the
-  // passed writer should have been completed and it should no longer be used to
-  // write data after calling this method.
+  // be bound (usually called when the writer's thread is destroyed). The
+  // registry will keep this writer alive until the registry is bound to an
+  // arbiter (or destroyed itself). This way, its buffered data is retained.
+  // Should only be called while unbound. All packets written to the passed
+  // writer should have been completed and it should no longer be used to write
+  // data after calling this method.
   void ReturnUnboundTraceWriter(std::unique_ptr<StartupTraceWriter>);
 
   // Binds all StartupTraceWriters created by this registry to the given arbiter
@@ -90,7 +91,8 @@ class PERFETTO_EXPORT StartupTraceWriterRegistry {
   // concurrently being written to. The registry will retry on the passed
   // TaskRunner until all writers were bound successfully.
   //
-  // Calls |on_bound_callback| asynchronously once all writers were bound.
+  // Calls |on_bound_callback| asynchronously on |trace_writer| once all writers
+  // were bound.
   void BindToArbiter(
       SharedMemoryArbiterImpl*,
       BufferID target_buffer,
@@ -119,8 +121,17 @@ class PERFETTO_EXPORT StartupTraceWriterRegistry {
 
   // Begin lock-protected members.
   std::mutex lock_;
+
+  // Unbound writers that we handed out to writer threads. These writers may be
+  // concurrently written to by the writer threads.
   std::set<StartupTraceWriter*> unbound_writers_;
+
+  // Unbound writers that writer threads returned to the registry by calling
+  // ReturnUnboundTraceWriter(). Writers are removed from |unbound_writers_|
+  // when they are added to |unbound_owned_writers_|. No new data can be written
+  // to these writers.
   std::vector<std::unique_ptr<StartupTraceWriter>> unbound_owned_writers_;
+
   SharedMemoryArbiterImpl* arbiter_ = nullptr;  // |nullptr| while unbound.
   BufferID target_buffer_ = 0;
   base::TaskRunner* task_runner_;

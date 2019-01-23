@@ -279,29 +279,30 @@ std::unique_ptr<TraceWriter> SharedMemoryArbiterImpl::CreateTraceWriter(
 void SharedMemoryArbiterImpl::BindStartupTraceWriterRegistry(
     std::unique_ptr<StartupTraceWriterRegistry> registry,
     BufferID target_buffer) {
-  registry->BindToArbiter(
-      this, target_buffer, task_runner_,
-      [this](StartupTraceWriterRegistry* bound_registry) {
-        std::unique_ptr<StartupTraceWriterRegistry> registry_to_delete;
-        {
-          std::lock_guard<std::mutex> scoped_lock(lock_);
+  // The registry will be owned by the arbiter, so it's safe to capture |this|
+  // in the callback.
+  auto on_bound_callback = [this](StartupTraceWriterRegistry* bound_registry) {
+    std::unique_ptr<StartupTraceWriterRegistry> registry_to_delete;
+    {
+      std::lock_guard<std::mutex> scoped_lock(lock_);
 
-          for (auto it = startup_trace_writer_registries_.begin();
-               it != startup_trace_writer_registries_.end(); it++) {
-            if (it->get() == bound_registry) {
-              // We can't delete the registry while the arbiter's lock is held
-              // (to avoid lock inversion).
-              registry_to_delete = std::move(*it);
-              startup_trace_writer_registries_.erase(it);
-              break;
-            }
-          }
+      for (auto it = startup_trace_writer_registries_.begin();
+           it != startup_trace_writer_registries_.end(); it++) {
+        if (it->get() == bound_registry) {
+          // We can't delete the registry while the arbiter's lock is held
+          // (to avoid lock inversion).
+          registry_to_delete = std::move(*it);
+          startup_trace_writer_registries_.erase(it);
+          break;
         }
+      }
+    }
 
-        // The registry should have been in |startup_trace_writer_registries_|.
-        PERFETTO_DCHECK(registry_to_delete);
-        registry_to_delete.reset();
-      });
+    // The registry should have been in |startup_trace_writer_registries_|.
+    PERFETTO_DCHECK(registry_to_delete);
+    registry_to_delete.reset();
+  };
+  registry->BindToArbiter(this, target_buffer, task_runner_, on_bound_callback);
   std::lock_guard<std::mutex> scoped_lock(lock_);
   startup_trace_writer_registries_.push_back(std::move(registry));
 }

@@ -128,20 +128,21 @@ void StartupTraceWriterRegistry::OnStartupTraceWriterDestroyed(
 }
 
 void StartupTraceWriterRegistry::OnUnboundWritersRemovedLocked() {
-  if (unbound_writers_.empty() && task_runner_ && on_bound_callback_) {
-    PERFETTO_DCHECK(weak_ptr_factory_);
-    auto weak_this = weak_ptr_factory_->GetWeakPtr();
-    // Run callback in PostTask() since the callback may delete |this| and thus
-    // might otherwise cause a deadlock.
-    auto callback = on_bound_callback_;
-    on_bound_callback_ = nullptr;
-    task_runner_->PostTask([weak_this, callback]() {
-      if (!weak_this)
-        return;
-      // Note: callback may delete |this|.
-      callback(weak_this.get());
-    });
-  }
+  if (!unbound_writers_.empty() || !task_runner_ || !on_bound_callback_)
+    return;
+
+  PERFETTO_DCHECK(weak_ptr_factory_);
+  auto weak_this = weak_ptr_factory_->GetWeakPtr();
+  // Run callback in PostTask() since the callback may delete |this| and thus
+  // might otherwise cause a deadlock.
+  auto callback = on_bound_callback_;
+  on_bound_callback_ = nullptr;
+  task_runner_->PostTask([weak_this, callback]() {
+    if (!weak_this)
+      return;
+    // Note: callback may delete |this|.
+    callback(weak_this.get());
+  });
 }
 
 }  // namespace perfetto
