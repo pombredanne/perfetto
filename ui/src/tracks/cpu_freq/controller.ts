@@ -87,6 +87,7 @@ class CpuFreqTrackController extends TrackController<Config, Data> {
       using span_join(${this.tableName('freq_idle')} PARTITIONED cpu,
                       ${this.tableName('window')} PARTITIONED cpu);`);
 
+      // TODO(taylori): Move the idle value processing to the TP.
       await this.query(`create view ${this.tableName('activity')}
       as select
         ts,
@@ -94,11 +95,10 @@ class CpuFreqTrackController extends TrackController<Config, Data> {
         quantum_ts,
         cpu,
         case idle_value
-          when 4294967295 then 0
-          else 1
+          when 4294967295 then -1
+          else idle_value
         end as idle,
-        freq_value,
-        idle_value
+        freq_value as freq
         from ${this.tableName('span_activity')};
       `);
 
@@ -112,7 +112,9 @@ class CpuFreqTrackController extends TrackController<Config, Data> {
       window_dur = ${windowDur},
       quantum = 0`);
 
-    const query = `select ts, dur, idle, freq_value, idle_value
+    // Cast as double to avoid problem where values are sometimes
+    // doubles, sometimes longs.
+    const query = `select ts, dur, cast(idle as DOUBLE), freq
       from ${this.tableName('activity')}`;
 
     const freqResult = await this.query(query);
@@ -125,9 +127,8 @@ class CpuFreqTrackController extends TrackController<Config, Data> {
       resolution,
       tsStarts: new Float64Array(numRows),
       tsEnds: new Float64Array(numRows),
+      idles: new Int8Array(numRows),
       freqKHz: new Uint32Array(numRows),
-      idleValues: new Float64Array(numRows),
-      idles: new Uint8Array(numRows),
     };
 
     const cols = freqResult.columns;
@@ -135,9 +136,8 @@ class CpuFreqTrackController extends TrackController<Config, Data> {
       const startSec = fromNs(+cols[0].longValues![row]);
       data.tsStarts[row] = startSec;
       data.tsEnds[row] = startSec + fromNs(+cols[1].longValues![row]);
-      data.idles[row] = +cols[2].longValues![row];
+      data.idles[row] = +cols[2].doubleValues![row];
       data.freqKHz[row] = +cols[3].doubleValues![row];
-      data.idleValues[row] = +cols[4].doubleValues![row];
     }
 
     this.publish(data);

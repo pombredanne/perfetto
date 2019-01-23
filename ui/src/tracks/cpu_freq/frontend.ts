@@ -89,7 +89,7 @@ class CpuFreqTrack extends Track<Config, Data> {
     if (data === undefined) return;  // Can't possibly draw anything.
 
     assertTrue(data.tsStarts.length === data.freqKHz.length);
-    assertTrue(data.freqKHz.length === data.idleValues.length);
+    assertTrue(data.freqKHz.length === data.idles.length);
 
     const startPx = Math.floor(timeScale.timeToPx(visibleWindowTime.start));
     const endPx = Math.floor(timeScale.timeToPx(visibleWindowTime.end));
@@ -143,7 +143,7 @@ class CpuFreqTrack extends Track<Config, Data> {
     const bottomY = MARGIN_TOP + RECT_HEIGHT;
 
     for (let i = 0; i < data.freqKHz.length; i++) {
-      if (data.idles[i]) {
+      if (data.idles[i] >= 0) {
         const value = data.freqKHz[i];
         const firstX = Math.floor(timeScale.timeToPx(data.tsStarts[i]));
         const secondX = Math.floor(timeScale.timeToPx(data.tsEnds[i]));
@@ -188,7 +188,7 @@ class CpuFreqTrack extends Track<Config, Data> {
       const centerY = MARGIN_TOP + RECT_HEIGHT/2;
       ctx.fillText(text, this.mouseXpos + 10, centerY - 3);
       // Display idle value if current hover is idle.
-      if (this.hoveredIdle !== undefined && this.hoveredIdle !== 4294967295) {
+      if (this.hoveredIdle !== undefined && this.hoveredIdle !== -1) {
         const idle = `idle: ${this.hoveredIdle.toLocaleString()}`;
         ctx.fillText(idle, this.mouseXpos + 10, centerY + 11);
       }
@@ -222,7 +222,7 @@ class CpuFreqTrack extends Track<Config, Data> {
     this.hoveredTs = index === -1 ? undefined : data.tsStarts[index];
     this.hoveredTsEnd = index === -1 ? undefined : data.tsEnds[index];
     this.hoveredValue = index === -1 ? undefined : data.freqKHz[index];
-    this.hoveredIdle = index === -1 ? undefined : data.idleValues[index];
+    this.hoveredIdle = index === -1 ? undefined : data.idles[index];
   }
 
   onMouseOut() {

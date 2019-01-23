@@ -22,9 +22,8 @@ export interface Data {
 
   tsStarts: Float64Array;
   tsEnds: Float64Array;
+  idles: Int8Array;
   freqKHz: Uint32Array;
-  idleValues: Float64Array;
-  idles: Uint8Array;
 }
 
 export interface Config {
