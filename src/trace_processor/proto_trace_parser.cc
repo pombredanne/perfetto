@@ -505,7 +505,7 @@ void ProtoTraceParser::ParseProcessStatsProcess(int64_t ts,
 
   // Maps a process counter field it to its value.
   // E.g., 4 := 1024 -> "mem.rss.anon" := 1024.
-  std::array<uint64_t, kProcStatsProcessSize> counter_values{};
+  std::array<int64_t, kProcStatsProcessSize> counter_values{};
   std::array<bool, kProcStatsProcessSize> has_counter{};
 
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
@@ -519,7 +519,10 @@ void ProtoTraceParser::ParseProcessStatsProcess(int64_t ts,
         if (is_counter_field) {
           // Memory counters are in KB, keep values in bytes in the trace
           // processor.
-          counter_values[fld.id] = fld.as_uint64() * 1024;
+          counter_values[fld.id] =
+              fld.id == protos::ProcessStats::Process::kOomScoreAdjFieldNumber
+                  ? fld.as_int64()
+                  : fld.as_int64() * 1024;
           has_counter[fld.id] = true;
         } else {
           PERFETTO_ELOG("Skipping unknown process stats field %" PRIu32,
@@ -539,7 +542,7 @@ void ProtoTraceParser::ParseProcessStatsProcess(int64_t ts,
     // Lookup the interned string id from the field name using the
     // pre-cached |proc_stats_process_names_| map.
     StringId name = proc_stats_process_names_[field_id];
-    uint64_t value = counter_values[field_id];
+    int64_t value = counter_values[field_id];
 
     UniquePid upid = context_->process_tracker->UpdateProcess(pid);
     context_->event_tracker->PushCounter(ts, value, name, upid,
