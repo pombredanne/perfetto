@@ -1598,15 +1598,14 @@ void TracingServiceImpl::SnapshotStats(TracingSession* tracing_session,
   packet.set_trusted_uid(static_cast<int32_t>(uid_));
 
   protos::TraceStats* trace_stats = packet.mutable_trace_stats();
-  SnapshotTraceStats(tracing_session).ToProto(trace_stats);
+  GetTraceStats(tracing_session).ToProto(trace_stats);
   Slice slice = Slice::Allocate(static_cast<size_t>(packet.ByteSize()));
   PERFETTO_CHECK(packet.SerializeWithCachedSizesToArray(slice.own_data()));
   packets->emplace_back();
   packets->back().AddSlice(std::move(slice));
 }
 
-TraceStats TracingServiceImpl::SnapshotTraceStats(
-    TracingSession* tracing_session) {
+TraceStats TracingServiceImpl::GetTraceStats(TracingSession* tracing_session) {
   TraceStats trace_stats;
   trace_stats.set_producers_connected(static_cast<uint32_t>(producers_.size()));
   trace_stats.set_producers_seen(last_producer_id_);
@@ -1762,7 +1761,7 @@ void TracingServiceImpl::ConsumerEndpointImpl::GetTraceStats() {
   TracingSession* session = service_->GetTracingSession(tracing_session_id_);
   if (session) {
     success = true;
-    stats = service_->SnapshotTraceStats(session);
+    stats = service_->GetTraceStats(session);
   }
   auto weak_this = GetWeakPtr();
   task_runner_->PostTask([weak_this, success, stats] {

@@ -379,7 +379,7 @@ class TracingServiceImpl : public TracingService {
   void SnapshotSyncMarker(std::vector<TracePacket>*);
   void SnapshotClocks(std::vector<TracePacket>*);
   void SnapshotStats(TracingSession*, std::vector<TracePacket>*);
-  TraceStats SnapshotTraceStats(TracingSession* tracing_session);
+  TraceStats GetTraceStats(TracingSession* tracing_session);
   void MaybeEmitTraceConfig(TracingSession*, std::vector<TracePacket>*);
   void OnFlushTimeout(TracingSessionID, FlushRequestID);
   void OnDisableTracingTimeout(TracingSessionID);
