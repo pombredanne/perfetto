@@ -82,7 +82,8 @@ bool ParseSystraceTracePoint(base::StringView str, SystraceTracePoint* out) {
   switch (s[0]) {
     case 'B': {
       size_t name_index = 2 + tid_length + 1;
-      out->name = base::StringView(s + name_index, len - name_index);
+      out->name = base::StringView(
+          s + name_index, len - name_index - (s[len - 1] == '\n' ? 1 : 0));
       return true;
     }
     case 'E': {
@@ -160,7 +161,7 @@ ProtoTraceParser::ProtoTraceParser(TraceProcessorContext* context)
   }
   rss_members_.emplace_back(context->storage->InternString("mem.rss.file"));
   rss_members_.emplace_back(context->storage->InternString("mem.rss.anon"));
-  rss_members_.emplace_back(context->storage->InternString("mem.rss.swapents"));
+  rss_members_.emplace_back(context->storage->InternString("mem.swap"));
   rss_members_.emplace_back(context->storage->InternString("mem.rss.shmem"));
   rss_members_.emplace_back(
       context->storage->InternString("mem.rss.unknown"));  // Keep this last.
@@ -525,8 +526,6 @@ void ProtoTraceParser::ParseProcessStatsProcess(int64_t ts,
                   : fld.as_int64() * 1024;
           has_counter[fld.id] = true;
         } else {
-          PERFETTO_ELOG("Skipping unknown process stats field %" PRIu32,
-                        fld.id);
           context_->storage->IncrementStats(stats::proc_stat_unknown_counters);
         }
         break;
