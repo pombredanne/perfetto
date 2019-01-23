@@ -964,7 +964,7 @@ void TracingServiceImpl::ReadBuffers(TracingSessionID tsid,
   if (now >= tracing_session->last_snapshot_time + kSnapshotsInterval) {
     tracing_session->last_snapshot_time = now;
     SnapshotSyncMarker(&packets);
-    SnapshotClocks(&packets);
+    SnapshotClocks(tracing_session, &packets);
     SnapshotStats(tracing_session, &packets);
   }
   MaybeEmitTraceConfig(tracing_session, &packets);
@@ -1538,7 +1538,11 @@ void TracingServiceImpl::SnapshotSyncMarker(std::vector<TracePacket>* packets) {
   packets->back().AddSlice(&sync_marker_packet_[0], sync_marker_packet_size_);
 }
 
-void TracingServiceImpl::SnapshotClocks(std::vector<TracePacket>* packets) {
+void TracingServiceImpl::SnapshotClocks(TracingSession* tracing_session,
+                                        std::vector<TracePacket>* packets) {
+  if (tracing_session->config.disable_clock_snapshotting())
+    return;
+
   protos::TrustedPacket packet;
   protos::ClockSnapshot* clock_snapshot = packet.mutable_clock_snapshot();
 
