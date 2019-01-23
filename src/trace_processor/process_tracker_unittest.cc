@@ -65,8 +65,9 @@ TEST_F(ProcessTrackerTest, PushTwoProcessEntries_DifferentPid) {
 
 TEST_F(ProcessTrackerTest, AddProcessEntry_CorrectName) {
   context.process_tracker->UpdateProcess(1, "test");
-  ASSERT_EQ(context.storage->GetString(context.storage->GetProcess(1).name_id),
-            "test");
+  ASSERT_STREQ(
+      context.storage->GetString(context.storage->GetProcess(1).name_id),
+      "test");
 }
 
 TEST_F(ProcessTrackerTest, UpdateThreadMatch) {

@@ -190,8 +190,10 @@ bool JsonTraceParser::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
     PERFETTO_CHECK(opt_ts.has_value());
     int64_t ts = opt_ts.value();
 
-    const char* cat = value.isMember("cat") ? value["cat"].asCString() : "";
-    const char* name = value.isMember("name") ? value["name"].asCString() : "";
+    const char* cat =
+        value.isMember("cat") ? value["cat"].asCString() : nullptr;
+    const char* name =
+        value.isMember("name") ? value["name"].asCString() : nullptr;
     StringId cat_id = storage->InternString(cat);
     StringId name_id = storage->InternString(name);
     UniqueTid utid = procs->UpdateThread(tid, pid);

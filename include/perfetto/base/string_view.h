@@ -35,7 +35,7 @@ class StringView {
 
   // Creates a StringView from a null-terminated C string.
   // Deliberately not "explicit".
-  StringView(const char* cstr) : data_(cstr), size_(strlen(cstr)) {}
+  StringView(const char* cstr) : data_(cstr), size_(cstr ? strlen(cstr) : 0) {}
 
   // This instead has to be explicit, as creating a StringView out of a
   // std::string can be subtle.

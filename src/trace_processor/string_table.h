@@ -59,8 +59,8 @@ class StringTable : public Table {
     int Column(sqlite3_context*, int N) override;
 
    private:
-    size_t row_ = 0;
-    size_t num_rows_ = 0;
+    uint32_t row_ = 0;
+    uint32_t num_rows_ = 0;
     const TraceStorage* const storage_;
   };
 
