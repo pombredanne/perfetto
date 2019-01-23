@@ -502,8 +502,6 @@ void ProtoTraceParser::ParseProcessStatsProcess(int64_t ts,
     }
   }
 
-  UniqueTid utid = context_->process_tracker->UpdateThread(ts, pid, 0);
-
   // Skip field_id 0 (invalid) and 1 (pid).
   for (size_t field_id = 2; field_id < counter_values.size(); field_id++) {
     if (!has_counter[field_id])
@@ -514,16 +512,9 @@ void ProtoTraceParser::ParseProcessStatsProcess(int64_t ts,
     StringId name = proc_stats_process_names_[field_id];
     uint64_t value = counter_values[field_id];
 
-    if (field_id == protos::ProcessStats::Process::kOomScoreAdjFieldNumber) {
-      UniquePid upid = context_->process_tracker->UpdateProcess(pid);
-      context_->event_tracker->PushCounter(ts, value, name, upid,
-                                           RefType::kRefUpid);
-    } else {
-      auto row_id = context_->event_tracker->PushCounter(
-          ts, value, name, utid, RefType::kRefUtidLookupUpid);
-      context_->storage->mutable_args()->AddArg(
-          row_id, utid_name_id_, utid_name_id_, Variadic::Integer(utid));
-    }
+    UniquePid upid = context_->process_tracker->UpdateProcess(pid);
+    context_->event_tracker->PushCounter(ts, value, name, upid,
+                                         RefType::kRefUpid);
   }
 
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
