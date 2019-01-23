@@ -61,7 +61,7 @@ class BoundedQueue {
     std::unique_lock<std::mutex> l(mutex_);
     if (deque_.size() == capacity_) {
       if (!logged.load(std::memory_order_relaxed)) {
-        PERFETTO_ELOG("heeapprofd queue %s at capacity (%zu). Blocking!",
+        PERFETTO_ELOG("heapprofd queue %s at capacity (%zu). Blocking!",
                       name_.c_str(), capacity_);
         logged.store(true, std::memory_order_relaxed);
       }
