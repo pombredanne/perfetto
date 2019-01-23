@@ -472,16 +472,7 @@ void ProtoTraceParser::ParseProcessStats(int64_t ts, TraceBlobView stats) {
 void ProtoTraceParser::ParseProcessStatsProcess(int64_t ts,
                                                 TraceBlobView proc_stat) {
   ProtoDecoder decoder(proc_stat.data(), proc_stat.length());
-  uint64_t raw_pid = 0;
-  constexpr auto kPidFieldNumber =
-      protos::ProcessStats::Process::kPidFieldNumber;
-  if (!decoder.FindIntField<kPidFieldNumber>(&raw_pid)) {
-    PERFETTO_ELOG("Skipping procstats process with no pid");
-    // TODO(lalitm): add a stat for this.
-    return;
-  }
-  uint32_t pid = static_cast<uint32_t>(raw_pid);
-  UniqueTid utid = context_->process_tracker->UpdateThread(ts, pid, 0);
+  uint32_t pid = 0;
 
   // Maps a process counter field it to its value.
   // E.g., 4 := 1024 -> "mem.rss.anon" := 1024.
@@ -491,7 +482,7 @@ void ProtoTraceParser::ParseProcessStatsProcess(int64_t ts,
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
       case protos::ProcessStats::Process::kPidFieldNumber:
-        // Ignore field.
+        pid = fld.as_uint32();
         break;
       default: {
         bool is_counter_field = fld.id < has_counter.size() &&
@@ -511,7 +502,10 @@ void ProtoTraceParser::ParseProcessStatsProcess(int64_t ts,
     }
   }
 
-  for (size_t field_id = 0; field_id < counter_values.size(); field_id++) {
+  UniqueTid utid = context_->process_tracker->UpdateThread(ts, pid, 0);
+
+  // Skip field_id 0 (invalid) and 1 (pid).
+  for (size_t field_id = 2; field_id < counter_values.size(); field_id++) {
     if (!has_counter[field_id])
       continue;
 
