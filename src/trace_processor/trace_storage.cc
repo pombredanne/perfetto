@@ -16,7 +16,6 @@
 
 #include "src/trace_processor/trace_storage.h"
 
-#include <stdlib.h>
 #include <string.h>
 
 namespace perfetto {
@@ -27,33 +26,27 @@ TraceStorage::TraceStorage() {
   unique_processes_.emplace_back(0);
   unique_threads_.emplace_back(0);
 
-  // Reserve StringId == 0 for null.
-  string_pool_.emplace_back(nullptr);
-
-  // Reserve StringId == 1 for the empty string.
+  // Reserve string ID 0 for the empty string.
   InternString("");
 }
 
-TraceStorage::~TraceStorage() {
-  for (const char* str : string_pool_) {
-    free(const_cast<char*>(str));
-  }
-}
+TraceStorage::~TraceStorage() {}
 
 StringId TraceStorage::InternString(base::StringView str) {
-  if (str.data() == nullptr)
-    return kNullStringId;
-
   auto hash = str.Hash();
   auto id_it = string_index_.find(hash);
   if (id_it != string_index_.end()) {
     PERFETTO_DCHECK(base::StringView(string_pool_[id_it->second]) == str);
     return id_it->second;
   }
-  string_pool_.emplace_back(strndup(str.data(), str.size()));
+  string_pool_.emplace_back(str.ToStdString());
   StringId string_id = static_cast<uint32_t>(string_pool_.size() - 1);
   string_index_.emplace(hash, string_id);
   return string_id;
+}
+
+void TraceStorage::ResetStorage() {
+  *this = TraceStorage();
 }
 
 void TraceStorage::SqlStats::RecordQueryBegin(const std::string& query,

@@ -62,7 +62,7 @@ class CountersTable : public StorageTable {
     const TraceStorage* storage_ = nullptr;
   };
 
-  std::deque<const char*> ref_types_;
+  std::deque<std::string> ref_types_;
   const TraceStorage* const storage_;
 };
 }  // namespace trace_processor

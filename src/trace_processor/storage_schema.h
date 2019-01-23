@@ -63,7 +63,7 @@ class StorageSchema {
     template <class Id>
     Builder& AddStringColumn(std::string column_name,
                              const std::deque<Id>* ids,
-                             const std::deque<const char*>* string_map) {
+                             const std::deque<std::string>* string_map) {
       columns_.emplace_back(new StringColumn<Id>(column_name, ids, string_map));
       return *this;
     }

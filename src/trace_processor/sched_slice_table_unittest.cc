@@ -53,6 +53,8 @@ class SchedSliceTableTest : public ::testing::Test {
     stmt_.reset(stmt);
   }
 
+  ~SchedSliceTableTest() override { context_.storage->ResetStorage(); }
+
  protected:
   TraceProcessorContext context_;
   ScopedDb db_;

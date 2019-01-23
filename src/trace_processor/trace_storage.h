@@ -59,6 +59,7 @@ enum TableId : uint8_t {
 // The top 8 bits are set to the TableId and the bottom 32 to the row of the
 // table.
 using RowId = int64_t;
+
 static const RowId kInvalidRowId = 0;
 
 enum RefType {
@@ -87,7 +88,7 @@ class TraceStorage {
     explicit Process(uint32_t p) : pid(p) {}
     int64_t start_ns = 0;
     int64_t end_ns = 0;
-    StringId name_id = kNullStringId;
+    StringId name_id = 0;
     uint32_t pid = 0;
   };
 
@@ -96,7 +97,7 @@ class TraceStorage {
     explicit Thread(uint32_t t) : tid(t) {}
     int64_t start_ns = 0;
     int64_t end_ns = 0;
-    StringId name_id = kNullStringId;
+    StringId name_id = 0;
     base::Optional<UniquePid> upid;
     uint32_t tid = 0;
   };
@@ -451,6 +452,8 @@ class TraceStorage {
   };
   using StatsMap = std::array<Stats, stats::kNumKeys>;
 
+  void ResetStorage();
+
   UniqueTid AddEmptyThread(uint32_t tid) {
     unique_threads_.emplace_back(tid);
     return static_cast<UniqueTid>(unique_threads_.size() - 1);
@@ -498,7 +501,7 @@ class TraceStorage {
   }
 
   // Reading methods.
-  const char* GetString(StringId id) const {
+  const std::string& GetString(StringId id) const {
     PERFETTO_DCHECK(id < string_pool_.size());
     return string_pool_[id];
   }
@@ -545,7 +548,7 @@ class TraceStorage {
   const RawEvents& raw_events() const { return raw_events_; }
   RawEvents* mutable_raw_events() { return &raw_events_; }
 
-  const std::deque<const char*>& string_pool() const { return string_pool_; }
+  const std::deque<std::string>& string_pool() const { return string_pool_; }
 
   // |unique_processes_| always contains at least 1 element becuase the 0th ID
   // is reserved to indicate an invalid process.
@@ -563,8 +566,6 @@ class TraceStorage {
 
   using StringHash = uint64_t;
 
-  static constexpr StringId kNullStringId = 0;
-
   // Stats about parsing the trace.
   StatsMap stats_{};
 
@@ -575,7 +576,7 @@ class TraceStorage {
   Args args_;
 
   // One entry for each unique string in the trace.
-  std::deque<const char*> string_pool_;
+  std::deque<std::string> string_pool_;
 
   // One entry for each unique string in the trace.
   std::unordered_map<StringHash, StringId> string_index_;

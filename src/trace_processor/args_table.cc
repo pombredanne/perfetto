@@ -82,10 +82,11 @@ void ArgsTable::ValueColumn::ReportResult(sqlite3_context* ctx,
     case VariadicType::kReal:
       sqlite_utils::ReportSqliteResult(ctx, value.real_value);
       break;
-    case VariadicType::kString:
-      sqlite_utils::ReportSqliteResult(ctx,
-                                       storage_->GetString(value.string_value));
+    case VariadicType::kString: {
+      const char* str = storage_->GetString(value.string_value).c_str();
+      sqlite3_result_text(ctx, str, -1, sqlite_utils::kSqliteStatic);
       break;
+    }
   }
 }
 
@@ -122,7 +123,7 @@ void ArgsTable::ValueColumn::Filter(int op,
       index->FilterRows([this, &predicate](uint32_t row) {
         const auto& arg = storage_->args().arg_values()[row];
         return arg.type == type_
-                   ? predicate(storage_->GetString(arg.string_value))
+                   ? predicate(storage_->GetString(arg.string_value).c_str())
                    : predicate(nullptr);
       });
       break;
@@ -150,8 +151,8 @@ int ArgsTable::ValueColumn::CompareRefsAsc(uint32_t f, uint32_t s) const {
         return sqlite_utils::CompareValuesAsc(arg_f.real_value,
                                               arg_s.real_value);
       case VariadicType::kString: {
-        const char* f_str = storage_->GetString(arg_f.string_value);
-        const char* s_str = storage_->GetString(arg_s.string_value);
+        const auto& f_str = storage_->GetString(arg_f.string_value);
+        const auto& s_str = storage_->GetString(arg_s.string_value);
         return sqlite_utils::CompareValuesAsc(f_str, s_str);
       }
     }
