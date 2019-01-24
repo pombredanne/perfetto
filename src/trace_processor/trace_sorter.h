@@ -112,18 +112,14 @@ class TraceSorter {
     SortAndFlushEventsBeyondWindow(/*window_size_ns=*/0);
   }
 
-  /*
   void set_window_ns_for_testing(int64_t window_size_ns) {
     window_size_ns_ = window_size_ns;
   }
-  */
 
  private:
   inline void AppendAndMaybeFlushEvents(TimestampedTracePiece ttp) {
-    // const int64_t timestamp = ttp.timestamp;
+    const int64_t timestamp = ttp.timestamp;
     events_.emplace_back(std::move(ttp));
-
-    /*
     earliest_timestamp_ = std::min(earliest_timestamp_, timestamp);
 
     // Events are often seen in order.
@@ -164,7 +160,6 @@ class TraceSorter {
     }
 
     SortAndFlushEventsBeyondWindow(window_size_ns_);
-    */
   }
 
   // std::deque makes erase-front potentially faster but std::sort slower.
@@ -176,13 +171,13 @@ class TraceSorter {
 
   // Events are propagated to the next stage only after (max - min) timestamp
   // is larger than this value.
-  // int64_t window_size_ns_;
+  int64_t window_size_ns_;
 
   // max(e.timestamp for e in events_).
-  // int64_t latest_timestamp_ = 0;
+  int64_t latest_timestamp_ = 0;
 
   // min(e.timestamp for e in events_).
-  // int64_t earliest_timestamp_ = std::numeric_limits<int64_t>::max();
+  int64_t earliest_timestamp_ = std::numeric_limits<int64_t>::max();
 
   // Monotonic increasing value used to index timestamped trace pieces.
   size_t packet_idx_ = 0;
@@ -190,13 +185,13 @@ class TraceSorter {
   // Contains the index (< events_.size()) of the last sorted event. In essence,
   // events_[0..sort_start_idx_] are guaranteed to be in-order, while
   // events_[(sort_start_idx_ + 1)..end] are in random order.
-  // size_t sort_start_idx_ = 0;
+  size_t sort_start_idx_ = 0;
 
   // The smallest timestamp that breaks the ordering in the range
   // events_[0..sort_start_idx_]. In order to re-establish a total order within
   // |events_| we need to sort entries from (the index corresponding to) that
   // timestamp.
-  // int64_t sort_min_ts_ = 0;
+  int64_t sort_min_ts_ = 0;
 };
 
 }  // namespace trace_processor
