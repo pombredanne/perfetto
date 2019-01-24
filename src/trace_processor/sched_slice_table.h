@@ -49,14 +49,15 @@ class SchedSliceTable : public StorageTable {
 
     void Filter(int op, sqlite3_value*, FilteredRowIndex*) const override;
 
-    Comparator Sort(const QueryConstraints::OrderBy& ob) const override;
+    Comparator Sort(const QueryConstraints::OrderBy&) const override;
 
     Table::ColumnType GetType() const override;
 
    private:
-    static constexpr uint16_t kStateStringSize =
+    static constexpr uint16_t kNumStateStrings =
         ftrace_utils::TaskState::kMaxState + 1;
-    std::array<std::array<char, 4>, kStateStringSize> state_strings_;
+    std::array<ftrace_utils::TaskState::TaskStateStr, kNumStateStrings>
+        state_strings_;
 
     void FilterOnState(int op,
                        sqlite3_value* value,
