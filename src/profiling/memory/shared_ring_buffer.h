@@ -83,18 +83,12 @@ class SharedRingBuffer {
   class Buffer {
    public:
     Buffer() {}
+    Buffer(uint8_t* d, size_t s) : data(d), size(s) {}
 
-    uint8_t* data() const { return data_; }
-    size_t size() const { return size_; }
-    operator bool() const { return data_ != nullptr; }
+    operator bool() const { return data != nullptr; }
 
-   private:
-    friend class SharedRingBuffer;
-
-    Buffer(uint8_t* data, size_t size) : data_(data), size_(size) {}
-
-    uint8_t* data_ = nullptr;
-    size_t size_ = 0;
+    uint8_t* data = nullptr;
+    size_t size = 0;
   };
 
   static base::Optional<SharedRingBuffer> Create(size_t);

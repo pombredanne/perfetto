@@ -193,8 +193,8 @@ SharedRingBuffer::Buffer SharedRingBuffer::BeginWrite(
 
   uint8_t* wr_ptr = at(meta_->write_pos);
 
-  result.size_ = size;
-  result.data_ = wr_ptr + kHeaderSize;
+  result.size = size;
+  result.data = wr_ptr + kHeaderSize;
   meta_->write_pos += size_with_header;
   meta_->bytes_written += size;
   meta_->num_writes_succeeded++;
@@ -206,9 +206,9 @@ SharedRingBuffer::Buffer SharedRingBuffer::BeginWrite(
 }
 
 void SharedRingBuffer::EndWrite(const Buffer& buf) {
-  uint8_t* wr_ptr = buf.data_ - kHeaderSize;
+  uint8_t* wr_ptr = buf.data - kHeaderSize;
   reinterpret_cast<std::atomic<uint32_t>*>(wr_ptr)->store(
-      static_cast<uint32_t>(buf.size_), std::memory_order_release);
+      static_cast<uint32_t>(buf.size), std::memory_order_release);
 }
 
 SharedRingBuffer::Buffer SharedRingBuffer::BeginRead() {
@@ -250,7 +250,7 @@ void SharedRingBuffer::EndRead(const Buffer& buf) {
   if (!buf)
     return;
   ScopedSpinlock spinlock(&meta_->spinlock, ScopedSpinlock::Mode::Blocking);
-  size_t size_with_header = base::AlignUp<kAlignment>(buf.size_ + kHeaderSize);
+  size_t size_with_header = base::AlignUp<kAlignment>(buf.size + kHeaderSize);
   meta_->read_pos += size_with_header;
 }
 
