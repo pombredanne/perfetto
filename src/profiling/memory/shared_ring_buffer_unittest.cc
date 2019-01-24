@@ -76,7 +76,6 @@ void StructuredTest(SharedRingBuffer* wr, SharedRingBuffer* rd) {
     auto buf_and_size = rd->BeginRead();
     ASSERT_EQ(buf_and_size.data(), nullptr);
     ASSERT_EQ(buf_and_size.size(), 0);
-    rd->EndRead(buf_and_size);
   }
 
   // Test extremely large writes (fill the buffer)
