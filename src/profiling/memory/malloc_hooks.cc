@@ -27,6 +27,7 @@
 
 #include <sys/system_properties.h>
 
+#include <private/bionic_malloc.h>
 #include <private/bionic_malloc_dispatch.h>
 
 #include "perfetto/base/build_config.h"
@@ -59,7 +60,7 @@ static const MallocDispatch* GetDispatch() {
 }
 
 static void MallocDispatchReset(const MallocDispatch* dispatch) {
-  __malloc_dispatch_reset(dispatch);
+  android_mallopt(M_RESET_HOOKS, nullptr, 0);
 }
 
 // This is so we can make an so that we can swap out with the existing
