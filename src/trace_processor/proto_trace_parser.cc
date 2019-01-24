@@ -517,7 +517,6 @@ void ProtoTraceParser::ParseProcMemCounters(int64_t ts,
           counter_values[fld.id] = fld.as_uint64() * 1024;
           has_counter[fld.id] = 1;
         } else {
-          PERFETTO_ELOG("Skipping unknown process counters %" PRIu32, fld.id);
           context_->storage->IncrementStats(stats::proc_stat_unknown_counters);
         }
     }
