@@ -98,7 +98,6 @@ export const STR = 'str';
 export const NUM_NULL: number|null = 1;
 export const STR_NULL: string|null = 'str_null';
 
-
 /**
  * This function allows for type safe use of RawQueryResults.
  * The input is a RawQueryResult (|raw|) and a "spec".
