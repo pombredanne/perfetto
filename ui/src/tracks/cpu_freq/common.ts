@@ -19,11 +19,10 @@ export interface Data {
   end: number;
   resolution: number;
   maximumValue: number;
+  minimumValue: number;
 
-  tsStarts: Float64Array;
-  tsEnds: Float64Array;
-  idles: Int8Array;
-  freqKHz: Uint32Array;
+  timestamps: Float64Array;
+  valuesKHz: Uint32Array;
 }
 
 export interface Config {

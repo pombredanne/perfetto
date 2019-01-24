@@ -23,8 +23,4 @@ export interface Data {
   utilizations: Float64Array;
 }
 
-export interface Config {
-  pidForColor: number;
-  upid: number|null;
-  utid: number;
-}
+export interface Config { upid: number; }

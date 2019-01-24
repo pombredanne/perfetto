@@ -39,7 +39,6 @@ namespace profiling {
 namespace {
 
 int StartChildHeapprofd(pid_t target_pid,
-                        std::string target_cmdline,
                         std::vector<base::ScopedFile> inherited_sock_fds);
 int StartCentralHeapprofd();
 
@@ -48,14 +47,12 @@ base::Event* g_dump_evt = nullptr;
 int HeapprofdMain(int argc, char** argv) {
   bool cleanup_crash = false;
   pid_t target_pid = base::kInvalidPid;
-  std::string target_cmdline;
   std::vector<base::ScopedFile> inherited_sock_fds;
 
-  enum { kCleanupCrash = 256, kTargetPid, kTargetCmd, kInheritFd };
+  enum { kCleanupCrash = 256, kTargetPid, kInheritFd };
   static struct option long_options[] = {
       {"cleanup-after-crash", no_argument, nullptr, kCleanupCrash},
       {"exclusive-for-pid", required_argument, nullptr, kTargetPid},
-      {"exclusive-for-cmdline", required_argument, nullptr, kTargetCmd},
       {"inherit-socket-fd", required_argument, nullptr, kInheritFd},
       {nullptr, 0, nullptr, 0}};
   int option_index;
@@ -67,9 +64,6 @@ int HeapprofdMain(int argc, char** argv) {
         break;
       case kTargetPid:
         target_pid = static_cast<pid_t>(atoi(optarg));
-        break;
-      case kTargetCmd:  // assumed to be already normalized
-        target_cmdline = std::string(optarg);
         break;
       case kInheritFd:  // repetition supported
         inherited_sock_fds.emplace_back(atoi(optarg));
@@ -88,19 +82,17 @@ int HeapprofdMain(int argc, char** argv) {
   // If |target_pid| is given, we're supposed to be operating as a private
   // heapprofd for that process. Note that we might not be a direct child due to
   // reparenting.
-  bool tpid_set = target_pid != base::kInvalidPid;
-  bool tcmd_set = !target_cmdline.empty();
-  bool fds_set = !inherited_sock_fds.empty();
-  if (tpid_set || tcmd_set || fds_set) {
-    if (!tpid_set || !tcmd_set || !fds_set) {
+  bool ppid_set = target_pid != base::kInvalidPid;
+  bool fds_set = inherited_sock_fds.size() > 0;
+  if (ppid_set || fds_set) {
+    if (!ppid_set || !fds_set) {
       PERFETTO_ELOG(
-          "If starting in child mode, requires all of: {--exclusive-for-pid, "
-          "--exclusive-for-cmdline, --inherit_socket_fd}");
+          "If starting in child mode, requires both --exclusive-for-pid and "
+          "--inherit_socket_fd");
       return 1;
     }
 
-    return StartChildHeapprofd(target_pid, target_cmdline,
-                               std::move(inherited_sock_fds));
+    return StartChildHeapprofd(target_pid, std::move(inherited_sock_fds));
   }
 
   // Otherwise start as a central daemon.
@@ -108,11 +100,10 @@ int HeapprofdMain(int argc, char** argv) {
 }
 
 int StartChildHeapprofd(pid_t target_pid,
-                        std::string target_cmdline,
                         std::vector<base::ScopedFile> inherited_sock_fds) {
   base::UnixTaskRunner task_runner;
   HeapprofdProducer producer(HeapprofdMode::kChild, &task_runner);
-  producer.SetTargetProcess(target_pid, target_cmdline);
+  producer.SetTargetProcess(target_pid);
   producer.ConnectWithRetries(GetProducerSocket());
   producer.AdoptConnectedSockets(std::move(inherited_sock_fds));
   task_runner.Run();

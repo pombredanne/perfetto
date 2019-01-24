@@ -27,7 +27,6 @@ namespace perfetto {
 
 class TraceConfig;
 class TracePacket;
-class TraceStats;
 
 class PERFETTO_EXPORT Consumer {
  public:
@@ -69,10 +68,6 @@ class PERFETTO_EXPORT Consumer {
   // Called back by the Service (or transport layer) after invoking
   // TracingService::ConsumerEndpoint::Attach().
   virtual void OnAttach(bool success, const TraceConfig&) = 0;
-
-  // Called back by the Service (or transport layer) after invoking
-  // TracingService::ConsumerEndpoint::GetTraceStats().
-  virtual void OnTraceStats(bool success, const TraceStats&) = 0;
 };
 
 }  // namespace perfetto

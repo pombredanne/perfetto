@@ -66,7 +66,7 @@ class HeapprofdProducer : public Producer {
   void AdoptConnectedSockets(std::vector<base::ScopedFile> inherited_sockets);
 
   // Valid only if mode_ == kChild.
-  void SetTargetProcess(pid_t target_pid, std::string target_cmdline);
+  void SetTargetProcess(pid_t target_pid);
 
  private:
   // TODO(fmayer): Delete once we have generic reconnect logic.
