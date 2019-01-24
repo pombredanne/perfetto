@@ -103,8 +103,7 @@ void SchedSliceTable::EndStateColumn::ReportResult(sqlite3_context* ctx,
                                                    uint32_t row) const {
   const auto& state = (*deque_)[row];
   if (state.is_valid()) {
-    if (state.raw_state() >= state_strings_.size())
-      PERFETTO_FATAL("Invalid state encounterd.");
+    PERFETTO_CHECK(state.raw_state() < state_strings_.size());
     sqlite3_result_text(ctx, state_strings_[state.raw_state()].data(), -1,
                         sqlite_utils::kSqliteStatic);
   } else {
