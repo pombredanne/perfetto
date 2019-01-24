@@ -17,6 +17,7 @@
 #ifndef SRC_TRACE_PROCESSOR_SCHED_SLICE_TABLE_H_
 #define SRC_TRACE_PROCESSOR_SCHED_SLICE_TABLE_H_
 
+#include "src/trace_processor/ftrace_utils.h"
 #include "src/trace_processor/storage_table.h"
 
 namespace perfetto {
@@ -53,6 +54,10 @@ class SchedSliceTable : public StorageTable {
     Table::ColumnType GetType() const override;
 
    private:
+    static constexpr uint16_t kStateStringSize =
+        ftrace_utils::TaskState::kMaxState + 1;
+    std::array<std::array<char, 4>, kStateStringSize> state_strings_;
+
     void FilterOnState(int op,
                        sqlite3_value* value,
                        FilteredRowIndex* index) const;

@@ -92,15 +92,19 @@ uint32_t SchedSliceTable::EstimateQueryCost(const QueryConstraints& qc) {
 SchedSliceTable::EndStateColumn::EndStateColumn(
     std::string col_name,
     const std::deque<ftrace_utils::TaskState>* deque)
-    : StorageColumn(col_name, false), deque_(deque) {}
+    : StorageColumn(col_name, false), deque_(deque) {
+  for (uint16_t i = 0; i < kStateStringSize; i++) {
+    state_strings_[i] = ftrace_utils::TaskState(i).ToString();
+  }
+}
 SchedSliceTable::EndStateColumn::~EndStateColumn() = default;
 
 void SchedSliceTable::EndStateColumn::ReportResult(sqlite3_context* ctx,
                                                    uint32_t row) const {
   const auto& state = (*deque_)[row];
   if (state.is_valid()) {
-    sqlite3_result_text(ctx, state.ToString().data(), -1,
-                        sqlite_utils::kSqliteTransient);
+    sqlite3_result_text(ctx, state_strings_[state.raw_state()].data(), -1,
+                        sqlite_utils::kSqliteStatic);
   } else {
     sqlite3_result_null(ctx);
   }
@@ -130,11 +134,13 @@ void SchedSliceTable::EndStateColumn::Filter(int op,
       break;
   }
 }
+
 void SchedSliceTable::EndStateColumn::FilterOnState(
     int op,
     sqlite3_value* value,
     FilteredRowIndex* index) const {
   if (sqlite3_value_type(value) != SQLITE_TEXT) {
+    // TODO(lalitm): report an error to sqlite for any other constraint.
     index->IntersectRows({});
     return;
   }
@@ -142,6 +148,7 @@ void SchedSliceTable::EndStateColumn::FilterOnState(
   const char* str = reinterpret_cast<const char*>(sqlite3_value_text(value));
   ftrace_utils::TaskState compare(str);
   if (!compare.is_valid()) {
+    // TODO(lalitm): report an error to sqlite for any other constraint.
     index->IntersectRows({});
     return;
   }
@@ -162,9 +169,7 @@ void SchedSliceTable::EndStateColumn::FilterOnState(
       const auto& state = (*deque_)[row];
       if (!state.is_valid())
         return false;
-      if (state.is_runnable() && compare.is_runnable())
-        return state.is_kernel_preempt() == compare.is_kernel_preempt();
-      return (state.raw_state() & compare.raw_state()) != 0;
+      return (state.raw_state() & compare.raw_state()) == compare.raw_state();
     });
   } else {
     PERFETTO_FATAL("Should never reach this state");
