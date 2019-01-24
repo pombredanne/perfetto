@@ -16,8 +16,7 @@
 
 #include "src/trace_processor/args_table.h"
 
-#include "src/trace_processor/storage_cursor.h"
-#include "src/trace_processor/table_utils.h"
+#include "src/trace_processor/sqlite_utils.h"
 
 namespace perfetto {
 namespace trace_processor {
@@ -29,46 +28,44 @@ void ArgsTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
   Table::Register<ArgsTable>(db, storage, "args");
 }
 
-Table::Schema ArgsTable::CreateSchema(int, const char* const*) {
+StorageSchema ArgsTable::CreateStorageSchema() {
   const auto& args = storage_->args();
-  std::unique_ptr<StorageSchema::Column> cols[] = {
-      StorageSchema::NumericColumnPtr("id", &args.ids()),
-      StorageSchema::StringColumnPtr("flat_key", &args.flat_keys(),
-                                     &storage_->string_pool()),
-      StorageSchema::StringColumnPtr("key", &args.keys(),
-                                     &storage_->string_pool()),
-      std::unique_ptr<ValueColumn>(
-          new ValueColumn("int_value", VarardicType::kInt, storage_)),
-      std::unique_ptr<ValueColumn>(
-          new ValueColumn("string_value", VarardicType::kString, storage_)),
-      std::unique_ptr<ValueColumn>(
-          new ValueColumn("real_value", VarardicType::kReal, storage_))};
-  schema_ = StorageSchema({
-      std::make_move_iterator(std::begin(cols)),
-      std::make_move_iterator(std::end(cols)),
-  });
-  return schema_.ToTableSchema({"id", "key"});
+  return StorageSchema::Builder()
+      .AddNumericColumn("id", &args.ids(), &args.args_for_id())
+      .AddStringColumn("flat_key", &args.flat_keys(), &storage_->string_pool())
+      .AddStringColumn("key", &args.keys(), &storage_->string_pool())
+      .AddColumn<ValueColumn>("int_value", VariadicType::kInt, storage_)
+      .AddColumn<ValueColumn>("string_value", VariadicType::kString, storage_)
+      .AddColumn<ValueColumn>("real_value", VariadicType::kReal, storage_)
+      .Build({"id", "key"});
 }
 
-std::unique_ptr<Table::Cursor> ArgsTable::CreateCursor(
-    const QueryConstraints& qc,
-    sqlite3_value** argv) {
-  uint32_t count = static_cast<uint32_t>(storage_->args().args_count());
-  auto it = table_utils::CreateBestRowIteratorForGenericSchema(schema_, count,
-                                                               qc, argv);
-  return std::unique_ptr<Table::Cursor>(
-      new StorageCursor(std::move(it), schema_.ToColumnReporters()));
+uint32_t ArgsTable::RowCount() {
+  return static_cast<uint32_t>(storage_->args().args_count());
 }
 
-int ArgsTable::BestIndex(const QueryConstraints&, BestIndexInfo*) {
-  // TODO(lalitm): implement BestIndex properly.
+int ArgsTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
+  // In the case of an id equality filter, we can do a very efficient lookup.
+  if (qc.constraints().size() == 1) {
+    auto id = static_cast<int>(schema().ColumnIndexFromName("id"));
+    const auto& cs = qc.constraints().back();
+    if (cs.iColumn == id && sqlite_utils::IsOpEq(cs.op)) {
+      info->estimated_cost = 1;
+      return SQLITE_OK;
+    }
+  }
+
+  // Otherwise, just give the worst case scenario.
+  info->estimated_cost = static_cast<uint32_t>(storage_->args().args_count());
   return SQLITE_OK;
 }
 
 ArgsTable::ValueColumn::ValueColumn(std::string col_name,
-                                    VarardicType type,
+                                    VariadicType type,
                                     const TraceStorage* storage)
-    : Column(col_name, false), type_(type), storage_(storage) {}
+    : StorageColumn(col_name, false /* hidden */),
+      type_(type),
+      storage_(storage) {}
 
 void ArgsTable::ValueColumn::ReportResult(sqlite3_context* ctx,
                                           uint32_t row) const {
@@ -79,16 +76,15 @@ void ArgsTable::ValueColumn::ReportResult(sqlite3_context* ctx,
   }
 
   switch (type_) {
-    case VarardicType::kInt:
+    case VariadicType::kInt:
       sqlite_utils::ReportSqliteResult(ctx, value.int_value);
       break;
-    case VarardicType::kReal:
+    case VariadicType::kReal:
       sqlite_utils::ReportSqliteResult(ctx, value.real_value);
       break;
-    case VarardicType::kString: {
-      const auto kSqliteStatic = reinterpret_cast<sqlite3_destructor_type>(0);
+    case VariadicType::kString: {
       const char* str = storage_->GetString(value.string_value).c_str();
-      sqlite3_result_text(ctx, str, -1, kSqliteStatic);
+      sqlite3_result_text(ctx, str, -1, sqlite_utils::kSqliteStatic);
       break;
     }
   }
@@ -100,38 +96,39 @@ ArgsTable::ValueColumn::Bounds ArgsTable::ValueColumn::BoundFilter(
   return Bounds{};
 }
 
-ArgsTable::ValueColumn::Predicate ArgsTable::ValueColumn::Filter(
-    int op,
-    sqlite3_value* value) const {
+void ArgsTable::ValueColumn::Filter(int op,
+                                    sqlite3_value* value,
+                                    FilteredRowIndex* index) const {
   switch (type_) {
-    case VarardicType::kInt: {
-      auto binary_op = sqlite_utils::GetPredicateForOp<int64_t>(op);
-      int64_t extracted = sqlite_utils::ExtractSqliteValue<int64_t>(value);
-      return [this, binary_op, extracted](uint32_t idx) {
-        const auto& arg = storage_->args().arg_values()[idx];
-        return arg.type == type_ && binary_op(arg.int_value, extracted);
-      };
+    case VariadicType::kInt: {
+      bool op_is_null = sqlite_utils::IsOpIsNull(op);
+      auto predicate = sqlite_utils::CreateNumericPredicate<int64_t>(op, value);
+      index->FilterRows([this, &predicate, op_is_null](uint32_t row) {
+        const auto& arg = storage_->args().arg_values()[row];
+        return arg.type == type_ ? predicate(arg.int_value) : op_is_null;
+      });
+      break;
     }
-    case VarardicType::kReal: {
-      auto binary_op = sqlite_utils::GetPredicateForOp<double>(op);
-      double extracted = sqlite_utils::ExtractSqliteValue<double>(value);
-      return [this, binary_op, extracted](uint32_t idx) {
-        const auto& arg = storage_->args().arg_values()[idx];
-        return arg.type == type_ && binary_op(arg.real_value, extracted);
-      };
+    case VariadicType::kReal: {
+      bool op_is_null = sqlite_utils::IsOpIsNull(op);
+      auto predicate = sqlite_utils::CreateNumericPredicate<double>(op, value);
+      index->FilterRows([this, &predicate, op_is_null](uint32_t row) {
+        const auto& arg = storage_->args().arg_values()[row];
+        return arg.type == type_ ? predicate(arg.real_value) : op_is_null;
+      });
+      break;
     }
-    case VarardicType::kString: {
-      auto binary_op = sqlite_utils::GetPredicateForOp<std::string>(op);
-      const auto* extracted =
-          reinterpret_cast<const char*>(sqlite3_value_text(value));
-      return [this, binary_op, extracted](uint32_t idx) {
-        const auto& arg = storage_->args().arg_values()[idx];
-        const char* str = storage_->GetString(arg.string_value).c_str();
-        return arg.type == type_ && binary_op(str, extracted);
-      };
+    case VariadicType::kString: {
+      auto predicate = sqlite_utils::CreateStringPredicate(op, value);
+      index->FilterRows([this, &predicate](uint32_t row) {
+        const auto& arg = storage_->args().arg_values()[row];
+        return arg.type == type_
+                   ? predicate(storage_->GetString(arg.string_value).c_str())
+                   : predicate(nullptr);
+      });
+      break;
     }
   }
-  PERFETTO_CHECK(false);
 }
 
 ArgsTable::ValueColumn::Comparator ArgsTable::ValueColumn::Sort(
@@ -148,12 +145,12 @@ int ArgsTable::ValueColumn::CompareRefsAsc(uint32_t f, uint32_t s) const {
 
   if (arg_f.type == type_ && arg_s.type == type_) {
     switch (type_) {
-      case VarardicType::kInt:
+      case VariadicType::kInt:
         return sqlite_utils::CompareValuesAsc(arg_f.int_value, arg_s.int_value);
-      case VarardicType::kReal:
+      case VariadicType::kReal:
         return sqlite_utils::CompareValuesAsc(arg_f.real_value,
                                               arg_s.real_value);
-      case VarardicType::kString: {
+      case VariadicType::kString: {
         const auto& f_str = storage_->GetString(arg_f.string_value);
         const auto& s_str = storage_->GetString(arg_s.string_value);
         return sqlite_utils::CompareValuesAsc(f_str, s_str);

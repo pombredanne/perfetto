@@ -17,39 +17,37 @@
 #ifndef SRC_TRACE_PROCESSOR_ARGS_TABLE_H_
 #define SRC_TRACE_PROCESSOR_ARGS_TABLE_H_
 
-#include "src/trace_processor/storage_schema.h"
-#include "src/trace_processor/table.h"
+#include "src/trace_processor/storage_table.h"
 #include "src/trace_processor/trace_storage.h"
 
 namespace perfetto {
 namespace trace_processor {
 
-class ArgsTable : public Table {
+class ArgsTable : public StorageTable {
  public:
-  using VarardicType = TraceStorage::Args::Varardic::Type;
+  using VariadicType = TraceStorage::Args::Variadic::Type;
 
   static void RegisterTable(sqlite3* db, const TraceStorage* storage);
 
   ArgsTable(sqlite3*, const TraceStorage*);
 
-  // Table implementation.
-  Table::Schema CreateSchema(int argc, const char* const* argv) override;
-  std::unique_ptr<Table::Cursor> CreateCursor(const QueryConstraints&,
-                                              sqlite3_value**) override;
+  // StorageTable implementation.
+  StorageSchema CreateStorageSchema() override;
+  uint32_t RowCount() override;
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
 
  private:
-  class ValueColumn final : public StorageSchema::Column {
+  class ValueColumn final : public StorageColumn {
    public:
     ValueColumn(std::string col_name,
-                VarardicType type,
+                VariadicType type,
                 const TraceStorage* storage);
 
     void ReportResult(sqlite3_context* ctx, uint32_t row) const override;
 
     Bounds BoundFilter(int op, sqlite3_value* sqlite_val) const override;
 
-    Predicate Filter(int op, sqlite3_value* value) const override;
+    void Filter(int op, sqlite3_value* value, FilteredRowIndex*) const override;
 
     Comparator Sort(const QueryConstraints::OrderBy& ob) const override;
 
@@ -57,24 +55,23 @@ class ArgsTable : public Table {
 
     Table::ColumnType GetType() const override {
       switch (type_) {
-        case VarardicType::kInt:
+        case VariadicType::kInt:
           return Table::ColumnType::kLong;
-        case VarardicType::kReal:
+        case VariadicType::kReal:
           return Table::ColumnType::kDouble;
-        case VarardicType::kString:
+        case VariadicType::kString:
           return Table::ColumnType::kString;
       }
-      PERFETTO_CHECK(false);
+      PERFETTO_FATAL("Not reached");  // For gcc
     }
 
    private:
     int CompareRefsAsc(uint32_t f, uint32_t s) const;
 
-    TraceStorage::Args::Varardic::Type type_;
+    TraceStorage::Args::Variadic::Type type_;
     const TraceStorage* storage_ = nullptr;
   };
 
-  StorageSchema schema_;
   const TraceStorage* const storage_;
 };
 

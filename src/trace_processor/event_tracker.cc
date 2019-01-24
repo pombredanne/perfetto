@@ -17,6 +17,7 @@
 #include "src/trace_processor/event_tracker.h"
 #include "perfetto/base/utils.h"
 #include "src/trace_processor/process_tracker.h"
+#include "src/trace_processor/stats.h"
 #include "src/trace_processor/trace_processor_context.h"
 
 #include <math.h>
@@ -35,15 +36,17 @@ StringId EventTracker::GetThreadNameId(uint32_t tid, base::StringView comm) {
 }
 
 void EventTracker::PushSchedSwitch(uint32_t cpu,
-                                   uint64_t timestamp,
+                                   int64_t timestamp,
                                    uint32_t prev_pid,
-                                   uint32_t,
+                                   int64_t prev_state,
                                    uint32_t next_pid,
-                                   base::StringView next_comm) {
+                                   base::StringView next_comm,
+                                   int32_t next_priority) {
   // At this stage all events should be globally timestamp ordered.
   if (timestamp < prev_timestamp_) {
     PERFETTO_ELOG("sched_switch event out of order by %.4f ms, skipping",
                   (prev_timestamp_ - timestamp) / 1e6);
+    context_->storage->IncrementStats(stats::sched_switch_out_of_order);
     return;
   }
   prev_timestamp_ = timestamp;
@@ -52,34 +55,40 @@ void EventTracker::PushSchedSwitch(uint32_t cpu,
   auto* slices = context_->storage->mutable_slices();
   auto* pending_slice = &pending_sched_per_cpu_[cpu];
   if (pending_slice->storage_index < std::numeric_limits<size_t>::max()) {
-    // If the this events previous pid does not match the previous event's next
-    // pid, make a note of this.
-    if (prev_pid != pending_slice->pid) {
-      context_->storage->mutable_stats()->mismatched_sched_switch_tids++;
-    }
-
     size_t idx = pending_slice->storage_index;
-    uint64_t duration = timestamp - slices->start_ns()[idx];
+    int64_t duration = timestamp - slices->start_ns()[idx];
     slices->set_duration(idx, duration);
+
+    if (prev_pid == pending_slice->pid) {
+      // TODO(lalitm): make use of prev_state.
+      perfetto::base::ignore_result(prev_state);
+    } else {
+      // If the this events previous pid does not match the previous event's
+      // next pid, make a note of this.
+      context_->storage->IncrementStats(stats::mismatched_sched_switch_tids);
+    }
   }
 
   StringId name_id = GetThreadNameId(next_pid, next_comm);
   auto utid =
       context_->process_tracker->UpdateThread(timestamp, next_pid, name_id);
 
+  // TODO(lalitm): make use of next_priority.
+  perfetto::base::ignore_result(next_priority);
   pending_slice->storage_index =
       slices->AddSlice(cpu, timestamp, 0 /* duration */, utid);
   pending_slice->pid = next_pid;
 }
 
-RowId EventTracker::PushCounter(uint64_t timestamp,
+RowId EventTracker::PushCounter(int64_t timestamp,
                                 double value,
                                 StringId name_id,
-                                uint64_t ref,
+                                int64_t ref,
                                 RefType ref_type) {
   if (timestamp < prev_timestamp_) {
     PERFETTO_ELOG("counter event out of order by %.4f ms, skipping",
                   (prev_timestamp_ - timestamp) / 1e6);
+    context_->storage->IncrementStats(stats::counter_events_out_of_order);
     return kInvalidRowId;
   }
   prev_timestamp_ = timestamp;
@@ -89,14 +98,14 @@ RowId EventTracker::PushCounter(uint64_t timestamp,
   auto counter_it = pending_counters_per_key_.find(key);
   if (counter_it != pending_counters_per_key_.end()) {
     size_t idx = counter_it->second;
-    uint64_t duration = timestamp - counters->timestamps()[idx];
+    int64_t duration = timestamp - counters->timestamps()[idx];
     // Update duration of previously stored event.
     counters->set_duration(idx, duration);
   }
 
   // At this point we don't know the duration so just store 0.
   size_t idx = counters->AddCounter(timestamp, 0 /* duration */, name_id, value,
-                                    static_cast<int64_t>(ref), ref_type);
+                                    ref, ref_type);
   pending_counters_per_key_[key] = idx;
   return TraceStorage::CreateRowId(TableId::kCounters,
                                    static_cast<uint32_t>(idx));

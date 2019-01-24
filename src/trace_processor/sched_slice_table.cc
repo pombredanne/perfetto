@@ -16,9 +16,6 @@
 
 #include "src/trace_processor/sched_slice_table.h"
 
-#include "src/trace_processor/storage_cursor.h"
-#include "src/trace_processor/table_utils.h"
-
 namespace perfetto {
 namespace trace_processor {
 
@@ -29,42 +26,24 @@ void SchedSliceTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
   Table::Register<SchedSliceTable>(db, storage, "sched");
 }
 
-Table::Schema SchedSliceTable::CreateSchema(int, const char* const*) {
+StorageSchema SchedSliceTable::CreateStorageSchema() {
   const auto& slices = storage_->slices();
-  std::unique_ptr<StorageSchema::Column> cols[] = {
-      StorageSchema::NumericColumnPtr("ts", &slices.start_ns(),
-                                      false /* hidden */, true /* ordered */),
-      StorageSchema::NumericColumnPtr("cpu", &slices.cpus()),
-      StorageSchema::NumericColumnPtr("dur", &slices.durations()),
-      StorageSchema::TsEndPtr("ts_end", &slices.start_ns(),
-                              &slices.durations()),
-      StorageSchema::NumericColumnPtr("utid", &slices.utids())};
-  schema_ = StorageSchema({
-      std::make_move_iterator(std::begin(cols)),
-      std::make_move_iterator(std::end(cols)),
-  });
-  return schema_.ToTableSchema({"cpu", "ts"});
+  return StorageSchema::Builder()
+      .AddOrderedNumericColumn("ts", &slices.start_ns())
+      .AddNumericColumn("cpu", &slices.cpus())
+      .AddNumericColumn("dur", &slices.durations())
+      .AddColumn<TsEndColumn>("ts_end", &slices.start_ns(), &slices.durations())
+      .AddNumericColumn("utid", &slices.utids(), &slices.rows_for_utids())
+      .Build({"cpu", "ts"});
 }
 
-std::unique_ptr<Table::Cursor> SchedSliceTable::CreateCursor(
-    const QueryConstraints& qc,
-    sqlite3_value** argv) {
-  uint32_t count = static_cast<uint32_t>(storage_->slices().slice_count());
-  auto it = table_utils::CreateBestRowIteratorForGenericSchema(schema_, count,
-                                                               qc, argv);
-  return std::unique_ptr<Table::Cursor>(
-      new StorageCursor(std::move(it), schema_.ToColumnReporters()));
+uint32_t SchedSliceTable::RowCount() {
+  return static_cast<uint32_t>(storage_->slices().slice_count());
 }
 
 int SchedSliceTable::BestIndex(const QueryConstraints& qc,
                                BestIndexInfo* info) {
-  const auto& cs = qc.constraints();
-  size_t ts_idx = schema_.ColumnIndexFromName("ts");
-  auto has_ts_column = [ts_idx](const QueryConstraints::Constraint& c) {
-    return c.iColumn == static_cast<int>(ts_idx);
-  };
-  bool has_time_constraint = std::any_of(cs.begin(), cs.end(), has_ts_column);
-  info->estimated_cost = has_time_constraint ? 10 : 10000;
+  info->estimated_cost = EstimateQueryCost(qc);
 
   // We should be able to handle any constraint and any order by clause given
   // to us.
@@ -72,6 +51,40 @@ int SchedSliceTable::BestIndex(const QueryConstraints& qc,
   std::fill(info->omit.begin(), info->omit.end(), true);
 
   return SQLITE_OK;
+}
+
+uint32_t SchedSliceTable::EstimateQueryCost(const QueryConstraints& qc) {
+  const auto& cs = qc.constraints();
+
+  size_t ts_idx = schema().ColumnIndexFromName("ts");
+  auto has_ts_column = [ts_idx](const QueryConstraints::Constraint& c) {
+    return c.iColumn == static_cast<int>(ts_idx);
+  };
+  bool has_time_constraint = std::any_of(cs.begin(), cs.end(), has_ts_column);
+  if (has_time_constraint) {
+    // If there is a constraint on ts, we can do queries very fast (O(log n))
+    // so always make this preferred if available.
+    return 10;
+  }
+
+  size_t utid_idx = schema().ColumnIndexFromName("utid");
+  auto has_utid_eq_cs = [utid_idx](const QueryConstraints::Constraint& c) {
+    return c.iColumn == static_cast<int>(utid_idx) &&
+           sqlite_utils::IsOpEq(c.op);
+  };
+  bool has_utid_eq = std::any_of(cs.begin(), cs.end(), has_utid_eq_cs);
+  if (has_utid_eq) {
+    // The other column which is often joined on is utid. Sometimes, doing
+    // nested subqueries on the thread table is faster but with some queries,
+    // it's actually better to do subqueries on this table. Estimate the cost
+    // of filtering on utid equality constraint by dividing the number of slices
+    // by the number of threads.
+    return RowCount() / storage_->thread_count();
+  }
+
+  // If we get to this point, we do not have any special filter logic so
+  // simply return the number of rows.
+  return RowCount();
 }
 
 }  // namespace trace_processor
