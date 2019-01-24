@@ -47,10 +47,11 @@ int SchedSliceTable::BestIndex(const QueryConstraints& qc,
                                BestIndexInfo* info) {
   info->estimated_cost = EstimateQueryCost(qc);
 
+  // We should be able to handle any constraint and any order by clause given
+  // to us.
   info->order_by_consumed = true;
-  for (size_t i = 0; i < qc.constraints().size(); i++) {
-    info->omit[i] = true;
-  }
+  std::fill(info->omit.begin(), info->omit.end(), true);
+
   return SQLITE_OK;
 }
 
