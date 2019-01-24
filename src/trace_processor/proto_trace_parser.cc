@@ -160,7 +160,7 @@ ProtoTraceParser::ProtoTraceParser(TraceProcessorContext* context)
   }
   rss_members_.emplace_back(context->storage->InternString("mem.rss.file"));
   rss_members_.emplace_back(context->storage->InternString("mem.rss.anon"));
-  rss_members_.emplace_back(context->storage->InternString("mem.rss.swapents"));
+  rss_members_.emplace_back(context->storage->InternString("mem.rss.swap"));
   rss_members_.emplace_back(context->storage->InternString("mem.rss.shmem"));
   rss_members_.emplace_back(
       context->storage->InternString("mem.rss.unknown"));  // Keep this last.
@@ -177,7 +177,7 @@ ProtoTraceParser::ProtoTraceParser(TraceProcessorContext* context)
   proc_mem_counter_names_[ProcessStats::Process::kRssShmemKbFieldNumber] =
       context->storage->InternString("mem.rss.shmem");
   proc_mem_counter_names_[ProcessStats::Process::kVmSwapKbFieldNumber] =
-      context->storage->InternString("mem.swap");
+      context->storage->InternString("mem.rss.swap");
   proc_mem_counter_names_[ProcessStats::Process::kVmLockedKbFieldNumber] =
       context->storage->InternString("mem.locked");
   proc_mem_counter_names_[ProcessStats::Process::kVmHwmKbFieldNumber] =
