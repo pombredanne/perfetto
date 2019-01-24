@@ -223,14 +223,19 @@ class StringColumn final : public StorageColumn {
  public:
   StringColumn(std::string col_name,
                const std::deque<Id>* deque,
-               const std::deque<const char*>* string_map,
+               const std::deque<std::string>* string_map,
                bool hidden = false)
       : StorageColumn(col_name, hidden),
         deque_(deque),
         string_map_(string_map) {}
 
   void ReportResult(sqlite3_context* ctx, uint32_t row) const override {
-    sqlite_utils::ReportSqliteResult(ctx, (*string_map_)[(*deque_)[row]]);
+    const auto& str = (*string_map_)[(*deque_)[row]];
+    if (str.empty()) {
+      sqlite3_result_null(ctx);
+    } else {
+      sqlite3_result_text(ctx, str.c_str(), -1, sqlite_utils::kSqliteStatic);
+    }
   }
 
   Bounds BoundFilter(int, sqlite3_value*) const override {
@@ -244,14 +249,14 @@ class StringColumn final : public StorageColumn {
   Comparator Sort(const QueryConstraints::OrderBy& ob) const override {
     if (ob.desc) {
       return [this](uint32_t f, uint32_t s) {
-        const char* a = (*string_map_)[(*deque_)[f]];
-        const char* b = (*string_map_)[(*deque_)[s]];
+        const std::string& a = (*string_map_)[(*deque_)[f]];
+        const std::string& b = (*string_map_)[(*deque_)[s]];
         return sqlite_utils::CompareValuesDesc(a, b);
       };
     }
     return [this](uint32_t f, uint32_t s) {
-      const char* a = (*string_map_)[(*deque_)[f]];
-      const char* b = (*string_map_)[(*deque_)[s]];
+      const std::string& a = (*string_map_)[(*deque_)[f]];
+      const std::string& b = (*string_map_)[(*deque_)[s]];
       return sqlite_utils::CompareValuesAsc(a, b);
     };
   }
@@ -264,7 +269,7 @@ class StringColumn final : public StorageColumn {
 
  private:
   const std::deque<Id>* deque_ = nullptr;
-  const std::deque<const char*>* string_map_ = nullptr;
+  const std::deque<std::string>* string_map_ = nullptr;
 };
 
 // Column which represents the "ts_end" column present in all time based

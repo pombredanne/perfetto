@@ -38,11 +38,11 @@ class SchedSliceTable : public StorageTable {
  private:
   uint32_t EstimateQueryCost(const QueryConstraints& cs);
 
-  class EndReasonColumn : public StorageColumn {
+  class EndStateColumn : public StorageColumn {
    public:
-    EndReasonColumn(std::string col_name,
-                    const std::deque<ftrace_utils::TaskState>* deque);
-    ~EndReasonColumn() override;
+    EndStateColumn(std::string col_name,
+                   const std::deque<ftrace_utils::TaskState>* deque);
+    ~EndStateColumn() override;
 
     void ReportResult(sqlite3_context*, uint32_t row) const override;
 
@@ -53,6 +53,10 @@ class SchedSliceTable : public StorageTable {
     Table::ColumnType GetType() const override;
 
    private:
+    void FilterOnState(int op,
+                       sqlite3_value* value,
+                       FilteredRowIndex* index) const;
+
     const std::deque<ftrace_utils::TaskState>* deque_ = nullptr;
   };
 

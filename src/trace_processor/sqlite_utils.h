@@ -20,7 +20,6 @@
 #include <math.h>
 #include <sqlite3.h>
 
-#include <deque>
 #include <functional>
 #include <limits>
 #include <string>
@@ -68,10 +67,6 @@ inline bool IsOpLt(int op) {
   return op == SQLITE_INDEX_CONSTRAINT_LT;
 }
 
-inline bool IsOpIsNull(int op) {
-  return op == SQLITE_INDEX_CONSTRAINT_ISNULL;
-}
-
 inline std::string OpToString(int op) {
   switch (op) {
     case SQLITE_INDEX_CONSTRAINT_EQ:
@@ -89,6 +84,10 @@ inline std::string OpToString(int op) {
     default:
       PERFETTO_FATAL("Operator to string conversion not impemented for %d", op);
   }
+}
+
+inline bool IsOpIsNull(int op) {
+  return op == SQLITE_INDEX_CONSTRAINT_ISNULL;
 }
 
 template <typename T>
@@ -348,17 +347,6 @@ inline void ReportSqliteResult(sqlite3_context* ctx, double value) {
   sqlite3_result_double(ctx, value);
 }
 
-inline void ReportSqliteResult(sqlite3_context* ctx,
-                               const char* value,
-                               int n = -1,
-                               sqlite3_destructor_type type = kSqliteStatic) {
-  if (value == nullptr) {
-    sqlite3_result_null(ctx);
-  } else {
-    sqlite3_result_text(ctx, value, n, type);
-  }
-}
-
 inline std::string SqliteValueAsString(sqlite3_value* value) {
   switch (sqlite3_value_type(value)) {
     case SQLITE_INTEGER:
@@ -436,21 +424,13 @@ inline std::vector<Table::Column> GetColumnsForTable(
   return columns;
 }
 
-template <typename T, typename sqlite_utils::is_numeric<T>* = nullptr>
-int CompareValuesAsc(T f, T s) {
+template <typename T>
+int CompareValuesAsc(const T& f, const T& s) {
   return f < s ? -1 : (f > s ? 1 : 0);
 }
 
-template <typename T, typename sqlite_utils::is_numeric<T>* = nullptr>
-int CompareValuesDesc(T f, T s) {
-  return -CompareValuesAsc(f, s);
-}
-
-inline int CompareValuesAsc(const char* f, const char* s) {
-  return strcmp(f, s);
-}
-
-inline int CompareValuesDesc(const char* f, const char* s) {
+template <typename T>
+int CompareValuesDesc(const T& f, const T& s) {
   return -CompareValuesAsc(f, s);
 }
 

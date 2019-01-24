@@ -34,7 +34,7 @@ StorageSchema SchedSliceTable::CreateStorageSchema() {
       .AddNumericColumn("dur", &slices.durations())
       .AddColumn<TsEndColumn>("ts_end", &slices.start_ns(), &slices.durations())
       .AddNumericColumn("utid", &slices.utids(), &slices.rows_for_utids())
-      .AddColumn<EndReasonColumn>("end_reason", &slices.end_state())
+      .AddColumn<EndStateColumn>("end_state", &slices.end_state())
       .AddNumericColumn("priority", &slices.priorities())
       .Build({"cpu", "ts"});
 }
@@ -48,10 +48,8 @@ int SchedSliceTable::BestIndex(const QueryConstraints& qc,
   info->estimated_cost = EstimateQueryCost(qc);
 
   info->order_by_consumed = true;
-  size_t end_reason_index = schema().ColumnIndexFromName("end_reason");
   for (size_t i = 0; i < qc.constraints().size(); i++) {
-    info->omit[i] =
-        qc.constraints()[i].iColumn != static_cast<int>(end_reason_index);
+    info->omit[i] = true;
   }
   return SQLITE_OK;
 }
@@ -90,14 +88,14 @@ uint32_t SchedSliceTable::EstimateQueryCost(const QueryConstraints& qc) {
   return RowCount();
 }
 
-SchedSliceTable::EndReasonColumn::EndReasonColumn(
+SchedSliceTable::EndStateColumn::EndStateColumn(
     std::string col_name,
     const std::deque<ftrace_utils::TaskState>* deque)
     : StorageColumn(col_name, false), deque_(deque) {}
-SchedSliceTable::EndReasonColumn::~EndReasonColumn() = default;
+SchedSliceTable::EndStateColumn::~EndStateColumn() = default;
 
-void SchedSliceTable::EndReasonColumn::ReportResult(sqlite3_context* ctx,
-                                                    uint32_t row) const {
+void SchedSliceTable::EndStateColumn::ReportResult(sqlite3_context* ctx,
+                                                   uint32_t row) const {
   const auto& state = (*deque_)[row];
   if (state.is_valid()) {
     sqlite3_result_text(ctx, state.ToString().data(), -1,
@@ -107,29 +105,98 @@ void SchedSliceTable::EndReasonColumn::ReportResult(sqlite3_context* ctx,
   }
 }
 
-void SchedSliceTable::EndReasonColumn::Filter(int,
-                                              sqlite3_value*,
-                                              FilteredRowIndex*) const {}
+void SchedSliceTable::EndStateColumn::Filter(int op,
+                                             sqlite3_value* value,
+                                             FilteredRowIndex* index) const {
+  switch (op) {
+    case SQLITE_INDEX_CONSTRAINT_ISNULL:
+    case SQLITE_INDEX_CONSTRAINT_ISNOTNULL: {
+      bool non_nulls = op == SQLITE_INDEX_CONSTRAINT_ISNOTNULL;
+      index->FilterRows([this, non_nulls](uint32_t row) {
+        const auto& state = (*deque_)[row];
+        return state.is_valid() == non_nulls;
+      });
+      break;
+    }
+    case SQLITE_INDEX_CONSTRAINT_EQ:
+    case SQLITE_INDEX_CONSTRAINT_NE:
+    case SQLITE_INDEX_CONSTRAINT_MATCH:
+      FilterOnState(op, value, index);
+      break;
+    default:
+      // TODO(lalitm): report an error to sqlite for any other constraint.
+      index->IntersectRows({});
+      break;
+  }
+}
+void SchedSliceTable::EndStateColumn::FilterOnState(
+    int op,
+    sqlite3_value* value,
+    FilteredRowIndex* index) const {
+  if (sqlite3_value_type(value) != SQLITE_TEXT) {
+    index->IntersectRows({});
+    return;
+  }
 
-StorageColumn::Comparator SchedSliceTable::EndReasonColumn::Sort(
+  const char* str = reinterpret_cast<const char*>(sqlite3_value_text(value));
+  ftrace_utils::TaskState compare(str);
+  if (!compare.is_valid()) {
+    index->IntersectRows({});
+    return;
+  }
+
+  uint16_t raw_state = compare.raw_state();
+  if (op == SQLITE_INDEX_CONSTRAINT_EQ) {
+    index->FilterRows([this, raw_state](uint32_t row) {
+      const auto& state = (*deque_)[row];
+      return state.is_valid() && state.raw_state() == raw_state;
+    });
+  } else if (op == SQLITE_INDEX_CONSTRAINT_NE) {
+    index->FilterRows([this, raw_state](uint32_t row) {
+      const auto& state = (*deque_)[row];
+      return state.is_valid() && state.raw_state() != raw_state;
+    });
+  } else if (op == SQLITE_INDEX_CONSTRAINT_MATCH) {
+    index->FilterRows([this, compare](uint32_t row) {
+      const auto& state = (*deque_)[row];
+      if (!state.is_valid())
+        return false;
+      if (state.is_runnable() && compare.is_runnable())
+        return state.is_kernel_preempt() == compare.is_kernel_preempt();
+      return (state.raw_state() & compare.raw_state()) != 0;
+    });
+  } else {
+    PERFETTO_FATAL("Should never reach this state");
+  }
+}
+
+StorageColumn::Comparator SchedSliceTable::EndStateColumn::Sort(
     const QueryConstraints::OrderBy& ob) const {
   if (ob.desc) {
     return [this](uint32_t f, uint32_t s) {
       const auto& a = (*deque_)[f];
       const auto& b = (*deque_)[s];
-      return sqlite_utils::CompareValuesDesc(a.ToString().data(),
-                                             b.ToString().data());
+      if (!a.is_valid()) {
+        return !b.is_valid() ? 0 : 1;
+      } else if (!b.is_valid()) {
+        return -1;
+      }
+      return sqlite_utils::CompareValuesAsc(a.raw_state(), b.raw_state());
     };
   }
   return [this](uint32_t f, uint32_t s) {
     const auto& a = (*deque_)[f];
     const auto& b = (*deque_)[s];
-    return sqlite_utils::CompareValuesAsc(a.ToString().data(),
-                                          b.ToString().data());
+    if (!a.is_valid()) {
+      return !b.is_valid() ? 0 : -1;
+    } else if (!b.is_valid()) {
+      return 1;
+    }
+    return sqlite_utils::CompareValuesAsc(a.raw_state(), b.raw_state());
   };
 }
 
-Table::ColumnType SchedSliceTable::EndReasonColumn::GetType() const {
+Table::ColumnType SchedSliceTable::EndStateColumn::GetType() const {
   return Table::ColumnType::kString;
 }
 

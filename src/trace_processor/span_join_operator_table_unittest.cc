@@ -50,6 +50,8 @@ class SpanJoinOperatorTableTest : public ::testing::Test {
     ASSERT_EQ(sqlite3_step(stmt_.get()), SQLITE_DONE);
   }
 
+  ~SpanJoinOperatorTableTest() override { context_.storage->ResetStorage(); }
+
  protected:
   TraceProcessorContext context_;
   ScopedDb db_;

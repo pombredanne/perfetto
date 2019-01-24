@@ -35,14 +35,28 @@ class TaskState {
 
   TaskState() = default;
   explicit TaskState(uint16_t raw_state) : state_(raw_state | kValid) {}
+  explicit TaskState(const char* state_str);
 
   // Returns if this TaskState has a valid representation.
   bool is_valid() const { return state_ & kValid; }
 
   // Returns the string representation of this (valid) TaskState. This array
   // is null terminated.
-  // Note: This function CHECKs that |IsValid()| is true.
+  // Note: This function CHECKs that |is_valid()| is true.
   TaskStateStr ToString() const;
+
+  // Returns the raw state this class was created from.
+  // Note: This function CHECKs that |is_valid()| is true.
+  uint16_t raw_state() const {
+    PERFETTO_CHECK(is_valid());
+    return state_ ^ kValid;
+  }
+
+  // Returns if this TaskState is runnable.
+  bool is_runnable() const { return (state_ & (kMaxState - 1)) == 0; }
+
+  // Returns whether kernel preemption caused the exit state.
+  bool is_kernel_preempt() const { return state_ & kMaxState; }
 
  private:
   // The ordering and values of these fields comes from the kernel in the file
@@ -64,11 +78,6 @@ class TaskState {
     kMaxState = 2048,
     kValid = 0x8000,
   };
-
-  bool is_runnable() const { return (state_ & (kMaxState - 1)) == 0; }
-
-  // Returns whether kernel preemption caused the exit state.
-  bool is_kernel_preempt() const { return state_ & kMaxState; }
 
   uint16_t state_ = 0;
 };

@@ -53,6 +53,8 @@ class CountersTableUnittest : public ::testing::Test {
     return reinterpret_cast<const char*>(sqlite3_column_text(*stmt_, colId));
   }
 
+  ~CountersTableUnittest() override { context_.storage->ResetStorage(); }
+
  protected:
   TraceProcessorContext context_;
   ScopedDb db_;
