@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "perfetto/base/build_config.h"
 #include "src/base/test/test_task_runner.h"
@@ -41,6 +42,9 @@
 namespace perfetto {
 namespace profiling {
 namespace {
+
+using ::testing::Eq;
+using ::testing::AnyOf;
 
 void WaitForHeapprofd(uint64_t timeout_ms) {
   constexpr uint64_t kSleepMs = 10;
@@ -148,7 +152,7 @@ class HeapprofdEndToEnd : public ::testing::Test {
 };
 
 // TODO(b/121352331): deflake and re-enable this test.
-TEST_F(HeapprofdEndToEnd, DISABLED_Smoke) {
+TEST_F(HeapprofdEndToEnd, Smoke) {
   constexpr size_t kAllocSize = 1024;
 
   pid_t pid = ForkContinousMalloc(kAllocSize);
@@ -197,6 +201,8 @@ TEST_F(HeapprofdEndToEnd, DISABLED_Smoke) {
         EXPECT_EQ(sample.self_freed() % kAllocSize, 0);
         last_allocated = sample.self_allocated();
         last_freed = sample.self_freed();
+        EXPECT_THAT(sample.self_allocated() - sample.self_freed(),
+                    AnyOf(Eq(0), Eq(kAllocSize)));
       }
       profile_packets++;
     }
@@ -208,7 +214,7 @@ TEST_F(HeapprofdEndToEnd, DISABLED_Smoke) {
 }
 
 // TODO(b/121352331): deflake and re-enable this test.
-TEST_F(HeapprofdEndToEnd, DISABLED_FinalFlush) {
+TEST_F(HeapprofdEndToEnd, FinalFlush) {
   constexpr size_t kAllocSize = 1024;
 
   pid_t pid = ForkContinousMalloc(kAllocSize);
@@ -255,6 +261,8 @@ TEST_F(HeapprofdEndToEnd, DISABLED_FinalFlush) {
         EXPECT_EQ(sample.self_freed() % kAllocSize, 0);
         last_allocated = sample.self_allocated();
         last_freed = sample.self_freed();
+        EXPECT_THAT(sample.self_allocated() - sample.self_freed(),
+                    AnyOf(Eq(0), Eq(kAllocSize)));
       }
       profile_packets++;
     }
@@ -266,7 +274,7 @@ TEST_F(HeapprofdEndToEnd, DISABLED_FinalFlush) {
 }
 
 // TODO(b/121352331): deflake and re-enable this test.
-TEST_F(HeapprofdEndToEnd, DISABLED_NativeStartup) {
+TEST_F(HeapprofdEndToEnd, NativeStartup) {
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(10 * 1024);
   trace_config.set_duration_ms(5000);
