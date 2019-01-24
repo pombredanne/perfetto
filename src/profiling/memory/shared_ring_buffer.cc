@@ -71,19 +71,15 @@ ScopedSpinlock::ScopedSpinlock(ScopedSpinlock&& other)
 }
 
 ScopedSpinlock& ScopedSpinlock::operator=(ScopedSpinlock&& other) {
-  using std::swap;
-  ScopedSpinlock tmp(std::move(other));
-  swap(*this, tmp);
+  if (this != &other) {
+    this->~ScopedSpinlock();
+    new (this) ScopedSpinlock(std::move(other));
+  }
   return *this;
 }
 
 ScopedSpinlock::~ScopedSpinlock() {
   Unlock();
-}
-
-void swap(ScopedSpinlock& a, ScopedSpinlock& b) {
-  std::swap(a.lock_, b.lock_);
-  std::swap(a.locked_, b.locked_);
 }
 
 SharedRingBuffer::SharedRingBuffer(CreateFlag, size_t size) {

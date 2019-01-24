@@ -32,8 +32,6 @@ namespace profiling {
 
 class ScopedSpinlock {
  public:
-  friend void swap(ScopedSpinlock&, ScopedSpinlock&);
-
   enum class Mode { Try, Blocking };
 
   ScopedSpinlock(std::atomic<bool>* lock, Mode mode);
@@ -59,8 +57,6 @@ class ScopedSpinlock {
   std::atomic<bool>* lock_;
   bool locked_ = false;
 };
-
-void swap(ScopedSpinlock&, ScopedSpinlock&);
 
 // A concurrent, multi-writer single-reader ring buffer FIFO, based on a
 // circular buffer over shared memory. It has similar semantics to a SEQ_PACKET
