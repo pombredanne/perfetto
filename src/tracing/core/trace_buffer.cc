@@ -346,6 +346,7 @@ ssize_t TraceBuffer::DeleteNextChunksFor(size_t bytes_to_clear) {
     if (PERFETTO_LIKELY(!next_chunk.is_padding)) {
       ChunkMeta::Key key(next_chunk);
       auto it = index_.find(key);
+      bool will_remove = false;
       if (PERFETTO_LIKELY(it != index_.end())) {
         const ChunkMeta& meta = it->second;
         if (PERFETTO_UNLIKELY(meta.num_fragments_read < meta.num_fragments)) {
@@ -356,12 +357,14 @@ ssize_t TraceBuffer::DeleteNextChunksFor(size_t bytes_to_clear) {
                                        next_chunk.size);
         }
         index_delete.push_back(it);
+        will_remove = true;
       }
       TRACE_BUFFER_DLOG("  del index {%" PRIu32 ",%" PRIu32
                         ",%u} @ [%lu - %lu] %d",
                         key.producer_id, key.writer_id, key.chunk_id,
                         next_chunk_ptr - begin(),
                         next_chunk_ptr - begin() + next_chunk.size, removed);
+      PERFETTO_DCHECK(will_remove);
     } else {
       stats_.set_padding_bytes_cleared(stats_.padding_bytes_cleared() +
                                        next_chunk.size);
