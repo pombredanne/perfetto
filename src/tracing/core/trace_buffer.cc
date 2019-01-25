@@ -323,6 +323,9 @@ ssize_t TraceBuffer::DeleteNextChunksFor(size_t bytes_to_clear) {
   DcheckIsAlignedAndWithinBounds(wptr_);
   PERFETTO_DCHECK(search_end <= end());
   std::vector<ChunkMap::iterator> index_delete;
+  uint64_t chunks_overwritten = stats_.chunks_overwritten();
+  uint64_t bytes_overwritten = stats_.bytes_overwritten();
+  uint64_t padding_bytes_cleared = stats_.padding_bytes_cleared();
   while (next_chunk_ptr < search_end) {
     const ChunkRecord& next_chunk = *GetChunkRecordAt(next_chunk_ptr);
     TRACE_BUFFER_DLOG(
@@ -352,9 +355,8 @@ ssize_t TraceBuffer::DeleteNextChunksFor(size_t bytes_to_clear) {
         if (PERFETTO_UNLIKELY(meta.num_fragments_read < meta.num_fragments)) {
           if (overwrite_policy_ == kDiscard)
             return -1;
-          stats_.set_chunks_overwritten(stats_.chunks_overwritten() + 1);
-          stats_.set_bytes_overwritten(stats_.bytes_overwritten() +
-                                       next_chunk.size);
+          chunks_overwritten++;
+          bytes_overwritten += next_chunk.size;
         }
         index_delete.push_back(it);
         will_remove = true;
@@ -366,8 +368,7 @@ ssize_t TraceBuffer::DeleteNextChunksFor(size_t bytes_to_clear) {
                         next_chunk_ptr - begin() + next_chunk.size, removed);
       PERFETTO_DCHECK(will_remove);
     } else {
-      stats_.set_padding_bytes_cleared(stats_.padding_bytes_cleared() +
-                                       next_chunk.size);
+      padding_bytes_cleared += next_chunk.size;
     }
 
     next_chunk_ptr += next_chunk.size;
@@ -383,6 +384,9 @@ ssize_t TraceBuffer::DeleteNextChunksFor(size_t bytes_to_clear) {
   for (auto it : index_delete) {
     index_.erase(it);
   }
+  stats_.set_chunks_overwritten(chunks_overwritten);
+  stats_.set_bytes_overwritten(bytes_overwritten);
+  stats_.set_padding_bytes_cleared(padding_bytes_cleared);
 
   PERFETTO_DCHECK(next_chunk_ptr >= search_end && next_chunk_ptr <= end());
   return static_cast<ssize_t>(next_chunk_ptr - search_end);
