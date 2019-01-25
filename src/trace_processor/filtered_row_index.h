@@ -73,7 +73,7 @@ class FilteredRowIndex {
 
   // Called when there is some error in the filter operation requested. The
   // error string is used by the coordinator to report the error to SQLite.
-  void FilterError(std::string error) { error_ = std::move(error); }
+  void set_error(std::string error) { error_ = std::move(error); }
 
   // The following functions should only be called by the coordinator classes.
 
