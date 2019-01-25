@@ -67,7 +67,7 @@ class TaskState {
 
   // Returns the raw state this class was created from.
   uint16_t raw_state() const {
-    PERFETTO_CHECK(is_valid());
+    PERFETTO_DCHECK(is_valid());
     return state_ & ~kValid;
   }
 

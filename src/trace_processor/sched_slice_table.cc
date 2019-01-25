@@ -93,7 +93,7 @@ SchedSliceTable::EndStateColumn::EndStateColumn(
     std::string col_name,
     const std::deque<ftrace_utils::TaskState>* deque)
     : StorageColumn(col_name, false), deque_(deque) {
-  for (uint16_t i = 0; i < kStateStringSize; i++) {
+  for (uint16_t i = 0; i < state_strings_.size(); i++) {
     state_strings_[i] = ftrace_utils::TaskState(i).ToString();
   }
 }
@@ -103,6 +103,7 @@ void SchedSliceTable::EndStateColumn::ReportResult(sqlite3_context* ctx,
                                                    uint32_t row) const {
   const auto& state = (*deque_)[row];
   if (state.is_valid()) {
+    PERFETTO_CHECK(state.raw_state() < state_strings_.size());
     sqlite3_result_text(ctx, state_strings_[state.raw_state()].data(), -1,
                         sqlite_utils::kSqliteStatic);
   } else {

@@ -18,7 +18,6 @@
 #define SRC_TRACE_PROCESSOR_TRACE_STORAGE_H_
 
 #include <array>
-#include <bitset>
 #include <deque>
 #include <map>
 #include <string>
