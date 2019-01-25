@@ -322,6 +322,7 @@ ssize_t TraceBuffer::DeleteNextChunksFor(size_t bytes_to_clear) {
   TRACE_BUFFER_DLOG("Delete [%zu %zu]", wptr_ - begin(), search_end - begin());
   DcheckIsAlignedAndWithinBounds(wptr_);
   PERFETTO_DCHECK(search_end <= end());
+  std::vector<ChunkMap::iterator> index_delete;
   while (next_chunk_ptr < search_end) {
     const ChunkRecord& next_chunk = *GetChunkRecordAt(next_chunk_ptr);
     TRACE_BUFFER_DLOG(
@@ -345,7 +346,6 @@ ssize_t TraceBuffer::DeleteNextChunksFor(size_t bytes_to_clear) {
     if (PERFETTO_LIKELY(!next_chunk.is_padding)) {
       ChunkMeta::Key key(next_chunk);
       auto it = index_.find(key);
-      bool removed = false;
       if (PERFETTO_LIKELY(it != index_.end())) {
         const ChunkMeta& meta = it->second;
         if (PERFETTO_UNLIKELY(meta.num_fragments_read < meta.num_fragments)) {
@@ -355,17 +355,13 @@ ssize_t TraceBuffer::DeleteNextChunksFor(size_t bytes_to_clear) {
           stats_.set_bytes_overwritten(stats_.bytes_overwritten() +
                                        next_chunk.size);
         }
-
-        // Remove from the index.
-        index_.erase(it);
-        removed = true;
+        index_delete.push_back(it);
       }
       TRACE_BUFFER_DLOG("  del index {%" PRIu32 ",%" PRIu32
                         ",%u} @ [%lu - %lu] %d",
                         key.producer_id, key.writer_id, key.chunk_id,
                         next_chunk_ptr - begin(),
                         next_chunk_ptr - begin() + next_chunk.size, removed);
-      PERFETTO_DCHECK(removed);
     } else {
       stats_.set_padding_bytes_cleared(stats_.padding_bytes_cleared() +
                                        next_chunk.size);
@@ -379,6 +375,12 @@ ssize_t TraceBuffer::DeleteNextChunksFor(size_t bytes_to_clear) {
     // buffer, to get more actionable bugs in case we hit this.
     PERFETTO_CHECK(next_chunk_ptr <= end());
   }
+
+  // Remove from the index.
+  for (auto it : index_delete) {
+    index_.erase(it);
+  }
+
   PERFETTO_DCHECK(next_chunk_ptr >= search_end && next_chunk_ptr <= end());
   return static_cast<ssize_t>(next_chunk_ptr - search_end);
 }

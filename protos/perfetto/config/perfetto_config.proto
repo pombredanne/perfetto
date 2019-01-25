@@ -494,7 +494,7 @@ message TraceConfig {
 
       // Default behavior. The buffer operates as a conventional ring buffer.
       // If the writer is faster than the reader (or if the reader reads only
-      // at the end of the trace) newly written packets will overwrite old
+      // after tracing is stopped) newly written packets will overwrite old
       // packets.
       RING_BUFFER = 1;
 
@@ -615,6 +615,9 @@ message TraceConfig {
   // Wait for this long for producers to acknowledge flush requests.
   // Default 5s.
   optional uint32 flush_timeout_ms = 14;
+
+  // Disable emitting clock timestamps into the trace.
+  optional bool disable_clock_snapshotting = 15;
 }
 
 // End of protos/perfetto/config/trace_config.proto

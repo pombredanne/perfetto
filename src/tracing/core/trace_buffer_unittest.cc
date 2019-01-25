@@ -1646,7 +1646,7 @@ TEST_F(TraceBufferTest, DiscardPolicy) {
       .AddPacket(4000 - 16, 'e')
       .CopyIntoTraceBuffer();
 
-  // But this will fail, preventing any further writer.
+  // But this will fail, preventing any further write.
   for (int i = 0; i < 3; i++) {
     CreateChunk(ProducerID(1), WriterID(i + 2), ChunkID(0))
         .AddPacket(120 - 16, 'X')

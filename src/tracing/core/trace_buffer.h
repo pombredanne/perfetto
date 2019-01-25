@@ -66,7 +66,7 @@ class TracePacket;
 //     a no-op, even if the reader manages to fully catch up. This is because
 //     once a chunk is discarded, the sequence of packets is broken and trying
 //     to recover would be too hard (also due to the fact that, at the same
-//     time, we allow out-of-order commits and chunk re-writes).+
+//     time, we allow out-of-order commits and chunk re-writes).
 //
 // Chunks are (over)written in the same order of the CopyChunkUntrusted() calls.
 // When overwriting old content, entire chunks are overwritten or clobbered.
@@ -556,7 +556,7 @@ class TraceBuffer {
   // It becomes invalid after any call to methods that alters the |index_|.
   SequenceIterator read_iter_;
 
-  // See comments in the top of the file.
+  // See comments at the top of the file.
   OverwritePolicy overwrite_policy_ = kOverwrite;
 
   // Only used when |overwrite_policy_ == kDiscard|. This is set the first time
