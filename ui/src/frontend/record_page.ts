@@ -16,24 +16,38 @@ import {DraftObject, produce} from 'immer';
 import * as m from 'mithril';
 
 import {Actions} from '../common/actions';
+import {MeminfoCounters, VmstatCounters} from '../common/protos';
 import {RecordConfig, RecordMode} from '../common/state';
 
 import {globals} from './globals';
 import {createPage} from './pages';
 
-
 const BUF_SIZES_MB = [4, 8, 16, 32, 64, 128, 256, 512];
-const DURATIONS_S = [10, 30, 60, 60 * 5, 60 * 30, 3600, 3600 * 6, 3600 * 12];
-const FILE_SIZES_MB = [5, 100, 500, 1000, 1000 * 5, 1000 * 10];
+const DURATIONS_MS = [
+  5000,
+  10000,
+  15000,
+  30000,
+  60000,
+  60000 * 5,
+  60000 * 30,
+  3600000,
+  3600000 * 6,
+  3600000 * 12
+];
+const FILE_SIZES_MB = [5, 25, 50, 100, 500, 1000, 1000 * 5, 1000 * 10];
 const FTRACE_BUF_MB = [1, 2, 4, 8, 16, 32, 64, 128];
 const FTRACE_FLUSH_MS = [100, 250, 500, 1000, 2500, 5000];
+const POLL_RATE_MS = [250, 500, 1000, 2500, 5000, 30000, 60000];
 
 declare type Setter<T> = (draft: DraftObject<RecordConfig>, val: T) => void;
 declare type Getter<T> = (cfg: RecordConfig) => T;
 
 interface SliderConfig {
   title: string;
-  icon: string;
+  icon?: string;
+  cssClass?: string;
+  isTime?: boolean;
   unit: string;
   predefinedValues: number[];
   get: Getter<number>;
@@ -46,6 +60,59 @@ interface ProbeConfig {
   descr: string;
   isEnabled: Getter<boolean>;
   setEnabled: Setter<boolean>;
+}
+
+interface DropdownConfig {
+  title: string;
+  cssClass?: string;
+  options: Map<string, string>;
+  get: Getter<string[]>;
+  set: Setter<string[]>;
+}
+
+function Dropdown(cfg: DropdownConfig) {
+  const resetScroll = function(this: HTMLElement) {
+    // Chrome seems to override the scroll offset on creation without this, even
+    // though we call it after having marked the options as selected.
+    setTimeout(() => {
+      // Don't reset the scroll position if the element is still focused.
+      if (this !== document.activeElement) this.scrollTop = 0;
+    }, 0);
+  };
+  const options: m.Children = [];
+  const selItems = cfg.get(globals.state.recordConfig);
+  let numSelected = 0;
+  for (const [key, label] of cfg.options) {
+    const opts = {value: key, selected: false};
+    if (selItems.indexOf(key) >= 0) {
+      opts.selected = true;
+      numSelected++;
+    }
+    options.push(m('option', opts, label));
+  }
+  const onChange = function(this: HTMLSelectElement) {
+    const selKeys: string[] = [];
+    for (let i = 0; i < this.selectedOptions.length; i++) {
+      const opt = this.selectedOptions.item(i)!;
+      selKeys.push(opt.value);
+    }
+    const traceCfg = produce(globals.state.recordConfig, draft => {
+      cfg.set(draft, selKeys);
+    });
+    globals.dispatch(Actions.setConfig({config: traceCfg}));
+  };
+  const label = `${cfg.title} ${numSelected ? `(${numSelected})` : ''}`;
+  return m(
+      `select.checkboxes${cfg.cssClass || ''}[multiple=multiple]`,
+      {
+        onblur: resetScroll,
+        onmouseleave: resetScroll,
+        oninput: onChange,
+        oncreate: (vnode) => {
+          resetScroll.bind(vnode.dom as HTMLSelectElement)();
+        }
+      },
+      m('optgroup', {label}, options));
 }
 
 function Probe(cfg: ProbeConfig, ...children: m.Children[]) {
@@ -69,7 +136,7 @@ function Probe(cfg: ProbeConfig, ...children: m.Children[]) {
         m(`input[type=checkbox]`,
           {checked: enabled, oninput: m.withAttr('checked', onToggle)}),
         m('span', cfg.title)),
-      m('div', m('div', cfg.descr), children));
+      m('div', m('div', cfg.descr), m('.settings', children)));
 }
 
 function Slider(cfg: SliderConfig) {
@@ -95,15 +162,27 @@ function Slider(cfg: SliderConfig) {
     idx = i;
     if (cfg.predefinedValues[i] >= val) break;
   }
-
+  let spinnerCfg = {};
+  if (cfg.isTime === true) {
+    spinnerCfg = {
+      type: 'time',
+      valueAsNumber: `${val}`,
+      oninput: m.withAttr('valueAsNumber', onValueChange)
+    };
+  } else {
+    spinnerCfg = {
+      type: 'number',
+      value: val,
+      oninput: m.withAttr('value', onValueChange)
+    };
+  }
   return m(
-      '.slider',
+      '.slider' + (cfg.cssClass || ''),
       m('header', cfg.title),
-      m('i.material-icons', cfg.icon),
+      cfg.icon !== undefined ? m('i.material-icons', cfg.icon) : [],
       m(`input[id="${id}"][type=range][min=0][max=${maxIdx}][value=${idx}]`,
         {oninput: m.withAttr('value', onSliderChange)}),
-      m(`input[type=number][min=1][for=${id}][value="${val}"]`,
-        {oninput: m.withAttr('value', onValueChange)}),
+      m(`input.spinner[min=1][for=${id}]`, spinnerCfg),
       m('.unit', cfg.unit));
 }
 
@@ -154,17 +233,20 @@ function RecSettings() {
           Slider({
             title: 'Max duration',
             icon: 'timer',
-            predefinedValues: DURATIONS_S,
-            unit: 's',
+            predefinedValues: DURATIONS_MS,
+            isTime: true,
+            unit: 'h:m:s',
             set: (cfg, val) => {
-              cfg.durationSeconds = val;
+              cfg.durationMs = val;
             },
-            get: (cfg) => cfg.durationSeconds
+            get: (cfg) => cfg.durationMs
           }),
+
 
           Slider({
             title: 'Max file size',
             icon: 'save',
+            cssClass: cfg.mode !== 'LONG_TRACE' ? '.hide' : '',
             predefinedValues: FILE_SIZES_MB,
             unit: 'MB',
             set: (cfg, val) => {
@@ -188,6 +270,7 @@ function RecSettings() {
 
           Slider({
             title: 'Flush on disk every',
+            cssClass: cfg.mode !== 'LONG_TRACE' ? '.hide' : '',
             icon: 'av_timer',
             predefinedValues: FTRACE_FLUSH_MS,
             unit: 'ms',
@@ -207,18 +290,27 @@ function PowerSettings() {
               title: 'Battery drain',
               img: 'battery_counters.png',
               descr:
-                  'Tracks charge counters and instantaneous power draw from ' +
+                  'Polls charge counters and instantaneous power draw from ' +
                   'the battery power management IC.',
               setEnabled: (cfg, val) => {
                 cfg.batteryDrain = val;
               },
               isEnabled: (cfg) => cfg.batteryDrain
             },
-            m('.settings', SliderThin('Poll rate'))),
+            Slider({
+              title: 'Poll rate',
+              cssClass: '.thin',
+              predefinedValues: POLL_RATE_MS,
+              unit: 'ms',
+              set: (cfg, val) => {
+                cfg.batteryPeriodMs = val;
+              },
+              get: (cfg) => cfg.batteryPeriodMs
+            })),
         Probe({
           title: 'CPU frequency and idle states',
           img: 'cpu_freq.png',
-          descr: 'TODO description',
+          descr: 'Records cpu frequency and idle state changes via ftrace',
           setEnabled: (cfg, val) => {
             cfg.cpuFreq = val;
           },
@@ -235,15 +327,6 @@ function PowerSettings() {
         }), ));
 }
 
-function SliderThin(title: string) {
-  return m(
-      '.slider .thin',
-      m('header', title),
-      m(`input[id="rec_period"][type=range][min=0][max=100][value=10]`, {}),
-      m('label[for="rec_period"]', `0 s`));
-}
-
-
 function CpuSettings() {
   return m(
       'div',
@@ -252,14 +335,23 @@ function CpuSettings() {
             {
               title: 'Coarse CPU usage counter',
               img: 'rec_cpu_coarse.png',
-              descr: 'Lightweight polling of CPU usage counters.\n' +
-                  'Allows to monitor CPU usage over fixed periods of time.',
+              descr: `Lightweight polling of CPU usage counters via /proc/stat.
+                      Allows to monitor CPU usage over fixed periods of time.`,
               setEnabled: (cfg, val) => {
                 cfg.cpuCoarse = val;
               },
               isEnabled: (cfg) => cfg.cpuCoarse
             },
-            m('.settings', SliderThin('Poll rate'))),
+            Slider({
+              title: 'Poll rate',
+              cssClass: '.thin',
+              predefinedValues: POLL_RATE_MS,
+              unit: 'ms',
+              set: (cfg, val) => {
+                cfg.statPeriodMs = val;
+              },
+              get: (cfg) => cfg.statPeriodMs
+            })),
         Probe({
           title: 'Scheduling details',
           img: 'rec_cpu_fine.png',
@@ -270,9 +362,11 @@ function CpuSettings() {
           isEnabled: (cfg) => cfg.cpuSched
         }),
         Probe({
-          title: 'Scheduling chains & latency',
+          title: 'Scheduling chains / latency analysis',
           img: 'rec_cpu_wakeup.png',
-          descr: 'Enables tracking of scheduling wakeup causes',
+          descr: `Tracks causality of scheduling transitions. When a task
+                  X transitions from blocked -> runnable, keeps track of the
+                  task Y that X's transition (e.g. posting a semaphore).`,
           setEnabled: (cfg, val) => {
             cfg.cpuLatency = val;
           },
@@ -281,6 +375,20 @@ function CpuSettings() {
 }
 
 function MemorySettings() {
+  const meminfoOpts = new Map<string, string>();
+  for (const x in MeminfoCounters) {
+    if (typeof MeminfoCounters[x] === 'number' &&
+        !`${x}`.endsWith('_UNSPECIFIED')) {
+      meminfoOpts.set(x, x.replace('MEMINFO_', '').toLowerCase());
+    }
+  }
+  const vmstatOpts = new Map<string, string>();
+  for (const x in VmstatCounters) {
+    if (typeof VmstatCounters[x] === 'number' &&
+        !`${x}`.endsWith('_UNSPECIFIED')) {
+      vmstatOpts.set(x, x.replace('VMSTAT_', '').toLowerCase());
+    }
+  }
   return m(
       'div',
       m('.container',
@@ -294,8 +402,24 @@ function MemorySettings() {
               },
               isEnabled: (cfg) => cfg.memMeminfo
             },
-            m('.settings', SliderThin('Poll rate'))),
-
+            Slider({
+              title: 'Poll rate',
+              cssClass: '.thin',
+              predefinedValues: POLL_RATE_MS,
+              unit: 'ms',
+              set: (cfg, val) => {
+                cfg.meminfoPeriodMs = val;
+              },
+              get: (cfg) => cfg.meminfoPeriodMs
+            }),
+            Dropdown({
+              title: 'Select counters',
+              options: meminfoOpts,
+              set: (cfg, val) => {
+                cfg.meminfoCounters = val;
+              },
+              get: (cfg) => cfg.meminfoCounters
+            })),
         Probe(
             {
               title: 'Virtual memory stats',
@@ -306,8 +430,25 @@ function MemorySettings() {
               },
               isEnabled: (cfg) => cfg.memVmstat
             },
-            m('.settings', SliderThin('Poll rate'))),
-
+            Slider({
+              title: 'Poll rate',
+              cssClass: '.thin',
+              predefinedValues: POLL_RATE_MS,
+              unit: 'ms',
+              set: (cfg, val) => {
+                cfg.vmstatPeriodMs = val;
+              },
+              get: (cfg) => cfg.vmstatPeriodMs
+            }),
+            Dropdown({
+              title: 'Select counters',
+              options: vmstatOpts,
+              set: (cfg, val) => {
+                cfg.vmstatCounters = val;
+              },
+              get: (cfg) => cfg.vmstatCounters
+            }),  //
+            ),
         m('header', 'Per-process probes'),
 
         Probe({
@@ -323,53 +464,87 @@ function MemorySettings() {
         Probe(
             {
               title: 'Per process stats',
-              img: 'lmk.png',
+              img: 'procstats.png',
               descr: 'TODO poll /proc/*/stat.descr',
               setEnabled: (cfg, val) => {
                 cfg.memProcStat = val;
               },
               isEnabled: (cfg) => cfg.memProcStat
             },
-            m('.checkboxes',
-              m('label', m('input[type=checkbox]'), m('.ui', 'MEM_TOTAL')),
-              m('label', m('input[type=checkbox]'), m('.ui', 'MEM_FREE')),
-              m('label', m('input[type=checkbox]'), m('.ui', 'MEM_AVAILABLE')),
-              m('label', m('input[type=checkbox]'), m('.ui', 'BUFFERS')),
-              m('label', m('input[type=checkbox]'), m('.ui', 'CACHED')),
-              m('label', m('input[type=checkbox]'), m('.ui', 'SWAP_CACHED')),
-              m('label', m('input[type=checkbox]'), m('.ui', 'ACTIVE')),
-              m('label', m('input[type=checkbox]'), m('.ui', 'INACTIVE')),
-              m('label', m('input[type=checkbox]'), m('.ui', 'ACTIVE_ANON')),
-              m('label', m('input[type=checkbox]'), m('.ui', 'INACTIVE_ANON')),
-              m('label', m('input[type=checkbox]'), m('.ui', 'ACTIVE_FILE')),
-              m('label', m('input[type=checkbox]'), m('.ui', 'INACTIVE_FILE')),
-              m('label', m('input[type=checkbox]'), m('.ui', 'UNEVICTABLE')),
-              m('label', m('input[type=checkbox]'), m('.ui', 'MLOCKED')),
-              m('label', m('input[type=checkbox]'), m('.ui', 'SWAP_TOTAL')),
-              m('label', m('input[type=checkbox]'), m('.ui', 'SWAP_FREE')),
-              m('label', m('input[type=checkbox]'), m('.ui', 'DIRTY')),
-              m('label', m('input[type=checkbox]'), m('.ui', 'WRITEBACK')),
-              m('label', m('input[type=checkbox]'), m('.ui', 'ANON_PAGES')),
-              m('label', m('input[type=checkbox]'), m('.ui', 'MAPPED')),
-              m('label', m('input[type=checkbox]'), m('.ui', 'SHMEM')),
-              m('label', m('input[type=checkbox]'), m('.ui', 'SLAB')),
-              m('label',
-                m('input[type=checkbox]'),
-                m('.ui', 'SLAB_RECLAIMABLE')),
-              m('label',
-                m('input[type=checkbox]'),
-                m('.ui', 'SLAB_UNRECLAIMABLE')),
-              m('label', m('input[type=checkbox]'), m('.ui', 'KERNEL_STACK')),
-              m('label', m('input[type=checkbox]'), m('.ui', 'PAGE_TABLES')),
-              m('label', m('input[type=checkbox]'), m('.ui', 'COMMIT_LIMIT')),
-              m('label', m('input[type=checkbox]'), m('.ui', 'COMMITED_AS')),
-              m('label', m('input[type=checkbox]'), m('.ui', 'VMALLOC_TOTAL')),
-              m('label', m('input[type=checkbox]'), m('.ui', 'VMALLOC_USED')),
-              m('label', m('input[type=checkbox]'), m('.ui', 'VMALLOC_CHUNK')),
-              m('label', m('input[type=checkbox]'), m('.ui', 'CMA_TOTAL')),
-              m('label', m('input[type=checkbox]'), m('.ui', 'CMA_FREE')),
-              //
-              ))));
+            Slider({
+              title: 'Poll rate',
+              cssClass: '.thin',
+              predefinedValues: POLL_RATE_MS,
+              unit: 'ms',
+              set: (cfg, val) => {
+                cfg.procStatusPeriodMs = val;
+              },
+              get: (cfg) => cfg.procStatusPeriodMs
+            }), )));
+}
+
+
+function AdvancedSettings() {
+  const ATRACE_CATEGORIES = new Map<string, string>();
+  ATRACE_CATEGORIES.set('gfx', 'Graphics');
+  ATRACE_CATEGORIES.set('input', 'Input');
+  ATRACE_CATEGORIES.set('view', 'View System');
+  ATRACE_CATEGORIES.set('webview', 'WebView');
+  ATRACE_CATEGORIES.set('wm', 'Window Manager');
+  ATRACE_CATEGORIES.set('am', 'Activity Manager');
+  ATRACE_CATEGORIES.set('sm', 'Sync Manager');
+  ATRACE_CATEGORIES.set('audio', 'Audio');
+  ATRACE_CATEGORIES.set('video', 'Video');
+  ATRACE_CATEGORIES.set('camera', 'Camera');
+  ATRACE_CATEGORIES.set('hal', 'Hardware Modules');
+  ATRACE_CATEGORIES.set('res', 'Resource Loading');
+  ATRACE_CATEGORIES.set('dalvik', 'ART & Dalvik');
+  ATRACE_CATEGORIES.set('rs', 'RenderScript');
+  ATRACE_CATEGORIES.set('bionic', 'Bionic C library');
+  ATRACE_CATEGORIES.set('gfx', 'Graphics');
+  ATRACE_CATEGORIES.set('power', 'Power Management');
+  ATRACE_CATEGORIES.set('pm', 'Package Manager');
+  ATRACE_CATEGORIES.set('ss', 'System Server');
+  ATRACE_CATEGORIES.set('database', 'Database');
+  ATRACE_CATEGORIES.set('network', 'Network');
+  ATRACE_CATEGORIES.set('adb', 'ADB');
+  ATRACE_CATEGORIES.set('vibrartor', 'Vibrator');
+  ATRACE_CATEGORIES.set('aidl', 'AIDL calls');
+  ATRACE_CATEGORIES.set('nnapi', 'Neural Network API');
+  ATRACE_CATEGORIES.set('rro', 'Resource Overlay');
+
+  return m(
+      'div',
+      m('.container',
+        Probe(
+            {
+              title: 'Atrace userspace annotations',
+              img: 'rec_atrace.png',
+              descr:
+                  `Enables C++ / Java codebase annotations via TRACE / os.Trace() `,
+              setEnabled: (cfg, val) => {
+                cfg.atrace = val;
+              },
+              isEnabled: (cfg) => cfg.atrace
+            },
+            Dropdown({
+              title: 'Categories',
+              cssClass: '.multicolumn.atrace_categories',
+              options: ATRACE_CATEGORIES,
+              set: (cfg, val) => {
+                cfg.atraceCategories = val;
+              },
+              get: (cfg) => cfg.atraceCategories
+            }), ),
+        Probe({
+          title: 'Extra kernel events',
+          img: 'rec_ftrace.png',
+          descr: `Enables extra events from the ftrace kernel tracer.`,
+          setEnabled: (cfg, val) => {
+            cfg.ftrace = val;
+          },
+          isEnabled: (cfg) => cfg.ftrace
+        }, )));
 }
 
 export const RecordPage = createPage({
@@ -389,6 +564,9 @@ export const RecordPage = createPage({
       case 'memory':
         page = MemorySettings();
         break;
+      case 'advanced':
+        page = AdvancedSettings();
+        break;
       default:
         page = RecSettings();
         routePage = 'buffers';
@@ -403,8 +581,13 @@ export const RecordPage = createPage({
               m('a[href="#!/record/buffers"]',
                 m(`li${routePage === 'buffers' ? '.active' : ''}`,
                   m('i.material-icons', 'tune'),
-                  m('.title', 'Recording settings'),
-                  m('.sub', 'Trace duration, buffer sizes'), ), ), ),
+                  m('.title', 'Recording options'),
+                  m('.sub', 'Buffer mode, size and duration'))),
+              m('a[href="#!/record/advanced"]',
+                m(`li${routePage === 'advanced' ? '.active' : ''}`,
+                  m('i.material-icons', 'settings'),
+                  m('.title', 'Advanced'),
+                  m('.sub', 'Advanced ftrace & atrace settings'))), ),
             m('header', 'Platform probes'),
             m('ul',
               m('a[href="#!/record/cpu"]',
@@ -422,16 +605,17 @@ export const RecordPage = createPage({
                   m('i.material-icons', 'memory'),
                   m('.title', 'Memory'),
                   m('.sub', 'Physical mem, VM, LMK'))),
-              m('a[href="#!/record/io"]',
-                m(`li${routePage === 'io' ? '.active' : ''}`,
-                  m('i.material-icons', 'sd_storage'),
-                  m('.title', 'Disk I/O'),
-                  m('.sub', 'TODO'))),
-              m('a[href="#!/record/peripherals"]',
-                m(`li${routePage === 'peripherals' ? '.active' : ''}`,
-                  m('i.material-icons', 'developer_board'),
-                  m('.title', 'Peripherals'),
-                  m('.sub', 'I2C, radio and other stuff'))), ),
+              //     m('a[href="#!/record/io"]',
+              //   m(`li${routePage === 'io' ? '.active' : ''}`,
+              //     m('i.material-icons', 'sd_storage'),
+              //     m('.title', 'Disk I/O'),
+              //     m('.sub', 'TODO'))),
+              // m('a[href="#!/record/peripherals"]',
+              //   m(`li${routePage === 'peripherals' ? '.active' : ''}`,
+              //     m('i.material-icons', 'developer_board'),
+              //     m('.title', 'Peripherals'),
+              //     m('.sub', 'I2C, radio and other stuff'))),
+              ),
             m('header', 'Android'),
             m('li',
               m('i.material-icons', 'android'),

@@ -109,6 +109,7 @@ function main() {
         '/': HomePage,
         '/viewer': ViewerPage,
         '/record': RecordPage,
+        '/record/advanced': RecordPage,
         '/record/buffers': RecordPage,
         '/record/cpu': RecordPage,
         '/record/memory': RecordPage,

@@ -131,6 +131,7 @@ export interface RecordConfig {
 
   // Global settings
   mode: RecordMode;
+  durationMs: number;
   durationSeconds: number;
   writeIntoFile: boolean;
   maxFileSizeMb: number;
@@ -157,6 +158,7 @@ export interface RecordConfig {
 
   // Ftrace
   ftrace: boolean;
+  atrace: boolean;
   ftraceEvents: string[];
   atraceCategories: string[];
   atraceApps: string[];
@@ -166,26 +168,27 @@ export interface RecordConfig {
   // Ps
   processMetadata: boolean;
   scanAllProcessesOnStart: boolean;
-  procStatusPeriodMs: number|null;
+  procStatusPeriodMs: number;
 
   // SysStats
   sysStats: boolean;
-  meminfoPeriodMs: number|null;
+  meminfoPeriodMs: number;
   meminfoCounters: string[];
-  vmstatPeriodMs: number|null;
+  vmstatPeriodMs: number;
   vmstatCounters: string[];
-  statPeriodMs: number|null;
+  statPeriodMs: number;
   statCounters: string[];
 
   // Battery and power
   power: boolean;
-  batteryPeriodMs: number|null;
+  batteryPeriodMs: number;
   batteryCounters: string[];
 }
 
 export function createEmptyRecordConfig(): RecordConfig {
   return {
     mode: 'STOP_WHEN_FULL',
+    durationMs: 10000.0,
     durationSeconds: 10.0,
     writeIntoFile: false,
     maxFileSizeMb: 32,
@@ -206,6 +209,7 @@ export function createEmptyRecordConfig(): RecordConfig {
     memProcStat: false,
 
     ftrace: false,
+    atrace: false,
     ftraceEvents: [],
     atraceApps: [],
     atraceCategories: [],
@@ -214,14 +218,14 @@ export function createEmptyRecordConfig(): RecordConfig {
 
     processMetadata: false,
     scanAllProcessesOnStart: false,
-    procStatusPeriodMs: null,
+    procStatusPeriodMs: 1000,
 
     sysStats: false,
-    meminfoPeriodMs: null,
+    meminfoPeriodMs: 1000,
     meminfoCounters: [],
-    vmstatPeriodMs: null,
+    vmstatPeriodMs: 1000,
     vmstatCounters: [],
-    statPeriodMs: null,
+    statPeriodMs: 1000,
     statCounters: [],
 
     power: false,
