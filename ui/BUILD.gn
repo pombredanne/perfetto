@@ -28,12 +28,13 @@ group("ui") {
   deps = [
     ":assets_dist",
     ":catapult_dist",
-    # ":controller_bundle_dist",
-    # ":engine_bundle_dist",
+    ":controller_bundle_dist",
+    ":engine_bundle_dist",
     ":frontend_bundle_dist",
     ":index_dist",
     ":scss",
     ":test_scripts",
+    ":typefaces_dist",
     ":wasm_dist",
   ]
 }
@@ -270,6 +271,7 @@ node_bin("transpile_all_ts") {
 
 scss_root = "src/assets/perfetto.scss"
 scss_srcs = [
+  "src/assets/typefaces.scss",
   "src/assets/sidebar.scss",
   "src/assets/topbar.scss",
   "src/assets/record.scss",
@@ -306,6 +308,21 @@ copy("index_dist") {
   ]
 }
 
+copy("typefaces_dist") {
+  sources = [
+    "../buildtools/typefaces/GoogleSans-Medium.woff2",
+    "../buildtools/typefaces/GoogleSans-Regular.woff2",
+    "../buildtools/typefaces/MaterialIcons.woff2",
+    "../buildtools/typefaces/Raleway-Regular.woff2",
+    "../buildtools/typefaces/Raleway-Thin.woff2",
+    "../buildtools/typefaces/RobotoMono-Regular.woff2",
+  ]
+
+  outputs = [
+    "$ui_dir/assets/{{source_file_part}}",
+  ]
+}
+
 copy("query_dist") {
   sources = [
     "query.html",
@@ -320,9 +337,11 @@ copy("assets_dist") {
               "src/assets/logo-3d.png",
               "src/assets/logo.png",
               "src/assets/rec_ring_buf.png",
+              "src/assets/rec_one_shot.png",
               "src/assets/rec_long_trace.png",
               "src/assets/rec_cpu_coarse.png",
               "src/assets/rec_cpu_fine.png",
+              "src/assets/rec_cpu_wakeup.png",
               "src/assets/battery_counters.png",
               "src/assets/cpu_freq.png",
               "src/assets/cpu_voltage.png",

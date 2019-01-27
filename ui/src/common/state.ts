@@ -63,16 +63,97 @@ export interface PermalinkConfig {
   hash?: string;       // Set by the controller when the link has been created.
 }
 
+export interface TraceTime {
+  startSec: number;
+  endSec: number;
+}
+
+export interface FrontendLocalState {
+  visibleTraceTime: TraceTime;
+  lastUpdate: number;  // Epoch in seconds (Date.now() / 1000).
+}
+
+export interface Status {
+  msg: string;
+  timestamp: number;  // Epoch in seconds (Date.now() / 1000).
+}
+
+export interface Note {
+  id: string;
+  timestamp: number;
+  color: string;
+  text: string;
+}
+
+export interface State {
+  route: string|null;
+  nextId: number;
+
+  /**
+   * State of the ConfigEditor.
+   */
+  recordConfig: RecordConfig;
+  displayConfigAsPbtxt: boolean;
+
+  /**
+   * Open traces.
+   */
+  engines: ObjectById<EngineConfig>;
+  traceTime: TraceTime;
+  trackGroups: ObjectById<TrackGroupState>;
+  tracks: ObjectById<TrackState>;
+  scrollingTracks: string[];
+  pinnedTracks: string[];
+  queries: ObjectById<QueryConfig>;
+  permalink: PermalinkConfig;
+  notes: ObjectById<Note>;
+  status: Status;
+  selectedNote: string|null;
+
+  /**
+   * This state is updated on the frontend at 60Hz and eventually syncronised to
+   * the controller at 10Hz. When the controller sends state updates to the
+   * frontend the frontend has special logic to pick whichever version of this
+   * key is most up to date.
+   */
+  frontendLocalState: FrontendLocalState;
+}
+
+export const defaultTraceTime = {
+  startSec: 0,
+  endSec: 10,
+};
+
+export declare type RecordMode = 'STOP_WHEN_FULL' | 'RING_BUFFER' | 'LONG_TRACE';
+
 export interface RecordConfig {
   [key: string]: null|number|boolean|string|string[];
 
   // Global settings
+  mode: RecordMode;
   durationSeconds: number;
   writeIntoFile: boolean;
+  maxFileSizeMb: number;
   fileWritePeriodMs: number|null;
 
   // Buffer setup
   bufferSizeMb: number;
+
+  // CPU probes
+  cpuCoarse: boolean;
+  cpuSched: boolean;
+  cpuLatency: boolean;
+
+  // Power probes
+  batteryDrain: boolean;
+  boardSensors: boolean;
+  cpuFreq: boolean;
+
+  // Memory probes
+  memMeminfo: boolean;
+  memVmstat: boolean;
+  memLmk: boolean;
+  memProcStat: boolean;
 
   // Ftrace
   ftrace: boolean;
@@ -102,89 +183,27 @@ export interface RecordConfig {
   batteryCounters: string[];
 }
 
-export interface TraceTime {
-  startSec: number;
-  endSec: number;
-}
-
-export interface FrontendLocalState {
-  visibleTraceTime: TraceTime;
-  lastUpdate: number;  // Epoch in seconds (Date.now() / 1000).
-}
-
-export interface Status {
-  msg: string;
-  timestamp: number;  // Epoch in seconds (Date.now() / 1000).
-}
-
-export interface State {
-  route: string|null;
-  nextId: number;
-
-  /**
-   * State of the ConfigEditor.
-   */
-  recordConfig: RecordConfig;
-  displayConfigAsPbtxt: boolean;
-
-  /**
-   * Open traces.
-   */
-  engines: ObjectById<EngineConfig>;
-  traceTime: TraceTime;
-  trackGroups: ObjectById<TrackGroupState>;
-  tracks: ObjectById<TrackState>;
-  scrollingTracks: string[];
-  pinnedTracks: string[];
-  queries: ObjectById<QueryConfig>;
-  permalink: PermalinkConfig;
-  status: Status;
-
-  /**
-   * This state is updated on the frontend at 60Hz and eventually syncronised to
-   * the controller at 10Hz. When the controller sends state updates to the
-   * frontend the frontend has special logic to pick whichever version of this
-   * key is most up to date.
-   */
-  frontendLocalState: FrontendLocalState;
-}
-
-export const defaultTraceTime = {
-  startSec: 0,
-  endSec: 10,
-};
-
-export function createEmptyState(): State {
-  return {
-    route: null,
-    nextId: 0,
-    engines: {},
-    traceTime: {...defaultTraceTime},
-    tracks: {},
-    trackGroups: {},
-    pinnedTracks: [],
-    scrollingTracks: [],
-    queries: {},
-    permalink: {},
-
-    recordConfig: createEmptyRecordConfig(),
-    displayConfigAsPbtxt: false,
-
-    frontendLocalState: {
-      visibleTraceTime: {...defaultTraceTime},
-      lastUpdate: 0,
-    },
-
-    status: {msg: '', timestamp: 0},
-  };
-}
-
 export function createEmptyRecordConfig(): RecordConfig {
   return {
+    mode: 'STOP_WHEN_FULL',
     durationSeconds: 10.0,
     writeIntoFile: false,
+    maxFileSizeMb: 32,
     fileWritePeriodMs: null,
     bufferSizeMb: 10.0,
+
+    cpuCoarse: false,
+    cpuSched: false,
+    cpuLatency: false,
+
+    batteryDrain: false,
+    boardSensors: false,
+    cpuFreq: false,
+
+    memMeminfo: false,
+    memVmstat: false,
+    memLmk: false,
+    memProcStat: false,
 
     ftrace: false,
     ftraceEvents: [],
@@ -208,5 +227,32 @@ export function createEmptyRecordConfig(): RecordConfig {
     power: false,
     batteryPeriodMs: 1000,
     batteryCounters: [],
+  };
+}
+
+export function createEmptyState(): State {
+  return {
+    route: null,
+    nextId: 0,
+    engines: {},
+    traceTime: {...defaultTraceTime},
+    tracks: {},
+    trackGroups: {},
+    pinnedTracks: [],
+    scrollingTracks: [],
+    queries: {},
+    permalink: {},
+    notes: {},
+
+    recordConfig: createEmptyRecordConfig(),
+    displayConfigAsPbtxt: false,
+
+    frontendLocalState: {
+      visibleTraceTime: {...defaultTraceTime},
+      lastUpdate: 0,
+    },
+
+    status: {msg: '', timestamp: 0},
+    selectedNote: null,
   };
 }
