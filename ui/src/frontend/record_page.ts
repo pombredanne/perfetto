@@ -62,7 +62,7 @@ function Probe(cfg: ProbeConfig, ...children: m.Children[]) {
       `.probe${enabled ? '.enabled' : ''}`,
       m(`img[src=assets/${cfg.img}]`, {
         onclick: () => {
-          onToggle(enabled);
+          onToggle(!enabled);
         }
       }),
       m('label',

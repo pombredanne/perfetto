@@ -154,6 +154,8 @@
     grid-template-rows: 40px 1fr;
     grid-template-columns: 220px 1fr;
     grid-template-areas: "label label" "img descr";
+    transition: color 0.2s ease;
+
 
     padding: 20px 5px 20px 20px;
 
@@ -171,8 +173,14 @@
       opacity: 0.5;
     }
 
-    &:hover >img {
-      opacity: 1;
+    &:hover {
+      >img { opacity: 1; }
+      >label {
+        color: #333;
+        input[type=checkbox]::after {
+          background: hsl(207, 60%, 60%);
+        }
+      }
     }
 
     >label {
@@ -219,10 +227,7 @@
           background: #8398b7;
         }
         &:focus::after {
-          background: hsl(207, 79%, 69%);
-        }
-        &:hover::after {
-          background: hsl(207, 79%, 29%);
+          background: hsl(207, 60%, 60%);
         }
         &:checked::after {
           left: 20px;
