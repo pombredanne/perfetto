@@ -263,9 +263,9 @@ function RecSettings() {
             predefinedValues: FTRACE_BUF_MB,
             unit: 'MB',
             set: (cfg, val) => {
-              cfg.ftraceBufferSizeKb = val;
+              cfg.ftraceBufferSizeKb = val * 1024;
             },
-            get: (cfg) => cfg.ftraceBufferSizeKb || 0
+            get: (cfg) => Math.ceil(cfg.ftraceBufferSizeKb / 1024)
           }),
 
           Slider({

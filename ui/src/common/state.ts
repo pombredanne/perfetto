@@ -162,8 +162,8 @@ export interface RecordConfig {
   ftraceEvents: string[];
   atraceCategories: string[];
   atraceApps: string[];
-  ftraceDrainPeriodMs: number|null;
-  ftraceBufferSizeKb: number|null;
+  ftraceDrainPeriodMs: number;
+  ftraceBufferSizeKb: number;
 
   // Ps
   processMetadata: boolean;
@@ -191,7 +191,7 @@ export function createEmptyRecordConfig(): RecordConfig {
     durationMs: 10000.0,
     durationSeconds: 10.0,
     writeIntoFile: false,
-    maxFileSizeMb: 32,
+    maxFileSizeMb: 100,
     fileWritePeriodMs: null,
     bufferSizeMb: 10.0,
 
