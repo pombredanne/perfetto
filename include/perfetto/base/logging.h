@@ -37,10 +37,16 @@
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/utils.h"
 
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID) && \
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID) &&    \
+    PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD) && \
     defined(PERFETTO_ANDROID_ASYNC_SAFE_LOG)
 // For binaries which need a very lightweight logging implementation.
+// Note that this header is incompatible with android/log.h.
 #include <async_safe/log.h>
+#elif defined(PERFETTO_ANDROID_ASYNC_SAFE_LOG) &&   \
+    !(PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD) && \
+      PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID))
+#error "Async-safe logging is limited to Android tree builds"
 #elif PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
 // Normal android logging.
 #include <android/log.h>
