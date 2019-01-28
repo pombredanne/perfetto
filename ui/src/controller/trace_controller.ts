@@ -32,8 +32,7 @@ import {CPU_SLICE_TRACK_KIND} from '../tracks/cpu_slices/common';
 import {
   PROCESS_SCHEDULING_TRACK_KIND
 } from '../tracks/process_scheduling/common';
-
-// import {PROCESS_SUMMARY_TRACK} from '../tracks/process_summary/common';
+import {PROCESS_SUMMARY_TRACK} from '../tracks/process_summary/common';
 
 import {Child, Children, Controller} from './controller';
 import {globals} from './globals';
@@ -328,7 +327,7 @@ export class TraceController extends Controller<States> {
           pid,
           thread.name as threadName,
           process.name as processName,
-          total_dur
+          total_dur as totalDur
         from
           thread
           left join process using(upid)
@@ -350,6 +349,7 @@ export class TraceController extends Controller<States> {
            pid: NUM_NULL,
            threadName: STR_NULL,
            processName: STR_NULL,
+           totalDur: NUM_NULL,
          })) {
       const utid = row.utid;
       const tid = row.tid;
@@ -357,6 +357,7 @@ export class TraceController extends Controller<States> {
       const pid = row.pid;
       const threadName = row.threadName;
       const processName = row.threadName;
+      const hasSchedEvents = !!row.totalDur;
 
       const maxDepth = utid === null ? undefined : utidToMaxDepth.get(utid);
       if (maxDepth === undefined &&
@@ -377,10 +378,12 @@ export class TraceController extends Controller<States> {
         }
 
         const pidForColor = pid || tid || upid || utid || 0;
+        const kind = hasSchedEvents ? PROCESS_SCHEDULING_TRACK_KIND :
+                                      PROCESS_SUMMARY_TRACK;
         addSummaryTrackActions.push(Actions.addTrack({
           id: summaryTrackId,
           engineId: this.engineId,
-          kind: PROCESS_SCHEDULING_TRACK_KIND,
+          kind,
           name: `${upid === null ? tid : pid} summary`,
           config: {pidForColor, upid, utid},
         }));
