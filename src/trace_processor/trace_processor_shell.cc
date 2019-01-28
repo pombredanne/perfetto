@@ -382,13 +382,13 @@ int RunQueryAndPrintResult(FILE* input, FILE* output) {
         is_query_error = true;
         return;
       } else if (res.num_records() != 0) {
-        // if (has_output_printed) {
-        //  PERFETTO_ELOG(
-        //      "More than one query generated result rows. This is "
-        //      "unsupported.");
-        //  is_query_error = true;
-        //  return;
-        //}
+        if (has_output_printed) {
+          PERFETTO_ELOG(
+              "More than one query generated result rows. This is "
+              "unsupported.");
+          is_query_error = true;
+          return;
+        }
         has_output_printed = true;
       }
       PrintQueryResultAsCsv(res, output);

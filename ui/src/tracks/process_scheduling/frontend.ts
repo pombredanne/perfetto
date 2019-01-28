@@ -1,4 +1,4 @@
-// Copyright (C) 2018 The Android Open Source Project
+// Copyright (C) 2019 The Android Open Source Project
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import {searchEq, searchRange} from '../../base/binary_search';
 import {assertTrue} from '../../base/logging';
 import {Actions} from '../../common/actions';
 import {TrackState} from '../../common/state';
 import {checkerboardExcept} from '../../frontend/checkerboard';
+import {colorForThread, colorForTid} from '../../frontend/colorizer';
 import {globals} from '../../frontend/globals';
 import {Track} from '../../frontend/track';
 import {trackRegistry} from '../../frontend/track_registry';
@@ -31,59 +33,6 @@ import {
 const MARGIN_TOP = 5;
 const RECT_HEIGHT = 30;
 
-interface Color {
-  c: string;
-  h: number;
-  s: number;
-  l: number;
-}
-const MD_PALETTE: Color[] = [
-  {c: 'red', h: 4, s: 90, l: 58},
-  {c: 'pink', h: 340, s: 82, l: 52},
-  {c: 'purple', h: 291, s: 64, l: 42},
-  {c: 'deep purple', h: 262, s: 52, l: 47},
-  {c: 'indigo', h: 231, s: 48, l: 48},
-  {c: 'blue', h: 207, s: 90, l: 54},
-  {c: 'light blue', h: 199, s: 98, l: 48},
-  {c: 'cyan', h: 187, s: 100, l: 42},
-  {c: 'teal', h: 174, s: 100, l: 29},
-  {c: 'green', h: 122, s: 39, l: 49},
-  {c: 'light green', h: 88, s: 50, l: 53},
-  {c: 'lime', h: 66, s: 70, l: 54},
-  {c: 'yellow', h: 54, s: 100, l: 62},
-  {c: 'amber', h: 45, s: 100, l: 51},
-  {c: 'orange', h: 36, s: 100, l: 50},
-  {c: 'deep organge', h: 14, s: 100, l: 57},
-  {c: 'brown', h: 16, s: 25, l: 38},
-  {c: 'grey', h: 0, s: 0, l: 62},
-  {c: 'blue gray', h: 200, s: 18, l: 46},
-];
-
-function hash(s: string, max: number): number {
-  let hash = 0x811c9dc5 & 0xfffffff;
-  for (let i = 0; i < s.length; i++) {
-    hash ^= s.charCodeAt(i);
-    hash = (hash * 16777619) & 0xffffffff;
-  }
-  return Math.abs(hash) % max;
-}
-
-function cropText(str: string, charWidth: number, rectWidth: number) {
-  const maxTextWidth = rectWidth - 4;
-  let displayText = '';
-  const nameLength = str.length * charWidth;
-  if (nameLength < maxTextWidth) {
-    displayText = str;
-  } else {
-    // -3 for the 3 ellipsis.
-    const displayedChars = Math.floor(maxTextWidth / charWidth) - 3;
-    if (displayedChars > 3) {
-      displayText = str.substring(0, displayedChars) + '...';
-    }
-  }
-  return displayText;
-}
-
 function getCurResolution() {
   // Truncate the resolution to the closest power of 10.
   const resolution = globals.frontendLocalState.timeScale.deltaPxToDuration(1);
@@ -98,14 +47,10 @@ class ProcessSchedulingTrack extends Track<Config, Data> {
 
   private mouseXpos?: number;
   private reqPending = false;
-  private hue: number;
   private utidHoveredInThisTrack = -1;
 
   constructor(trackState: TrackState) {
     super(trackState);
-    // TODO: this needs to be kept in sync with the hue generation algorithm
-    // of overview_timeline_panel.ts
-    this.hue = (128 + (32 * 0)) % 256;
   }
 
   reqDataDeferred() {
@@ -165,7 +110,8 @@ class ProcessSchedulingTrack extends Track<Config, Data> {
     let lastX = startPx;
     let lastY = bottomY;
 
-    ctx.fillStyle = `hsl(${this.hue}, 50%, 60%)`;
+    const color = colorForTid(this.config.pidForColor);
+    ctx.fillStyle = `hsl(${color.h}, ${color.s}%, ${color.l}%)`;
     ctx.beginPath();
     ctx.moveTo(lastX, lastY);
     for (let i = 0; i < data.utilizations.length; i++) {
@@ -188,64 +134,43 @@ class ProcessSchedulingTrack extends Track<Config, Data> {
     assertTrue(data.starts.length === data.ends.length);
     assertTrue(data.starts.length === data.utids.length);
 
-    ctx.textAlign = 'center';
-    ctx.font = '12px Google Sans';
-    const charWidth = ctx.measureText('dbpqaouk').width / 8;
+    const cpuTrackHeight = Math.floor(RECT_HEIGHT / data.numCpus);
 
     for (let i = 0; i < data.starts.length; i++) {
       const tStart = data.starts[i];
       const tEnd = data.ends[i];
       const utid = data.utids[i];
+      const cpu = data.cpus[i];
       if (tEnd <= visibleWindowTime.start || tStart >= visibleWindowTime.end) {
         continue;
       }
       const rectStart = timeScale.timeToPx(tStart);
       const rectEnd = timeScale.timeToPx(tEnd);
       const rectWidth = rectEnd - rectStart;
-      if (rectWidth < 0.1) continue;
-
-
-      // TODO: consider de-duplicating this code with the copied one from
-      // chrome_slices/frontend.ts.
-      let title = `[utid:${utid}]`;
-      let subTitle = '';
-      const color = Object.assign({}, MD_PALETTE[14]);
+      if (rectWidth < 0.3) continue;
 
       const threadInfo = globals.threads.get(utid);
-      if (threadInfo !== undefined) {
-        const hasProc = !!threadInfo.pid;
-        const procName = threadInfo.procName || '';
-        let hashKey = threadInfo.tid;
-        if (hasProc) {
-          title = `${procName} [${threadInfo.pid}]`;
-          subTitle = `${threadInfo.threadName} [${threadInfo.tid}]`;
-          hashKey = threadInfo.pid!;
+      const pid = (threadInfo ? threadInfo.pid : -1) || -1;
+
+      const isHovering = globals.frontendLocalState.hoveredUtid !== -1;
+      const isThreadHovered = globals.frontendLocalState.hoveredUtid === utid;
+      const isProcessHovered = globals.frontendLocalState.hoveredPid === pid;
+      const color = colorForThread(threadInfo);
+      if (isHovering && !isThreadHovered) {
+        if (!isProcessHovered) {
+          color.l = 90;
+          color.s = 0;
         } else {
-          title = `${threadInfo.threadName} [${threadInfo.tid}]`;
+          color.l = Math.min(color.l + 30, 80);
+          color.s -= 20;
         }
-        const colorIdx = hash(hashKey.toString(), 16);
-        Object.assign(color, MD_PALETTE[colorIdx]);
+      } else {
+        color.l = Math.min(color.l + 10, 60);
+        color.s -= 20;
       }
-
-      const hovered = globals.frontendLocalState.highlightedUtid === utid;
-      color.l =
-          hovered ? Math.max(color.l - 40, 20) : Math.min(color.l + 10, 80);
-      color.s -= 20;
       ctx.fillStyle = `hsl(${color.h}, ${color.s}%, ${color.l}%)`;
-      ctx.fillRect(rectStart, MARGIN_TOP, rectEnd - rectStart, RECT_HEIGHT);
-
-      // Don't render text when we have less than 5px to play with.
-      if (rectWidth < 5) continue;
-
-      title = cropText(title, charWidth, rectWidth);
-      subTitle = cropText(subTitle, charWidth, rectWidth);
-      const rectXCenter = rectStart + rectWidth / 2;
-      ctx.fillStyle = '#fff';
-      ctx.font = '12px Google Sans';
-      ctx.fillText(title, rectXCenter, MARGIN_TOP + RECT_HEIGHT / 2 - 3);
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-      ctx.font = '10px Google Sans';
-      ctx.fillText(subTitle, rectXCenter, MARGIN_TOP + RECT_HEIGHT / 2 + 11);
+      const y = MARGIN_TOP + cpuTrackHeight * cpu + cpu;
+      ctx.fillRect(rectStart, y, rectEnd - rectStart, cpuTrackHeight);
     }
 
     const hoveredThread = globals.threads.get(this.utidHoveredInThisTrack);
@@ -277,31 +202,34 @@ class ProcessSchedulingTrack extends Track<Config, Data> {
     const data = this.data();
     this.mouseXpos = x;
     if (data === undefined || data.kind === 'summary') return;
-    const {timeScale} = globals.frontendLocalState;
     if (y < MARGIN_TOP || y > MARGIN_TOP + RECT_HEIGHT) {
       this.utidHoveredInThisTrack = -1;
-      globals.frontendLocalState.setHighlightedUtid(-1);
+      globals.frontendLocalState.setHoveredUtidAndPid(-1, -1);
       return;
     }
-    const t = timeScale.pxToTime(x);
-    let hoveredUtid = -1;
 
-    for (let i = 0; i < data.starts.length; i++) {
-      const tStart = data.starts[i];
-      const tEnd = data.ends[i];
-      const utid = data.utids[i];
-      if (tStart <= t && t <= tEnd) {
-        hoveredUtid = utid;
-        break;
-      }
+    const cpuTrackHeight = Math.floor(RECT_HEIGHT / data.numCpus);
+    const cpu = Math.floor((y - MARGIN_TOP) / (cpuTrackHeight + 1));
+    const {timeScale} = globals.frontendLocalState;
+    const t = timeScale.pxToTime(x);
+
+    const [i, j] = searchRange(data.starts, t, searchEq(data.cpus, cpu));
+    if (i === j || i >= data.starts.length || t > data.ends[i]) {
+      this.utidHoveredInThisTrack = -1;
+      globals.frontendLocalState.setHoveredUtidAndPid(-1, -1);
+      return;
     }
-    this.utidHoveredInThisTrack = hoveredUtid;
-    globals.frontendLocalState.setHighlightedUtid(hoveredUtid);
+
+    const utid = data.utids[i];
+    this.utidHoveredInThisTrack = utid;
+    const threadInfo = globals.threads.get(utid);
+    const pid = threadInfo ? (threadInfo.pid ? threadInfo.pid : -1) : -1;
+    globals.frontendLocalState.setHoveredUtidAndPid(utid, pid);
   }
 
   onMouseOut() {
     this.utidHoveredInThisTrack = -1;
-    globals.frontendLocalState.setHighlightedUtid(-1);
+    globals.frontendLocalState.setHoveredUtidAndPid(-1, -1);
     this.mouseXpos = 0;
   }
 }

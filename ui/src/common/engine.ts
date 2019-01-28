@@ -15,13 +15,6 @@
 import {RawQueryResult, TraceProcessor} from './protos';
 import {TimeSpan} from './time';
 
-function logQuery(query: string) {
-  if (!(self as any).queries) {
-    (self as any).queries = [];
-  }
-  (self as any).queries.push(query);
-}
-
 /**
  * Abstract interface of a trace proccessor.
  * This class is wrapper for multiple proto services defined in:
@@ -58,7 +51,6 @@ export abstract class Engine {
    */
   query(sqlQuery: string): Promise<RawQueryResult> {
     const timeQueuedNs = Math.floor(performance.now() * 1e6);
-    logQuery(sqlQuery);
     return this.rpc.rawQuery({sqlQuery, timeQueuedNs});
   }
 

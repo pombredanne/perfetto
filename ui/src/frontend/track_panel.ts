@@ -21,11 +21,8 @@ import {globals} from './globals';
 import {drawGridLines} from './gridline_helper';
 import {Panel, PanelSize} from './panel';
 import {Track} from './track';
+import {TRACK_SHELL_WIDTH} from './track_constants';
 import {trackRegistry} from './track_registry';
-
-// TODO(hjd): We should remove the constant where possible.
-// If any uses can't be removed we should read this constant from CSS.
-export const TRACK_SHELL_WIDTH = 250;
 
 function isPinned(id: string) {
   return globals.state.pinnedTracks.indexOf(id) !== -1;
@@ -58,7 +55,11 @@ class TrackShell implements m.ClassComponent<TrackShellAttrs> {
           ondragleave: this.ondragleave.bind(this),
           ondrop: this.ondrop.bind(this),
         },
-        m('h1', attrs.trackState.name),
+        m('h1',
+          {
+            title: attrs.trackState.name,
+          },
+          attrs.trackState.name),
         m(TrackButton, {
           action: Actions.toggleTrackPinned({trackId: attrs.trackState.id}),
           i: isPinned(attrs.trackState.id) ? 'star' : 'star_border',
@@ -116,10 +117,8 @@ class TrackShell implements m.ClassComponent<TrackShellAttrs> {
   }
 }
 
-interface TrackContentAttrs {
-  track: Track;
-}
-class TrackContent implements m.ClassComponent<TrackContentAttrs> {
+export interface TrackContentAttrs { track: Track; }
+export class TrackContent implements m.ClassComponent<TrackContentAttrs> {
   view({attrs}: m.CVnode<TrackContentAttrs>) {
     return m('.track-content', {
       onmousemove: (e: MouseEvent) => {
@@ -193,12 +192,14 @@ export class TrackPanel extends Panel<TrackPanelAttrs> {
 
   renderCanvas(ctx: CanvasRenderingContext2D, size: PanelSize) {
     ctx.save();
-    ctx.translate(TRACK_SHELL_WIDTH, 0);
     drawGridLines(
         ctx,
         globals.frontendLocalState.timeScale,
         globals.frontendLocalState.visibleWindowTime,
+        size.width,
         size.height);
+
+    ctx.translate(TRACK_SHELL_WIDTH, 0);
 
     this.track.renderCanvas(ctx);
     ctx.restore();

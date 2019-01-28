@@ -32,14 +32,19 @@ export interface SliceData {
   start: number;
   end: number;
   resolution: number;
+  numCpus: number;
 
   // Slices are stored in a columnar fashion. All fields have the same length.
   starts: Float64Array;
   ends: Float64Array;
   utids: Uint32Array;
+  cpus: Uint32Array;
 }
 
 export type Data = SummaryData | SliceData;
 
-
-export interface Config { upid: number; }
+export interface Config {
+  pidForColor: number;
+  upid: null|number;
+  utid: number;
+}
