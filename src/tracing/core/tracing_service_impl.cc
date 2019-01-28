@@ -379,8 +379,12 @@ bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
     tracing_session->buffers_index.push_back(global_id);
     const size_t buf_size_bytes = buffer_cfg.size_kb() * 1024u;
     total_buf_size_kb += buffer_cfg.size_kb();
-    auto it_and_inserted =
-        buffers_.emplace(global_id, TraceBuffer::Create(buf_size_bytes));
+    TraceBuffer::OverwritePolicy policy =
+        buffer_cfg.fill_policy() == TraceConfig::BufferConfig::DISCARD
+            ? TraceBuffer::kDiscard
+            : TraceBuffer::kOverwrite;
+    auto it_and_inserted = buffers_.emplace(
+        global_id, TraceBuffer::Create(buf_size_bytes, policy));
     PERFETTO_DCHECK(it_and_inserted.second);  // buffers_.count(global_id) == 0.
     std::unique_ptr<TraceBuffer>& trace_buffer = it_and_inserted.first->second;
     if (!trace_buffer) {
@@ -1576,6 +1580,12 @@ void TracingServiceImpl::SnapshotClocks(std::vector<TracePacket>* packets) {
       PERFETTO_DLOG("clock_gettime failed for clock %d", clock.id);
   }
   for (auto& clock : clocks) {
+    // Put a timestamp in the base packet for sorting on the
+    // trace processor side.
+    if (clock.type == protos::ClockSnapshot::Clock::BOOTTIME) {
+      packet.set_timestamp(
+          static_cast<uint64_t>(base::FromPosixTimespec(clock.ts).count()));
+    };
     protos::ClockSnapshot::Clock* c = clock_snapshot->add_clocks();
     c->set_type(clock.type);
     c->set_timestamp(
