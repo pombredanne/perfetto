@@ -61,7 +61,7 @@ void HeapTracker::RecordMalloc(const std::vector<FrameData>& callstack,
       // already happened at committed_sequence_number_, while in fact the free
       // might not have happened until right before this operation.
 
-      if (alloc.sequence_number > commited_sequence_number_) {
+      if (alloc.sequence_number > committed_sequence_number_) {
         // Only count the previous allocation if it hasn't already been
         // committed to avoid double counting it.
         alloc.AddToCallstackAllocations();
@@ -84,7 +84,7 @@ void HeapTracker::RecordMalloc(const std::vector<FrameData>& callstack,
 }
 
 void HeapTracker::RecordOperation(uint64_t sequence_number, uint64_t address) {
-  if (sequence_number != commited_sequence_number_ + 1) {
+  if (sequence_number != committed_sequence_number_ + 1) {
     pending_operations_.emplace(sequence_number, address);
     return;
   }
@@ -95,14 +95,14 @@ void HeapTracker::RecordOperation(uint64_t sequence_number, uint64_t address) {
   // committed.
   auto it = pending_operations_.begin();
   while (it != pending_operations_.end() &&
-         it->first == commited_sequence_number_ + 1) {
+         it->first == committed_sequence_number_ + 1) {
     CommitOperation(it->first, it->second);
     it = pending_operations_.erase(it);
   }
 }
 
 void HeapTracker::CommitOperation(uint64_t sequence_number, uint64_t address) {
-  commited_sequence_number_++;
+  committed_sequence_number_++;
 
   // We will see many frees for addresses we do not know about.
   auto leaf_it = allocations_.find(address);
@@ -361,8 +361,18 @@ void BookkeepingThread::HandleBookkeepingRecord(BookkeepingRecord* rec) {
     trace_writer->Flush(dump_rec.callback);
   } else if (rec->record_type == BookkeepingRecord::Type::Free) {
     FreeRecord& free_rec = rec->free_record;
-    FreePageEntry* entries = free_rec.metadata->entries;
-    uint64_t num_entries = free_rec.metadata->num_entries;
+    FreeMetadata& free_metadata = *free_rec.metadata;
+
+    if (bookkeeping_data->client_generation < free_metadata.client_generation) {
+      bookkeeping_data->heap_tracker = HeapTracker(&callsites_);
+      bookkeeping_data->client_generation = free_metadata.client_generation;
+    } else if (bookkeeping_data->client_generation >
+               free_metadata.client_generation) {
+      return;
+    }
+
+    FreePageEntry* entries = free_metadata.entries;
+    uint64_t num_entries = free_metadata.num_entries;
     if (num_entries > kFreePageSize)
       return;
     for (size_t i = 0; i < num_entries; ++i) {
@@ -372,6 +382,17 @@ void BookkeepingThread::HandleBookkeepingRecord(BookkeepingRecord* rec) {
     }
   } else if (rec->record_type == BookkeepingRecord::Type::Malloc) {
     AllocRecord& alloc_rec = rec->alloc_record;
+    AllocMetadata& alloc_metadata = alloc_rec.alloc_metadata;
+
+    if (bookkeeping_data->client_generation <
+        alloc_metadata.client_generation) {
+      bookkeeping_data->heap_tracker = HeapTracker(&callsites_);
+      bookkeeping_data->client_generation = alloc_metadata.client_generation;
+    } else if (bookkeeping_data->client_generation >
+               alloc_metadata.client_generation) {
+      return;
+    }
+
     bookkeeping_data->heap_tracker.RecordMalloc(
         alloc_rec.frames, alloc_rec.alloc_metadata.alloc_address,
         alloc_rec.alloc_metadata.total_size,
