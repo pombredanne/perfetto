@@ -90,7 +90,9 @@ void SliceTracker::EndAndroid(int64_t timestamp,
     return;
   }
   uint32_t actual_tgid = actual_tgid_it->second;
-  if (atrace_tgid != actual_tgid) {
+  // atrace_tgid can be 0 in older android versions where the end event would
+  // not contain the value.
+  if (atrace_tgid != 0 && atrace_tgid != actual_tgid) {
     PERFETTO_DLOG("Mismatched atrace pid %u and looked up pid %u", atrace_tgid,
                   actual_tgid);
     context_->storage->IncrementStats(stats::atrace_tgid_mismatch);
