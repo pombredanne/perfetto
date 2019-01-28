@@ -91,7 +91,7 @@ void SliceTracker::EndAndroid(int64_t timestamp,
   }
   uint32_t actual_tgid = actual_tgid_it->second;
   if (atrace_tgid != actual_tgid) {
-    PERFETTO_ELOG("Mismatched atrace pid %u and looked up pid %u", atrace_tgid,
+    PERFETTO_DLOG("Mismatched atrace pid %u and looked up pid %u", atrace_tgid,
                   actual_tgid);
     context_->storage->IncrementStats(stats::atrace_tgid_mismatch);
   }
