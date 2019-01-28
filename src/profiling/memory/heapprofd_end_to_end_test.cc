@@ -169,7 +169,7 @@ TEST_F(HeapprofdEndToEnd, Smoke) {
   heapprofd_config->mutable_continuous_dump_config()->set_dump_interval_ms(100);
 
   helper.StartTracing(trace_config);
-  helper.WaitForTracingDisabled(5000);
+  helper.WaitForTracingDisabled(10000);
 
   helper.ReadData();
   helper.WaitForReadData();
@@ -227,7 +227,7 @@ TEST_F(HeapprofdEndToEnd, FinalFlush) {
   heapprofd_config->set_all(false);
 
   helper.StartTracing(trace_config);
-  helper.WaitForTracingDisabled(5000);
+  helper.WaitForTracingDisabled(10000);
 
   helper.ReadData();
   helper.WaitForReadData();
