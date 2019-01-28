@@ -1478,6 +1478,10 @@ void ProtoTraceParser::ParseTraceStats(TraceBlobView packet) {
               storage->SetIndexedStats(stats::traced_buf_chunks_overwritten,
                                        buf_num, fld2.as_int64());
               break;
+            case protos::TraceStats::BufferStats::kChunksDiscardedFieldNumber:
+              storage->SetIndexedStats(stats::traced_buf_chunks_discarded,
+                                       buf_num, fld2.as_int64());
+              break;
             case protos::TraceStats::BufferStats::kChunksReadFieldNumber:
               storage->SetIndexedStats(stats::traced_buf_chunks_read, buf_num,
                                        fld2.as_int64());

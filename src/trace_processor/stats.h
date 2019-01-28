@@ -61,6 +61,7 @@ namespace stats {
   F(traced_buf_bytes_overwritten,               kIndexed, kInfo,  kTrace),    \
   F(traced_buf_bytes_read,                      kIndexed, kInfo,  kTrace),    \
   F(traced_buf_bytes_written,                   kIndexed, kInfo,  kTrace),    \
+  F(traced_buf_chunks_discarded,                kIndexed, kInfo,  kTrace),    \
   F(traced_buf_chunks_overwritten,              kIndexed, kInfo,  kTrace),    \
   F(traced_buf_chunks_read,                     kIndexed, kInfo,  kTrace),    \
   F(traced_buf_chunks_rewritten,                kIndexed, kInfo,  kTrace),    \
