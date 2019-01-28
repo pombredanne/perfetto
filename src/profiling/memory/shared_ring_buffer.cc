@@ -65,7 +65,7 @@ ScopedSpinlock::ScopedSpinlock(std::atomic<bool>* lock, Mode mode)
   }
 }
 
-ScopedSpinlock::ScopedSpinlock(ScopedSpinlock&& other)
+ScopedSpinlock::ScopedSpinlock(ScopedSpinlock&& other) noexcept
     : lock_(other.lock_), locked_(other.locked_) {
   other.locked_ = false;
 }
