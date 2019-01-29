@@ -21,7 +21,7 @@ import {globals} from '../../frontend/globals';
 import {Track} from '../../frontend/track';
 import {trackRegistry} from '../../frontend/track_registry';
 import {toNs} from '../../common/time';
-import { search } from '../../base/binary_search';
+import {search} from '../../base/binary_search';
 
 import {
   Config,
