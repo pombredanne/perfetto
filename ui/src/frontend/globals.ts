@@ -23,10 +23,10 @@ type Dispatch = (action: DeferredAction) => void;
 type TrackDataStore = Map<string, {}>;
 type QueryResultsStore = Map<string, {}>;
 export interface ClickSelection {
-  ts: number;
-  dur: number;
-  priority: number;
-  endState: string;
+  ts?: number;
+  dur?: number;
+  priority?: number;
+  endState?: string;
 }
 
 export interface QuantizedLoad {
@@ -74,7 +74,7 @@ class Globals {
     this._queryResults = new Map<string, {}>();
     this._overviewStore = new Map<string, QuantizedLoad[]>();
     this._threadMap = new Map<number, ThreadDesc>();
-    this._clickSelection = {ts: -1,dur: -1,priority: -1,endState: ""};
+    this._clickSelection = {};
   }
 
   get state(): State {
@@ -120,7 +120,7 @@ class Globals {
 
   set clickSelection(click: ClickSelection) {
     this._clickSelection = assertExists(click);
-  } 
+  }
 
   resetForTesting() {
     this._dispatch = undefined;

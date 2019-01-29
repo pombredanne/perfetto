@@ -77,5 +77,4 @@ export class FrontendLocalState {
     this.hoveredPid = pid;
     globals.rafScheduler.scheduleRedraw();
   }
-
 }

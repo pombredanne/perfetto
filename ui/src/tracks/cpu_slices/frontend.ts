@@ -21,7 +21,7 @@ import {globals} from '../../frontend/globals';
 import {Track} from '../../frontend/track';
 import {trackRegistry} from '../../frontend/track_registry';
 import {toNs} from '../../common/time';
-
+import { search } from '../../base/binary_search';
 
 import {
   Config,
@@ -30,7 +30,6 @@ import {
   SliceData,
   SummaryData
 } from './common';
-import { search } from '../../base/binary_search';
 
 
 const MARGIN_TOP = 5;
@@ -281,7 +280,7 @@ class CpuSliceTrack extends Track<Config, Data> {
     this.mouseXpos = 0;
   }
 
-  onMouseClick({x}: {x: number, y: number}) {
+  onMouseClick({x}: {x: number}) {
     const data = this.data();
     if (data === undefined || data.kind === 'summary') return;
     this.mouseXpos = x;

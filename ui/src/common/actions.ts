@@ -313,7 +313,7 @@ export const StateActions = {
     }
   },
 
-  selectSlice(state: StateDraft, args: {utid: number, ts?: number}): void {
+  selectSlice(state: StateDraft, args: {utid: number, ts: number}): void {
     state.selectedSlice.utid = args.utid;
     state.selectedSlice.timestamp = args.ts;
   },

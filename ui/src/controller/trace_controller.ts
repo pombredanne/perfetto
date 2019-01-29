@@ -36,7 +36,7 @@ import {globals} from './globals';
 import {QueryController, QueryControllerArgs} from './query_controller';
 import {TrackControllerArgs, trackControllerRegistry} from './track_controller';
 import {
-  SelectionController, 
+  SelectionController,
   SelectionControllerArgs
 } from './selection_controller';
 

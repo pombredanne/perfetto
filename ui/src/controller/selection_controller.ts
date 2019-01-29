@@ -40,7 +40,7 @@ export class SelectionController extends Controller<'main'> {
 
     const ts = selectedSlice.timestamp;
     if (ts !== undefined) {
-      const sqlQuery = `SELECT ts, dur, end_state, priority FROM sched 
+      const sqlQuery = `SELECT ts, dur, end_state, priority FROM sched
                         WHERE ts = ${ts}`;
       this.args.engine.query(sqlQuery).then(result => {
         if (result.numRecords === 1) {
@@ -51,10 +51,9 @@ export class SelectionController extends Controller<'main'> {
           const selected = {ts, dur, priority, endState};
           if (globals.state.selectedSlice === selectedSlice) {
             globals.publish('ClickSelection', selected);
-          } 
+          }
         }
       });
     }
-    
   }
 }

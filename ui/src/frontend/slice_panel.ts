@@ -24,7 +24,7 @@ export class SliceDetailsPanel extends Panel<SliceDetailsPanelAttrs> {
   view({attrs}: m.CVnode<SliceDetailsPanelAttrs>) {
     const threadInfo = globals.threads.get(attrs.utid);
     const sliceInfo = globals.clickSelection;
-    if(threadInfo && sliceInfo) {
+    if(threadInfo && sliceInfo.ts && sliceInfo.dur) {
       return m(
           '.slice-details-panel',
           m('.slice-details-panel-heading',
