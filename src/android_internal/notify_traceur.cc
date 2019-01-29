@@ -23,7 +23,7 @@ int main() {
   char argv3[] = "com.android.traceur/.TraceService";
   char argv4[] = "-a";
   char argv5[] = "com.android.traceur.STOP_TRACING";
-  char* argv[] = {argv0, argv1, argv2, argv3, argv4, argv4, argv5, nullptr};
+  char* argv[] = {argv0, argv1, argv2, argv3, argv4, argv5, nullptr};
   execvp(argv0, argv);
   _exit(3);
 }

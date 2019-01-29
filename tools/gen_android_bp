@@ -116,7 +116,7 @@ additional_args = {
       ('static_libs', ['libhealthhalutils']),
     ],
     'traced': [
-      ('deps', ['notify_traceur']),
+      ('required', ['notify_traceur']),
     ]
 }
 

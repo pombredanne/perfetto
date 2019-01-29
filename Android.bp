@@ -2898,7 +2898,7 @@ cc_binary {
   cflags: [
     "-DPERFETTO_BUILD_WITH_ANDROID",
   ],
-  deps: [
+  required: [
     "notify_traceur",
   ],
 }
