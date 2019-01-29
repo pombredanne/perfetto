@@ -15,6 +15,7 @@
  */
 
 #include "src/trace_processor/clock_tracker.h"
+#include "perfetto/base/optional.h"
 #include "src/trace_processor/trace_processor_context.h"
 
 #include "gmock/gmock.h"
@@ -27,6 +28,8 @@ namespace {
 TEST(ClockTrackerTest, ClockDomainConversions) {
   TraceProcessorContext context;
   ClockTracker ct(&context);
+
+  EXPECT_EQ(ct.ToTraceTime(ClockDomain::kRealTime, 0), base::nullopt);
 
   ct.SyncClocks(ClockDomain::kRealTime, 10, 10010);
   ct.SyncClocks(ClockDomain::kRealTime, 20, 20220);
@@ -48,7 +51,8 @@ TEST(ClockTrackerTest, ClockDomainConversions) {
   EXPECT_EQ(ct.ToTraceTime(ClockDomain::kMonotonic, 0), 100000 - 1000);
   EXPECT_EQ(ct.ToTraceTime(ClockDomain::kMonotonic, 999), 100000 - 1);
   EXPECT_EQ(ct.ToTraceTime(ClockDomain::kMonotonic, 1000), 100000);
-  EXPECT_EQ(ct.ToTraceTime(ClockDomain::kMonotonic, 1e6), 100000 - 1000 + 1e6);
+  EXPECT_EQ(ct.ToTraceTime(ClockDomain::kMonotonic, 1e6),
+            static_cast<int64_t>(100000 - 1000 + 1e6));
 }
 
 TEST(ClockTrackerTest, RealTimeClockMovingBackwards) {
