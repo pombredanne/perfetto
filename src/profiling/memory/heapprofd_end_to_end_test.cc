@@ -319,14 +319,17 @@ TEST_F(HeapprofdEndToEnd, NativeStartup) {
   EXPECT_GT(total_freed, 0);
 }
 
-// Enable in CL that fixes b/123352823.
+// TODO(fmayer): Enable in CL that fixes b/123352823.
 TEST_F(HeapprofdEndToEnd, DISABLED_ReInit) {
   constexpr uint64_t kFirstIterationBytes = 5;
   constexpr uint64_t kSecondIterationBytes = 7;
 
-  base::Pipe pipe = base::Pipe::Create();
+  base::Pipe signal_pipe = base::Pipe::Create();
+  base::Pipe ack_pipe = base::Pipe::Create();
 
-  ASSERT_EQ(fcntl(*pipe.rd, F_SETFL, fcntl(*pipe.rd, F_GETFL) | O_NONBLOCK), 0);
+  ASSERT_EQ(fcntl(*signal_pipe.rd, F_SETFL,
+                  fcntl(*signal_pipe.rd, F_GETFL) | O_NONBLOCK),
+            0);
 
   pid_t pid = fork();
   switch (pid) {
@@ -334,7 +337,8 @@ TEST_F(HeapprofdEndToEnd, DISABLED_ReInit) {
       PERFETTO_FATAL("Failed to fork.");
     case 0: {
       uint64_t bytes = kFirstIterationBytes;
-      pipe.wr.reset();
+      signal_pipe.wr.reset();
+      ack_pipe.rd.reset();
       for (;;) {
         // This volatile is needed to prevent the compiler from trying to be
         // helpful and compiling a "useless" malloc + free into a noop.
@@ -344,17 +348,20 @@ TEST_F(HeapprofdEndToEnd, DISABLED_ReInit) {
           free(const_cast<char*>(x));
         }
         char buf[1];
-        if (read(*pipe.rd, buf, sizeof(buf)) == sizeof(buf)) {
+        if (read(*signal_pipe.rd, buf, sizeof(buf)) == sizeof(buf)) {
           bytes = kSecondIterationBytes;
-          pipe.rd.reset();
+          signal_pipe.rd.reset();
+          ack_pipe.wr.reset();
         }
       }
+      PERFETTO_FATAL("Should be unreachable");
     }
     default:
       break;
   }
 
-  pipe.rd.reset();
+  signal_pipe.rd.reset();
+  ack_pipe.wr.reset();
 
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(10 * 1024);
@@ -374,8 +381,10 @@ TEST_F(HeapprofdEndToEnd, DISABLED_ReInit) {
   TraceAndValidate(trace_config, pid, kFirstIterationBytes);
 
   char buf[1] = {'1'};
-  ASSERT_EQ(write(*pipe.wr, buf, sizeof(buf)), sizeof(buf));
-  pipe.wr.reset();
+  ASSERT_EQ(write(*signal_pipe.wr, buf, sizeof(buf)), sizeof(buf));
+  signal_pipe.wr.reset();
+  ASSERT_EQ(read(*ack_pipe.rd, buf, sizeof(buf)), 0);
+  ack_pipe.rd.reset();
 
   TraceAndValidate(trace_config, pid, kSecondIterationBytes);
 
