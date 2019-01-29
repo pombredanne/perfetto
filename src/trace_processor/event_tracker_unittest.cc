@@ -117,8 +117,7 @@ TEST_F(EventTrackerTest, SchedMismatchedPids) {
 
   ASSERT_EQ(context.storage->slices().utids().at(0),
             std::numeric_limits<UniqueTid>::max());
-  ASSERT_EQ(context.storage->slices().utids().at(0),
-            TraceStorage::kInvalidUtid);
+  ASSERT_EQ(context.storage->slices().utids().at(0), kInvalidUtid);
 }
 
 TEST_F(EventTrackerTest, CounterDuration) {

@@ -17,6 +17,7 @@
 #ifndef SRC_TRACE_PROCESSOR_TRACE_STORAGE_H_
 #define SRC_TRACE_PROCESSOR_TRACE_STORAGE_H_
 
+#include <algorithm>
 #include <array>
 #include <deque>
 #include <limits>
