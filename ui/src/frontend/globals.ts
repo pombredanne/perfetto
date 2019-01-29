@@ -22,6 +22,12 @@ import {RafScheduler} from './raf_scheduler';
 type Dispatch = (action: DeferredAction) => void;
 type TrackDataStore = Map<string, {}>;
 type QueryResultsStore = Map<string, {}>;
+export interface ClickSelection {
+  ts: number;
+  dur: number;
+  priority: number;
+  endState: string;
+}
 
 export interface QuantizedLoad {
   startSec: number;
@@ -54,6 +60,7 @@ class Globals {
   private _queryResults?: QueryResultsStore = undefined;
   private _overviewStore?: OverviewStore = undefined;
   private _threadMap?: ThreadMap = undefined;
+  private _clickSelection?: ClickSelection = undefined;
 
   initialize(dispatch: Dispatch, controllerWorker: Worker) {
     this._dispatch = dispatch;
@@ -67,6 +74,7 @@ class Globals {
     this._queryResults = new Map<string, {}>();
     this._overviewStore = new Map<string, QuantizedLoad[]>();
     this._threadMap = new Map<number, ThreadDesc>();
+    this._clickSelection = {ts: -1,dur: -1,priority: -1,endState: ""};
   }
 
   get state(): State {
@@ -106,6 +114,14 @@ class Globals {
     return assertExists(this._threadMap);
   }
 
+  get clickSelection() {
+    return assertExists(this._clickSelection);
+  }
+
+  set clickSelection(click: ClickSelection) {
+    this._clickSelection = assertExists(click);
+  } 
+
   resetForTesting() {
     this._dispatch = undefined;
     this._state = undefined;
@@ -117,6 +133,7 @@ class Globals {
     this._queryResults = undefined;
     this._overviewStore = undefined;
     this._threadMap = undefined;
+    this._clickSelection = undefined;
   }
 
   // Used when switching to the legacy TraceViewer UI.
