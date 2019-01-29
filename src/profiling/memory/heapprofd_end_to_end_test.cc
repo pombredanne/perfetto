@@ -190,7 +190,6 @@ TEST_F(HeapprofdEndToEnd, Smoke) {
       ASSERT_EQ(dumps.size(), 1);
       const protos::ProfilePacket_ProcessHeapSamples& dump = dumps.Get(0);
       EXPECT_EQ(dump.pid(), pid);
-      EXPECT_EQ(dump.samples().size(), 1);
       for (const auto& sample : dump.samples()) {
         samples++;
         EXPECT_EQ(sample.self_allocated() % kAllocSize, 0);
