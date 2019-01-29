@@ -17,13 +17,12 @@
 #include <unistd.h>
 
 int main() {
-  char argv0[] = "am";
-  char argv1[] = "start-foreground-service";
-  char argv2[] = "-n";
-  char argv3[] = "com.android.traceur/.TraceService";
-  char argv4[] = "-a";
-  char argv5[] = "com.android.traceur.STOP_TRACING";
-  char* argv[] = {argv0, argv1, argv2, argv3, argv4, argv5, nullptr};
-  execvp(argv0, argv);
+  char argv0[] = "setprop";
+  char argv1[] = "sys.traced.trace_end_signal";
+  char argv2[] = "1";
+  char argvlogcat[] = "logwrapper";
+
+  char* enable[] = {argvlogcat, argv0, argv1, argv2, nullptr};
+  execvp(argv0, enable);
   _exit(3);
 }
