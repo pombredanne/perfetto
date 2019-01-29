@@ -245,7 +245,7 @@ class TraceViewer implements m.ClassComponent {
     if(globals.state.selectedSlice.utid) {
       detailsPanels.push(m(SliceDetailsPanel, {
         key: 'slice',
-        utid: globals.state.selectedSlice.utid,
+        selection: globals.state.selectedSlice,
       }));
     }
 

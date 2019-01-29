@@ -283,14 +283,13 @@ class CpuSliceTrack extends Track<Config, Data> {
   onMouseClick({x}: {x: number}) {
     const data = this.data();
     if (data === undefined || data.kind === 'summary') return;
-    this.mouseXpos = x;
     const {timeScale} = globals.frontendLocalState;
     const time = timeScale.pxToTime(x);
     const index = search(data.starts, time);
     const timestamp = index === -1 ? undefined : data.starts[index];
     if (timestamp && this.utidHoveredInThisTrack !== -1) {
       globals.dispatch(Actions.selectSlice(
-        {utid: this.utidHoveredInThisTrack, ts: toNs(timestamp)}));
+        {utid: this.utidHoveredInThisTrack, timestamp: toNs(timestamp)}));
     }
   }
 }

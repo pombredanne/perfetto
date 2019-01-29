@@ -125,8 +125,8 @@ export interface Note {
 }
 
 export interface SliceSelection {
-  utid?: number;
-  timestamp?: number;
+  utid: number;
+  timestamp: number;
 }
 
 export interface State {
@@ -193,7 +193,7 @@ export function createEmptyState(): State {
 
     status: {msg: '', timestamp: 0},
     selectedNote: null,
-    selectedSlice: {},
+    selectedSlice: {utid: 0, timestamp: 0},
   };
 }
 

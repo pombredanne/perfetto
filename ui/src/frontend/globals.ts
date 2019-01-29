@@ -22,7 +22,7 @@ import {RafScheduler} from './raf_scheduler';
 type Dispatch = (action: DeferredAction) => void;
 type TrackDataStore = Map<string, {}>;
 type QueryResultsStore = Map<string, {}>;
-export interface ClickSelection {
+export interface SliceDetails {
   ts?: number;
   dur?: number;
   priority?: number;
@@ -60,7 +60,7 @@ class Globals {
   private _queryResults?: QueryResultsStore = undefined;
   private _overviewStore?: OverviewStore = undefined;
   private _threadMap?: ThreadMap = undefined;
-  private _clickSelection?: ClickSelection = undefined;
+  private _sliceDetails?: SliceDetails = undefined;
 
   initialize(dispatch: Dispatch, controllerWorker: Worker) {
     this._dispatch = dispatch;
@@ -74,7 +74,7 @@ class Globals {
     this._queryResults = new Map<string, {}>();
     this._overviewStore = new Map<string, QuantizedLoad[]>();
     this._threadMap = new Map<number, ThreadDesc>();
-    this._clickSelection = {};
+    this._sliceDetails = {};
   }
 
   get state(): State {
@@ -114,12 +114,12 @@ class Globals {
     return assertExists(this._threadMap);
   }
 
-  get clickSelection() {
-    return assertExists(this._clickSelection);
+  get sliceDetails() {
+    return assertExists(this._sliceDetails);
   }
 
-  set clickSelection(click: ClickSelection) {
-    this._clickSelection = assertExists(click);
+  set sliceDetails(click: SliceDetails) {
+    this._sliceDetails = assertExists(click);
   }
 
   resetForTesting() {
@@ -133,7 +133,7 @@ class Globals {
     this._queryResults = undefined;
     this._overviewStore = undefined;
     this._threadMap = undefined;
-    this._clickSelection = undefined;
+    this._sliceDetails = undefined;
   }
 
   // Used when switching to the legacy TraceViewer UI.

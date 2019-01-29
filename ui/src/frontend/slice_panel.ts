@@ -15,16 +15,19 @@
 import * as m from 'mithril';
 import {globals} from './globals';
 import {Panel, PanelSize} from './panel';
+import { SliceSelection } from '../common/state';
+import { assertTrue } from '../base/logging';
 
 interface SliceDetailsPanelAttrs {
-  utid: number;
+  selection: SliceSelection;
 }
 
 export class SliceDetailsPanel extends Panel<SliceDetailsPanelAttrs> {
   view({attrs}: m.CVnode<SliceDetailsPanelAttrs>) {
-    const threadInfo = globals.threads.get(attrs.utid);
-    const sliceInfo = globals.clickSelection;
+    const threadInfo = globals.threads.get(attrs.selection.utid);
+    const sliceInfo = globals.sliceDetails;
     if(threadInfo && sliceInfo.ts && sliceInfo.dur) {
+      assertTrue(sliceInfo.ts === attrs.selection.timestamp);
       return m(
           '.slice-details-panel',
           m('.slice-details-panel-heading',

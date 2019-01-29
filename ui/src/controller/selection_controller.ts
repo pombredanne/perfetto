@@ -40,17 +40,17 @@ export class SelectionController extends Controller<'main'> {
 
     const ts = selectedSlice.timestamp;
     if (ts !== undefined) {
-      const sqlQuery = `SELECT ts, dur, end_state, priority FROM sched
+      const sqlQuery = `SELECT ts, dur, priority, end_state FROM sched
                         WHERE ts = ${ts}`;
       this.args.engine.query(sqlQuery).then(result => {
         if (result.numRecords === 1) {
           const ts = result.columns[0].longValues![0] as number;
           const dur = result.columns[1].longValues![0] as number;
-          const endState = result.columns[2].stringValues![0];
-          const priority = result.columns[3].longValues![0] as number;
+          const priority = result.columns[2].longValues![0] as number;
+          const endState = result.columns[3].stringValues![0];
           const selected = {ts, dur, priority, endState};
           if (globals.state.selectedSlice === selectedSlice) {
-            globals.publish('ClickSelection', selected);
+            globals.publish('SliceDetails', selected);
           }
         }
       });
