@@ -53,6 +53,7 @@ enum TableId : uint8_t {
   kCounters = 1,
   kRawEvents = 2,
   kInstants = 3,
+  kSched = 4,
 };
 
 // The top 8 bits are set to the TableId and the bottom 32 to the row of the
@@ -144,7 +145,7 @@ class TraceStorage {
     const std::multimap<RowId, uint32_t>& args_for_id() const {
       return args_for_id_;
     }
-    size_t args_count() const { return ids_.size(); }
+    uint32_t args_count() const { return static_cast<uint32_t>(ids_.size()); }
 
     void AddArg(RowId id, StringId flat_key, StringId key, Variadic value) {
       // TODO(b/123252504): disable this code to stop blow-ups in ingestion time
@@ -187,7 +188,7 @@ class TraceStorage {
       utids_.emplace_back(utid);
       end_states_.emplace_back(end_state);
       priorities_.emplace_back(priority);
-      rows_for_utids_.emplace(utid, slice_count() - 1);
+      // rows_for_utids_.emplace(utid, slice_count() - 1);
       return slice_count() - 1;
     }
 
@@ -199,7 +200,9 @@ class TraceStorage {
       end_states_[index] = end_state;
     }
 
-    size_t slice_count() const { return start_ns_.size(); }
+    uint32_t slice_count() const {
+      return static_cast<uint32_t>(start_ns_.size());
+    }
 
     const std::deque<uint32_t>& cpus() const { return cpus_; }
 
@@ -396,7 +399,9 @@ class TraceStorage {
                          static_cast<uint32_t>(raw_event_count() - 1));
     }
 
-    size_t raw_event_count() const { return timestamps_.size(); }
+    uint32_t raw_event_count() const {
+      return static_cast<uint32_t>(timestamps_.size());
+    }
 
     const std::deque<int64_t>& timestamps() const { return timestamps_; }
 
@@ -519,6 +524,14 @@ class TraceStorage {
   static RowId CreateRowId(TableId table, uint32_t row) {
     static constexpr uint8_t kRowIdTableShift = 32;
     return (static_cast<RowId>(table) << kRowIdTableShift) | row;
+  }
+
+  static std::pair<uint8_t, uint32_t> ParseRowId(RowId rowid) {
+    static constexpr uint8_t kRowIdTableShift = 32;
+    auto id = static_cast<uint64_t>(rowid);
+    auto table_id = static_cast<uint8_t>(id >> kRowIdTableShift);
+    auto row = static_cast<uint32_t>(id & ((1ul << kRowIdTableShift) - 1));
+    return std::make_pair(table_id, row);
   }
 
   const Slices& slices() const { return slices_; }

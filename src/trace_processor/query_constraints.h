@@ -21,6 +21,7 @@
 
 #include <vector>
 
+#include "perfetto/base/optional.h"
 #include "perfetto/base/scoped_file.h"
 
 namespace perfetto {
@@ -59,6 +60,24 @@ class QueryConstraints {
   void AddOrderBy(int column, unsigned char desc);
 
   void ClearOrderBy() { order_by_.clear(); }
+
+  base::Optional<uint32_t> HasConstraint(int column, int op) const {
+    for (uint32_t i = 0; i < constraints_.size(); i++) {
+      const auto& cs = constraints_[i];
+      if (cs.op == op && column == cs.iColumn)
+        return i;
+    }
+    return base::nullopt;
+  }
+
+  base::Optional<uint32_t> HasOrderByAsc(int column) const {
+    for (uint32_t i = 0; i < order_by_.size(); i++) {
+      const auto& ob = order_by_[i];
+      if (column == ob.iColumn && !ob.desc)
+        return i;
+    }
+    return base::nullopt;
+  }
 
   // Converts the constraints and order by information to a string for
   // use by sqlite.

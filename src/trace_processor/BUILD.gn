@@ -42,6 +42,10 @@ static_library("trace_processor") {
 
 source_set("lib") {
   sources = [
+    "all_events_args_table.cc",
+    "all_events_args_table.h",
+    "all_events_table.cc",
+    "all_events_table.h",
     "android_logs_table.cc",
     "android_logs_table.h",
     "args_table.cc",

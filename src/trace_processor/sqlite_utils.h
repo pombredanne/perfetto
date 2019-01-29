@@ -34,6 +34,7 @@ namespace trace_processor {
 namespace sqlite_utils {
 
 const auto kSqliteStatic = reinterpret_cast<sqlite3_destructor_type>(0);
+const auto kSqliteTransient = reinterpret_cast<sqlite3_destructor_type>(-1);
 
 template <typename T>
 using is_numeric =
@@ -337,6 +338,11 @@ inline void ReportSqliteResult(sqlite3_context* ctx, uint8_t value) {
 }
 
 template <>
+inline void ReportSqliteResult(sqlite3_context* ctx, uint16_t value) {
+  sqlite3_result_int(ctx, value);
+}
+
+template <>
 inline void ReportSqliteResult(sqlite3_context* ctx, uint32_t value) {
   sqlite3_result_int64(ctx, value);
 }
@@ -344,6 +350,17 @@ inline void ReportSqliteResult(sqlite3_context* ctx, uint32_t value) {
 template <>
 inline void ReportSqliteResult(sqlite3_context* ctx, double value) {
   sqlite3_result_double(ctx, value);
+}
+
+inline void ReportSqliteResult(sqlite3_context* ctx,
+                               const char* value,
+                               int n = -1,
+                               sqlite3_destructor_type type = kSqliteStatic) {
+  if (value == nullptr) {
+    sqlite3_result_null(ctx);
+  } else {
+    sqlite3_result_text(ctx, value, n, type);
+  }
 }
 
 inline std::string SqliteValueAsString(sqlite3_value* value) {

@@ -21,6 +21,8 @@
 #include <functional>
 
 #include "perfetto/base/time.h"
+#include "src/trace_processor/all_events_args_table.h"
+#include "src/trace_processor/all_events_table.h"
 #include "src/trace_processor/android_logs_table.h"
 #include "src/trace_processor/args_table.h"
 #include "src/trace_processor/clock_tracker.h"
@@ -118,6 +120,8 @@ TraceProcessorImpl::TraceProcessorImpl(const Config& cfg) {
       new TraceSorter(&context_, cfg.optimization_mode,
                       static_cast<int64_t>(cfg.window_size_ns)));
 
+  AllEventsTable::RegisterTable(*db_, context_.storage.get());
+  AllEventsArgsTable::RegisterTable(*db_, context_.storage.get());
   ArgsTable::RegisterTable(*db_, context_.storage.get());
   ProcessTable::RegisterTable(*db_, context_.storage.get());
   SchedSliceTable::RegisterTable(*db_, context_.storage.get());
