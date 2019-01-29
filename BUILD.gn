@@ -290,9 +290,9 @@ if (perfetto_build_standalone) {
 # structure (which is a tree of targets) as the dependencies would not pick
 # up the flag (and thus use the wrong logging macro).
 #
-# The hack is deemed acceptable as, at the time of writing, there is no
-# interest in building this library standalone.
-if (perfetto_build_with_android && !perfetto_build_standalone) {
+# This is deemed acceptable as, at the time of writing, there is no interest in
+# building this library standalone.
+if (perfetto_build_with_android) {
   # TODO(fmayer): Investigate shared library for common pieces.
   shared_library("heapprofd_client") {
     cflags = [ "-DPERFETTO_ANDROID_ASYNC_SAFE_LOG" ]
