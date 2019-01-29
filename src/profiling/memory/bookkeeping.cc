@@ -44,10 +44,11 @@ GlobalCallstackTrie::Node* GlobalCallstackTrie::Node::GetOrCreateChild(
   return child;
 }
 
-void HeapTracker::RecordMalloc(const std::vector<FrameData>& callstack,
-                               uint64_t address,
-                               uint64_t size,
-                               uint64_t sequence_number) {
+void HeapTracker::RecordMalloc(
+    const std::vector<unwindstack::FrameData>& callstack,
+    uint64_t address,
+    uint64_t size,
+    uint64_t sequence_number) {
   auto it = allocations_.find(address);
   if (it != allocations_.end()) {
     Allocation& alloc = it->second;
@@ -167,7 +168,8 @@ void HeapTracker::Dump(pid_t pid, DumpState* dump_state) {
   }
 }
 
-uint64_t HeapTracker::GetSizeForTesting(const std::vector<FrameData>& stack) {
+uint64_t HeapTracker::GetSizeForTesting(
+    const std::vector<unwindstack::FrameData>& stack) {
   GlobalCallstackTrie::Node* node = callsites_->CreateCallsite(stack);
   // Hack to make it go away again if it wasn't used before.
   // This is only good because this is used for testing only.
@@ -192,9 +194,9 @@ std::vector<Interned<Frame>> GlobalCallstackTrie::BuildCallstack(
 }
 
 GlobalCallstackTrie::Node* GlobalCallstackTrie::CreateCallsite(
-    const std::vector<FrameData>& callstack) {
+    const std::vector<unwindstack::FrameData>& callstack) {
   Node* node = &root_;
-  for (const FrameData& loc : callstack) {
+  for (const unwindstack::FrameData& loc : callstack) {
     node = node->GetOrCreateChild(InternCodeLocation(loc));
   }
   return node;
@@ -222,25 +224,25 @@ void GlobalCallstackTrie::DecrementNode(Node* node) {
   }
 }
 
-Interned<Frame> GlobalCallstackTrie::InternCodeLocation(const FrameData& loc) {
-  Mapping map(string_interner_.Intern(loc.build_id));
-  map.offset = loc.frame.map_elf_start_offset;
-  map.start = loc.frame.map_start;
-  map.end = loc.frame.map_end;
-  map.load_bias = loc.frame.map_load_bias;
-  base::StringSplitter sp(loc.frame.map_name, '/');
+Interned<Frame> GlobalCallstackTrie::InternCodeLocation(
+    const unwindstack::FrameData& loc) {
+  Mapping map{};
+  map.offset = loc.map_elf_start_offset;
+  map.start = loc.map_start;
+  map.end = loc.map_end;
+  map.load_bias = loc.map_load_bias;
+  base::StringSplitter sp(loc.map_name, '/');
   while (sp.Next())
     map.path_components.emplace_back(string_interner_.Intern(sp.cur_token()));
 
   Frame frame(mapping_interner_.Intern(std::move(map)),
-              string_interner_.Intern(loc.frame.function_name),
-              loc.frame.rel_pc);
+              string_interner_.Intern(loc.function_name), loc.rel_pc);
 
   return frame_interner_.Intern(frame);
 }
 
 Interned<Frame> GlobalCallstackTrie::MakeRootFrame() {
-  Mapping map(string_interner_.Intern(""));
+  Mapping map{};
 
   Frame frame(mapping_interner_.Intern(std::move(map)),
               string_interner_.Intern(""), 0);
@@ -254,8 +256,6 @@ void DumpState::WriteMap(const Interned<Mapping> map) {
     for (const Interned<std::string>& str : map->path_components)
       WriteString(str);
 
-    WriteString(map->build_id);
-
     if (currently_written() > kPacketSizeThreshold)
       NewProfilePacket();
 
@@ -265,7 +265,6 @@ void DumpState::WriteMap(const Interned<Mapping> map) {
     mapping->set_start(map->start);
     mapping->set_end(map->end);
     mapping->set_load_bias(map->load_bias);
-    mapping->set_build_id(map->build_id.id());
     for (const Interned<std::string>& str : map->path_components)
       mapping->add_path_string_ids(str.id());
   }

@@ -173,7 +173,7 @@ TEST_F(HeapprofdEndToEnd, Smoke) {
   heapprofd_config->mutable_continuous_dump_config()->set_dump_interval_ms(100);
 
   helper.StartTracing(trace_config);
-  helper.WaitForTracingDisabled(5000);
+  helper.WaitForTracingDisabled(10000);
 
   helper.ReadData();
   helper.WaitForReadData();
@@ -194,7 +194,6 @@ TEST_F(HeapprofdEndToEnd, Smoke) {
       ASSERT_EQ(dumps.size(), 1);
       const protos::ProfilePacket_ProcessHeapSamples& dump = dumps.Get(0);
       EXPECT_EQ(dump.pid(), pid);
-      EXPECT_EQ(dump.samples().size(), 1);
       for (const auto& sample : dump.samples()) {
         samples++;
         EXPECT_EQ(sample.self_allocated() % kAllocSize, 0);
@@ -233,7 +232,7 @@ TEST_F(HeapprofdEndToEnd, FinalFlush) {
   heapprofd_config->set_all(false);
 
   helper.StartTracing(trace_config);
-  helper.WaitForTracingDisabled(5000);
+  helper.WaitForTracingDisabled(10000);
 
   helper.ReadData();
   helper.WaitForReadData();

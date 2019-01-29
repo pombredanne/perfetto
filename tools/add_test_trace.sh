@@ -21,7 +21,7 @@ cp $1 /tmp/latest-test-data
 echo ""
 echo "Zipping file back up"
 echo ""
-NEW_TEST_DATA="test-data-$(date +%Y%m%d-%H%M%S).zip"
+NEW_TEST_DATA="test-data-$(date +%Y%m%d).zip"
 CWD="$(pwd)"
 cd /tmp/latest-test-data
 zip -r /tmp/$NEW_TEST_DATA *
@@ -40,11 +40,10 @@ gsutil acl ch -u AllUsers:R gs://perfetto/$NEW_TEST_DATA
 echo ""
 echo "SHA1 of file $NEW_TEST_DATA is"
 if which shasum; then
-NEW_SHA=$(shasum /tmp/$NEW_TEST_DATA)  # Mac OS
+echo $(shasum /tmp/$NEW_TEST_DATA)  # Mac OS
 else
-NEW_SHA=$(sha1sum /tmp/$NEW_TEST_DATA)  # Linux
+echo $(sha1sum /tmp/$NEW_TEST_DATA)  # Linux
 fi
-echo $NEW_SHA
 
 echo ""
 echo "Cleaning up leftover files"
@@ -54,12 +53,6 @@ rm /tmp/latest-test-data.zip
 rm /tmp/$NEW_TEST_DATA
 
 echo ""
-echo "Updating tools/install-build-deps"
+echo "All done! Please update tools/install-build-deps"
+echo "with the new file name and sha1sum"
 echo ""
-OLD_URL="https://\(.*/perfetto\)/test-data-.*.zip"
-NEW_URL="https://\1/$NEW_TEST_DATA"
-OLD_SHA="\w*"
-SED_MAGIC="s|'$OLD_URL',\n\(\s*\)'$OLD_SHA'|'$NEW_URL',\n\2'$NEW_SHA'|g"
-sed -i '' -z -e "$SED_MAGIC" tools/install-build-deps
-
-echo "All done!"

@@ -26,30 +26,29 @@ namespace {
 using ::testing::AnyOf;
 using ::testing::Eq;
 
-std::vector<FrameData> stack() {
-  std::vector<FrameData> res;
-
+std::vector<unwindstack::FrameData> stack() {
+  std::vector<unwindstack::FrameData> res;
   unwindstack::FrameData data{};
   data.function_name = "fun1";
   data.map_name = "map1";
-  res.emplace_back(std::move(data), "dummy_buildid");
+  res.emplace_back(std::move(data));
   data = {};
   data.function_name = "fun2";
   data.map_name = "map2";
-  res.emplace_back(std::move(data), "dummy_buildid");
+  res.emplace_back(std::move(data));
   return res;
 }
 
-std::vector<FrameData> stack2() {
-  std::vector<FrameData> res;
+std::vector<unwindstack::FrameData> stack2() {
+  std::vector<unwindstack::FrameData> res;
   unwindstack::FrameData data{};
   data.function_name = "fun1";
   data.map_name = "map1";
-  res.emplace_back(std::move(data), "dummy_buildid");
+  res.emplace_back(std::move(data));
   data = {};
   data.function_name = "fun3";
   data.map_name = "map3";
-  res.emplace_back(std::move(data), "dummy_buildid");
+  res.emplace_back(std::move(data));
   return res;
 }
 
@@ -127,14 +126,14 @@ TEST(BookkeepingTest, ManyAllocations) {
 }
 
 TEST(BookkeepingTest, ArbitraryOrder) {
-  std::vector<FrameData> s = stack();
-  std::vector<FrameData> s2 = stack2();
+  std::vector<unwindstack::FrameData> s = stack();
+  std::vector<unwindstack::FrameData> s2 = stack2();
 
   struct Operation {
     uint64_t sequence_number;
     uint64_t address;
-    uint64_t bytes;                       // 0 for free
-    const std::vector<FrameData>* stack;  // nullptr for free
+    uint64_t bytes;                                    // 0 for free
+    const std::vector<unwindstack::FrameData>* stack;  // nullptr for free
 
     // For std::next_permutation.
     bool operator<(const Operation& other) const {

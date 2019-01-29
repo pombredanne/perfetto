@@ -15,9 +15,10 @@
 import {TimeSpan} from '../common/time';
 
 import {TimeScale} from './time_scale';
-import {TRACK_BORDER_COLOR, TRACK_SHELL_WIDTH} from './track_constants';
 
 export const DESIRED_PX_PER_STEP = 80;
+// TODO(hjd): Deduplicate.
+export const TRACK_SHELL_WIDTH = 250;
 
 /**
  * Returns the step size of a grid line in seconds.
@@ -88,7 +89,8 @@ export function drawGridLines(
     timeSpan: TimeSpan,
     width: number,
     height: number): void {
-  ctx.strokeStyle = TRACK_BORDER_COLOR;
+  // Keep this synchronised with --track-border-color.
+  ctx.strokeStyle = '#00000025';
   ctx.lineWidth = 1;
 
   for (const xAndTime of gridlines(width, timeSpan, x)) {

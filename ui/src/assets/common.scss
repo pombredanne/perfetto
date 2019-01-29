@@ -15,7 +15,11 @@
     --sidebar-width: 256px;
     --topbar-height: 48px;
     --monospace-font: 'Roboto Mono', monospace;
+
+    // Keep in sync with TRACK_SHELL_WIDTH in track_panel.ts
     --track-shell-width: 250px;
+
+    // Keep this synchronised with drawGridLines.
     --track-border-color: #00000025;
 }
 
@@ -268,8 +272,6 @@ button.close {
             margin: 0;
             font-size: 14px;
             text-overflow: ellipsis;
-            text-align: left;
-            direction: rtl;
             font-family: 'Google Sans';
             color: hsl(213, 22%, 30%);
         }
@@ -502,15 +504,13 @@ button.query-ctrl {
     grid-template-columns: 1fr 24px;
     align-items: center;
     line-height: 1;
-    width: var(--track-shell-width);
+    width: 250px;
     transition: background-color .4s;
     h1 {
       grid-area: title;
       font-size: 14px;
       text-overflow: ellipsis;
       font-family: 'Google Sans';
-      text-align: left;
-      direction: rtl;
     }
     .fold-button {
       grid-area: fold-button;

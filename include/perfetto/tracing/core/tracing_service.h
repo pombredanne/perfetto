@@ -167,9 +167,6 @@ class PERFETTO_EXPORT TracingService {
 
     // Will call OnAttach().
     virtual void Attach(const std::string& key) = 0;
-
-    // Will call OnTraceStats().
-    virtual void GetTraceStats() = 0;
   };  // class ConsumerEndpoint.
 
   // Implemented in src/core/tracing_service_impl.cc .
