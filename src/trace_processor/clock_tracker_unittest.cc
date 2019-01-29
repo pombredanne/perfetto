@@ -17,6 +17,7 @@
 #include "src/trace_processor/clock_tracker.h"
 #include "perfetto/base/optional.h"
 #include "src/trace_processor/trace_processor_context.h"
+#include "src/trace_processor/trace_storage.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -25,8 +26,15 @@ namespace perfetto {
 namespace trace_processor {
 namespace {
 
+using ::testing::NiceMock;
+class MockTraceStorage : public TraceStorage {
+ public:
+  MockTraceStorage() : TraceStorage() {}
+};
+
 TEST(ClockTrackerTest, ClockDomainConversions) {
   TraceProcessorContext context;
+  context.storage.reset(new NiceMock<MockTraceStorage>());
   ClockTracker ct(&context);
 
   EXPECT_EQ(ct.ToTraceTime(ClockDomain::kRealTime, 0), base::nullopt);

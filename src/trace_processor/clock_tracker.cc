@@ -61,7 +61,7 @@ base::Optional<int64_t> ClockTracker::ToTraceTime(ClockDomain domain,
                                                   int64_t clock_time_ns) {
   ClockSnapshotVector& snapshots = clocks_[domain];
   if (snapshots.empty()) {
-    context_->storage->IncrementStats(stats::could_not_convert_timestamp);
+    context_->storage->IncrementStats(stats::clock_sync_failure);
     return base::nullopt;
   }
   static auto comparator = [](int64_t lhs, const ClockSnapshot& rhs) {

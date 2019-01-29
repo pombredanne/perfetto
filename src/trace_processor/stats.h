@@ -82,7 +82,7 @@ namespace stats {
   F(traced_total_buffers,                       kSingle,  kInfo,  kTrace),    \
   F(traced_tracing_sessions,                    kSingle,  kInfo,  kTrace),    \
   F(vmstat_unknown_keys,                        kSingle,  kError, kAnalysis), \
-  F(could_not_convert_timestamp,                kSingle,  kError, kAnalysis)
+  F(clock_sync_failure,                         kSingle,  kError, kAnalysis)
 // clang-format on
 
 enum Type {
