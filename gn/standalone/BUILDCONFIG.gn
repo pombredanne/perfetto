@@ -63,6 +63,7 @@ default_configs = [
   "//gn/standalone:no_exceptions",
   "//gn/standalone:no_rtti",
   "//gn/standalone:visibility_hidden",
+  "//gn/standalone:android_liblog",
   "//gn/standalone/libc++:config",
   "//gn/standalone/sanitizers:sanitizers_cflags",
 ]

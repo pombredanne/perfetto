@@ -120,10 +120,6 @@ config("default") {
     ]
   }
 
-  if (is_android) {
-    libs += [ "log" ]
-  }
-
   if (is_debug) {
     libs += [ "dl" ]
   }
@@ -239,5 +235,11 @@ config("executable") {
       "-Wl,-rpath=\$ORIGIN/.",
       "-Wl,-rpath-link=.",
     ]
+  }
+}
+
+config("android_liblog") {
+  if (is_android) {
+    libs = [ "log" ]
   }
 }
