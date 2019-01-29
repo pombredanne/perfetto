@@ -25,6 +25,7 @@
 
 #if !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 #include <sys/uio.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #endif
 
@@ -99,6 +100,30 @@ uid_t geteuid() {
   return 0;
 }
 #endif  // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+
+void NotifyTraceur() {
+#if !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+  // TODO(primiano): switch to Process API.
+  auto pid = fork();
+  if (pid < 0) {
+    PERFETTO_PLOG("fork() failed");
+  } else if (pid == 0) {
+    // Child process.
+    for (int i = 0; i < 512; i++)
+      close(i);  // Avoid leaking FDs accidentally not marked as O_CLOEXEC.
+    char argv0[] = "notify_traceur";
+    char* argv[] = {argv0, nullptr};
+    execvp(argv0, argv);
+    _exit(126);
+  } else {
+    int status = 0;
+    waitpid(pid, &status, 0);
+    int exit_status = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+    PERFETTO_LOG("Notifying Traceur, retcode=%d", exit_status);
+  }
+#endif
+}
+
 }  // namespace
 
 // These constants instead are defined in the header because are used by tests.
@@ -1168,11 +1193,15 @@ void TracingServiceImpl::FreeBuffers(TracingSessionID tsid) {
     PERFETTO_DCHECK(buffers_.count(buffer_id) == 1);
     buffers_.erase(buffer_id);
   }
+  bool notify_traceur = tracing_session->config.notify_traceur();
   tracing_sessions_.erase(tsid);
   UpdateMemoryGuardrail();
 
   PERFETTO_LOG("Tracing session %" PRIu64 " ended, total sessions:%zu", tsid,
                tracing_sessions_.size());
+
+  if (notify_traceur)
+    NotifyTraceur();
 }
 
 void TracingServiceImpl::RegisterDataSource(ProducerID producer_id,

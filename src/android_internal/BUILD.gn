@@ -54,3 +54,12 @@ source_set("android_internal") {
     "//include/*",
   ]
 }
+
+source_set("notify_traceur") {
+  deps = [
+    "../../gn:default_deps",
+  ]
+  sources = [
+    "notify_traceur.cc",
+  ]
+}

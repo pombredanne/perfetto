@@ -618,6 +618,10 @@ message TraceConfig {
 
   // Disable emitting clock timestamps into the trace.
   optional bool disable_clock_snapshotting = 15;
+
+  // Android-only. If the trace is started in detached mode (passing --detach)
+  // an intent is sent to the Traceur system app when the trace ends.
+  optional bool notify_traceur = 16;
 }
 
 // End of protos/perfetto/config/trace_config.proto

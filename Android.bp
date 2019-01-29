@@ -356,6 +356,23 @@ cc_library_shared {
   ],
 }
 
+// GN target: //:notify_traceur
+cc_binary {
+  name: "notify_traceur",
+  srcs: [
+    "src/android_internal/notify_traceur.cc",
+  ],
+  shared_libs: [
+    "liblog",
+  ],
+  defaults: [
+    "perfetto_defaults",
+  ],
+  cflags: [
+    "-DPERFETTO_BUILD_WITH_ANDROID",
+  ],
+}
+
 // GN target: //:perfetto
 cc_binary {
   name: "perfetto",

@@ -38,6 +38,7 @@ import sys
 default_targets = [
     '//:libperfetto',
     '//:libperfetto_android_internal',
+    '//:notify_traceur',
     '//:perfetto_integrationtests',
     '//:perfetto_trace_protos',
     '//:perfetto_unittests',
