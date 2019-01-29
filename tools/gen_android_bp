@@ -115,6 +115,9 @@ additional_args = {
     'libperfetto_android_internal': [
       ('static_libs', ['libhealthhalutils']),
     ],
+    'traced': [
+      ('deps', ['notify_traceur']),
+    ]
 }
 
 

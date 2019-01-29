@@ -2898,6 +2898,9 @@ cc_binary {
   cflags: [
     "-DPERFETTO_BUILD_WITH_ANDROID",
   ],
+  deps: [
+    "notify_traceur",
+  ],
 }
 
 // GN target: //:traced_probes
