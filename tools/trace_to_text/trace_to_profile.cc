@@ -101,12 +101,12 @@ void DumpProfilePacket(std::vector<ProfilePacket>& packet_fragments,
   GValueType* value_type = profile.add_sample_type();
   // ["allocations", "count"];
   value_type->set_type(1);
-  value_type->set_type(2);
+  value_type->set_unit(2);
   value_type = profile.add_sample_type();
   // The last value is the default one selected.
   // ["space", "bytes"];
   value_type->set_type(3);
-  value_type->set_type(4);
+  value_type->set_unit(4);
 
   for (const ProfilePacket& packet : packet_fragments) {
     for (const ProfilePacket::Mapping& mapping : packet.mappings()) {
