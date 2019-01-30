@@ -53,9 +53,7 @@ class CpuSliceTrackController extends TrackController<Config, Data> {
       this.setup = true;
     }
 
-    // |resolution| is in s/px (to nearest power of 10) asumming a display
-    // of ~1000px 0.001 is 1s.
-    const isQuantized = resolution >= 0.001;
+    const isQuantized = this.shouldSummarize(resolution);
     // |resolution| is in s/px we want # ns for 10px window:
     const bucketSizeNs = Math.round(resolution * 10 * 1e9);
     let windowStartNs = startNs;

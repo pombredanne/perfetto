@@ -356,7 +356,7 @@ export class TraceController extends Controller<States> {
       const upid = row.upid;
       const pid = row.pid;
       const threadName = row.threadName;
-      const processName = row.threadName;
+      const processName = row.processName;
       const hasSchedEvents = !!row.totalDur;
 
       const maxDepth = utid === null ? undefined : utidToMaxDepth.get(utid);

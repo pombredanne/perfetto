@@ -63,9 +63,7 @@ class ProcessSchedulingTrackController extends TrackController<Config, Data> {
       this.setup = true;
     }
 
-    // |resolution| is in s/px (to nearest power of 10) asumming a display
-    // of ~1000px 0.001 is 1s.
-    const isQuantized = resolution >= 0.001;
+    const isQuantized = this.shouldSummarize(resolution);
     // |resolution| is in s/px we want # ns for 10px window:
     const bucketSizeNs = Math.round(resolution * 10 * 1e9);
     let windowStartNs = startNs;
@@ -97,6 +95,8 @@ class ProcessSchedulingTrackController extends TrackController<Config, Data> {
     const endNs = Math.round(end * 1e9);
     const numBuckets = Math.ceil((endNs - startNs) / bucketSizeNs);
 
+    // cpu < numCpus improves perfomance a lot since the window table can
+    // avoid generating many rows.
     const query = `select
         quantum_ts as bucket,
         sum(dur)/cast(${bucketSizeNs * this.numCpus} as float) as utilization
@@ -130,12 +130,14 @@ class ProcessSchedulingTrackController extends TrackController<Config, Data> {
     // TODO(hjd): Remove LIMIT
     const LIMIT = 10000;
 
+    // cpu < numCpus improves perfomance a lot since the window table can
+    // avoid generating many rows.
     const query = `select ts,dur,cpu,utid from ${this.tableName('span')}
         join
         (select utid from thread where upid = ${this.config.upid})
         using(utid)
         where
-        cpu <= ${this.numCpus}
+        cpu < ${this.numCpus}
         order by
         cpu,
         ts
@@ -143,6 +145,9 @@ class ProcessSchedulingTrackController extends TrackController<Config, Data> {
     const rawResult = await this.query(query);
 
     const numRows = +rawResult.numRecords;
+    if (numRows === LIMIT) {
+      console.warn(`More than ${LIMIT} rows returned.`);
+    }
     const slices: SliceData = {
       kind: 'slice',
       start,
