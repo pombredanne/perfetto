@@ -238,6 +238,10 @@ config("executable") {
   }
 }
 
+# This config is only added to certain leaf target types (see BUILDCONFIG.gn).
+# This allows us to remove the config (and thus the dependency) on a per-target
+# basis. If the config was applied to source_sets, then they would unavoidably
+# carry the dependency onto liblog to the final target.
 config("android_liblog") {
   if (is_android) {
     libs = [ "log" ]
