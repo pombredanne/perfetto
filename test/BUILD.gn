@@ -16,9 +16,17 @@ import("../gn/fuzzer.gni")
 import("../gn/perfetto.gni")
 import("//build_overrides/build.gni")
 
+source_set("alignment_trap") {
+  testonly = true
+  sources = [
+    "alignment_trap.cc",
+  ]
+}
+
 source_set("end_to_end_integrationtests") {
   testonly = true
   deps = [
+    ":alignment_trap",
     ":task_runner_thread",
     ":task_runner_thread_delegates",
     ":test_helper",
@@ -53,6 +61,7 @@ perfetto_fuzzer_test("end_to_end_shared_memory_fuzzer") {
   ]
   testonly = true
   deps = [
+    ":alignment_trap",
     ":task_runner_thread",
     ":task_runner_thread_delegates",
     ":test_helper",

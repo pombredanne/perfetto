@@ -113,6 +113,7 @@ test("perfetto_unittests") {
     "src/base:unittests",
     "src/protozero:unittests",
     "src/tracing:unittests",
+    "test:alignment_trap",
   ]
 
   if (perfetto_build_standalone || perfetto_build_with_android) {
@@ -142,6 +143,7 @@ if (perfetto_build_standalone || perfetto_build_with_android) {
       "gn:default_deps",
       "gn:gtest_main",
       "src/traced/probes/ftrace:integrationtests",
+      "test:alignment_trap",
       "test:end_to_end_integrationtests",
     ]
     if (perfetto_build_standalone && !is_android) {
