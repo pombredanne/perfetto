@@ -366,6 +366,9 @@ struct BookkeepingData {
   explicit BookkeepingData(GlobalCallstackTrie* callsites)
       : heap_tracker(callsites) {}
 
+  // This is different to a shared_ptr to HeapTracker, because we want to keep
+  // it around until the first dump after the last socket for the PID has
+  // disconnected
   uint64_t ref_count = 0;
   uint64_t client_generation = 0;
   HeapTracker heap_tracker;
