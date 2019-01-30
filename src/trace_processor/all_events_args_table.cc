@@ -126,8 +126,7 @@ int AllEventsArgsTable::Cursor::Column(sqlite3_context* ctx, int N) {
     }
     case Column::kFlatKey: {
       sqlite_utils::ReportSqliteResult(
-          ctx,
-          storage_->GetString(args.flat_keys()[args_it_->Row()]).c_str());
+          ctx, storage_->GetString(args.flat_keys()[args_it_->Row()]).c_str());
       break;
     }
     case Column::kKey: {
@@ -216,8 +215,7 @@ int AllEventsArgsTable::Cursor::ColumnSched(sqlite3_context* ctx, int N) {
               ctx, storage_->GetThread(sched.utids()[sched_row]).tid);
           break;
         case kPrevPrio:
-          sqlite_utils::ReportSqliteResult(ctx,
-                                            sched.priorities()[sched_row]);
+          sqlite_utils::ReportSqliteResult(ctx, sched.priorities()[sched_row]);
           break;
         case kPrevState:
           sqlite_utils::ReportSqliteResult(
@@ -229,7 +227,7 @@ int AllEventsArgsTable::Cursor::ColumnSched(sqlite3_context* ctx, int N) {
           break;
         case kNextPrio:
           sqlite_utils::ReportSqliteResult(ctx,
-                                            sched.priorities()[sched_row + 1]);
+                                           sched.priorities()[sched_row + 1]);
           break;
         case kPrevComm:
         case kNextComm:
