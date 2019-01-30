@@ -21,6 +21,8 @@
 #include <algorithm>
 #include <functional>
 
+#include <gperftools/profiler.h>
+
 #include "perfetto/base/time.h"
 #include "src/trace_processor/android_logs_table.h"
 #include "src/trace_processor/args_table.h"
@@ -166,6 +168,7 @@ bool TraceProcessorImpl::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
   // If this is the first Parse() call, guess the trace type and create the
   // appropriate parser.
   if (!context_.chunk_reader) {
+    ProfilerStart("/tmp/startup.data");
     TraceType trace_type = GuessTraceType(data.get(), size);
     switch (trace_type) {
       case kJsonTraceType:
@@ -188,11 +191,13 @@ bool TraceProcessorImpl::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
 void TraceProcessorImpl::NotifyEndOfFile() {
   context_.sorter->FlushEventsForced();
   BuildBoundsTable(*db_, context_.storage->GetTraceTimestampBoundsNs());
+  ProfilerStop();
 }
 
 void TraceProcessorImpl::ExecuteQuery(
     const protos::RawQueryArgs& args,
     std::function<void(const protos::RawQueryResult&)> callback) {
+  ProfilerStart("/tmp/query.data");
   protos::RawQueryResult proto;
   query_interrupted_.store(false, std::memory_order_relaxed);
 
@@ -297,6 +302,8 @@ void TraceProcessorImpl::ExecuteQuery(
   base::TimeNanos t_end = base::GetWallTimeNs();
   context_.storage->mutable_sql_stats()->RecordQueryEnd(t_end.count());
   proto.set_execution_time_ns(static_cast<uint64_t>((t_end - t_start).count()));
+  ProfilerStop();
+
   callback(proto);
 }
 

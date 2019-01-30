@@ -37,6 +37,25 @@ class ArgsTable : public StorageTable {
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
 
  private:
+  class KeyColumn final : public StorageColumn {
+   public:
+    KeyColumn(std::string col_name, bool is_flat, const TraceStorage* storage);
+
+    void ReportResult(sqlite3_context* ctx, uint32_t row) const override;
+
+    void Filter(int op, sqlite3_value* value, FilteredRowIndex*) const override;
+
+    Comparator Sort(const QueryConstraints::OrderBy& ob) const override;
+
+    Table::ColumnType GetType() const override {
+      return Table::ColumnType::kString;
+    }
+
+   private:
+    bool is_flat_;
+    const TraceStorage* storage_ = nullptr;
+  };
+
   class ValueColumn final : public StorageColumn {
    public:
     ValueColumn(std::string col_name,
@@ -45,13 +64,9 @@ class ArgsTable : public StorageTable {
 
     void ReportResult(sqlite3_context* ctx, uint32_t row) const override;
 
-    Bounds BoundFilter(int op, sqlite3_value* sqlite_val) const override;
-
     void Filter(int op, sqlite3_value* value, FilteredRowIndex*) const override;
 
     Comparator Sort(const QueryConstraints::OrderBy& ob) const override;
-
-    bool IsNaturallyOrdered() const override { return false; }
 
     Table::ColumnType GetType() const override {
       switch (type_) {

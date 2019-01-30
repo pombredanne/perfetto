@@ -32,8 +32,8 @@ StorageSchema ArgsTable::CreateStorageSchema() {
   const auto& args = storage_->args();
   return StorageSchema::Builder()
       .AddNumericColumn("id", &args.ids(), &args.args_for_id())
-      .AddStringColumn("flat_key", &args.flat_keys(), &storage_->string_pool())
-      .AddStringColumn("key", &args.keys(), &storage_->string_pool())
+      .AddColumn<KeyColumn>("flat_key", true, storage_)
+      .AddColumn<KeyColumn>("key", false, storage_)
       .AddColumn<ValueColumn>("int_value", VariadicType::kInt, storage_)
       .AddColumn<ValueColumn>("string_value", VariadicType::kString, storage_)
       .AddColumn<ValueColumn>("real_value", VariadicType::kReal, storage_)
@@ -60,6 +60,53 @@ int ArgsTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
   return SQLITE_OK;
 }
 
+ArgsTable::KeyColumn::KeyColumn(std::string col_name,
+                                bool is_flat,
+                                const TraceStorage* storage)
+    : StorageColumn(col_name, false /* hidden */),
+      is_flat_(is_flat),
+      storage_(storage) {}
+
+void ArgsTable::KeyColumn::ReportResult(sqlite3_context* ctx,
+                                        uint32_t row) const {
+  auto id = storage_->args().key_value_ids()[row];
+  auto kv = storage_->args().key_values()[id];
+  const auto& str = storage_->GetString(is_flat_ ? kv.flat_key : kv.key);
+  if (str.empty()) {
+    sqlite3_result_null(ctx);
+  } else {
+    sqlite3_result_text(ctx, str.c_str(), -1, sqlite_utils::kSqliteStatic);
+  }
+}
+
+void ArgsTable::KeyColumn::Filter(int,
+                                  sqlite3_value*,
+                                  FilteredRowIndex*) const {}
+
+ArgsTable::ValueColumn::Comparator ArgsTable::KeyColumn::Sort(
+    const QueryConstraints::OrderBy& ob) const {
+  if (ob.desc) {
+    return [this](uint32_t f, uint32_t s) {
+      auto id_f = storage_->args().key_value_ids()[f];
+      auto kv_f = storage_->args().key_values()[id_f];
+      const auto& a = storage_->GetString(is_flat_ ? kv_f.flat_key : kv_f.key);
+      auto id_s = storage_->args().key_value_ids()[s];
+      auto kv_s = storage_->args().key_values()[id_s];
+      const auto& b = storage_->GetString(is_flat_ ? kv_s.flat_key : kv_s.key);
+      return sqlite_utils::CompareValuesDesc(a, b);
+    };
+  }
+  return [this](uint32_t f, uint32_t s) {
+    auto id_f = storage_->args().key_value_ids()[f];
+    auto kv_f = storage_->args().key_values()[id_f];
+    const auto& a = storage_->GetString(is_flat_ ? kv_f.flat_key : kv_f.key);
+    auto id_s = storage_->args().key_value_ids()[s];
+    auto kv_s = storage_->args().key_values()[id_s];
+    const auto& b = storage_->GetString(is_flat_ ? kv_s.flat_key : kv_s.key);
+    return sqlite_utils::CompareValuesAsc(a, b);
+  };
+}
+
 ArgsTable::ValueColumn::ValueColumn(std::string col_name,
                                     VariadicType type,
                                     const TraceStorage* storage)
@@ -69,7 +116,8 @@ ArgsTable::ValueColumn::ValueColumn(std::string col_name,
 
 void ArgsTable::ValueColumn::ReportResult(sqlite3_context* ctx,
                                           uint32_t row) const {
-  const auto& value = storage_->args().arg_values()[row];
+  auto id = storage_->args().key_value_ids()[row];
+  const auto& value = storage_->args().key_values()[id].value;
   if (value.type != type_) {
     sqlite3_result_null(ctx);
     return;
@@ -90,12 +138,6 @@ void ArgsTable::ValueColumn::ReportResult(sqlite3_context* ctx,
   }
 }
 
-ArgsTable::ValueColumn::Bounds ArgsTable::ValueColumn::BoundFilter(
-    int,
-    sqlite3_value*) const {
-  return Bounds{};
-}
-
 void ArgsTable::ValueColumn::Filter(int op,
                                     sqlite3_value* value,
                                     FilteredRowIndex* index) const {
@@ -104,7 +146,8 @@ void ArgsTable::ValueColumn::Filter(int op,
       bool op_is_null = sqlite_utils::IsOpIsNull(op);
       auto predicate = sqlite_utils::CreateNumericPredicate<int64_t>(op, value);
       index->FilterRows([this, &predicate, op_is_null](uint32_t row) {
-        const auto& arg = storage_->args().arg_values()[row];
+        auto id = storage_->args().key_value_ids()[row];
+        const auto& arg = storage_->args().key_values()[id].value;
         return arg.type == type_ ? predicate(arg.int_value) : op_is_null;
       });
       break;
@@ -113,7 +156,8 @@ void ArgsTable::ValueColumn::Filter(int op,
       bool op_is_null = sqlite_utils::IsOpIsNull(op);
       auto predicate = sqlite_utils::CreateNumericPredicate<double>(op, value);
       index->FilterRows([this, &predicate, op_is_null](uint32_t row) {
-        const auto& arg = storage_->args().arg_values()[row];
+        auto id = storage_->args().key_value_ids()[row];
+        const auto& arg = storage_->args().key_values()[id].value;
         return arg.type == type_ ? predicate(arg.real_value) : op_is_null;
       });
       break;
@@ -121,7 +165,8 @@ void ArgsTable::ValueColumn::Filter(int op,
     case VariadicType::kString: {
       auto predicate = sqlite_utils::CreateStringPredicate(op, value);
       index->FilterRows([this, &predicate](uint32_t row) {
-        const auto& arg = storage_->args().arg_values()[row];
+        auto id = storage_->args().key_value_ids()[row];
+        const auto& arg = storage_->args().key_values()[id].value;
         return arg.type == type_
                    ? predicate(storage_->GetString(arg.string_value).c_str())
                    : predicate(nullptr);
@@ -140,8 +185,10 @@ ArgsTable::ValueColumn::Comparator ArgsTable::ValueColumn::Sort(
 }
 
 int ArgsTable::ValueColumn::CompareRefsAsc(uint32_t f, uint32_t s) const {
-  const auto& arg_f = storage_->args().arg_values()[f];
-  const auto& arg_s = storage_->args().arg_values()[s];
+  auto id_f = storage_->args().key_value_ids()[f];
+  const auto& arg_f = storage_->args().key_values()[id_f].value;
+  auto id_s = storage_->args().key_value_ids()[s];
+  const auto& arg_s = storage_->args().key_values()[id_s].value;
 
   if (arg_f.type == type_ && arg_s.type == type_) {
     switch (type_) {

@@ -24,11 +24,24 @@
 #include "src/trace_processor/slice_tracker.h"
 #include "src/trace_processor/trace_sorter.h"
 
+#include <gperftools/profiler.h>
+
 namespace perfetto {
 namespace trace_processor {
 
 TraceProcessorContext::TraceProcessorContext() = default;
-TraceProcessorContext::~TraceProcessorContext() = default;
+TraceProcessorContext::~TraceProcessorContext() {
+  ProfilerStart("/tmp/destroy.data");
+  slice_tracker.reset();
+  process_tracker.reset();
+  event_tracker.reset();
+  clock_tracker.reset();
+  storage.reset();
+  proto_parser.reset();
+  sorter.reset();
+  chunk_reader.reset();
+  ProfilerStop();
+}
 
 }  // namespace trace_processor
 }  // namespace perfetto

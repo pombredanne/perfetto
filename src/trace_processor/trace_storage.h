@@ -105,6 +105,8 @@ class TraceStorage {
   // Generic key value storage which can be referenced by other tables.
   class Args {
    public:
+    using KeyValueRowId = uint32_t;
+
     // Variadic type representing the possible values for the args table.
     struct Variadic {
       enum Type { kInt, kString, kReal };
@@ -130,6 +132,39 @@ class TraceStorage {
         return variadic;
       }
 
+      uint64_t Hash() const {
+        uint64_t hash = 0xcbf29ce484222325;  // FNV-1a-64 offset basis.
+        hash ^= static_cast<decltype(hash)>(type);
+        hash *= 1099511628211;  // FNV-1a-64 prime.
+        switch (type) {
+          case Type::kInt:
+            hash ^= static_cast<decltype(hash)>(int_value);
+            break;
+          case Type::kString:
+            hash ^= static_cast<decltype(hash)>(string_value);
+            break;
+          case Type::kReal:
+            hash ^= static_cast<decltype(hash)>(real_value);
+            break;
+        }
+        hash *= 1099511628211;  // FNV-1a-64 prime.
+        return hash;
+      }
+
+      bool operator==(const Variadic& other) const {
+        if (type != other.type) {
+          return false;
+        }
+        switch (type) {
+          case Type::kInt:
+            return int_value == other.int_value;
+          case Type::kString:
+            return string_value == other.string_value;
+          case Type::kReal:
+            return std::equal_to<double>()(real_value, other.real_value);
+        }
+      }
+
       Type type;
       union {
         int64_t int_value;
@@ -138,40 +173,70 @@ class TraceStorage {
       };
     };
 
+    struct KeyValue {
+      KeyValue(StringId f_k, StringId k, Variadic v)
+          : flat_key(f_k), key(k), value(v) {}
+
+      uint64_t Hash() const {
+        uint64_t hash = 0xcbf29ce484222325;  // FNV-1a-64 offset basis.
+        hash ^= static_cast<decltype(hash)>(flat_key);
+        hash *= 1099511628211;  // FNV-1a-64 prime.
+        hash ^= static_cast<decltype(hash)>(key);
+        hash *= 1099511628211;  // FNV-1a-64 prime.
+        hash ^= static_cast<decltype(hash)>(value.Hash());
+        hash *= 1099511628211;  // FNV-1a-64 prime.
+        return hash;
+      }
+
+      bool operator==(const KeyValue& other) const {
+        return flat_key == other.flat_key && key == other.key &&
+               value == other.value;
+      }
+
+      StringId flat_key;
+      StringId key;
+      Variadic value;
+    };
+
+    struct KeyValueHasher {
+      std::size_t operator()(const KeyValue& k) const { return k.Hash(); }
+    };
+
     const std::deque<RowId>& ids() const { return ids_; }
-    const std::deque<StringId>& flat_keys() const { return flat_keys_; }
-    const std::deque<StringId>& keys() const { return keys_; }
-    const std::deque<Variadic>& arg_values() const { return arg_values_; }
+    const std::deque<KeyValueRowId>& key_value_ids() const {
+      return key_values_ids_;
+    }
     const std::multimap<RowId, uint32_t>& args_for_id() const {
       return args_for_id_;
     }
+
+    const std::deque<KeyValue>& key_values() const { return key_values_; }
+    const std::unordered_map<KeyValue, KeyValueRowId, KeyValueHasher>&
+    key_value_map() const {
+      return key_value_map_;
+    }
+
     size_t args_count() const { return ids_.size(); }
 
     void AddArg(RowId id, StringId flat_key, StringId key, Variadic value) {
-      // TODO(b/123252504): disable this code to stop blow-ups in ingestion time
-      // and memory.
-      perfetto::base::ignore_result(id);
-      perfetto::base::ignore_result(flat_key);
-      perfetto::base::ignore_result(key);
-      perfetto::base::ignore_result(value);
-      /*
-      if (id == kInvalidRowId)
-        return;
-
       ids_.emplace_back(id);
-      flat_keys_.emplace_back(flat_key);
-      keys_.emplace_back(key);
-      arg_values_.emplace_back(value);
-      args_for_id_.emplace(id, static_cast<uint32_t>(args_count() - 1));
-      */
+
+      KeyValue kv(flat_key, key, value);
+      auto pair = key_value_map_.emplace(kv, key_values_.size());
+      if (pair.second)
+        key_values_.emplace_back(kv);
+      key_values_ids_.emplace_back(pair.first->second);
+
+      // args_for_id_.emplace(id, static_cast<uint32_t>(args_count() - 1));
     }
 
    private:
     std::deque<RowId> ids_;
-    std::deque<StringId> flat_keys_;
-    std::deque<StringId> keys_;
-    std::deque<Variadic> arg_values_;
+    std::deque<KeyValueRowId> key_values_ids_;
     std::multimap<RowId, uint32_t> args_for_id_;
+
+    std::deque<KeyValue> key_values_;
+    std::unordered_map<KeyValue, KeyValueRowId, KeyValueHasher> key_value_map_;
   };
 
   class Slices {
@@ -188,7 +253,7 @@ class TraceStorage {
       utids_.emplace_back(utid);
       end_states_.emplace_back(end_state);
       priorities_.emplace_back(priority);
-      rows_for_utids_.emplace(utid, slice_count() - 1);
+      // rows_for_utids_.emplace(utid, slice_count() - 1);
       return slice_count() - 1;
     }
 

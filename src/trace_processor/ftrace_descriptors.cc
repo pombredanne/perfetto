@@ -9,9 +9,9 @@ namespace trace_processor {
 namespace {
 
 std::array<MessageDescriptor, 331> descriptors{{
-    {},
-    {},
-    {},
+    {nullptr, {}, 0},
+    {nullptr, {}, 0},
+    {nullptr, {}, 0},
     {
         "print",
         {
@@ -19,6 +19,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ip", ProtoSchemaType::kUint64},
             {"buf", ProtoSchemaType::kString},
         },
+        2,
     },
     {
         "sched_switch",
@@ -32,13 +33,14 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"next_pid", ProtoSchemaType::kInt32},
             {"next_prio", ProtoSchemaType::kInt32},
         },
+        7,
     },
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
+    {nullptr, {}, 0},
+    {nullptr, {}, 0},
+    {nullptr, {}, 0},
+    {nullptr, {}, 0},
+    {nullptr, {}, 0},
+    {nullptr, {}, 0},
     {
         "cpu_frequency",
         {
@@ -46,6 +48,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"state", ProtoSchemaType::kUint32},
             {"cpu_id", ProtoSchemaType::kUint32},
         },
+        2,
     },
     {
         "cpu_frequency_limits",
@@ -55,6 +58,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"max_freq", ProtoSchemaType::kUint32},
             {"cpu_id", ProtoSchemaType::kUint32},
         },
+        3,
     },
     {
         "cpu_idle",
@@ -63,6 +67,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"state", ProtoSchemaType::kUint32},
             {"cpu_id", ProtoSchemaType::kUint32},
         },
+        2,
     },
     {
         "clock_enable",
@@ -72,6 +77,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"state", ProtoSchemaType::kUint64},
             {"cpu_id", ProtoSchemaType::kUint64},
         },
+        3,
     },
     {
         "clock_disable",
@@ -81,6 +87,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"state", ProtoSchemaType::kUint64},
             {"cpu_id", ProtoSchemaType::kUint64},
         },
+        3,
     },
     {
         "clock_set_rate",
@@ -90,6 +97,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"state", ProtoSchemaType::kUint64},
             {"cpu_id", ProtoSchemaType::kUint64},
         },
+        3,
     },
     {
         "sched_wakeup",
@@ -101,6 +109,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"success", ProtoSchemaType::kInt32},
             {"target_cpu", ProtoSchemaType::kInt32},
         },
+        5,
     },
     {
         "sched_blocked_reason",
@@ -110,6 +119,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"caller", ProtoSchemaType::kUint64},
             {"io_wait", ProtoSchemaType::kUint32},
         },
+        3,
     },
     {
         "sched_cpu_hotplug",
@@ -119,6 +129,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"error", ProtoSchemaType::kInt32},
             {"status", ProtoSchemaType::kInt32},
         },
+        3,
     },
     {
         "sched_waking",
@@ -130,6 +141,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"success", ProtoSchemaType::kInt32},
             {"target_cpu", ProtoSchemaType::kInt32},
         },
+        5,
     },
     {
         "ipi_entry",
@@ -137,6 +149,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {},
             {"reason", ProtoSchemaType::kString},
         },
+        1,
     },
     {
         "ipi_exit",
@@ -144,6 +157,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {},
             {"reason", ProtoSchemaType::kString},
         },
+        1,
     },
     {
         "ipi_raise",
@@ -152,6 +166,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"target_cpus", ProtoSchemaType::kUint32},
             {"reason", ProtoSchemaType::kString},
         },
+        2,
     },
     {
         "softirq_entry",
@@ -159,6 +174,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {},
             {"vec", ProtoSchemaType::kUint32},
         },
+        1,
     },
     {
         "softirq_exit",
@@ -166,6 +182,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {},
             {"vec", ProtoSchemaType::kUint32},
         },
+        1,
     },
     {
         "softirq_raise",
@@ -173,6 +190,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {},
             {"vec", ProtoSchemaType::kUint32},
         },
+        1,
     },
     {
         "i2c_read",
@@ -184,6 +202,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"flags", ProtoSchemaType::kUint32},
             {"len", ProtoSchemaType::kUint32},
         },
+        5,
     },
     {
         "i2c_write",
@@ -196,6 +215,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"len", ProtoSchemaType::kUint32},
             {"buf", ProtoSchemaType::kUint32},
         },
+        6,
     },
     {
         "i2c_result",
@@ -205,6 +225,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"nr_msgs", ProtoSchemaType::kUint32},
             {"ret", ProtoSchemaType::kInt32},
         },
+        3,
     },
     {
         "i2c_reply",
@@ -217,6 +238,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"len", ProtoSchemaType::kUint32},
             {"buf", ProtoSchemaType::kUint32},
         },
+        6,
     },
     {
         "smbus_read",
@@ -228,6 +250,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"command", ProtoSchemaType::kUint32},
             {"protocol", ProtoSchemaType::kUint32},
         },
+        5,
     },
     {
         "smbus_write",
@@ -240,6 +263,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"len", ProtoSchemaType::kUint32},
             {"protocol", ProtoSchemaType::kUint32},
         },
+        6,
     },
     {
         "smbus_result",
@@ -253,6 +277,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"res", ProtoSchemaType::kInt32},
             {"protocol", ProtoSchemaType::kUint32},
         },
+        7,
     },
     {
         "smbus_reply",
@@ -265,6 +290,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"len", ProtoSchemaType::kUint32},
             {"protocol", ProtoSchemaType::kUint32},
         },
+        6,
     },
     {
         "lowmemory_kill",
@@ -276,6 +302,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"pagecache_limit", ProtoSchemaType::kInt64},
             {"free", ProtoSchemaType::kInt64},
         },
+        5,
     },
     {
         "irq_handler_entry",
@@ -285,6 +312,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"name", ProtoSchemaType::kString},
             {"handler", ProtoSchemaType::kUint32},
         },
+        3,
     },
     {
         "irq_handler_exit",
@@ -293,6 +321,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"irq", ProtoSchemaType::kInt32},
             {"ret", ProtoSchemaType::kInt32},
         },
+        2,
     },
     {
         "sync_pt",
@@ -301,6 +330,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"timeline", ProtoSchemaType::kString},
             {"value", ProtoSchemaType::kString},
         },
+        2,
     },
     {
         "sync_timeline",
@@ -309,6 +339,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"name", ProtoSchemaType::kString},
             {"value", ProtoSchemaType::kString},
         },
+        2,
     },
     {
         "sync_wait",
@@ -318,6 +349,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"status", ProtoSchemaType::kInt32},
             {"begin", ProtoSchemaType::kUint32},
         },
+        3,
     },
     {
         "ext4_da_write_begin",
@@ -329,6 +361,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"len", ProtoSchemaType::kUint32},
             {"flags", ProtoSchemaType::kUint32},
         },
+        5,
     },
     {
         "ext4_da_write_end",
@@ -340,6 +373,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"len", ProtoSchemaType::kUint32},
             {"copied", ProtoSchemaType::kUint32},
         },
+        5,
     },
     {
         "ext4_sync_file_enter",
@@ -350,6 +384,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"parent", ProtoSchemaType::kUint64},
             {"datasync", ProtoSchemaType::kInt32},
         },
+        4,
     },
     {
         "ext4_sync_file_exit",
@@ -359,6 +394,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ino", ProtoSchemaType::kUint64},
             {"ret", ProtoSchemaType::kInt32},
         },
+        3,
     },
     {
         "block_rq_issue",
@@ -372,6 +408,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"comm", ProtoSchemaType::kString},
             {"cmd", ProtoSchemaType::kString},
         },
+        7,
     },
     {
         "mm_vmscan_direct_reclaim_begin",
@@ -381,6 +418,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"may_writepage", ProtoSchemaType::kInt32},
             {"gfp_flags", ProtoSchemaType::kUint32},
         },
+        3,
     },
     {
         "mm_vmscan_direct_reclaim_end",
@@ -388,6 +426,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {},
             {"nr_reclaimed", ProtoSchemaType::kUint64},
         },
+        1,
     },
     {
         "mm_vmscan_kswapd_wake",
@@ -396,6 +435,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"nid", ProtoSchemaType::kInt32},
             {"order", ProtoSchemaType::kInt32},
         },
+        2,
     },
     {
         "mm_vmscan_kswapd_sleep",
@@ -403,6 +443,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {},
             {"nid", ProtoSchemaType::kInt32},
         },
+        1,
     },
     {
         "binder_transaction",
@@ -416,6 +457,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"code", ProtoSchemaType::kUint32},
             {"flags", ProtoSchemaType::kUint32},
         },
+        7,
     },
     {
         "binder_transaction_received",
@@ -423,6 +465,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {},
             {"debug_id", ProtoSchemaType::kInt32},
         },
+        1,
     },
     {
         "binder_set_priority",
@@ -434,6 +477,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"new_prio", ProtoSchemaType::kUint32},
             {"desired_prio", ProtoSchemaType::kUint32},
         },
+        5,
     },
     {
         "binder_lock",
@@ -441,6 +485,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {},
             {"tag", ProtoSchemaType::kString},
         },
+        1,
     },
     {
         "binder_locked",
@@ -448,6 +493,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {},
             {"tag", ProtoSchemaType::kString},
         },
+        1,
     },
     {
         "binder_unlock",
@@ -455,6 +501,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {},
             {"tag", ProtoSchemaType::kString},
         },
+        1,
     },
     {
         "workqueue_activate_work",
@@ -462,6 +509,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {},
             {"work", ProtoSchemaType::kUint64},
         },
+        1,
     },
     {
         "workqueue_execute_end",
@@ -469,6 +517,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {},
             {"work", ProtoSchemaType::kUint64},
         },
+        1,
     },
     {
         "workqueue_execute_start",
@@ -477,6 +526,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"work", ProtoSchemaType::kUint64},
             {"function", ProtoSchemaType::kUint64},
         },
+        2,
     },
     {
         "workqueue_queue_work",
@@ -488,6 +538,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"req_cpu", ProtoSchemaType::kUint32},
             {"cpu", ProtoSchemaType::kUint32},
         },
+        5,
     },
     {
         "regulator_disable",
@@ -495,6 +546,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {},
             {"name", ProtoSchemaType::kString},
         },
+        1,
     },
     {
         "regulator_disable_complete",
@@ -502,6 +554,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {},
             {"name", ProtoSchemaType::kString},
         },
+        1,
     },
     {
         "regulator_enable",
@@ -509,6 +562,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {},
             {"name", ProtoSchemaType::kString},
         },
+        1,
     },
     {
         "regulator_enable_complete",
@@ -516,6 +570,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {},
             {"name", ProtoSchemaType::kString},
         },
+        1,
     },
     {
         "regulator_enable_delay",
@@ -523,6 +578,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {},
             {"name", ProtoSchemaType::kString},
         },
+        1,
     },
     {
         "regulator_set_voltage",
@@ -532,6 +588,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"min", ProtoSchemaType::kInt32},
             {"max", ProtoSchemaType::kInt32},
         },
+        3,
     },
     {
         "regulator_set_voltage_complete",
@@ -540,6 +597,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"name", ProtoSchemaType::kString},
             {"val", ProtoSchemaType::kUint32},
         },
+        2,
     },
     {
         "cgroup_attach_task",
@@ -551,6 +609,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"comm", ProtoSchemaType::kString},
             {"cname", ProtoSchemaType::kString},
         },
+        5,
     },
     {
         "cgroup_mkdir",
@@ -560,6 +619,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"id", ProtoSchemaType::kInt32},
             {"cname", ProtoSchemaType::kString},
         },
+        3,
     },
     {
         "cgroup_remount",
@@ -569,6 +629,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ss_mask", ProtoSchemaType::kUint32},
             {"name", ProtoSchemaType::kString},
         },
+        3,
     },
     {
         "cgroup_rmdir",
@@ -578,6 +639,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"id", ProtoSchemaType::kInt32},
             {"cname", ProtoSchemaType::kString},
         },
+        3,
     },
     {
         "cgroup_transfer_tasks",
@@ -589,6 +651,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"comm", ProtoSchemaType::kString},
             {"cname", ProtoSchemaType::kString},
         },
+        5,
     },
     {
         "cgroup_destroy_root",
@@ -598,6 +661,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ss_mask", ProtoSchemaType::kUint32},
             {"name", ProtoSchemaType::kString},
         },
+        3,
     },
     {
         "cgroup_release",
@@ -607,6 +671,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"id", ProtoSchemaType::kInt32},
             {"cname", ProtoSchemaType::kString},
         },
+        3,
     },
     {
         "cgroup_rename",
@@ -616,6 +681,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"id", ProtoSchemaType::kInt32},
             {"cname", ProtoSchemaType::kString},
         },
+        3,
     },
     {
         "cgroup_setup_root",
@@ -625,6 +691,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ss_mask", ProtoSchemaType::kUint32},
             {"name", ProtoSchemaType::kString},
         },
+        3,
     },
     {
         "mdp_cmd_kickoff",
@@ -633,6 +700,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ctl_num", ProtoSchemaType::kUint32},
             {"kickoff_cnt", ProtoSchemaType::kInt32},
         },
+        2,
     },
     {
         "mdp_commit",
@@ -643,6 +711,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"clk_rate", ProtoSchemaType::kUint32},
             {"bandwidth", ProtoSchemaType::kUint64},
         },
+        4,
     },
     {
         "mdp_perf_set_ot",
@@ -653,6 +722,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"rd_lim", ProtoSchemaType::kUint32},
             {"is_vbif_rt", ProtoSchemaType::kUint32},
         },
+        4,
     },
     {
         "mdp_sspp_change",
@@ -675,6 +745,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"dst_w", ProtoSchemaType::kUint32},
             {"dst_h", ProtoSchemaType::kUint32},
         },
+        16,
     },
     {
         "tracing_mark_write",
@@ -684,6 +755,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"trace_name", ProtoSchemaType::kString},
             {"trace_begin", ProtoSchemaType::kUint32},
         },
+        3,
     },
     {
         "mdp_cmd_pingpong_done",
@@ -694,6 +766,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"pp_num", ProtoSchemaType::kUint32},
             {"koff_cnt", ProtoSchemaType::kInt32},
         },
+        4,
     },
     {
         "mdp_compare_bw",
@@ -708,6 +781,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"params_changed", ProtoSchemaType::kUint32},
             {"update_bw", ProtoSchemaType::kUint32},
         },
+        8,
     },
     {
         "mdp_perf_set_panic_luts",
@@ -719,6 +793,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"panic_lut", ProtoSchemaType::kUint32},
             {"robust_lut", ProtoSchemaType::kUint32},
         },
+        5,
     },
     {
         "mdp_sspp_set",
@@ -741,6 +816,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"dst_w", ProtoSchemaType::kUint32},
             {"dst_h", ProtoSchemaType::kUint32},
         },
+        16,
     },
     {
         "mdp_cmd_readptr_done",
@@ -749,6 +825,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ctl_num", ProtoSchemaType::kUint32},
             {"koff_cnt", ProtoSchemaType::kInt32},
         },
+        2,
     },
     {
         "mdp_misr_crc",
@@ -758,6 +835,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"vsync_cnt", ProtoSchemaType::kUint32},
             {"crc", ProtoSchemaType::kUint32},
         },
+        3,
     },
     {
         "mdp_perf_set_qos_luts",
@@ -771,6 +849,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"lut", ProtoSchemaType::kUint32},
             {"linear", ProtoSchemaType::kUint32},
         },
+        7,
     },
     {
         "mdp_trace_counter",
@@ -780,6 +859,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"counter_name", ProtoSchemaType::kString},
             {"value", ProtoSchemaType::kInt32},
         },
+        3,
     },
     {
         "mdp_cmd_release_bw",
@@ -787,6 +867,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {},
             {"ctl_num", ProtoSchemaType::kUint32},
         },
+        1,
     },
     {
         "mdp_mixer_update",
@@ -794,6 +875,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {},
             {"mixer_num", ProtoSchemaType::kUint32},
         },
+        1,
     },
     {
         "mdp_perf_set_wm_levels",
@@ -808,6 +890,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"mb_cnt", ProtoSchemaType::kUint32},
             {"mb_size", ProtoSchemaType::kUint32},
         },
+        8,
     },
     {
         "mdp_video_underrun_done",
@@ -816,6 +899,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ctl_num", ProtoSchemaType::kUint32},
             {"underrun_cnt", ProtoSchemaType::kUint32},
         },
+        2,
     },
     {
         "mdp_cmd_wait_pingpong",
@@ -824,6 +908,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ctl_num", ProtoSchemaType::kUint32},
             {"kickoff_cnt", ProtoSchemaType::kInt32},
         },
+        2,
     },
     {
         "mdp_perf_prefill_calc",
@@ -840,6 +925,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"fbc_bytes", ProtoSchemaType::kUint32},
             {"prefill_bytes", ProtoSchemaType::kUint32},
         },
+        10,
     },
     {
         "mdp_perf_update_bus",
@@ -849,6 +935,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ab_quota", ProtoSchemaType::kUint64},
             {"ib_quota", ProtoSchemaType::kUint64},
         },
+        3,
     },
     {
         "rotator_bw_ao_as_context",
@@ -856,6 +943,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {},
             {"state", ProtoSchemaType::kUint32},
         },
+        1,
     },
     {
         "mm_filemap_add_to_page_cache",
@@ -867,6 +955,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"s_dev", ProtoSchemaType::kUint64},
             {"page", ProtoSchemaType::kUint64},
         },
+        5,
     },
     {
         "mm_filemap_delete_from_page_cache",
@@ -878,6 +967,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"s_dev", ProtoSchemaType::kUint64},
             {"page", ProtoSchemaType::kUint64},
         },
+        5,
     },
     {
         "mm_compaction_begin",
@@ -889,6 +979,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"zone_end", ProtoSchemaType::kUint64},
             {"sync", ProtoSchemaType::kUint32},
         },
+        5,
     },
     {
         "mm_compaction_defer_compaction",
@@ -901,6 +992,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"defer_shift", ProtoSchemaType::kUint32},
             {"order_failed", ProtoSchemaType::kInt32},
         },
+        6,
     },
     {
         "mm_compaction_deferred",
@@ -913,6 +1005,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"defer_shift", ProtoSchemaType::kUint32},
             {"order_failed", ProtoSchemaType::kInt32},
         },
+        6,
     },
     {
         "mm_compaction_defer_reset",
@@ -925,6 +1018,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"defer_shift", ProtoSchemaType::kUint32},
             {"order_failed", ProtoSchemaType::kInt32},
         },
+        6,
     },
     {
         "mm_compaction_end",
@@ -937,6 +1031,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"sync", ProtoSchemaType::kUint32},
             {"status", ProtoSchemaType::kInt32},
         },
+        6,
     },
     {
         "mm_compaction_finished",
@@ -947,6 +1042,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"order", ProtoSchemaType::kInt32},
             {"ret", ProtoSchemaType::kInt32},
         },
+        4,
     },
     {
         "mm_compaction_isolate_freepages",
@@ -957,6 +1053,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"nr_scanned", ProtoSchemaType::kUint64},
             {"nr_taken", ProtoSchemaType::kUint64},
         },
+        4,
     },
     {
         "mm_compaction_isolate_migratepages",
@@ -967,6 +1064,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"nr_scanned", ProtoSchemaType::kUint64},
             {"nr_taken", ProtoSchemaType::kUint64},
         },
+        4,
     },
     {
         "mm_compaction_kcompactd_sleep",
@@ -974,6 +1072,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {},
             {"nid", ProtoSchemaType::kInt32},
         },
+        1,
     },
     {
         "mm_compaction_kcompactd_wake",
@@ -983,6 +1082,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"order", ProtoSchemaType::kInt32},
             {"classzone_idx", ProtoSchemaType::kUint32},
         },
+        3,
     },
     {
         "mm_compaction_migratepages",
@@ -991,6 +1091,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"nr_migrated", ProtoSchemaType::kUint64},
             {"nr_failed", ProtoSchemaType::kUint64},
         },
+        2,
     },
     {
         "mm_compaction_suitable",
@@ -1001,6 +1102,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"order", ProtoSchemaType::kInt32},
             {"ret", ProtoSchemaType::kInt32},
         },
+        4,
     },
     {
         "mm_compaction_try_to_compact_pages",
@@ -1010,6 +1112,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"gfp_mask", ProtoSchemaType::kUint32},
             {"mode", ProtoSchemaType::kUint32},
         },
+        3,
     },
     {
         "mm_compaction_wakeup_kcompactd",
@@ -1019,6 +1122,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"order", ProtoSchemaType::kInt32},
             {"classzone_idx", ProtoSchemaType::kUint32},
         },
+        3,
     },
     {
         "suspend_resume",
@@ -1028,6 +1132,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"val", ProtoSchemaType::kInt32},
             {"start", ProtoSchemaType::kUint32},
         },
+        3,
     },
     {
         "sched_wakeup_new",
@@ -1039,6 +1144,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"success", ProtoSchemaType::kInt32},
             {"target_cpu", ProtoSchemaType::kInt32},
         },
+        5,
     },
     {
         "block_bio_backmerge",
@@ -1050,6 +1156,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"rwbs", ProtoSchemaType::kString},
             {"comm", ProtoSchemaType::kString},
         },
+        5,
     },
     {
         "block_bio_bounce",
@@ -1061,6 +1168,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"rwbs", ProtoSchemaType::kString},
             {"comm", ProtoSchemaType::kString},
         },
+        5,
     },
     {
         "block_bio_complete",
@@ -1072,6 +1180,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"error", ProtoSchemaType::kInt32},
             {"rwbs", ProtoSchemaType::kString},
         },
+        5,
     },
     {
         "block_bio_frontmerge",
@@ -1083,6 +1192,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"rwbs", ProtoSchemaType::kString},
             {"comm", ProtoSchemaType::kString},
         },
+        5,
     },
     {
         "block_bio_queue",
@@ -1094,6 +1204,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"rwbs", ProtoSchemaType::kString},
             {"comm", ProtoSchemaType::kString},
         },
+        5,
     },
     {
         "block_bio_remap",
@@ -1106,6 +1217,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"old_sector", ProtoSchemaType::kUint64},
             {"rwbs", ProtoSchemaType::kString},
         },
+        6,
     },
     {
         "block_dirty_buffer",
@@ -1115,6 +1227,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"sector", ProtoSchemaType::kUint64},
             {"size", ProtoSchemaType::kUint64},
         },
+        3,
     },
     {
         "block_getrq",
@@ -1126,6 +1239,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"rwbs", ProtoSchemaType::kString},
             {"comm", ProtoSchemaType::kString},
         },
+        5,
     },
     {
         "block_plug",
@@ -1133,6 +1247,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {},
             {"comm", ProtoSchemaType::kString},
         },
+        1,
     },
     {
         "block_rq_abort",
@@ -1145,6 +1260,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"rwbs", ProtoSchemaType::kString},
             {"cmd", ProtoSchemaType::kString},
         },
+        6,
     },
     {
         "block_rq_complete",
@@ -1157,6 +1273,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"rwbs", ProtoSchemaType::kString},
             {"cmd", ProtoSchemaType::kString},
         },
+        6,
     },
     {
         "block_rq_insert",
@@ -1170,8 +1287,9 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"comm", ProtoSchemaType::kString},
             {"cmd", ProtoSchemaType::kString},
         },
+        7,
     },
-    {},
+    {nullptr, {}, 0},
     {
         "block_rq_remap",
         {
@@ -1184,6 +1302,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"nr_bios", ProtoSchemaType::kUint32},
             {"rwbs", ProtoSchemaType::kString},
         },
+        7,
     },
     {
         "block_rq_requeue",
@@ -1196,6 +1315,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"rwbs", ProtoSchemaType::kString},
             {"cmd", ProtoSchemaType::kString},
         },
+        6,
     },
     {
         "block_sleeprq",
@@ -1207,6 +1327,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"rwbs", ProtoSchemaType::kString},
             {"comm", ProtoSchemaType::kString},
         },
+        5,
     },
     {
         "block_split",
@@ -1218,6 +1339,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"rwbs", ProtoSchemaType::kString},
             {"comm", ProtoSchemaType::kString},
         },
+        5,
     },
     {
         "block_touch_buffer",
@@ -1227,6 +1349,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"sector", ProtoSchemaType::kUint64},
             {"size", ProtoSchemaType::kUint64},
         },
+        3,
     },
     {
         "block_unplug",
@@ -1235,6 +1358,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"nr_rq", ProtoSchemaType::kInt32},
             {"comm", ProtoSchemaType::kString},
         },
+        2,
     },
     {
         "ext4_alloc_da_blocks",
@@ -1245,6 +1369,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"data_blocks", ProtoSchemaType::kUint32},
             {"meta_blocks", ProtoSchemaType::kUint32},
         },
+        4,
     },
     {
         "ext4_allocate_blocks",
@@ -1262,6 +1387,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"pright", ProtoSchemaType::kUint64},
             {"flags", ProtoSchemaType::kUint32},
         },
+        11,
     },
     {
         "ext4_allocate_inode",
@@ -1272,6 +1398,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"dir", ProtoSchemaType::kUint64},
             {"mode", ProtoSchemaType::kUint32},
         },
+        4,
     },
     {
         "ext4_begin_ordered_truncate",
@@ -1281,6 +1408,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ino", ProtoSchemaType::kUint64},
             {"new_size", ProtoSchemaType::kInt64},
         },
+        3,
     },
     {
         "ext4_collapse_range",
@@ -1291,6 +1419,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"offset", ProtoSchemaType::kInt64},
             {"len", ProtoSchemaType::kInt64},
         },
+        4,
     },
     {
         "ext4_da_release_space",
@@ -1305,6 +1434,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"allocated_meta_blocks", ProtoSchemaType::kInt32},
             {"mode", ProtoSchemaType::kUint32},
         },
+        8,
     },
     {
         "ext4_da_reserve_space",
@@ -1318,6 +1448,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"mode", ProtoSchemaType::kUint32},
             {"md_needed", ProtoSchemaType::kInt32},
         },
+        7,
     },
     {
         "ext4_da_update_reserve_space",
@@ -1333,6 +1464,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"quota_claim", ProtoSchemaType::kInt32},
             {"mode", ProtoSchemaType::kUint32},
         },
+        9,
     },
     {
         "ext4_da_write_pages",
@@ -1349,6 +1481,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"io_done", ProtoSchemaType::kInt32},
             {"pages_written", ProtoSchemaType::kInt32},
         },
+        10,
     },
     {
         "ext4_da_write_pages_extent",
@@ -1360,6 +1493,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"len", ProtoSchemaType::kUint32},
             {"flags", ProtoSchemaType::kUint32},
         },
+        5,
     },
     {
         "ext4_direct_IO_enter",
@@ -1371,6 +1505,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"len", ProtoSchemaType::kUint64},
             {"rw", ProtoSchemaType::kInt32},
         },
+        5,
     },
     {
         "ext4_direct_IO_exit",
@@ -1383,6 +1518,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"rw", ProtoSchemaType::kInt32},
             {"ret", ProtoSchemaType::kInt32},
         },
+        6,
     },
     {
         "ext4_discard_blocks",
@@ -1392,6 +1528,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"blk", ProtoSchemaType::kUint64},
             {"count", ProtoSchemaType::kUint64},
         },
+        3,
     },
     {
         "ext4_discard_preallocations",
@@ -1400,6 +1537,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"dev", ProtoSchemaType::kUint64},
             {"ino", ProtoSchemaType::kUint64},
         },
+        2,
     },
     {
         "ext4_drop_inode",
@@ -1409,6 +1547,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ino", ProtoSchemaType::kUint64},
             {"drop", ProtoSchemaType::kInt32},
         },
+        3,
     },
     {
         "ext4_es_cache_extent",
@@ -1421,6 +1560,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"pblk", ProtoSchemaType::kUint64},
             {"status", ProtoSchemaType::kUint32},
         },
+        6,
     },
     {
         "ext4_es_find_delayed_extent_range_enter",
@@ -1430,6 +1570,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ino", ProtoSchemaType::kUint64},
             {"lblk", ProtoSchemaType::kUint32},
         },
+        3,
     },
     {
         "ext4_es_find_delayed_extent_range_exit",
@@ -1442,6 +1583,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"pblk", ProtoSchemaType::kUint64},
             {"status", ProtoSchemaType::kUint64},
         },
+        6,
     },
     {
         "ext4_es_insert_extent",
@@ -1454,6 +1596,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"pblk", ProtoSchemaType::kUint64},
             {"status", ProtoSchemaType::kUint64},
         },
+        6,
     },
     {
         "ext4_es_lookup_extent_enter",
@@ -1463,6 +1606,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ino", ProtoSchemaType::kUint64},
             {"lblk", ProtoSchemaType::kUint32},
         },
+        3,
     },
     {
         "ext4_es_lookup_extent_exit",
@@ -1476,6 +1620,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"status", ProtoSchemaType::kUint64},
             {"found", ProtoSchemaType::kInt32},
         },
+        7,
     },
     {
         "ext4_es_remove_extent",
@@ -1486,6 +1631,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"lblk", ProtoSchemaType::kInt64},
             {"len", ProtoSchemaType::kInt64},
         },
+        4,
     },
     {
         "ext4_es_shrink",
@@ -1497,6 +1643,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"nr_skipped", ProtoSchemaType::kInt32},
             {"retried", ProtoSchemaType::kInt32},
         },
+        5,
     },
     {
         "ext4_es_shrink_count",
@@ -1506,6 +1653,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"nr_to_scan", ProtoSchemaType::kInt32},
             {"cache_cnt", ProtoSchemaType::kInt32},
         },
+        3,
     },
     {
         "ext4_es_shrink_scan_enter",
@@ -1515,6 +1663,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"nr_to_scan", ProtoSchemaType::kInt32},
             {"cache_cnt", ProtoSchemaType::kInt32},
         },
+        3,
     },
     {
         "ext4_es_shrink_scan_exit",
@@ -1524,6 +1673,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"nr_shrunk", ProtoSchemaType::kInt32},
             {"cache_cnt", ProtoSchemaType::kInt32},
         },
+        3,
     },
     {
         "ext4_evict_inode",
@@ -1533,6 +1683,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ino", ProtoSchemaType::kUint64},
             {"nlink", ProtoSchemaType::kInt32},
         },
+        3,
     },
     {
         "ext4_ext_convert_to_initialized_enter",
@@ -1546,6 +1697,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"u_len", ProtoSchemaType::kUint32},
             {"u_pblk", ProtoSchemaType::kUint64},
         },
+        7,
     },
     {
         "ext4_ext_convert_to_initialized_fastpath",
@@ -1562,6 +1714,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"i_len", ProtoSchemaType::kUint32},
             {"i_pblk", ProtoSchemaType::kUint64},
         },
+        10,
     },
     {
         "ext4_ext_handle_unwritten_extents",
@@ -1576,6 +1729,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"allocated", ProtoSchemaType::kUint32},
             {"newblk", ProtoSchemaType::kUint64},
         },
+        8,
     },
     {
         "ext4_ext_in_cache",
@@ -1586,6 +1740,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"lblk", ProtoSchemaType::kUint32},
             {"ret", ProtoSchemaType::kInt32},
         },
+        4,
     },
     {
         "ext4_ext_load_extent",
@@ -1596,6 +1751,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"pblk", ProtoSchemaType::kUint64},
             {"lblk", ProtoSchemaType::kUint32},
         },
+        4,
     },
     {
         "ext4_ext_map_blocks_enter",
@@ -1607,6 +1763,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"len", ProtoSchemaType::kUint32},
             {"flags", ProtoSchemaType::kUint32},
         },
+        5,
     },
     {
         "ext4_ext_map_blocks_exit",
@@ -1621,6 +1778,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"mflags", ProtoSchemaType::kUint32},
             {"ret", ProtoSchemaType::kInt32},
         },
+        8,
     },
     {
         "ext4_ext_put_in_cache",
@@ -1632,6 +1790,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"len", ProtoSchemaType::kUint32},
             {"start", ProtoSchemaType::kUint64},
         },
+        5,
     },
     {
         "ext4_ext_remove_space",
@@ -1643,6 +1802,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"end", ProtoSchemaType::kUint32},
             {"depth", ProtoSchemaType::kInt32},
         },
+        5,
     },
     {
         "ext4_ext_remove_space_done",
@@ -1656,6 +1816,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"partial", ProtoSchemaType::kInt64},
             {"eh_entries", ProtoSchemaType::kUint32},
         },
+        7,
     },
     {
         "ext4_ext_rm_idx",
@@ -1665,6 +1826,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ino", ProtoSchemaType::kUint64},
             {"pblk", ProtoSchemaType::kUint64},
         },
+        3,
     },
     {
         "ext4_ext_rm_leaf",
@@ -1678,6 +1840,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ee_pblk", ProtoSchemaType::kUint64},
             {"ee_len", ProtoSchemaType::kInt32},
         },
+        7,
     },
     {
         "ext4_ext_show_extent",
@@ -1689,6 +1852,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"lblk", ProtoSchemaType::kUint32},
             {"len", ProtoSchemaType::kUint32},
         },
+        5,
     },
     {
         "ext4_fallocate_enter",
@@ -1701,6 +1865,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"mode", ProtoSchemaType::kInt32},
             {"pos", ProtoSchemaType::kInt64},
         },
+        6,
     },
     {
         "ext4_fallocate_exit",
@@ -1712,6 +1877,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"blocks", ProtoSchemaType::kUint32},
             {"ret", ProtoSchemaType::kInt32},
         },
+        5,
     },
     {
         "ext4_find_delalloc_range",
@@ -1725,6 +1891,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"found", ProtoSchemaType::kInt32},
             {"found_blk", ProtoSchemaType::kUint32},
         },
+        7,
     },
     {
         "ext4_forget",
@@ -1736,6 +1903,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"is_metadata", ProtoSchemaType::kInt32},
             {"mode", ProtoSchemaType::kUint32},
         },
+        5,
     },
     {
         "ext4_free_blocks",
@@ -1748,6 +1916,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"flags", ProtoSchemaType::kInt32},
             {"mode", ProtoSchemaType::kUint32},
         },
+        6,
     },
     {
         "ext4_free_inode",
@@ -1760,6 +1929,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"blocks", ProtoSchemaType::kUint64},
             {"mode", ProtoSchemaType::kUint32},
         },
+        6,
     },
     {
         "ext4_get_implied_cluster_alloc_exit",
@@ -1772,6 +1942,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"len", ProtoSchemaType::kUint32},
             {"ret", ProtoSchemaType::kInt32},
         },
+        6,
     },
     {
         "ext4_get_reserved_cluster_alloc",
@@ -1782,6 +1953,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"lblk", ProtoSchemaType::kUint32},
             {"len", ProtoSchemaType::kUint32},
         },
+        4,
     },
     {
         "ext4_ind_map_blocks_enter",
@@ -1793,6 +1965,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"len", ProtoSchemaType::kUint32},
             {"flags", ProtoSchemaType::kUint32},
         },
+        5,
     },
     {
         "ext4_ind_map_blocks_exit",
@@ -1807,6 +1980,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"mflags", ProtoSchemaType::kUint32},
             {"ret", ProtoSchemaType::kInt32},
         },
+        8,
     },
     {
         "ext4_insert_range",
@@ -1817,6 +1991,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"offset", ProtoSchemaType::kInt64},
             {"len", ProtoSchemaType::kInt64},
         },
+        4,
     },
     {
         "ext4_invalidatepage",
@@ -1828,6 +2003,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"offset", ProtoSchemaType::kUint64},
             {"length", ProtoSchemaType::kUint32},
         },
+        5,
     },
     {
         "ext4_journal_start",
@@ -1839,6 +2015,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"rsv_blocks", ProtoSchemaType::kInt32},
             {"nblocks", ProtoSchemaType::kInt32},
         },
+        5,
     },
     {
         "ext4_journal_start_reserved",
@@ -1848,6 +2025,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ip", ProtoSchemaType::kUint64},
             {"blocks", ProtoSchemaType::kInt32},
         },
+        3,
     },
     {
         "ext4_journalled_invalidatepage",
@@ -1859,6 +2037,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"offset", ProtoSchemaType::kUint64},
             {"length", ProtoSchemaType::kUint32},
         },
+        5,
     },
     {
         "ext4_journalled_write_end",
@@ -1870,6 +2049,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"len", ProtoSchemaType::kUint32},
             {"copied", ProtoSchemaType::kUint32},
         },
+        5,
     },
     {
         "ext4_load_inode",
@@ -1878,6 +2058,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"dev", ProtoSchemaType::kUint64},
             {"ino", ProtoSchemaType::kUint64},
         },
+        2,
     },
     {
         "ext4_load_inode_bitmap",
@@ -1886,6 +2067,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"dev", ProtoSchemaType::kUint64},
             {"group", ProtoSchemaType::kUint32},
         },
+        2,
     },
     {
         "ext4_mark_inode_dirty",
@@ -1895,6 +2077,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ino", ProtoSchemaType::kUint64},
             {"ip", ProtoSchemaType::kUint64},
         },
+        3,
     },
     {
         "ext4_mb_bitmap_load",
@@ -1903,6 +2086,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"dev", ProtoSchemaType::kUint64},
             {"group", ProtoSchemaType::kUint32},
         },
+        2,
     },
     {
         "ext4_mb_buddy_bitmap_load",
@@ -1911,6 +2095,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"dev", ProtoSchemaType::kUint64},
             {"group", ProtoSchemaType::kUint32},
         },
+        2,
     },
     {
         "ext4_mb_discard_preallocations",
@@ -1919,6 +2104,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"dev", ProtoSchemaType::kUint64},
             {"needed", ProtoSchemaType::kInt32},
         },
+        2,
     },
     {
         "ext4_mb_new_group_pa",
@@ -1930,6 +2116,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"pa_lstart", ProtoSchemaType::kUint64},
             {"pa_len", ProtoSchemaType::kUint32},
         },
+        5,
     },
     {
         "ext4_mb_new_inode_pa",
@@ -1941,6 +2128,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"pa_lstart", ProtoSchemaType::kUint64},
             {"pa_len", ProtoSchemaType::kUint32},
         },
+        5,
     },
     {
         "ext4_mb_release_group_pa",
@@ -1950,6 +2138,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"pa_pstart", ProtoSchemaType::kUint64},
             {"pa_len", ProtoSchemaType::kUint32},
         },
+        3,
     },
     {
         "ext4_mb_release_inode_pa",
@@ -1960,6 +2149,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"block", ProtoSchemaType::kUint64},
             {"count", ProtoSchemaType::kUint32},
         },
+        4,
     },
     {
         "ext4_mballoc_alloc",
@@ -1986,6 +2176,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"tail", ProtoSchemaType::kUint32},
             {"cr", ProtoSchemaType::kUint32},
         },
+        20,
     },
     {
         "ext4_mballoc_discard",
@@ -1997,6 +2188,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"result_group", ProtoSchemaType::kUint32},
             {"result_len", ProtoSchemaType::kInt32},
         },
+        5,
     },
     {
         "ext4_mballoc_free",
@@ -2008,6 +2200,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"result_group", ProtoSchemaType::kUint32},
             {"result_len", ProtoSchemaType::kInt32},
         },
+        5,
     },
     {
         "ext4_mballoc_prealloc",
@@ -2024,6 +2217,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"result_group", ProtoSchemaType::kUint32},
             {"result_len", ProtoSchemaType::kInt32},
         },
+        10,
     },
     {
         "ext4_other_inode_update_time",
@@ -2036,6 +2230,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"gid", ProtoSchemaType::kUint32},
             {"mode", ProtoSchemaType::kUint32},
         },
+        6,
     },
     {
         "ext4_punch_hole",
@@ -2047,6 +2242,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"len", ProtoSchemaType::kInt64},
             {"mode", ProtoSchemaType::kInt32},
         },
+        5,
     },
     {
         "ext4_read_block_bitmap_load",
@@ -2055,6 +2251,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"dev", ProtoSchemaType::kUint64},
             {"group", ProtoSchemaType::kUint32},
         },
+        2,
     },
     {
         "ext4_readpage",
@@ -2064,6 +2261,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ino", ProtoSchemaType::kUint64},
             {"index", ProtoSchemaType::kUint64},
         },
+        3,
     },
     {
         "ext4_releasepage",
@@ -2073,6 +2271,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ino", ProtoSchemaType::kUint64},
             {"index", ProtoSchemaType::kUint64},
         },
+        3,
     },
     {
         "ext4_remove_blocks",
@@ -2087,6 +2286,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ee_lblk", ProtoSchemaType::kUint32},
             {"ee_len", ProtoSchemaType::kUint32},
         },
+        8,
     },
     {
         "ext4_request_blocks",
@@ -2103,6 +2303,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"pright", ProtoSchemaType::kUint64},
             {"flags", ProtoSchemaType::kUint32},
         },
+        10,
     },
     {
         "ext4_request_inode",
@@ -2112,6 +2313,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"dir", ProtoSchemaType::kUint64},
             {"mode", ProtoSchemaType::kUint32},
         },
+        3,
     },
     {
         "ext4_sync_fs",
@@ -2120,6 +2322,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"dev", ProtoSchemaType::kUint64},
             {"wait", ProtoSchemaType::kInt32},
         },
+        2,
     },
     {
         "ext4_trim_all_free",
@@ -2131,6 +2334,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"start", ProtoSchemaType::kInt32},
             {"len", ProtoSchemaType::kInt32},
         },
+        5,
     },
     {
         "ext4_trim_extent",
@@ -2142,6 +2346,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"start", ProtoSchemaType::kInt32},
             {"len", ProtoSchemaType::kInt32},
         },
+        5,
     },
     {
         "ext4_truncate_enter",
@@ -2151,6 +2356,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ino", ProtoSchemaType::kUint64},
             {"blocks", ProtoSchemaType::kUint64},
         },
+        3,
     },
     {
         "ext4_truncate_exit",
@@ -2160,6 +2366,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ino", ProtoSchemaType::kUint64},
             {"blocks", ProtoSchemaType::kUint64},
         },
+        3,
     },
     {
         "ext4_unlink_enter",
@@ -2170,6 +2377,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"parent", ProtoSchemaType::kUint64},
             {"size", ProtoSchemaType::kInt64},
         },
+        4,
     },
     {
         "ext4_unlink_exit",
@@ -2179,6 +2387,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ino", ProtoSchemaType::kUint64},
             {"ret", ProtoSchemaType::kInt32},
         },
+        3,
     },
     {
         "ext4_write_begin",
@@ -2190,17 +2399,18 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"len", ProtoSchemaType::kUint32},
             {"flags", ProtoSchemaType::kUint32},
         },
+        5,
     },
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
-    {},
+    {nullptr, {}, 0},
+    {nullptr, {}, 0},
+    {nullptr, {}, 0},
+    {nullptr, {}, 0},
+    {nullptr, {}, 0},
+    {nullptr, {}, 0},
+    {nullptr, {}, 0},
+    {nullptr, {}, 0},
+    {nullptr, {}, 0},
+    {nullptr, {}, 0},
     {
         "ext4_write_end",
         {
@@ -2211,6 +2421,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"len", ProtoSchemaType::kUint32},
             {"copied", ProtoSchemaType::kUint32},
         },
+        5,
     },
     {
         "ext4_writepage",
@@ -2220,6 +2431,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ino", ProtoSchemaType::kUint64},
             {"index", ProtoSchemaType::kUint64},
         },
+        3,
     },
     {
         "ext4_writepages",
@@ -2236,6 +2448,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"for_kupdate", ProtoSchemaType::kUint32},
             {"range_cyclic", ProtoSchemaType::kUint32},
         },
+        10,
     },
     {
         "ext4_writepages_result",
@@ -2249,6 +2462,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"writeback_index", ProtoSchemaType::kUint64},
             {"sync_mode", ProtoSchemaType::kInt32},
         },
+        7,
     },
     {
         "ext4_zero_range",
@@ -2260,6 +2474,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"len", ProtoSchemaType::kInt64},
             {"mode", ProtoSchemaType::kInt32},
         },
+        5,
     },
     {
         "task_newtask",
@@ -2270,6 +2485,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"clone_flags", ProtoSchemaType::kUint64},
             {"oom_score_adj", ProtoSchemaType::kInt32},
         },
+        4,
     },
     {
         "task_rename",
@@ -2280,6 +2496,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"newcomm", ProtoSchemaType::kString},
             {"oom_score_adj", ProtoSchemaType::kInt32},
         },
+        4,
     },
     {
         "sched_process_exec",
@@ -2289,6 +2506,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"pid", ProtoSchemaType::kInt32},
             {"old_pid", ProtoSchemaType::kInt32},
         },
+        3,
     },
     {
         "sched_process_exit",
@@ -2299,6 +2517,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"tgid", ProtoSchemaType::kInt32},
             {"prio", ProtoSchemaType::kInt32},
         },
+        4,
     },
     {
         "sched_process_fork",
@@ -2309,6 +2528,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"child_comm", ProtoSchemaType::kString},
             {"child_pid", ProtoSchemaType::kInt32},
         },
+        4,
     },
     {
         "sched_process_free",
@@ -2318,6 +2538,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"pid", ProtoSchemaType::kInt32},
             {"prio", ProtoSchemaType::kInt32},
         },
+        3,
     },
     {
         "sched_process_hang",
@@ -2326,6 +2547,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"comm", ProtoSchemaType::kString},
             {"pid", ProtoSchemaType::kInt32},
         },
+        2,
     },
     {
         "sched_process_wait",
@@ -2335,6 +2557,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"pid", ProtoSchemaType::kInt32},
             {"prio", ProtoSchemaType::kInt32},
         },
+        3,
     },
     {
         "f2fs_do_submit_bio",
@@ -2346,6 +2569,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"sector", ProtoSchemaType::kUint64},
             {"size", ProtoSchemaType::kUint32},
         },
+        5,
     },
     {
         "f2fs_evict_inode",
@@ -2360,6 +2584,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"blocks", ProtoSchemaType::kUint64},
             {"advise", ProtoSchemaType::kUint32},
         },
+        8,
     },
     {
         "f2fs_fallocate",
@@ -2374,6 +2599,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"blocks", ProtoSchemaType::kUint64},
             {"ret", ProtoSchemaType::kInt32},
         },
+        8,
     },
     {
         "f2fs_get_data_block",
@@ -2386,6 +2612,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"bh_size", ProtoSchemaType::kUint64},
             {"ret", ProtoSchemaType::kInt32},
         },
+        6,
     },
     {
         "f2fs_get_victim",
@@ -2402,6 +2629,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"prefree", ProtoSchemaType::kUint32},
             {"free", ProtoSchemaType::kUint32},
         },
+        10,
     },
     {
         "f2fs_iget",
@@ -2416,6 +2644,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"blocks", ProtoSchemaType::kUint64},
             {"advise", ProtoSchemaType::kUint32},
         },
+        8,
     },
     {
         "f2fs_iget_exit",
@@ -2425,6 +2654,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ino", ProtoSchemaType::kUint64},
             {"ret", ProtoSchemaType::kInt32},
         },
+        3,
     },
     {
         "f2fs_new_inode",
@@ -2434,6 +2664,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ino", ProtoSchemaType::kUint64},
             {"ret", ProtoSchemaType::kInt32},
         },
+        3,
     },
     {
         "f2fs_readpage",
@@ -2445,6 +2676,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"blkaddr", ProtoSchemaType::kUint64},
             {"type", ProtoSchemaType::kInt32},
         },
+        5,
     },
     {
         "f2fs_reserve_new_block",
@@ -2454,6 +2686,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"nid", ProtoSchemaType::kUint32},
             {"ofs_in_node", ProtoSchemaType::kUint32},
         },
+        3,
     },
     {
         "f2fs_set_page_dirty",
@@ -2466,6 +2699,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"index", ProtoSchemaType::kUint64},
             {"dirty", ProtoSchemaType::kInt32},
         },
+        6,
     },
     {
         "f2fs_submit_write_page",
@@ -2477,6 +2711,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"index", ProtoSchemaType::kUint64},
             {"block", ProtoSchemaType::kUint32},
         },
+        5,
     },
     {
         "f2fs_sync_file_enter",
@@ -2491,6 +2726,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"blocks", ProtoSchemaType::kUint64},
             {"advise", ProtoSchemaType::kUint32},
         },
+        8,
     },
     {
         "f2fs_sync_file_exit",
@@ -2502,6 +2738,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"datasync", ProtoSchemaType::kInt32},
             {"ret", ProtoSchemaType::kInt32},
         },
+        5,
     },
     {
         "f2fs_sync_fs",
@@ -2511,6 +2748,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"dirty", ProtoSchemaType::kInt32},
             {"wait", ProtoSchemaType::kInt32},
         },
+        3,
     },
     {
         "f2fs_truncate",
@@ -2525,6 +2763,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"blocks", ProtoSchemaType::kUint64},
             {"advise", ProtoSchemaType::kUint32},
         },
+        8,
     },
     {
         "f2fs_truncate_blocks_enter",
@@ -2536,6 +2775,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"blocks", ProtoSchemaType::kUint64},
             {"from", ProtoSchemaType::kUint64},
         },
+        5,
     },
     {
         "f2fs_truncate_blocks_exit",
@@ -2545,6 +2785,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ino", ProtoSchemaType::kUint64},
             {"ret", ProtoSchemaType::kInt32},
         },
+        3,
     },
     {
         "f2fs_truncate_data_blocks_range",
@@ -2556,6 +2797,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ofs", ProtoSchemaType::kUint32},
             {"free", ProtoSchemaType::kInt32},
         },
+        5,
     },
     {
         "f2fs_truncate_inode_blocks_enter",
@@ -2567,6 +2809,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"blocks", ProtoSchemaType::kUint64},
             {"from", ProtoSchemaType::kUint64},
         },
+        5,
     },
     {
         "f2fs_truncate_inode_blocks_exit",
@@ -2576,6 +2819,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ino", ProtoSchemaType::kUint64},
             {"ret", ProtoSchemaType::kInt32},
         },
+        3,
     },
     {
         "f2fs_truncate_node",
@@ -2586,6 +2830,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"nid", ProtoSchemaType::kUint32},
             {"blk_addr", ProtoSchemaType::kUint32},
         },
+        4,
     },
     {
         "f2fs_truncate_nodes_enter",
@@ -2596,6 +2841,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"nid", ProtoSchemaType::kUint32},
             {"blk_addr", ProtoSchemaType::kUint32},
         },
+        4,
     },
     {
         "f2fs_truncate_nodes_exit",
@@ -2605,6 +2851,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ino", ProtoSchemaType::kUint64},
             {"ret", ProtoSchemaType::kInt32},
         },
+        3,
     },
     {
         "f2fs_truncate_partial_nodes",
@@ -2616,6 +2863,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"depth", ProtoSchemaType::kInt32},
             {"err", ProtoSchemaType::kInt32},
         },
+        5,
     },
     {
         "f2fs_unlink_enter",
@@ -2627,6 +2875,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"blocks", ProtoSchemaType::kUint64},
             {"name", ProtoSchemaType::kString},
         },
+        5,
     },
     {
         "f2fs_unlink_exit",
@@ -2636,6 +2885,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"ino", ProtoSchemaType::kUint64},
             {"ret", ProtoSchemaType::kInt32},
         },
+        3,
     },
     {
         "f2fs_vm_page_mkwrite",
@@ -2648,6 +2898,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"index", ProtoSchemaType::kUint64},
             {"dirty", ProtoSchemaType::kInt32},
         },
+        6,
     },
     {
         "f2fs_write_begin",
@@ -2659,6 +2910,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"len", ProtoSchemaType::kUint32},
             {"flags", ProtoSchemaType::kUint32},
         },
+        5,
     },
     {
         "f2fs_write_checkpoint",
@@ -2668,6 +2920,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"is_umount", ProtoSchemaType::kUint32},
             {"msg", ProtoSchemaType::kString},
         },
+        3,
     },
     {
         "f2fs_write_end",
@@ -2679,6 +2932,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"len", ProtoSchemaType::kUint32},
             {"copied", ProtoSchemaType::kUint32},
         },
+        5,
     },
     {
         "alloc_pages_iommu_end",
@@ -2687,6 +2941,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"gfp_flags", ProtoSchemaType::kUint32},
             {"order", ProtoSchemaType::kUint32},
         },
+        2,
     },
     {
         "alloc_pages_iommu_fail",
@@ -2695,6 +2950,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"gfp_flags", ProtoSchemaType::kUint32},
             {"order", ProtoSchemaType::kUint32},
         },
+        2,
     },
     {
         "alloc_pages_iommu_start",
@@ -2703,6 +2959,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"gfp_flags", ProtoSchemaType::kUint32},
             {"order", ProtoSchemaType::kUint32},
         },
+        2,
     },
     {
         "alloc_pages_sys_end",
@@ -2711,6 +2968,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"gfp_flags", ProtoSchemaType::kUint32},
             {"order", ProtoSchemaType::kUint32},
         },
+        2,
     },
     {
         "alloc_pages_sys_fail",
@@ -2719,6 +2977,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"gfp_flags", ProtoSchemaType::kUint32},
             {"order", ProtoSchemaType::kUint32},
         },
+        2,
     },
     {
         "alloc_pages_sys_start",
@@ -2727,6 +2986,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"gfp_flags", ProtoSchemaType::kUint32},
             {"order", ProtoSchemaType::kUint32},
         },
+        2,
     },
     {
         "dma_alloc_contiguous_retry",
@@ -2734,6 +2994,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {},
             {"tries", ProtoSchemaType::kInt32},
         },
+        1,
     },
     {
         "iommu_map_range",
@@ -2744,6 +3005,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"pa", ProtoSchemaType::kUint64},
             {"va", ProtoSchemaType::kUint64},
         },
+        4,
     },
     {
         "iommu_sec_ptbl_map_range_end",
@@ -2755,6 +3017,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"sec_id", ProtoSchemaType::kInt32},
             {"va", ProtoSchemaType::kUint64},
         },
+        5,
     },
     {
         "iommu_sec_ptbl_map_range_start",
@@ -2766,6 +3029,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"sec_id", ProtoSchemaType::kInt32},
             {"va", ProtoSchemaType::kUint64},
         },
+        5,
     },
     {
         "ion_alloc_buffer_end",
@@ -2777,6 +3041,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"len", ProtoSchemaType::kUint64},
             {"mask", ProtoSchemaType::kUint32},
         },
+        5,
     },
     {
         "ion_alloc_buffer_fail",
@@ -2789,6 +3054,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"len", ProtoSchemaType::kUint64},
             {"mask", ProtoSchemaType::kUint32},
         },
+        6,
     },
     {
         "ion_alloc_buffer_fallback",
@@ -2801,6 +3067,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"len", ProtoSchemaType::kUint64},
             {"mask", ProtoSchemaType::kUint32},
         },
+        6,
     },
     {
         "ion_alloc_buffer_start",
@@ -2812,6 +3079,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"len", ProtoSchemaType::kUint64},
             {"mask", ProtoSchemaType::kUint32},
         },
+        5,
     },
     {
         "ion_cp_alloc_retry",
@@ -2819,6 +3087,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {},
             {"tries", ProtoSchemaType::kInt32},
         },
+        1,
     },
     {
         "ion_cp_secure_buffer_end",
@@ -2829,6 +3098,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"heap_name", ProtoSchemaType::kString},
             {"len", ProtoSchemaType::kUint64},
         },
+        4,
     },
     {
         "ion_cp_secure_buffer_start",
@@ -2839,6 +3109,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"heap_name", ProtoSchemaType::kString},
             {"len", ProtoSchemaType::kUint64},
         },
+        4,
     },
     {
         "ion_prefetching",
@@ -2846,6 +3117,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {},
             {"len", ProtoSchemaType::kUint64},
         },
+        1,
     },
     {
         "ion_secure_cma_add_to_pool_end",
@@ -2855,6 +3127,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"len", ProtoSchemaType::kUint64},
             {"pool_total", ProtoSchemaType::kInt32},
         },
+        3,
     },
     {
         "ion_secure_cma_add_to_pool_start",
@@ -2864,6 +3137,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"len", ProtoSchemaType::kUint64},
             {"pool_total", ProtoSchemaType::kInt32},
         },
+        3,
     },
     {
         "ion_secure_cma_allocate_end",
@@ -2874,6 +3148,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"heap_name", ProtoSchemaType::kString},
             {"len", ProtoSchemaType::kUint64},
         },
+        4,
     },
     {
         "ion_secure_cma_allocate_start",
@@ -2884,6 +3159,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"heap_name", ProtoSchemaType::kString},
             {"len", ProtoSchemaType::kUint64},
         },
+        4,
     },
     {
         "ion_secure_cma_shrink_pool_end",
@@ -2892,6 +3168,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"drained_size", ProtoSchemaType::kUint64},
             {"skipped_size", ProtoSchemaType::kUint64},
         },
+        2,
     },
     {
         "ion_secure_cma_shrink_pool_start",
@@ -2900,6 +3177,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"drained_size", ProtoSchemaType::kUint64},
             {"skipped_size", ProtoSchemaType::kUint64},
         },
+        2,
     },
     {
         "kfree",
@@ -2908,6 +3186,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"call_site", ProtoSchemaType::kUint64},
             {"ptr", ProtoSchemaType::kUint64},
         },
+        2,
     },
     {
         "kmalloc",
@@ -2919,6 +3198,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"gfp_flags", ProtoSchemaType::kUint32},
             {"ptr", ProtoSchemaType::kUint64},
         },
+        5,
     },
     {
         "kmalloc_node",
@@ -2931,6 +3211,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"node", ProtoSchemaType::kInt32},
             {"ptr", ProtoSchemaType::kUint64},
         },
+        6,
     },
     {
         "kmem_cache_alloc",
@@ -2942,6 +3223,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"gfp_flags", ProtoSchemaType::kUint32},
             {"ptr", ProtoSchemaType::kUint64},
         },
+        5,
     },
     {
         "kmem_cache_alloc_node",
@@ -2954,6 +3236,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"node", ProtoSchemaType::kInt32},
             {"ptr", ProtoSchemaType::kUint64},
         },
+        6,
     },
     {
         "kmem_cache_free",
@@ -2962,6 +3245,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"call_site", ProtoSchemaType::kUint64},
             {"ptr", ProtoSchemaType::kUint64},
         },
+        2,
     },
     {
         "migrate_pages_end",
@@ -2969,6 +3253,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {},
             {"mode", ProtoSchemaType::kInt32},
         },
+        1,
     },
     {
         "migrate_pages_start",
@@ -2976,6 +3261,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {},
             {"mode", ProtoSchemaType::kInt32},
         },
+        1,
     },
     {
         "migrate_retry",
@@ -2983,6 +3269,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {},
             {"tries", ProtoSchemaType::kInt32},
         },
+        1,
     },
     {
         "mm_page_alloc",
@@ -2994,6 +3281,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"page", ProtoSchemaType::kUint64},
             {"pfn", ProtoSchemaType::kUint64},
         },
+        5,
     },
     {
         "mm_page_alloc_extfrag",
@@ -3007,6 +3295,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"change_ownership", ProtoSchemaType::kInt32},
             {"pfn", ProtoSchemaType::kUint64},
         },
+        7,
     },
     {
         "mm_page_alloc_zone_locked",
@@ -3017,6 +3306,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"page", ProtoSchemaType::kUint64},
             {"pfn", ProtoSchemaType::kUint64},
         },
+        4,
     },
     {
         "mm_page_free",
@@ -3026,6 +3316,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"page", ProtoSchemaType::kUint64},
             {"pfn", ProtoSchemaType::kUint64},
         },
+        3,
     },
     {
         "mm_page_free_batched",
@@ -3035,6 +3326,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"page", ProtoSchemaType::kUint64},
             {"pfn", ProtoSchemaType::kUint64},
         },
+        3,
     },
     {
         "mm_page_pcpu_drain",
@@ -3045,6 +3337,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"page", ProtoSchemaType::kUint64},
             {"pfn", ProtoSchemaType::kUint64},
         },
+        4,
     },
     {
         "rss_stat",
@@ -3053,6 +3346,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"member", ProtoSchemaType::kInt32},
             {"size", ProtoSchemaType::kInt64},
         },
+        2,
     },
     {
         "ion_heap_shrink",
@@ -3062,6 +3356,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"len", ProtoSchemaType::kUint64},
             {"total_allocated", ProtoSchemaType::kInt64},
         },
+        3,
     },
     {
         "ion_heap_grow",
@@ -3071,6 +3366,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"len", ProtoSchemaType::kUint64},
             {"total_allocated", ProtoSchemaType::kInt64},
         },
+        3,
     },
     {
         "fence_init",
@@ -3081,6 +3377,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"seqno", ProtoSchemaType::kUint32},
             {"timeline", ProtoSchemaType::kString},
         },
+        4,
     },
     {
         "fence_destroy",
@@ -3091,6 +3388,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"seqno", ProtoSchemaType::kUint32},
             {"timeline", ProtoSchemaType::kString},
         },
+        4,
     },
     {
         "fence_enable_signal",
@@ -3101,6 +3399,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"seqno", ProtoSchemaType::kUint32},
             {"timeline", ProtoSchemaType::kString},
         },
+        4,
     },
     {
         "fence_signaled",
@@ -3111,6 +3410,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"seqno", ProtoSchemaType::kUint32},
             {"timeline", ProtoSchemaType::kString},
         },
+        4,
     },
     {
         "clk_enable",
@@ -3118,6 +3418,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {},
             {"name", ProtoSchemaType::kString},
         },
+        1,
     },
     {
         "clk_disable",
@@ -3125,6 +3426,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {},
             {"name", ProtoSchemaType::kString},
         },
+        1,
     },
     {
         "clk_set_rate",
@@ -3133,6 +3435,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"name", ProtoSchemaType::kString},
             {"rate", ProtoSchemaType::kUint64},
         },
+        2,
     },
     {
         "binder_transaction_alloc_buf",
@@ -3142,6 +3445,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"debug_id", ProtoSchemaType::kInt32},
             {"offsets_size", ProtoSchemaType::kUint64},
         },
+        3,
     },
     {
         "signal_deliver",
@@ -3151,6 +3455,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"sa_flags", ProtoSchemaType::kUint64},
             {"sig", ProtoSchemaType::kInt32},
         },
+        3,
     },
     {
         "signal_generate",
@@ -3163,6 +3468,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"result", ProtoSchemaType::kInt32},
             {"sig", ProtoSchemaType::kInt32},
         },
+        6,
     },
     {
         "oom_score_adj_update",
@@ -3172,6 +3478,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"oom_score_adj", ProtoSchemaType::kInt32},
             {"pid", ProtoSchemaType::kInt32},
         },
+        3,
     },
     {
         "generic",
@@ -3180,6 +3487,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"event_name", ProtoSchemaType::kString},
             {},
         },
+        2,
     },
     {
         "mm_event_record",
@@ -3190,6 +3498,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"max_lat", ProtoSchemaType::kUint32},
             {"type", ProtoSchemaType::kUint32},
         },
+        4,
     },
     {
         "sys_enter",
@@ -3197,6 +3506,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {},
             {"id", ProtoSchemaType::kInt64},
         },
+        1,
     },
     {
         "sys_exit",
@@ -3205,6 +3515,7 @@ std::array<MessageDescriptor, 331> descriptors{{
             {"id", ProtoSchemaType::kInt64},
             {"ret", ProtoSchemaType::kInt64},
         },
+        2,
     },
 }};
 
