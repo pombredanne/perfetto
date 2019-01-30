@@ -20,7 +20,6 @@ import {colorForThread, hueForCpu} from '../../frontend/colorizer';
 import {globals} from '../../frontend/globals';
 import {Track} from '../../frontend/track';
 import {trackRegistry} from '../../frontend/track_registry';
-import {toNs} from '../../common/time';
 import {search} from '../../base/binary_search';
 
 import {
@@ -286,10 +285,10 @@ class CpuSliceTrack extends Track<Config, Data> {
     const {timeScale} = globals.frontendLocalState;
     const time = timeScale.pxToTime(x);
     const index = search(data.starts, time);
-    const timestamp = index === -1 ? undefined : data.starts[index];
-    if (timestamp && this.utidHoveredInThisTrack !== -1) {
+    const id = index === -1 ? undefined : data.ids[index];
+    if (id && this.utidHoveredInThisTrack !== -1) {
       globals.dispatch(Actions.selectSlice(
-        {utid: this.utidHoveredInThisTrack, timestamp: toNs(timestamp)}));
+        {utid: this.utidHoveredInThisTrack, id}));
     }
   }
 }

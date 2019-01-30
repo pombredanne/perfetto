@@ -16,7 +16,6 @@ import * as m from 'mithril';
 import {globals} from './globals';
 import {Panel, PanelSize} from './panel';
 import { SliceSelection } from '../common/state';
-import { assertTrue } from '../base/logging';
 
 interface SliceDetailsPanelAttrs {
   selection: SliceSelection;
@@ -26,23 +25,21 @@ export class SliceDetailsPanel extends Panel<SliceDetailsPanelAttrs> {
   view({attrs}: m.CVnode<SliceDetailsPanelAttrs>) {
     const threadInfo = globals.threads.get(attrs.selection.utid);
     const sliceInfo = globals.sliceDetails;
-    if(threadInfo && sliceInfo.ts && sliceInfo.dur) {
-      assertTrue(sliceInfo.ts === attrs.selection.timestamp);
+    if (threadInfo && sliceInfo.ts && sliceInfo.dur) {
       return m(
           '.slice-details-panel',
           m('.slice-details-panel-heading',
             `Details for slice:`),
-          m('.slice-details-ul',[
-            m('ul',[
+          m('.slice-details-ul', [
+            m('ul', [
               m('li', `PID: ${threadInfo.pid}`),
               m('li', `Process name: ${threadInfo.procName}`),
               m('li', `TID: ${threadInfo.tid}`),
               m('li', `Thread name: ${threadInfo.threadName}`),
-              m('li', `Start time: ${sliceInfo.ts / 1e6} ms`),
-              m('li', `Duration: ${sliceInfo.dur / 1e6} ms`),
+              m('li', `Start time: ${sliceInfo.ts} s`),
+              m('li', `Duration: ${sliceInfo.dur} s`),
               m('li', `Prio: ${sliceInfo.priority}`),
               m('li', `End State: ${sliceInfo.endState}`),
-
             ])],
           ));
     }

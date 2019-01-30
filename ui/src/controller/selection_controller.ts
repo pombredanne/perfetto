@@ -17,6 +17,7 @@ import {globals} from './globals';
 import {SliceSelection} from '../common/state';
 import {Engine} from '../common/engine';
 import {assertExists} from '../base/logging';
+import {fromNs} from '../common/time';
 
 export interface SelectionControllerArgs {
   engine: Engine;
@@ -31,27 +32,26 @@ export class SelectionController extends Controller<'main'> {
   }
 
   run() {
-    if (globals.state.selectedSlice === undefined ||
+    if (globals.state.selectedSlice === null ||
         globals.state.selectedSlice === this.lastSelectedSlice) {
       return;
     }
     const selectedSlice = assertExists(globals.state.selectedSlice);
     this.lastSelectedSlice = selectedSlice;
 
-    const ts = selectedSlice.timestamp;
-    if (ts !== undefined) {
+    const id = selectedSlice.id;
+    if (id !== undefined) {
       const sqlQuery = `SELECT ts, dur, priority, end_state FROM sched
-                        WHERE ts = ${ts}`;
+                        WHERE row_id = ${id}`;
       this.args.engine.query(sqlQuery).then(result => {
-        if (result.numRecords === 1) {
-          const ts = result.columns[0].longValues![0] as number;
-          const dur = result.columns[1].longValues![0] as number;
+        if (result.numRecords === 1 || 
+            globals.state.selectedSlice !== selectedSlice) {
+          const ts = fromNs(result.columns[0].longValues![0] as number);
+          const dur = fromNs(result.columns[1].longValues![0] as number);
           const priority = result.columns[2].longValues![0] as number;
           const endState = result.columns[3].stringValues![0];
           const selected = {ts, dur, priority, endState};
-          if (globals.state.selectedSlice === selectedSlice) {
-            globals.publish('SliceDetails', selected);
-          }
+          globals.publish('SliceDetails', selected);
         }
       });
     }

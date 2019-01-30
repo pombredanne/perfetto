@@ -30,10 +30,6 @@ export function fromNs(ns: number) {
   return ns / 1e9;
 }
 
-export function toNs(s: number) {
-  return s * 1e9;
-}
-
 export class TimeSpan {
   readonly start: number;
   readonly end: number;
