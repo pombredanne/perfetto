@@ -358,16 +358,20 @@ TYPED_TEST(TaskRunnerTest, IsIdleForTesting) {
   task_runner.Run();
 }
 
-TYPED_TEST(TaskRunnerTest, RunsOnCurrentThread) {
-  auto& task_runner = this->task_runner;
-  EXPECT_TRUE(task_runner.RunsTasksOnCurrentThread());
-}
+TYPED_TEST(TaskRunnerTest, RunsTasksOnCurrentThread) {
+  auto& main_tr = this->task_runner;
 
-TYPED_TEST(TaskRunnerTest, RunsOnDifferentThread) {
-  auto& task_runner = this->task_runner;
-  std::thread thread(
-      [&task_runner] { EXPECT_FALSE(task_runner.RunsTasksOnCurrentThread()); });
-  thread.join();
+  EXPECT_TRUE(task_runner.RunsTasksOnCurrentThread());
+  std::thread thread([&main_tr] {
+    TypedTaskRunner second_tr;
+    second_tr.PostTask([main_tr, second_tr] {
+      EXPECT_FALSE(main_tr.RunsTasksOnCurrentThread());
+      EXPECT_TRUE(second_tr.RunsTasksOnCurrentThread());
+      second_tr.Quit()
+    });
+    second_tr.Run();
+    thread.join();
+  });
 }
 
 }  // namespace

@@ -67,11 +67,11 @@ class PERFETTO_EXPORT TaskRunner {
   // thread.
   virtual void RemoveFileDescriptorWatch(int fd) = 0;
 
-  // Checks to see if the current thread is the same thread that the TaskRunner
-  // was created on. This allows single threaded task runners (like the ones
-  // used in perfetto) to inform the caller that that anything posted will run
-  // on the same thread/sequence which can allow some callers to skip PostTask
-  // and instead directly execute the code. Can be called from any thread.
+  // Checks if the current thread is the same thread where the TaskRunner's task
+  // run. This allows single threaded task runners (like the ones used in
+  // perfetto) to inform the caller that that anything posted will run on the
+  // same thread/sequence. This can allow some callers to skip PostTask and
+  // instead directly execute the code. Can be called from any thread.
   virtual bool RunsTasksOnCurrentThread() const = 0;
 
  protected:
