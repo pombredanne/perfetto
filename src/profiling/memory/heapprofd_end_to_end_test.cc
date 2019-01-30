@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "perfetto/base/build_config.h"
 #include "src/base/test/test_task_runner.h"
@@ -42,9 +41,6 @@
 namespace perfetto {
 namespace profiling {
 namespace {
-
-using ::testing::Eq;
-using ::testing::AnyOf;
 
 void WaitForHeapprofd(uint64_t timeout_ms) {
   constexpr uint64_t kSleepMs = 10;
@@ -152,7 +148,7 @@ class HeapprofdEndToEnd : public ::testing::Test {
 };
 
 // TODO(b/121352331): deflake and re-enable this test.
-TEST_F(HeapprofdEndToEnd, Smoke) {
+TEST_F(HeapprofdEndToEnd, DISABLED_Smoke) {
   constexpr size_t kAllocSize = 1024;
 
   pid_t pid = ForkContinousMalloc(kAllocSize);
@@ -173,66 +169,7 @@ TEST_F(HeapprofdEndToEnd, Smoke) {
   heapprofd_config->mutable_continuous_dump_config()->set_dump_interval_ms(100);
 
   helper.StartTracing(trace_config);
-  helper.WaitForTracingDisabled(10000);
-
-  helper.ReadData();
-  helper.WaitForReadData();
-
-  PERFETTO_CHECK(kill(pid, SIGKILL) == 0);
-  PERFETTO_CHECK(waitpid(pid, nullptr, 0) == pid);
-
-  const auto& packets = helper.trace();
-  ASSERT_GT(packets.size(), 0u);
-  size_t profile_packets = 0;
-  size_t samples = 0;
-  uint64_t last_allocated = 0;
-  uint64_t last_freed = 0;
-  for (const protos::TracePacket& packet : packets) {
-    if (packet.has_profile_packet() &&
-        packet.profile_packet().process_dumps().size() > 0) {
-      const auto& dumps = packet.profile_packet().process_dumps();
-      ASSERT_EQ(dumps.size(), 1);
-      const protos::ProfilePacket_ProcessHeapSamples& dump = dumps.Get(0);
-      EXPECT_EQ(dump.pid(), pid);
-      for (const auto& sample : dump.samples()) {
-        samples++;
-        EXPECT_EQ(sample.self_allocated() % kAllocSize, 0);
-        EXPECT_EQ(sample.self_freed() % kAllocSize, 0);
-        last_allocated = sample.self_allocated();
-        last_freed = sample.self_freed();
-        EXPECT_THAT(sample.self_allocated() - sample.self_freed(),
-                    AnyOf(Eq(0), Eq(kAllocSize)));
-      }
-      profile_packets++;
-    }
-  }
-  EXPECT_GT(profile_packets, 0);
-  EXPECT_GT(samples, 0);
-  EXPECT_GT(last_allocated, 0);
-  EXPECT_GT(last_freed, 0);
-}
-
-// TODO(b/121352331): deflake and re-enable this test.
-TEST_F(HeapprofdEndToEnd, FinalFlush) {
-  constexpr size_t kAllocSize = 1024;
-
-  pid_t pid = ForkContinousMalloc(kAllocSize);
-
-  TraceConfig trace_config;
-  trace_config.add_buffers()->set_size_kb(10 * 1024);
-  trace_config.set_duration_ms(1000);
-
-  auto* ds_config = trace_config.add_data_sources()->mutable_config();
-  ds_config->set_name("android.heapprofd");
-  ds_config->set_target_buffer(0);
-
-  auto* heapprofd_config = ds_config->mutable_heapprofd_config();
-  heapprofd_config->set_sampling_interval_bytes(1);
-  *heapprofd_config->add_pid() = static_cast<uint64_t>(pid);
-  heapprofd_config->set_all(false);
-
-  helper.StartTracing(trace_config);
-  helper.WaitForTracingDisabled(10000);
+  helper.WaitForTracingDisabled(5000);
 
   helper.ReadData();
   helper.WaitForReadData();
@@ -260,8 +197,64 @@ TEST_F(HeapprofdEndToEnd, FinalFlush) {
         EXPECT_EQ(sample.self_freed() % kAllocSize, 0);
         last_allocated = sample.self_allocated();
         last_freed = sample.self_freed();
-        EXPECT_THAT(sample.self_allocated() - sample.self_freed(),
-                    AnyOf(Eq(0), Eq(kAllocSize)));
+      }
+      profile_packets++;
+    }
+  }
+  EXPECT_GT(profile_packets, 0);
+  EXPECT_GT(samples, 0);
+  EXPECT_GT(last_allocated, 0);
+  EXPECT_GT(last_freed, 0);
+}
+
+// TODO(b/121352331): deflake and re-enable this test.
+TEST_F(HeapprofdEndToEnd, DISABLED_FinalFlush) {
+  constexpr size_t kAllocSize = 1024;
+
+  pid_t pid = ForkContinousMalloc(kAllocSize);
+
+  TraceConfig trace_config;
+  trace_config.add_buffers()->set_size_kb(10 * 1024);
+  trace_config.set_duration_ms(1000);
+
+  auto* ds_config = trace_config.add_data_sources()->mutable_config();
+  ds_config->set_name("android.heapprofd");
+  ds_config->set_target_buffer(0);
+
+  auto* heapprofd_config = ds_config->mutable_heapprofd_config();
+  heapprofd_config->set_sampling_interval_bytes(1);
+  *heapprofd_config->add_pid() = static_cast<uint64_t>(pid);
+  heapprofd_config->set_all(false);
+
+  helper.StartTracing(trace_config);
+  helper.WaitForTracingDisabled(5000);
+
+  helper.ReadData();
+  helper.WaitForReadData();
+
+  PERFETTO_CHECK(kill(pid, SIGKILL) == 0);
+  PERFETTO_CHECK(waitpid(pid, nullptr, 0) == pid);
+
+  const auto& packets = helper.trace();
+  ASSERT_GT(packets.size(), 0u);
+  size_t profile_packets = 0;
+  size_t samples = 0;
+  uint64_t last_allocated = 0;
+  uint64_t last_freed = 0;
+  for (const protos::TracePacket& packet : packets) {
+    if (packet.has_profile_packet() &&
+        packet.profile_packet().process_dumps().size() > 0) {
+      const auto& dumps = packet.profile_packet().process_dumps();
+      ASSERT_EQ(dumps.size(), 1);
+      const protos::ProfilePacket_ProcessHeapSamples& dump = dumps.Get(0);
+      EXPECT_EQ(dump.pid(), pid);
+      EXPECT_EQ(dump.samples().size(), 1);
+      for (const auto& sample : dump.samples()) {
+        samples++;
+        EXPECT_EQ(sample.self_allocated() % kAllocSize, 0);
+        EXPECT_EQ(sample.self_freed() % kAllocSize, 0);
+        last_allocated = sample.self_allocated();
+        last_freed = sample.self_freed();
       }
       profile_packets++;
     }
@@ -273,7 +266,7 @@ TEST_F(HeapprofdEndToEnd, FinalFlush) {
 }
 
 // TODO(b/121352331): deflake and re-enable this test.
-TEST_F(HeapprofdEndToEnd, NativeStartup) {
+TEST_F(HeapprofdEndToEnd, DISABLED_NativeStartup) {
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(10 * 1024);
   trace_config.set_duration_ms(5000);

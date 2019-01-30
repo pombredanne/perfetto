@@ -114,180 +114,161 @@ AllEventsArgsTable::Cursor::Cursor(const TraceStorage* storage,
 }
 
 int AllEventsArgsTable::Cursor::Column(sqlite3_context* ctx, int N) {
+  if (type_ == Type::kSched) {
+    return ColumnSched(ctx, N);
+  }
+
   const auto& args = storage_->args();
-  const auto& sched = storage_->slices();
   switch (N) {
     case Column::kRowId: {
-      if (type_ == Type::kArgs) {
-        sqlite_utils::ReportSqliteResult(ctx, args.ids()[args_it_->Row()]);
-      } else /* (type == kSched) */ {
-        auto sched_row = sched_it_->Row() / 7;
-        sqlite_utils::ReportSqliteResult(
-            ctx, TraceStorage::CreateRowId(TableId::kSched, sched_row));
-      }
+      sqlite_utils::ReportSqliteResult(ctx, args.ids()[args_it_->Row()]);
       break;
     }
     case Column::kFlatKey: {
-      if (type_ == Type::kArgs) {
-        sqlite_utils::ReportSqliteResult(
-            ctx,
-            storage_->GetString(args.flat_keys()[args_it_->Row()]).c_str());
-      } else /* (type == kSched) */ {
-        auto sched_field = sched_it_->Row() % 7;
-        switch (sched_field) {
-          case kPrevComm:
-            sqlite_utils::ReportSqliteResult(ctx, "prev_comm");
-            break;
-          case kPrevPid:
-            sqlite_utils::ReportSqliteResult(ctx, "prev_pid");
-            break;
-          case kPrevPrio:
-            sqlite_utils::ReportSqliteResult(ctx, "prev_prio");
-            break;
-          case kPrevState:
-            sqlite_utils::ReportSqliteResult(ctx, "prev_state");
-            break;
-          case kNextComm:
-            sqlite_utils::ReportSqliteResult(ctx, "next_comm");
-            break;
-          case kNextPid:
-            sqlite_utils::ReportSqliteResult(ctx, "next_pid");
-            break;
-          case kNextPrio:
-            sqlite_utils::ReportSqliteResult(ctx, "next_prio");
-            break;
-          case kMax:
-            PERFETTO_FATAL("Invalid sched field");
-        }
-      }
+      sqlite_utils::ReportSqliteResult(
+          ctx,
+          storage_->GetString(args.flat_keys()[args_it_->Row()]).c_str());
       break;
     }
     case Column::kKey: {
-      if (type_ == Type::kArgs) {
-        sqlite_utils::ReportSqliteResult(
-            ctx, storage_->GetString(args.keys()[args_it_->Row()]).c_str());
-      } else /* (type == kSched) */ {
-        auto sched_field = sched_it_->Row() % 7;
-        switch (sched_field) {
-          case kPrevComm:
-            sqlite_utils::ReportSqliteResult(ctx, "prev_comm");
-            break;
-          case kPrevPid:
-            sqlite_utils::ReportSqliteResult(ctx, "prev_pid");
-            break;
-          case kPrevPrio:
-            sqlite_utils::ReportSqliteResult(ctx, "prev_prio");
-            break;
-          case kPrevState:
-            sqlite_utils::ReportSqliteResult(ctx, "prev_state");
-            break;
-          case kNextComm:
-            sqlite_utils::ReportSqliteResult(ctx, "next_comm");
-            break;
-          case kNextPid:
-            sqlite_utils::ReportSqliteResult(ctx, "next_pid");
-            break;
-          case kNextPrio:
-            sqlite_utils::ReportSqliteResult(ctx, "next_prio");
-            break;
-          case kMax:
-            PERFETTO_FATAL("Invalid sched field");
-        }
-      }
+      sqlite_utils::ReportSqliteResult(
+          ctx, storage_->GetString(args.keys()[args_it_->Row()]).c_str());
       break;
     }
     case Column::kIntValue: {
-      if (type_ == Type::kArgs) {
-        auto value = args.arg_values()[args_it_->Row()];
-        if (value.type == TraceStorage::Args::Variadic::kInt) {
-          sqlite_utils::ReportSqliteResult(ctx, value.int_value);
-        } else {
-          sqlite3_result_null(ctx);
-        }
-      } else /* (type == kSched) */ {
-        auto sched_row = sched_it_->Row() / 7;
-        auto sched_field = sched_it_->Row() % 7;
-        switch (sched_field) {
-          case kPrevPid:
-            sqlite_utils::ReportSqliteResult(
-                ctx, storage_->GetThread(sched.utids()[sched_row]).tid);
-            break;
-          case kPrevPrio:
-            sqlite_utils::ReportSqliteResult(ctx,
-                                             sched.priorities()[sched_row]);
-            break;
-          case kPrevState:
-            sqlite_utils::ReportSqliteResult(
-                ctx, sched.end_state()[sched_row].raw_state());
-            break;
-          case kNextPid:
-            sqlite_utils::ReportSqliteResult(
-                ctx, storage_->GetThread(sched.utids()[sched_row + 1]).tid);
-            break;
-          case kNextPrio:
-            sqlite_utils::ReportSqliteResult(ctx,
-                                             sched.priorities()[sched_row + 1]);
-            break;
-          case kPrevComm:
-          case kNextComm:
-            sqlite3_result_null(ctx);
-            break;
-          case kMax:
-            PERFETTO_FATAL("Invalid sched field");
-        }
+      auto value = args.arg_values()[args_it_->Row()];
+      if (value.type == TraceStorage::Args::Variadic::kInt) {
+        sqlite_utils::ReportSqliteResult(ctx, value.int_value);
+      } else {
+        sqlite3_result_null(ctx);
       }
       break;
     }
     case Column::kStringValue: {
-      if (type_ == Type::kArgs) {
-        auto value = args.arg_values()[args_it_->Row()];
-        if (value.type == TraceStorage::Args::Variadic::kString) {
-          sqlite_utils::ReportSqliteResult(
-              ctx, storage_->GetString(value.string_value).c_str());
-        } else {
-          sqlite3_result_null(ctx);
-        }
-      } else /* (type == kSched) */ {
-        auto sched_row = sched_it_->Row() / 7;
-        auto sched_field = sched_it_->Row() % 7;
-        switch (sched_field) {
-          case kPrevComm: {
-            const auto& thread = storage_->GetThread(sched.utids()[sched_row]);
-            sqlite_utils::ReportSqliteResult(
-                ctx, storage_->GetString(thread.name_id).c_str());
-            break;
-          }
-          case kNextComm: {
-            const auto& thread =
-                storage_->GetThread(sched.utids()[sched_row + 1]);
-            sqlite_utils::ReportSqliteResult(
-                ctx, storage_->GetString(thread.name_id).c_str());
-            break;
-          }
-          case kPrevPid:
-          case kPrevPrio:
-          case kPrevState:
-          case kNextPid:
-          case kNextPrio:
-            sqlite3_result_null(ctx);
-            break;
-          case kMax:
-            PERFETTO_FATAL("Invalid sched field");
-        }
+      auto value = args.arg_values()[args_it_->Row()];
+      if (value.type == TraceStorage::Args::Variadic::kString) {
+        sqlite_utils::ReportSqliteResult(
+            ctx, storage_->GetString(value.string_value).c_str());
+      } else {
+        sqlite3_result_null(ctx);
       }
       break;
     }
     case Column::kRealValue: {
-      if (type_ == Type::kArgs) {
-        auto value = args.arg_values()[args_it_->Row()];
-        if (value.type == TraceStorage::Args::Variadic::kReal) {
-          sqlite_utils::ReportSqliteResult(ctx, value.real_value);
-        } else {
-          sqlite3_result_null(ctx);
-        }
-      } else /* (type == kSched) */ {
+      auto value = args.arg_values()[args_it_->Row()];
+      if (value.type == TraceStorage::Args::Variadic::kReal) {
+        sqlite_utils::ReportSqliteResult(ctx, value.real_value);
+      } else {
         sqlite3_result_null(ctx);
       }
+      break;
+    }
+    default:
+      PERFETTO_FATAL("Unknown column %d", N);
+      break;
+  }
+  return SQLITE_OK;
+}
+
+int AllEventsArgsTable::Cursor::ColumnSched(sqlite3_context* ctx, int N) {
+  const auto& sched = storage_->slices();
+  auto sched_row = sched_it_->Row() / 7;
+  auto sched_field = sched_it_->Row() % 7;
+  switch (N) {
+    case Column::kRowId: {
+      sqlite_utils::ReportSqliteResult(
+          ctx, TraceStorage::CreateRowId(TableId::kSched, sched_row));
+      break;
+    }
+    case Column::kFlatKey:
+    case Column::kKey: {
+      switch (sched_field) {
+        case kPrevComm:
+          sqlite_utils::ReportSqliteResult(ctx, "prev_comm");
+          break;
+        case kPrevPid:
+          sqlite_utils::ReportSqliteResult(ctx, "prev_pid");
+          break;
+        case kPrevPrio:
+          sqlite_utils::ReportSqliteResult(ctx, "prev_prio");
+          break;
+        case kPrevState:
+          sqlite_utils::ReportSqliteResult(ctx, "prev_state");
+          break;
+        case kNextComm:
+          sqlite_utils::ReportSqliteResult(ctx, "next_comm");
+          break;
+        case kNextPid:
+          sqlite_utils::ReportSqliteResult(ctx, "next_pid");
+          break;
+        case kNextPrio:
+          sqlite_utils::ReportSqliteResult(ctx, "next_prio");
+          break;
+        case kMax:
+          PERFETTO_FATAL("Invalid sched field");
+      }
+      break;
+    }
+    case Column::kIntValue: {
+      switch (sched_field) {
+        case kPrevPid:
+          sqlite_utils::ReportSqliteResult(
+              ctx, storage_->GetThread(sched.utids()[sched_row]).tid);
+          break;
+        case kPrevPrio:
+          sqlite_utils::ReportSqliteResult(ctx,
+                                            sched.priorities()[sched_row]);
+          break;
+        case kPrevState:
+          sqlite_utils::ReportSqliteResult(
+              ctx, sched.end_state()[sched_row].raw_state());
+          break;
+        case kNextPid:
+          sqlite_utils::ReportSqliteResult(
+              ctx, storage_->GetThread(sched.utids()[sched_row + 1]).tid);
+          break;
+        case kNextPrio:
+          sqlite_utils::ReportSqliteResult(ctx,
+                                            sched.priorities()[sched_row + 1]);
+          break;
+        case kPrevComm:
+        case kNextComm:
+          sqlite3_result_null(ctx);
+          break;
+        case kMax:
+          PERFETTO_FATAL("Invalid sched field");
+      }
+      break;
+    }
+    case Column::kStringValue: {
+      switch (sched_field) {
+        case kPrevComm: {
+          const auto& thread = storage_->GetThread(sched.utids()[sched_row]);
+          sqlite_utils::ReportSqliteResult(
+              ctx, storage_->GetString(thread.name_id).c_str());
+          break;
+        }
+        case kNextComm: {
+          const auto& thread =
+              storage_->GetThread(sched.utids()[sched_row + 1]);
+          sqlite_utils::ReportSqliteResult(
+              ctx, storage_->GetString(thread.name_id).c_str());
+          break;
+        }
+        case kPrevPid:
+        case kPrevPrio:
+        case kPrevState:
+        case kNextPid:
+        case kNextPrio:
+          sqlite3_result_null(ctx);
+          break;
+        case kMax:
+          PERFETTO_FATAL("Invalid sched field");
+      }
+      break;
+    }
+    case Column::kRealValue: {
+      sqlite3_result_null(ctx);
       break;
     }
     default:

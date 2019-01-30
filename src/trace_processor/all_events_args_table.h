@@ -72,6 +72,8 @@ class AllEventsArgsTable : public Table {
    private:
     enum class Type { kArgs = 0, kSched };
 
+    int ColumnSched(sqlite3_context*, int N);
+
     Type type_ = Type::kArgs;
     std::unique_ptr<RowIterator> args_it_;
     std::unique_ptr<RowIterator> sched_it_;

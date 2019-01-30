@@ -61,12 +61,6 @@
     "no-for-in-array": true,
     "no-unnecessary-type-assertion": true,
     "no-unused-variable": true,
-    "restrict-plus-operands": true,
-    "whitespace": [
-       true,
-       "check-branch",
-       "check-decl",
-       "check-operator"
-    ]
+    "restrict-plus-operands": true
   }
 }

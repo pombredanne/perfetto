@@ -16,6 +16,8 @@
 
 #include "src/trace_processor/all_events_table.h"
 
+#include <inttypes.h>
+
 #include "perfetto/base/logging.h"
 #include "src/trace_processor/all_events_args_table.h"
 #include "src/trace_processor/filtered_row_index.h"
@@ -219,7 +221,7 @@ int AllEventsTable::FormatSystraceArgs(TableId table_id,
         const auto& value = args.arg_values()[arg_row];
         switch (value.type) {
           case TraceStorage::Args::Variadic::kInt:
-            n += snprintf(line + n, size - static_cast<size_t>(n), "%lld",
+            n += snprintf(line + n, size - static_cast<size_t>(n), "%" PRId64,
                           value.int_value);
             break;
           case TraceStorage::Args::Variadic::kReal:
