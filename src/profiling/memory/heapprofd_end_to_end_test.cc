@@ -326,7 +326,7 @@ TEST_F(HeapprofdEndToEnd, NativeStartup) {
 }
 
 // TODO(fmayer): Enable in CL that fixes b/123352823.
-TEST_F(HeapprofdEndToEnd, DISABLED_ReInit) {
+TEST_F(HeapprofdEndToEnd, ReInit) {
   constexpr uint64_t kFirstIterationBytes = 5;
   constexpr uint64_t kSecondIterationBytes = 7;
 
@@ -368,7 +368,7 @@ TEST_F(HeapprofdEndToEnd, DISABLED_ReInit) {
 
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(10 * 1024);
-  trace_config.set_duration_ms(1000);
+  trace_config.set_duration_ms(2000);
 
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
   ds_config->set_name("android.heapprofd");
@@ -386,6 +386,7 @@ TEST_F(HeapprofdEndToEnd, DISABLED_ReInit) {
   ASSERT_EQ(read(*ack_pipe.rd, buf, sizeof(buf)), 0);
   ack_pipe.rd.reset();
 
+  PERFETTO_LOG("HeapprofdEndToEnd::Reinit: Starting second");
   TraceAndValidate(trace_config, pid, kSecondIterationBytes);
 
   PERFETTO_CHECK(kill(pid, SIGKILL) == 0);
