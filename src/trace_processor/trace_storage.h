@@ -138,6 +138,11 @@ class TraceStorage {
       };
     };
 
+    struct RowAndCount {
+      uint32_t start = 0;
+      uint32_t count = 0;
+    };
+
     const std::deque<RowId>& ids() const { return ids_; }
     const std::deque<StringId>& flat_keys() const { return flat_keys_; }
     const std::deque<StringId>& keys() const { return keys_; }
@@ -145,25 +150,36 @@ class TraceStorage {
     const std::multimap<RowId, uint32_t>& args_for_id() const {
       return args_for_id_;
     }
+    const std::deque<RowAndCount>& raw_table_args_for_id_2() const {
+      return raw_table_args_for_id_2_;
+    }
     uint32_t args_count() const { return static_cast<uint32_t>(ids_.size()); }
 
-    void AddArg(RowId id, StringId flat_key, StringId key, Variadic value) {
-      // TODO(b/123252504): disable this code to stop blow-ups in ingestion time
-      // and memory.
-      perfetto::base::ignore_result(id);
-      perfetto::base::ignore_result(flat_key);
-      perfetto::base::ignore_result(key);
-      perfetto::base::ignore_result(value);
-      /*
+    void AddArg(RowId id, StringId, StringId key, Variadic value) {
       if (id == kInvalidRowId)
         return;
 
       ids_.emplace_back(id);
-      flat_keys_.emplace_back(flat_key);
+      // flat_keys_.emplace_back(flat_key);
       keys_.emplace_back(key);
       arg_values_.emplace_back(value);
-      args_for_id_.emplace(id, static_cast<uint32_t>(args_count() - 1));
-      */
+
+      auto pair = ParseRowId(id);
+      if (pair.first == TableId::kRawEvents) {
+        if (pair.second != raw_table_args_for_id_2_.size() - 1) {
+          raw_table_args_for_id_2_.emplace_back();
+          auto* last = &raw_table_args_for_id_2_.back();
+          if (raw_table_args_for_id_2_.size() > 1) {
+            auto new_size = raw_table_args_for_id_2_.size();
+            auto* penult = &raw_table_args_for_id_2_[new_size - 2];
+            last->start = penult->start + penult->count;
+          } else {
+            last->start = 0;
+          }
+        }
+        raw_table_args_for_id_2_.back().count++;
+      }
+      // args_for_id_.emplace(id, static_cast<uint32_t>(args_count() - 1));
     }
 
    private:
@@ -172,6 +188,7 @@ class TraceStorage {
     std::deque<StringId> keys_;
     std::deque<Variadic> arg_values_;
     std::multimap<RowId, uint32_t> args_for_id_;
+    std::deque<RowAndCount> raw_table_args_for_id_2_;
   };
 
   class Slices {

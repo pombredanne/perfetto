@@ -38,12 +38,6 @@ class AllEventsArgsTable : public Table {
     kRealValue = 5
   };
 
-  static int WriteFieldToString(TraceStorage* storage,
-                                TableId table_id,
-                                uint32_t row,
-                                char* line,
-                                size_t n);
-
   static void RegisterTable(sqlite3* db, const TraceStorage* storage);
 
   AllEventsArgsTable(sqlite3*, const TraceStorage*);

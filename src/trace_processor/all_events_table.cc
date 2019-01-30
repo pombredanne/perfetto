@@ -101,13 +101,13 @@ AllEventsTable::Cursor::Cursor(const TraceStorage* storage,
       sched_it_ = sched_index.ToRowIterator(false);
     }
   } else {
-    FilteredRowIndex raw_index(0, storage_->args().args_count());
+    FilteredRowIndex raw_index(0, storage_->raw_events().raw_event_count());
     FilteredRowIndex sched_index(0, storage_->slices().slice_count() - 1);
     raw_it_ = raw_index.ToRowIterator(false);
     sched_it_ = sched_index.ToRowIterator(false);
   }
 
-  if (!raw_it_->IsEnd() && sched_it_->IsEnd()) {
+  if (!raw_it_->IsEnd() && !sched_it_->IsEnd()) {
     auto raw_ts = storage_->raw_events().timestamps()[raw_it_->Row()];
     auto sched_ts = storage_->slices().start_ns()[sched_it_->Row()];
     type_ = raw_ts < sched_ts ? Type::kRaw : Type::kSched;
@@ -183,7 +183,7 @@ int AllEventsTable::Cursor::Next() {
     sched_it_->NextRow();
   }
 
-  if (!raw_it_->IsEnd() && sched_it_->IsEnd()) {
+  if (!raw_it_->IsEnd() && !sched_it_->IsEnd()) {
     auto raw_ts = storage_->raw_events().timestamps()[raw_it_->Row()];
     auto sched_ts = storage_->slices().start_ns()[sched_it_->Row()];
     type_ = raw_ts < sched_ts ? Type::kRaw : Type::kSched;
@@ -202,22 +202,54 @@ int AllEventsTable::Cursor::Eof() {
 int AllEventsTable::FormatSystraceArgs(TableId table_id,
                                        uint32_t row,
                                        char* line,
-                                       size_t n) {
+                                       size_t size) {
+  const auto& args = storage_->args();
   const auto& sched = storage_->slices();
-  switch (table_id) {
-    case TableId::kRawEvents:
 
-    case TableId::kSched:
+  switch (table_id) {
+    case TableId::kRawEvents: {
+      const auto& row_and_count = args.raw_table_args_for_id_2()[row];
+      int n = 0;
+      for (size_t i = 0; i < row_and_count.count; i++) {
+        auto arg_row = row_and_count.start + i;
+        if (i != 0)
+          n += snprintf(line + n, size - static_cast<size_t>(n), " ");
+        n += snprintf(line + n, size - static_cast<size_t>(n),
+                      "%s=", storage_->GetString(args.keys()[arg_row]).c_str());
+        const auto& value = args.arg_values()[arg_row];
+        switch (value.type) {
+          case TraceStorage::Args::Variadic::kInt:
+            n += snprintf(line + n, size - static_cast<size_t>(n), "%lld",
+                          value.int_value);
+            break;
+          case TraceStorage::Args::Variadic::kReal:
+            n += snprintf(line + n, size - static_cast<size_t>(n), "%f",
+                          value.real_value);
+            break;
+          case TraceStorage::Args::Variadic::kString:
+            n += snprintf(line + n, size - static_cast<size_t>(n), "%s",
+                          storage_->GetString(value.string_value).c_str());
+            break;
+        }
+      }
+      return n;
+    }
+    case TableId::kSched: {
+      const auto& prev_thread = storage_->GetThread(sched.utids()[row]);
+      const auto& next_thread = storage_->GetThread(sched.utids()[row + 1]);
+      const auto& state = sched.end_state()[row];
       return snprintf(
-          line, n,
-          "sched_switch: prev_comm=%s "
+          line, size,
+          "prev_comm=%s "
           "prev_pid=%d prev_prio=%d prev_state=%s ==> next_comm=%s next_pid=%d "
           "next_prio=%d",
-          AllEventsArgsTable::WriteFieldToString(row * 7),
-          sched_switch.prev_pid(), sched_switch.prev_prio(),
-          GetSchedSwitchFlag(sched_switch.prev_state()),
-          sched_switch.next_comm().c_str(), sched_switch.next_pid(),
-          sched_switch.next_prio());
+          storage_->GetString(prev_thread.name_id).c_str(),
+          storage_->GetThread(sched.utids()[row]).tid, sched.priorities()[row],
+          state.is_valid() ? state.ToString().data() : "?",
+          storage_->GetString(next_thread.name_id).c_str(),
+          storage_->GetThread(sched.utids()[row + 1]).tid,
+          sched.priorities()[row + 1]);
+    }
     case TableId::kCounters:
     case TableId::kInstants:
       PERFETTO_CHECK(false);
@@ -252,12 +284,21 @@ void AllEventsTable::ToSystrace(sqlite3_context* ctx,
   const auto& name = storage_->GetString(thread.name_id);
 
   char line[2048];
-  int n = ftrace_utils::FormatSystracePrefix(
+  int n = 0;
+  n += ftrace_utils::FormatSystracePrefix(
       Timestamp(table_id, row), Cpu(table_id, row), thread.tid, tgid,
-      base::StringView(name), line, sizeof(line));
+      base::StringView(name), line, sizeof(line) - static_cast<size_t>(n));
   PERFETTO_CHECK(static_cast<size_t>(n) < sizeof(line));
 
-  FormatSystraceArgs(table_id, row, line,
+  if (table_id == TableId::kSched) {
+    n += snprintf(line + n, sizeof(line) - static_cast<size_t>(n),
+                  "%s: ", "sched_switch");
+  } else {
+    n += snprintf(
+        line + n, sizeof(line) - static_cast<size_t>(n), "%s: ",
+        storage_->GetString(storage_->raw_events().name_ids()[row]).c_str());
+  }
+  FormatSystraceArgs(table_id, row, line + n,
                      sizeof(line) - static_cast<size_t>(n));
   sqlite3_result_text(ctx, line, -1, sqlite_utils::kSqliteTransient);
 }

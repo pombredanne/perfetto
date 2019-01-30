@@ -32,50 +32,6 @@ using namespace sqlite_utils;
 AllEventsArgsTable::AllEventsArgsTable(sqlite3*, const TraceStorage* storage)
     : storage_(storage) {}
 
-int AllEventsArgsTable::WriteFieldToString(TraceStorage* storage,
-                                           TableId table_id,
-                                           uint32_t raw_row,
-                                           char* line,
-                                           size_t n) {
-  if (table_id == TableId::kRawEvents) {
-    // TODO(lalitm): this would be done the same way as filtering on rowid
-    // below.
-  } else /* (type == kSched) */ {
-    const auto& sched = storage->slices();
-    auto row = raw_row / 7;
-    auto sched_field = raw_row % 7;
-    switch (sched_field) {
-      case kPrevPid:
-        snprintf(line, n, "%d", storage->GetThread(sched.utids()[row]).tid);
-        break;
-      case kPrevPrio:
-        snprintf(line, n, "%d", sched.priorities()[row]);
-        break;
-      case kPrevState:
-        snprintf(line, n, "%d", sched.end_state()[row].raw_state());
-        break;
-      case kNextPid:
-        snprintf(line, n, "%d", storage->GetThread(sched.utids()[row + 1]).tid);
-        break;
-      case kNextPrio:
-        snprintf(line, n, "%d", sched.priorities()[row + 1]);
-        break;
-      case kPrevComm: {
-        const auto& thread = storage->GetThread(sched.utids()[row]);
-        snprintf(line, n, "%s", storage->GetString(thread.name_id).c_str());
-        break;
-      }
-      case kNextComm: {
-        const auto& thread = storage->GetThread(sched.utids()[row + 1]);
-        snprintf(line, n, "%s", storage->GetString(thread.name_id).c_str());
-        break;
-      }
-      case kMax:
-        PERFETTO_FATAL("Invalid sched field");
-    }
-  }
-}
-
 void AllEventsArgsTable::RegisterTable(sqlite3* db,
                                        const TraceStorage* storage) {
   Table::Register<AllEventsArgsTable>(db, storage, "all_events_args");
@@ -143,12 +99,12 @@ AllEventsArgsTable::Cursor::Cursor(const TraceStorage* storage,
     }
   } else {
     FilteredRowIndex args_index(0, storage_->args().args_count());
-    FilteredRowIndex sched_index(0, storage_->slices().slice_count() - 1);
+    FilteredRowIndex sched_index(0, (storage_->slices().slice_count() - 1) * 7);
     args_it_ = args_index.ToRowIterator(false);
     sched_it_ = sched_index.ToRowIterator(false);
   }
 
-  if (!args_it_->IsEnd() && sched_it_->IsEnd()) {
+  if (!args_it_->IsEnd() && !sched_it_->IsEnd()) {
     // Don't switch iteration type.
   } else if (!sched_it_->IsEnd()) {
     type_ = Type::kSched;
@@ -173,8 +129,9 @@ int AllEventsArgsTable::Cursor::Column(sqlite3_context* ctx, int N) {
     }
     case Column::kFlatKey: {
       if (type_ == Type::kArgs) {
-        sqlite_utils::ReportSqliteResult(ctx,
-                                         args.flat_keys()[args_it_->Row()]);
+        sqlite_utils::ReportSqliteResult(
+            ctx,
+            storage_->GetString(args.flat_keys()[args_it_->Row()]).c_str());
       } else /* (type == kSched) */ {
         auto sched_field = sched_it_->Row() % 7;
         switch (sched_field) {
@@ -207,7 +164,8 @@ int AllEventsArgsTable::Cursor::Column(sqlite3_context* ctx, int N) {
     }
     case Column::kKey: {
       if (type_ == Type::kArgs) {
-        sqlite_utils::ReportSqliteResult(ctx, args.keys()[args_it_->Row()]);
+        sqlite_utils::ReportSqliteResult(
+            ctx, storage_->GetString(args.keys()[args_it_->Row()]).c_str());
       } else /* (type == kSched) */ {
         auto sched_field = sched_it_->Row() % 7;
         switch (sched_field) {
@@ -346,7 +304,7 @@ int AllEventsArgsTable::Cursor::Next() {
     sched_it_->NextRow();
   }
 
-  if (!args_it_->IsEnd() && sched_it_->IsEnd()) {
+  if (!args_it_->IsEnd() && !sched_it_->IsEnd()) {
     // Don't switch iteration type.
   } else if (!sched_it_->IsEnd()) {
     type_ = Type::kSched;
