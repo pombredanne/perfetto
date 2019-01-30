@@ -122,6 +122,7 @@ bool TestHelper::AttachConsumer(const std::string& key) {
 
 void TestHelper::StartTracing(const TraceConfig& config,
                               base::ScopedFile file) {
+  trace_.clear();
   on_stop_tracing_callback_ = CreateCheckpoint("stop.tracing");
   endpoint_->EnableTracing(config, std::move(file));
 }
