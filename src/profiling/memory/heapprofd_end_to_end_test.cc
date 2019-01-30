@@ -121,7 +121,7 @@ pid_t ForkContinousMalloc(size_t bytes) {
           x[1] = 'x';
           free(const_cast<char*>(x));
         }
-        usleep(1000 * kMsToUs);
+        usleep(10 * kMsToUs);
       }
     default:
       break;
@@ -359,7 +359,7 @@ TEST_F(HeapprofdEndToEnd, ReInit) {
           signal_pipe.rd.reset();
           ack_pipe.wr.reset();
         }
-        usleep(1000 * kMsToUs);
+        usleep(10 * kMsToUs);
       }
       PERFETTO_FATAL("Should be unreachable");
     }
