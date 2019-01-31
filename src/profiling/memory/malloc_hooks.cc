@@ -23,6 +23,7 @@
 #include <unistd.h>
 
 #include <atomic>
+#include <memory>
 #include <tuple>
 
 #include <sys/system_properties.h>
@@ -37,31 +38,6 @@
 #include "src/profiling/memory/client.h"
 #include "src/profiling/memory/proc_utils.h"
 #include "src/profiling/memory/wire_protocol.h"
-
-// The real malloc function pointers we get in initialize.
-static std::atomic<const MallocDispatch*> g_dispatch{nullptr};
-static std::atomic<perfetto::profiling::Client*> g_client{nullptr};
-static constexpr size_t kNumConnections = 2;
-
-static constexpr char kHeapprofdBinPath[] = "/system/bin/heapprofd";
-
-// The only writes are in the initialization function. Because Bionic does a
-// release write after initialization and an acquire read to retrieve the hooked
-// malloc functions, we can use relaxed memory mode for both writing, and more
-// importantly because in the fast-path, reading.
-static constexpr std::memory_order write_order = std::memory_order_relaxed;
-
-static perfetto::profiling::Client* GetClient() {
-  return g_client.load(std::memory_order_relaxed);
-}
-
-static const MallocDispatch* GetDispatch() {
-  return g_dispatch.load(std::memory_order_relaxed);
-}
-
-static void MallocDispatchReset(const MallocDispatch* dispatch) {
-  android_mallopt(M_RESET_HOOKS, nullptr, 0);
-}
 
 // This is so we can make an so that we can swap out with the existing
 // libc_malloc_hooks.so
@@ -119,6 +95,100 @@ void* HEAPPROFD_ADD_PREFIX(_valloc)(size_t size);
 #pragma GCC visibility pop
 
 namespace {
+
+constexpr size_t kNumConnections = 2;
+constexpr char kHeapprofdBinPath[] = "/system/bin/heapprofd";
+
+// Tracks the state of profiling instrumentation. Used to guarantee that at most
+// one perfetto::profiling::Client is instantiated at a given point in time.
+enum class ClientState {
+  // The initial state, also the state reached after fully tearing down a
+  // client. No client is active. It is valid to transition to kInitializing to
+  // create a client.
+  kUninitialized = 0,
+  // Actively constructing & initializing the client. Initialization
+  // transitions to kActive if successful. Note that this state does not track
+  // bionic's work (such as patching in the dispatch hooks, which happens after
+  // this library has deemed itself initialized).
+  kInitializing,
+  // There is an active client, and therefore we're likely actively profiling.
+  // It is valid to transition to kShuttingDown to perform lazy teardown.
+  kActive,
+  // Waiting to tear down the client. In this state, no new usages of the
+  // client are introduced, but there might still be active hooks with a
+  // reference to it. The thread that decrements the last reference to the
+  // client runs final cleanup, and transitions back to kUninitialized.
+  kShuttingDown,
+};
+std::atomic<ClientState> g_client_state{ClientState::kUninitialized};
+
+// Active profiling client, all hooks make an owning copy for as long as they're
+// referencing the client.
+//
+// Protected by g_shclient_mutex.
+std::shared_ptr<perfetto::profiling::Client> g_shclient{nullptr};
+// TODO: dns: switch to spinlock (with necessary mem fences)
+std::mutex g_shclient_mutex;
+
+// TODO: dns: double-check that relaxed ordering makes sense on dispatch
+// The real malloc function pointers we get in initialize.
+std::atomic<const MallocDispatch*> g_dispatch{nullptr};
+
+std::shared_ptr<perfetto::profiling::Client> GetClient() {
+  std::shared_ptr<perfetto::profiling::Client> client;
+
+  g_shclient_mutex.lock();
+  client = g_shclient;  // copy
+  g_shclient_mutex.unlock();
+
+  return client;
+}
+
+const MallocDispatch* GetDispatch() {
+  return g_dispatch.load(std::memory_order_relaxed);
+}
+
+// Releases the global master client pointer, but the actual work will be
+// deferred until the last active hook using it goes away. See
+// |DeleteClientAndCleanup|.
+void StopClientLazy() {
+  PERFETTO_DLOG("StopClientLazy() in state [%d]",
+                g_client_state.load(std::memory_order_acquire));
+
+  // kActive -> kShuttingDown
+  ClientState expected_state = ClientState::kActive;
+  if (!std::atomic_compare_exchange_strong_explicit(
+          &g_client_state, &expected_state, ClientState::kShuttingDown,
+          std::memory_order_acq_rel, std::memory_order_acquire)) {
+    PERFETTO_DLOG("Rejecting concurrent StopClientLazy()");
+    PERFETTO_DCHECK(expected_state == ClientState::kShuttingDown);
+    return;
+  }
+
+  g_shclient_mutex.lock();
+  g_shclient.reset();
+  g_shclient_mutex.unlock();
+}
+
+// Custom deleter to clean up after the last active reference to the
+// shutting-down client goes away.
+void DeleteClientAndCleanup(perfetto::profiling::Client* p) {
+  PERFETTO_DLOG("DeleteClientAndCleanup() in state [%d]",
+                g_client_state.load(std::memory_order_acquire));
+
+  // Destruct client.
+  delete p;
+
+  // Unpatch hooks.
+  bool success = android_mallopt(M_RESET_HOOKS, nullptr, 0);
+  if (!success)
+    PERFETTO_PLOG("android_mallopt(M_RESET_HOOKS)");
+
+  // kShuttingDown -> kUninitialized
+  PERFETTO_DCHECK(g_client_state.load(std::memory_order_acquire) ==
+                  ClientState::kShuttingDown);
+  g_client_state.store(ClientState::kUninitialized, std::memory_order_release);
+}
 
 std::string ReadSystemProperty(const char* key) {
   std::string prop_value;
@@ -242,32 +312,65 @@ std::unique_ptr<perfetto::profiling::Client> CreateClientAndPrivateDaemon() {
 bool HEAPPROFD_ADD_PREFIX(_initialize)(const MallocDispatch* malloc_dispatch,
                                        int*,
                                        const char*) {
-  perfetto::profiling::Client* old_client = GetClient();
-  if (old_client)
-    old_client->Shutdown();
+  using perfetto::profiling::Client;
+  PERFETTO_DLOG("heapprofd_initialize() in state [%d]",
+                g_client_state.load(std::memory_order_acquire));
 
-  // Table of pointers to backing implementation.
-  g_dispatch.store(malloc_dispatch, write_order);
-
-  std::unique_ptr<perfetto::profiling::Client> client =
-      ShouldForkPrivateDaemon() ? CreateClientAndPrivateDaemon()
-                                : CreateClientForCentralDaemon();
-
-  if (!client || !client->inited()) {
-    PERFETTO_LOG("Client not initialized, not installing hooks.");
+  // kUninitialized -> kInitializing
+  ClientState expected_state = ClientState::kUninitialized;
+  if (!std::atomic_compare_exchange_strong_explicit(
+          &g_client_state, &expected_state, ClientState::kInitializing,
+          std::memory_order_acq_rel, std::memory_order_acquire)) {
+    PERFETTO_LOG(
+        "Rejecting concurrent profiling initialization as client already "
+        "exists.");
     return false;
   }
 
-  g_client.store(client.release());
+  // Table of pointers to backing implementation.
+  g_dispatch.store(malloc_dispatch, std::memory_order_relaxed);
+
+  std::unique_ptr<Client> client = ShouldForkPrivateDaemon()
+                                       ? CreateClientAndPrivateDaemon()
+                                       : CreateClientForCentralDaemon();
+
+  if (!client || !client->inited()) {
+    PERFETTO_LOG("Client not initialized, not installing hooks.");
+    // kInitializing -> kUninitialized
+    PERFETTO_DCHECK(g_client_state.load(std::memory_order_acquire) ==
+                    ClientState::kInitializing);
+    g_client_state.store(ClientState::kUninitialized,
+                         std::memory_order_release);
+    return false;
+  }
+
+  // Store client into |g_shclient| with a custom deleter to lazily perform
+  // final cleanup. Note that the hooks in this file do not observe
+  // |g_client_state|, and will start using the client as soon as the global
+  // shared_ptr is set (though the hooks would not yet be patched-in by bionic
+  // until later in the init process).
+  g_shclient_mutex.lock();
+  g_shclient =
+      std::shared_ptr<Client>(client.release(), DeleteClientAndCleanup);
+  g_shclient_mutex.unlock();
+
+  // kInitializing -> kActive
+  PERFETTO_DCHECK(g_client_state.load(std::memory_order_acquire) ==
+                  ClientState::kInitializing);
+  g_client_state.store(ClientState::kActive, std::memory_order_release);
   return true;
 }
 
 void HEAPPROFD_ADD_PREFIX(_finalize)() {
-  // TODO(fmayer): This should not leak.
-  perfetto::profiling::Client* client = GetClient();
-  if (client)
-    client->Shutdown();
-  MallocDispatchReset(GetDispatch());
+  PERFETTO_DLOG("heapprofd_finalize() in state [%d]",
+                g_client_state.load(std::memory_order_acquire));
+  // Currently heapprofd_finalize is called only during process termination, so
+  // drop everything on the floor and let the OS clean up.
+
+  // TODO(rsavitski): is this a reasonable assumption long-term? Should we avoid
+  // leaking for asan purposes (that is, if malloc hooking can coexist with it)?
+  // If we have an active client, could we block for a short grace period to let
+  // it transmit final allocations?
 }
 
 void HEAPPROFD_ADD_PREFIX(_dump_heap)(const char*) {}
@@ -292,72 +395,72 @@ size_t HEAPPROFD_ADD_PREFIX(_malloc_usable_size)(void* pointer) {
 
 void* HEAPPROFD_ADD_PREFIX(_malloc)(size_t size) {
   const MallocDispatch* dispatch = GetDispatch();
-  perfetto::profiling::Client* client = GetClient();
+  std::shared_ptr<perfetto::profiling::Client> client = GetClient();
   void* addr = dispatch->malloc(size);
   if (client) {
     if (!client->MaybeSampleAlloc(size, reinterpret_cast<uint64_t>(addr),
                                   dispatch->malloc, dispatch->free))
-      MallocDispatchReset(GetDispatch());
+      StopClientLazy();
   }
   return addr;
 }
 
 void HEAPPROFD_ADD_PREFIX(_free)(void* pointer) {
   const MallocDispatch* dispatch = GetDispatch();
-  perfetto::profiling::Client* client = GetClient();
+  std::shared_ptr<perfetto::profiling::Client> client = GetClient();
   if (client)
     if (!client->RecordFree(reinterpret_cast<uint64_t>(pointer)))
-      MallocDispatchReset(GetDispatch());
+      StopClientLazy();
   return dispatch->free(pointer);
 }
 
 void* HEAPPROFD_ADD_PREFIX(_aligned_alloc)(size_t alignment, size_t size) {
   const MallocDispatch* dispatch = GetDispatch();
-  perfetto::profiling::Client* client = GetClient();
+  std::shared_ptr<perfetto::profiling::Client> client = GetClient();
   void* addr = dispatch->aligned_alloc(alignment, size);
   if (client) {
     if (!client->MaybeSampleAlloc(size, reinterpret_cast<uint64_t>(addr),
                                   dispatch->malloc, dispatch->free))
-      MallocDispatchReset(GetDispatch());
+      StopClientLazy();
   }
   return addr;
 }
 
 void* HEAPPROFD_ADD_PREFIX(_memalign)(size_t alignment, size_t size) {
   const MallocDispatch* dispatch = GetDispatch();
-  perfetto::profiling::Client* client = GetClient();
+  std::shared_ptr<perfetto::profiling::Client> client = GetClient();
   void* addr = dispatch->memalign(alignment, size);
   if (client) {
     if (!client->MaybeSampleAlloc(size, reinterpret_cast<uint64_t>(addr),
                                   dispatch->malloc, dispatch->free))
-      MallocDispatchReset(GetDispatch());
+      StopClientLazy();
   }
   return addr;
 }
 
 void* HEAPPROFD_ADD_PREFIX(_realloc)(void* pointer, size_t size) {
   const MallocDispatch* dispatch = GetDispatch();
-  perfetto::profiling::Client* client = GetClient();
+  std::shared_ptr<perfetto::profiling::Client> client = GetClient();
   if (client && pointer)
     if (!client->RecordFree(reinterpret_cast<uint64_t>(pointer)))
-      MallocDispatchReset(GetDispatch());
+      StopClientLazy();
   void* addr = dispatch->realloc(pointer, size);
   if (client && size > 0) {
     if (!client->MaybeSampleAlloc(size, reinterpret_cast<uint64_t>(addr),
                                   dispatch->malloc, dispatch->free))
-      MallocDispatchReset(GetDispatch());
+      StopClientLazy();
   }
   return addr;
 }
 
 void* HEAPPROFD_ADD_PREFIX(_calloc)(size_t nmemb, size_t size) {
   const MallocDispatch* dispatch = GetDispatch();
-  perfetto::profiling::Client* client = GetClient();
+  std::shared_ptr<perfetto::profiling::Client> client = GetClient();
   void* addr = dispatch->calloc(nmemb, size);
   if (client) {
     if (!client->MaybeSampleAlloc(size, reinterpret_cast<uint64_t>(addr),
                                   dispatch->malloc, dispatch->free))
-      MallocDispatchReset(GetDispatch());
+      StopClientLazy();
   }
   return addr;
 }
@@ -376,12 +479,12 @@ int HEAPPROFD_ADD_PREFIX(_posix_memalign)(void** memptr,
                                           size_t alignment,
                                           size_t size) {
   const MallocDispatch* dispatch = GetDispatch();
-  perfetto::profiling::Client* client = GetClient();
+  std::shared_ptr<perfetto::profiling::Client> client = GetClient();
   int res = dispatch->posix_memalign(memptr, alignment, size);
   if (res == 0 && client) {
     if (!client->MaybeSampleAlloc(size, reinterpret_cast<uint64_t>(*memptr),
                                   dispatch->malloc, dispatch->free))
-      MallocDispatchReset(GetDispatch());
+      StopClientLazy();
   }
   return res;
 }
