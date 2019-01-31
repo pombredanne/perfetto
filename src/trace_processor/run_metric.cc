@@ -77,7 +77,9 @@ protos::RawQueryResult ExecuteQuerySync(TraceProcessor* tp, std::string query) {
   args.set_sql_query(query);
   protos::RawQueryResult res;
   tp->ExecuteQuery(
-      args, [&res](const protos::RawQueryResult& cb_res) { res = std::move(cb_res); });
+      args, [&res](const protos::RawQueryResult& cb_res) {
+        // Not sure if this std::move has any effect.
+        res = std::move(cb_res); });
   if (res.has_error()) {
     PERFETTO_ELOG("SQLite error: %s", res.error().c_str());
     PERFETTO_ELOG("Query: %s", query.c_str());
@@ -141,14 +143,14 @@ void PrintQueryResultAsCsv(const protos::RawQueryResult& res, FILE* output) {
 // slightly easier.
 struct QueryResult {
   QueryResult(protos::RawQueryResult&& res) : result(std::move(res)) {}
-  protos::RawQueryResult result;
-  const protos::RawQueryResult_ColumnValues& Column(const std::string& col_name) {
+  const protos::RawQueryResult result;
+  const protos::RawQueryResult_ColumnValues& Column(const std::string& col_name) const{
     return GetColumn(result, col_name);
   }
-  int num_records() {
+  int num_records() const {
     return static_cast<int>(result.num_records());
   }
-  void Print() {
+  void Print() const {
     PrintQueryResultAsCsv(result, stdout);
   }
 };
@@ -258,7 +260,26 @@ StringToIntVector GetFrameToNavs(const TraceProcessorWrapper& tpw, int64 utid) {
 
 // Iterates over the tagged timestamps (endpoints) and calculates TTI.
 // Returns -1 if TTI was not reached.
-int64 GetInteractiveCandidate(std::vector<Endpoint>& endpoints, int64 fcp) {
+int64 GetInteractiveCandidate(const QueryResult& long_tasks,
+    const QueryResult& resource_loads, int64 fcp, int64 nav_end) {
+  // Extract timestamps where a quiet window can possibly change.
+  // We extract start and end of long tasks and resource loads, and the
+  // end of navigation event.
+  std::vector<Endpoint> endpoints;
+  ExtractEndpoints(endpoints,
+      long_tasks.Column("task_start"),
+      Endpoint::TaskStart);
+  ExtractEndpoints(endpoints,
+      long_tasks.Column("task_end"),
+      Endpoint::TaskEnd);
+  ExtractEndpoints(endpoints,
+      resource_loads.Column("load_start"),
+      Endpoint::LoadStart);
+  ExtractEndpoints(endpoints,
+      resource_loads.Column("load_end"),
+      Endpoint::LoadEnd);
+  endpoints.emplace_back(Endpoint::NavigationEnd, nav_end);
+
   int64 net_quiet_window_start = fcp;
   int64 mt_quiet_window_start = fcp;
   int num_active_requests = 0;
@@ -379,25 +400,8 @@ void ComputeTTI(TraceProcessor* tp) {
           << " and load_end > " << nav_range.first
         ).str());
 
-        // Extract timestamps where a quiet window can possibly change.
-        // We extract start and end of long tasks and resource loads, and the
-        // end of navigation event.
-        std::vector<Endpoint> endpoints;
-        ExtractEndpoints(endpoints,
-            long_tasks_query.Column("task_start"),
-            Endpoint::TaskStart);
-        ExtractEndpoints(endpoints,
-            long_tasks_query.Column("task_end"),
-            Endpoint::TaskEnd);
-        ExtractEndpoints(endpoints,
-            resource_load_query.Column("load_start"),
-            Endpoint::LoadStart);
-        ExtractEndpoints(endpoints,
-            resource_load_query.Column("load_end"),
-            Endpoint::LoadEnd);
-        endpoints.emplace_back(Endpoint::NavigationEnd, nav_range.second);
-
-        int64 interactive_candidate = GetInteractiveCandidate(endpoints, fcp);
+        int64 interactive_candidate = GetInteractiveCandidate(
+          long_tasks_query, resource_load_query, fcp, nav_range.second);
 
         if (interactive_candidate == -1) continue;  // TTI not found.
 
