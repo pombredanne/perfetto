@@ -13,7 +13,8 @@ tools/heap_profile --name system_server
 ```
 
 This will create a heap dump when Ctrl+C is pressed.
-Head to http://pprof/ and upload the gzipped protos to get a visualization.
+Googlers: Head to http://pprof/ and upload the gzipped protos to get a
+visualization.
 
 The resulting profile proto contains four views on the data
 
