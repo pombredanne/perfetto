@@ -103,7 +103,7 @@ struct AndroidPowerDataSource::DynamicLibLoader {
       return std::vector<android_internal::RailEnergyData>();
 
     std::vector<android_internal::RailEnergyData> energy_data(kMaxNumRails);
-    size_t num_rails = num_rails = energy_data.size();
+    size_t num_rails = energy_data.size();
     get_rail_energy_data_(&energy_data[0], &num_rails);
     energy_data.resize(num_rails);
     return energy_data;
