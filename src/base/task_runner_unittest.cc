@@ -361,17 +361,17 @@ TYPED_TEST(TaskRunnerTest, IsIdleForTesting) {
 TYPED_TEST(TaskRunnerTest, RunsTasksOnCurrentThread) {
   auto& main_tr = this->task_runner;
 
-  EXPECT_TRUE(task_runner.RunsTasksOnCurrentThread());
+  EXPECT_TRUE(main_tr.RunsTasksOnCurrentThread());
   std::thread thread([&main_tr] {
-    TypedTaskRunner second_tr;
-    second_tr.PostTask([main_tr, second_tr] {
+    typename std::remove_reference<decltype(main_tr)>::type second_tr;
+    second_tr.PostTask([&main_tr, &second_tr] {
       EXPECT_FALSE(main_tr.RunsTasksOnCurrentThread());
       EXPECT_TRUE(second_tr.RunsTasksOnCurrentThread());
-      second_tr.Quit()
+      second_tr.Quit();
     });
     second_tr.Run();
-    thread.join();
   });
+  thread.join();
 }
 
 }  // namespace
