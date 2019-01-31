@@ -193,7 +193,7 @@ class TraceStorage {
       ArgSetId id = static_cast<uint32_t>(arg_row_for_hash_.size()) + 1;
       arg_row_for_hash_.emplace(hash, args_count());
       for (uint8_t i = 0; i < size; i++) {
-        const auto& arg = args[i];
+        const auto& arg = arg_set[i];
         set_ids_.emplace_back(id);
         flat_keys_.emplace_back(arg.flat_key);
         keys_.emplace_back(arg.key);
