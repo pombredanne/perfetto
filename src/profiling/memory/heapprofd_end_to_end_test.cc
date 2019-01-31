@@ -331,7 +331,6 @@ TEST_F(HeapprofdEndToEnd, NativeStartup) {
   EXPECT_GT(total_freed, 0);
 }
 
-// TODO(fmayer): Enable in CL that fixes b/123352823.
 TEST_F(HeapprofdEndToEnd, ReInit) {
   constexpr uint64_t kFirstIterationBytes = 5;
   constexpr uint64_t kSecondIterationBytes = 7;
