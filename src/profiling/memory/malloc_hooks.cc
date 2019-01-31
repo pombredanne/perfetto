@@ -106,18 +106,18 @@ enum class ClientState {
   // client. No client is active. It is valid to transition to kInitializing to
   // create a client.
   kUninitialized = 0,
-  // Actively constructing & initializing the client. Initialization
-  // transitions to kActive if successful. Note that this state does not track
-  // bionic's work (such as patching in the dispatch hooks, which happens after
-  // this library has deemed itself initialized).
+  // Actively constructing & initializing the client. Initialization transitions
+  // to kActive if successful. Note that this state does not track bionic's work
+  // (such as patching in the dispatch hooks, which happens after this library
+  // has deemed itself initialized).
   kInitializing,
   // There is an active client, and therefore we're likely actively profiling.
-  // It is valid to transition to kShuttingDown to perform lazy teardown.
+  // It is valid to transition to kShuttingDown to initiate lazy teardown.
   kActive,
-  // Waiting to tear down the client. In this state, no new usages of the
-  // client are introduced, but there might still be active hooks with a
-  // reference to it. The thread that decrements the last reference to the
-  // client runs final cleanup, and transitions back to kUninitialized.
+  // Waiting to tear down the client. In this state, no new usages of the client
+  // are introduced, but there might still be active hooks with a reference to
+  // it. The thread that decrements the last reference to the client runs final
+  // cleanup, and transitions to kUninitialized.
   kShuttingDown,
 };
 std::atomic<ClientState> g_client_state{ClientState::kUninitialized};
@@ -324,7 +324,7 @@ bool HEAPPROFD_ADD_PREFIX(_initialize)(const MallocDispatch* malloc_dispatch,
     PERFETTO_LOG(
         "Rejecting concurrent profiling initialization as client already "
         "exists.");
-    return false;
+    return true;  // success since the ongoing session should continue
   }
 
   // Table of pointers to backing implementation.
@@ -335,7 +335,7 @@ bool HEAPPROFD_ADD_PREFIX(_initialize)(const MallocDispatch* malloc_dispatch,
                                        : CreateClientForCentralDaemon();
 
   if (!client || !client->inited()) {
-    PERFETTO_LOG("Client not initialized, not installing hooks.");
+    PERFETTO_LOG("Client creation unsuccessful, not installing hooks.");
     // kInitializing -> kUninitialized
     PERFETTO_DCHECK(g_client_state.load(std::memory_order_acquire) ==
                     ClientState::kInitializing);
