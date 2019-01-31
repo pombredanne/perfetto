@@ -26,6 +26,7 @@
 #include "perfetto/base/utils.h"
 #include "perfetto/protozero/proto_decoder.h"
 #include "perfetto/traced/sys_stats_counters.h"
+#include "src/trace_processor/args_tracker.h"
 #include "src/trace_processor/clock_tracker.h"
 #include "src/trace_processor/event_tracker.h"
 #include "src/trace_processor/ftrace_descriptors.h"
@@ -268,6 +269,9 @@ void ProtoTraceParser::ParseTracePacket(int64_t ts, TraceBlobView packet) {
         break;
     }
   }
+  // TODO(lalitm): move this to the flush method once we have it.
+  context_->args_tracker->Flush();
+
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 
@@ -684,6 +688,9 @@ void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
         break;
     }
   }
+  // TODO(lalitm): move this to the flush method once we have it.
+  context_->args_tracker->Flush();
+
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 
@@ -755,8 +762,8 @@ void ProtoTraceParser::ParseLowmemoryKill(int64_t timestamp,
   // Store the comm as an arg.
   RowId row_id = TraceStorage::CreateRowId(TableId::kInstants, row);
   auto comm_id = context_->storage->InternString(comm);
-  context_->storage->mutable_args()->AddArg(
-      row_id, comm_name_id_, comm_name_id_, Variadic::String(comm_id));
+  context_->args_tracker->AddArg(row_id, comm_name_id_, comm_name_id_,
+                                 Variadic::String(comm_id));
 }
 
 void ProtoTraceParser::ParseRssStat(int64_t timestamp,
@@ -1127,16 +1134,15 @@ void ProtoTraceParser::ParseGenericFtraceField(RowId generic_row_id,
     switch (fld.id) {
       case protos::GenericFtraceEvent::Field::kIntValue:
       case protos::GenericFtraceEvent::Field::kUintValue: {
-        context_->storage->mutable_args()->AddArg(
-            generic_row_id, field_name_id, field_name_id,
-            Variadic::Integer(fld.as_integer()));
+        context_->args_tracker->AddArg(generic_row_id, field_name_id,
+                                       field_name_id,
+                                       Variadic::Integer(fld.as_integer()));
         break;
       }
       case protos::GenericFtraceEvent::Field::kStrValue: {
         StringId value = context_->storage->InternString(fld.as_string());
-        context_->storage->mutable_args()->AddArg(generic_row_id, field_name_id,
-                                                  field_name_id,
-                                                  Variadic::String(value));
+        context_->args_tracker->AddArg(generic_row_id, field_name_id,
+                                       field_name_id, Variadic::String(value));
       }
     }
   }
@@ -1173,22 +1179,21 @@ void ProtoTraceParser::ParseTypedFtraceToRaw(uint32_t ftrace_id,
       case ProtoSchemaType::kSint64:
       case ProtoSchemaType::kBool:
       case ProtoSchemaType::kEnum: {
-        context_->storage->mutable_args()->AddArg(
-            raw_event_id, name_id, name_id,
-            Variadic::Integer(fld.as_integer()));
+        context_->args_tracker->AddArg(raw_event_id, name_id, name_id,
+                                       Variadic::Integer(fld.as_integer()));
         break;
       }
       case ProtoSchemaType::kString:
       case ProtoSchemaType::kBytes: {
         StringId value = context_->storage->InternString(fld.as_string());
-        context_->storage->mutable_args()->AddArg(
-            raw_event_id, name_id, name_id, Variadic::String(value));
+        context_->args_tracker->AddArg(raw_event_id, name_id, name_id,
+                                       Variadic::String(value));
         break;
       }
       case ProtoSchemaType::kDouble:
       case ProtoSchemaType::kFloat: {
-        context_->storage->mutable_args()->AddArg(
-            raw_event_id, name_id, name_id, Variadic::Real(fld.as_real()));
+        context_->args_tracker->AddArg(raw_event_id, name_id, name_id,
+                                       Variadic::Real(fld.as_real()));
         break;
       }
       case ProtoSchemaType::kUnknown:
