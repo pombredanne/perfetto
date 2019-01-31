@@ -51,7 +51,7 @@ void GenerateFtraceDescriptors(
     // Skip events that don't exist or are not messages. (Proxy for events)
     if (!event ||
         event->type() != google::protobuf::FieldDescriptor::TYPE_MESSAGE) {
-      *fout << "{},";
+      *fout << "{nullptr, {}, 0},";
       continue;
     }
 
@@ -76,7 +76,9 @@ void GenerateFtraceDescriptors(
       *fout << "{\"" + field->name() + "\", ProtoSchemaType::k" +
                    ToCamelCase(type.ToString()) + "},";
     }
-    *fout << "},\n},";
+    *fout << "},\n";
+    *fout << max_field_id << ",";
+    *fout << "},";
   }
   *fout << "}};\n";
   *fout << R"(
