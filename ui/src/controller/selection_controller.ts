@@ -32,7 +32,7 @@ export class SelectionController extends Controller<'main'> {
   }
 
   run() {
-    if (globals.state.currentSelection  == null ||
+    if (globals.state.currentSelection === null ||
         globals.state.currentSelection.kind !== 'SLICE' ||
         globals.state.currentSelection.args === this.lastSelectedSlice) {
       return;

@@ -125,7 +125,7 @@ export interface Note {
 }
 
 export interface Selection {
-  kind: "SLICE" | "NOTE";
+  kind: 'SLICE'|'NOTE';
   args: SliceSelection | string;
 }
 
@@ -157,7 +157,7 @@ export interface State {
   permalink: PermalinkConfig;
   notes: ObjectById<Note>;
   status: Status;
-  currentSelection: Selection | null;
+  currentSelection: Selection|null;
 
   /**
    * This state is updated on the frontend at 60Hz and eventually syncronised to

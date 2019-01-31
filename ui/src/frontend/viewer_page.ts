@@ -237,14 +237,14 @@ class TraceViewer implements m.ClassComponent {
 
     const detailsPanels: AnyAttrsVnode[] = [];
     if (globals.state.currentSelection) {
-      if (globals.state.currentSelection.kind === "NOTE") {
+      if (globals.state.currentSelection.kind === 'NOTE') {
         detailsPanels.push(m(NotesEditorPanel, {
           key: 'notes',
           id: globals.state.currentSelection.args as string,
         }));
       }
 
-      if (globals.state.currentSelection.kind === "SLICE") {
+      if (globals.state.currentSelection.kind === 'SLICE') {
         detailsPanels.push(m(SliceDetailsPanel, {
           key: 'slice',
           selection: globals.state.currentSelection.args as SliceSelection,
