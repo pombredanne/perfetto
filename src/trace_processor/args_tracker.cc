@@ -25,34 +25,33 @@ void ArgsTracker::AddArg(RowId row_id,
                          StringId flat_key,
                          StringId key,
                          Variadic value) {
-  auto it = std::find_if(row_id_args_.begin(), row_id_args_.end(),
-                         [row_id](const RowIdArgs& row_id_args) {
-                           return row_id_args.row_id == row_id;
-                         });
+  args_.emplace_back();
 
-  RowIdArgs* row_id_args;
-  if (it == row_id_args_.end()) {
-    row_id_args_.emplace_back();
-    row_id_args = &row_id_args_.back();
-    row_id_args->row_id = row_id;
-  } else {
-    row_id_args = &*it;
-  }
-
-  uint8_t idx = row_id_args->size++;
-  PERFETTO_CHECK(idx < row_id_args->args.size());
-  row_id_args->args[idx].flat_key = flat_key;
-  row_id_args->args[idx].key = key;
-  row_id_args->args[idx].value = value;
+  auto* rid_arg = &args_.back();
+  rid_arg->row_id = row_id;
+  rid_arg->flat_key = flat_key;
+  rid_arg->key = key;
+  rid_arg->value = value;
 }
 
 void ArgsTracker::Flush() {
-  auto* storage = context_->storage.get();
-  for (const auto& row_id_to_arg : row_id_args_) {
-    auto set_id = storage->mutable_args()->AddArgs(row_id_to_arg.args,
-                                                   row_id_to_arg.size);
+  using Arg = TraceStorage::Args::Arg;
+  auto comparator = [](const Arg& f, const Arg& s) {
+    return f.row_id < s.row_id;
+  };
+  std::sort(args_.begin(), args_.end(), comparator);
 
-    auto pair = TraceStorage::ParseRowId(row_id_to_arg.row_id);
+  auto* storage = context_->storage.get();
+  for (uint32_t i = 0; i < args_.size();) {
+    const auto& args = args_[i];
+    RowId rid = args.row_id;
+
+    uint32_t next_rid_idx = i + 1;
+    while (next_rid_idx < args_.size() && rid == args_[next_rid_idx].row_id)
+      next_rid_idx++;
+
+    auto set_id = storage->mutable_args()->AddArgs(args_, i, next_rid_idx);
+    auto pair = TraceStorage::ParseRowId(rid);
     switch (pair.first) {
       case TableId::kRawEvents:
         storage->mutable_raw_events()->set_arg_set_id(pair.second, set_id);
@@ -63,8 +62,9 @@ void ArgsTracker::Flush() {
       default:
         PERFETTO_FATAL("Unsupported table to insert args into");
     }
+    i = next_rid_idx;
   }
-  row_id_args_.clear();
+  args_.clear();
 }
 
 }  // namespace trace_processor

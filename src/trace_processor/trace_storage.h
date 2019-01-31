@@ -17,10 +17,8 @@
 #ifndef SRC_TRACE_PROCESSOR_TRACE_STORAGE_H_
 #define SRC_TRACE_PROCESSOR_TRACE_STORAGE_H_
 
-#include <algorithm>
 #include <array>
 #include <deque>
-#include <limits>
 #include <map>
 #include <string>
 #include <unordered_map>
@@ -45,7 +43,6 @@ using UniquePid = uint32_t;
 // UniqueTid is an offset into |unique_threads_|. Necessary because tids can
 // be reused.
 using UniqueTid = uint32_t;
-constexpr UniqueTid kInvalidUtid = std::numeric_limits<UniqueTid>::max();
 
 // StringId is an offset into |string_pool_|.
 using StringId = uint32_t;
@@ -148,29 +145,30 @@ class TraceStorage {
       StringId key = 0;
       Variadic value = Variadic::Integer(0);
 
-      uint64_t Hash() const {
+      // This is only used by the arg tracker and so is not part of the hash.
+      RowId row_id = 0;
+    };
+
+    struct ArgHasher {
+      uint64_t operator()(const Arg& arg) const noexcept {
         uint64_t hash = 0xcbf29ce484222325;  // FNV-1a-64 offset basis.
-        hash ^= static_cast<decltype(hash)>(flat_key);
+        hash ^= static_cast<decltype(hash)>(arg.key);
         hash *= 1099511628211;  // FNV-1a-64 prime.
-        hash ^= static_cast<decltype(hash)>(key);
-        hash *= 1099511628211;  // FNV-1a-64 prime.
-        switch (value.type) {
+        switch (arg.value.type) {
           case Variadic::Type::kInt:
-            hash ^= static_cast<decltype(hash)>(value.int_value);
+            hash ^= static_cast<decltype(hash)>(arg.value.int_value);
             break;
           case Variadic::Type::kString:
-            hash ^= static_cast<decltype(hash)>(value.string_value);
+            hash ^= static_cast<decltype(hash)>(arg.value.string_value);
             break;
           case Variadic::Type::kReal:
-            hash ^= static_cast<decltype(hash)>(value.real_value);
+            hash ^= static_cast<decltype(hash)>(arg.value.real_value);
             break;
         }
         hash *= 1099511628211;  // FNV-1a-64 prime.
         return hash;
       }
     };
-
-    using ArgSet = std::array<Arg, 16>;
 
     const std::deque<ArgSetId>& set_ids() const { return set_ids_; }
     const std::deque<StringId>& flat_keys() const { return flat_keys_; }
@@ -180,10 +178,10 @@ class TraceStorage {
       return static_cast<uint32_t>(set_ids_.size());
     }
 
-    ArgSetId AddArgs(const ArgSet& arg_set, uint8_t size) {
+    ArgSetId AddArgs(const std::vector<Arg>& args, uint32_t b, uint32_t e) {
       ArgSetHash hash = 0xcbf29ce484222325;  // FNV-1a-64 offset basis.
-      for (const auto& arg : arg_set) {
-        hash ^= arg.Hash();
+      for (uint32_t i = b; i < e; i++) {
+        hash ^= ArgHasher()(args[i]);
         hash *= 1099511628211;  // FNV-1a-64 prime.
       }
 
@@ -195,8 +193,8 @@ class TraceStorage {
       // The +1 ensures that nothing has an id == kInvalidArgSetId == 0.
       ArgSetId id = static_cast<uint32_t>(arg_row_for_hash_.size()) + 1;
       arg_row_for_hash_.emplace(hash, args_count());
-      for (uint8_t i = 0; i < size; i++) {
-        const auto& arg = arg_set[i];
+      for (uint32_t i = b; i < e; i++) {
+        const auto& arg = args[i];
         set_ids_.emplace_back(id);
         flat_keys_.emplace_back(arg.flat_key);
         keys_.emplace_back(arg.key);
@@ -230,22 +228,11 @@ class TraceStorage {
       utids_.emplace_back(utid);
       end_states_.emplace_back(end_state);
       priorities_.emplace_back(priority);
-      rows_for_utids_.emplace(utid, slice_count() - 1);
+
+      if (utid >= rows_for_utids_.size())
+        rows_for_utids_.resize(utid + 1);
+      rows_for_utids_[utid].emplace_back(slice_count() - 1);
       return slice_count() - 1;
-    }
-
-    void InvalidateSlice(size_t index) {
-      using T = decltype(rows_for_utids_)::value_type;
-      auto pair = rows_for_utids_.equal_range(utids_[index]);
-      auto it = std::find_if(pair.first, pair.second,
-                             [index](const T& p) { return index == p.second; });
-      PERFETTO_CHECK(it != pair.second);
-      rows_for_utids_.erase(it);
-
-      utids_[index] = kInvalidUtid;
-      end_states_[index] = ftrace_utils::TaskState();
-      priorities_[index] = 0;
-      rows_for_utids_.emplace(kInvalidUtid, index);
     }
 
     void set_duration(size_t index, int64_t duration_ns) {
@@ -272,7 +259,7 @@ class TraceStorage {
 
     const std::deque<int32_t>& priorities() const { return priorities_; }
 
-    const std::multimap<UniqueTid, uint32_t>& rows_for_utids() const {
+    const std::deque<std::vector<uint32_t>>& rows_for_utids() const {
       return rows_for_utids_;
     }
 
@@ -285,7 +272,9 @@ class TraceStorage {
     std::deque<UniqueTid> utids_;
     std::deque<ftrace_utils::TaskState> end_states_;
     std::deque<int32_t> priorities_;
-    std::multimap<UniqueTid, uint32_t> rows_for_utids_;
+
+    // One row per utid.
+    std::deque<std::vector<uint32_t>> rows_for_utids_;
   };
 
   class NestableSlices {
@@ -590,7 +579,7 @@ class TraceStorage {
     return (static_cast<RowId>(table) << kRowIdTableShift) | row;
   }
 
-  static std::pair<int8_t, uint32_t> ParseRowId(RowId rowid) {
+  static std::pair<int8_t /*table*/, uint32_t /*row*/> ParseRowId(RowId rowid) {
     static constexpr uint8_t kRowIdTableShift = 32;
     auto id = static_cast<uint64_t>(rowid);
     auto table_id = static_cast<uint8_t>(id >> kRowIdTableShift);
