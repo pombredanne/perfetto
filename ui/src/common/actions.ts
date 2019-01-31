@@ -313,11 +313,6 @@ export const StateActions = {
     }
   },
 
-  selectSlice(state: StateDraft,
-              args: {utid: number, id: number}): void {
-    state.selectedSlice = args;
-  },
-
 };
 
 // When we are on the frontend side, we don't really want to execute the

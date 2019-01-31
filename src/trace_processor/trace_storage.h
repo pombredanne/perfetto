@@ -54,7 +54,6 @@ enum TableId : uint8_t {
   kCounters = 1,
   kRawEvents = 2,
   kInstants = 3,
-  kSched = 4,
 };
 
 // The top 8 bits are set to the TableId and the bottom 32 to the row of the
@@ -189,10 +188,7 @@ class TraceStorage {
       utids_.emplace_back(utid);
       end_states_.emplace_back(end_state);
       priorities_.emplace_back(priority);
-
-      if (utid >= rows_for_utids_.size())
-        rows_for_utids_.resize(utid + 1);
-      rows_for_utids_[utid].emplace_back(slice_count() - 1);
+      rows_for_utids_.emplace(utid, slice_count() - 1);
       return slice_count() - 1;
     }
 
@@ -220,7 +216,7 @@ class TraceStorage {
 
     const std::deque<int32_t>& priorities() const { return priorities_; }
 
-    const std::deque<std::vector<uint32_t>>& rows_for_utids() const {
+    const std::multimap<UniqueTid, uint32_t>& rows_for_utids() const {
       return rows_for_utids_;
     }
 
@@ -233,9 +229,7 @@ class TraceStorage {
     std::deque<UniqueTid> utids_;
     std::deque<ftrace_utils::TaskState> end_states_;
     std::deque<int32_t> priorities_;
-
-    // One row per utid.
-    std::deque<std::vector<uint32_t>> rows_for_utids_;
+    std::multimap<UniqueTid, uint32_t> rows_for_utids_;
   };
 
   class NestableSlices {

@@ -22,12 +22,6 @@ import {RafScheduler} from './raf_scheduler';
 type Dispatch = (action: DeferredAction) => void;
 type TrackDataStore = Map<string, {}>;
 type QueryResultsStore = Map<string, {}>;
-export interface SliceDetails {
-  ts?: number;
-  dur?: number;
-  priority?: number;
-  endState?: string;
-}
 
 export interface QuantizedLoad {
   startSec: number;
@@ -60,7 +54,6 @@ class Globals {
   private _queryResults?: QueryResultsStore = undefined;
   private _overviewStore?: OverviewStore = undefined;
   private _threadMap?: ThreadMap = undefined;
-  private _sliceDetails?: SliceDetails = undefined;
 
   initialize(dispatch: Dispatch, controllerWorker: Worker) {
     this._dispatch = dispatch;
@@ -74,7 +67,6 @@ class Globals {
     this._queryResults = new Map<string, {}>();
     this._overviewStore = new Map<string, QuantizedLoad[]>();
     this._threadMap = new Map<number, ThreadDesc>();
-    this._sliceDetails = {};
   }
 
   get state(): State {
@@ -114,14 +106,6 @@ class Globals {
     return assertExists(this._threadMap);
   }
 
-  get sliceDetails() {
-    return assertExists(this._sliceDetails);
-  }
-
-  set sliceDetails(click: SliceDetails) {
-    this._sliceDetails = assertExists(click);
-  }
-
   resetForTesting() {
     this._dispatch = undefined;
     this._state = undefined;
@@ -133,7 +117,6 @@ class Globals {
     this._queryResults = undefined;
     this._overviewStore = undefined;
     this._threadMap = undefined;
-    this._sliceDetails = undefined;
   }
 
   // Used when switching to the legacy TraceViewer UI.

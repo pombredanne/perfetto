@@ -124,11 +124,6 @@ export interface Note {
   text: string;
 }
 
-export interface SliceSelection {
-  utid: number;
-  id: number;
-}
-
 export interface State {
   route: string|null;
   nextId: number;
@@ -153,7 +148,6 @@ export interface State {
   notes: ObjectById<Note>;
   status: Status;
   selectedNote: string|null;
-  selectedSlice: SliceSelection|null;
 
   /**
    * This state is updated on the frontend at 60Hz and eventually syncronised to
@@ -193,7 +187,6 @@ export function createEmptyState(): State {
 
     status: {msg: '', timestamp: 0},
     selectedNote: null,
-    selectedSlice: null,
   };
 }
 
