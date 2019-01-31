@@ -232,8 +232,6 @@ void SharedMemoryArbiterImpl::UpdateCommitDataRequest(Chunk chunk,
 
 void SharedMemoryArbiterImpl::FlushPendingCommitDataRequests(
     std::function<void()> callback) {
-  PERFETTO_DCHECK_THREAD(thread_checker_);
-
   std::shared_ptr<CommitDataRequest> req;
   {
     std::lock_guard<std::mutex> scoped_lock(lock_);
