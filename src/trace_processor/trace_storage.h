@@ -147,20 +147,22 @@ class TraceStorage {
 
       // This is only used by the arg tracker and so is not part of the hash.
       RowId row_id = 0;
+    };
 
-      uint64_t Hash() const {
+    struct ArgHasher {
+      uint64_t operator()(const Arg& arg) const noexcept {
         uint64_t hash = 0xcbf29ce484222325;  // FNV-1a-64 offset basis.
-        hash ^= static_cast<decltype(hash)>(key);
+        hash ^= static_cast<decltype(hash)>(arg.key);
         hash *= 1099511628211;  // FNV-1a-64 prime.
-        switch (value.type) {
+        switch (arg.value.type) {
           case Variadic::Type::kInt:
-            hash ^= static_cast<decltype(hash)>(value.int_value);
+            hash ^= static_cast<decltype(hash)>(arg.value.int_value);
             break;
           case Variadic::Type::kString:
-            hash ^= static_cast<decltype(hash)>(value.string_value);
+            hash ^= static_cast<decltype(hash)>(arg.value.string_value);
             break;
           case Variadic::Type::kReal:
-            hash ^= static_cast<decltype(hash)>(value.real_value);
+            hash ^= static_cast<decltype(hash)>(arg.value.real_value);
             break;
         }
         hash *= 1099511628211;  // FNV-1a-64 prime.
@@ -179,7 +181,7 @@ class TraceStorage {
     ArgSetId AddArgs(const std::vector<Arg>& args, uint32_t b, uint32_t e) {
       ArgSetHash hash = 0xcbf29ce484222325;  // FNV-1a-64 offset basis.
       for (uint32_t i = b; i < e; i++) {
-        hash ^= args[i].Hash();
+        hash ^= ArgHasher()(args[i]);
         hash *= 1099511628211;  // FNV-1a-64 prime.
       }
 
@@ -577,7 +579,7 @@ class TraceStorage {
     return (static_cast<RowId>(table) << kRowIdTableShift) | row;
   }
 
-  static std::pair<int8_t, uint32_t> ParseRowId(RowId rowid) {
+  static std::pair<int8_t /*table*/, uint32_t /*row*/> ParseRowId(RowId rowid) {
     static constexpr uint8_t kRowIdTableShift = 32;
     auto id = static_cast<uint64_t>(rowid);
     auto table_id = static_cast<uint8_t>(id >> kRowIdTableShift);
