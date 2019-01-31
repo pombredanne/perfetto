@@ -44,7 +44,7 @@ export class SelectionController extends Controller<'main'> {
       const sqlQuery = `SELECT ts, dur, priority, end_state FROM sched
                         WHERE row_id = ${id}`;
       this.args.engine.query(sqlQuery).then(result => {
-        if (result.numRecords === 1 || 
+        if (result.numRecords === 1 ||
             globals.state.selectedSlice !== selectedSlice) {
           const ts = fromNs(result.columns[0].longValues![0] as number);
           const dur = fromNs(result.columns[1].longValues![0] as number);
