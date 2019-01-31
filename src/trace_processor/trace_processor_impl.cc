@@ -21,8 +21,6 @@
 #include <algorithm>
 #include <functional>
 
-#include <gperftools/profiler.h>
-
 #include "perfetto/base/time.h"
 #include "src/trace_processor/android_logs_table.h"
 #include "src/trace_processor/args_table.h"
