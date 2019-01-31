@@ -167,6 +167,8 @@ class TraceStorage {
       }
     };
 
+    using ArgSet = std::array<Arg, 16>;
+
     const std::deque<ArgSetId>& set_ids() const { return set_ids_; }
     const std::deque<StringId>& flat_keys() const { return flat_keys_; }
     const std::deque<StringId>& keys() const { return keys_; }
@@ -175,9 +177,9 @@ class TraceStorage {
       return static_cast<uint32_t>(set_ids_.size());
     }
 
-    ArgSetId AddArgs(const std::array<Arg, 16>& args, uint8_t size) {
+    ArgSetId AddArgs(const ArgSet& arg_set, uint8_t size) {
       ArgSetHash hash = 0xcbf29ce484222325;  // FNV-1a-64 offset basis.
-      for (const auto& arg : args) {
+      for (const auto& arg : arg_set) {
         hash ^= arg.Hash();
         hash *= 1099511628211;  // FNV-1a-64 prime.
       }

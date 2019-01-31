@@ -37,7 +37,7 @@ class ArgsTracker {
  private:
   struct RowIdArgs {
     RowId row_id = 0;
-    std::array<TraceStorage::Args::Arg, 16> args;
+    TraceStorage::Args::ArgSet args;
     uint8_t size = 0;
   };
 
