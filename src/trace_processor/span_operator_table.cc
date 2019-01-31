@@ -66,6 +66,8 @@ std::vector<Table::Column> GetColumnsForTable(
         reinterpret_cast<const char*>(sqlite3_column_text(*stmt, 0));
     const char* raw_type =
         reinterpret_cast<const char*>(sqlite3_column_text(*stmt, 1));
+    PERFETTO_ELOG("Column name: %s", name);
+    PERFETTO_ELOG("Column raw type: %s", raw_type);
     if (!name || !raw_type || !*name || !*raw_type) {
       PERFETTO_ELOG("Schema has invalid column values");
       return {};

@@ -23,12 +23,15 @@
 #include <functional>
 #include <iostream>
 #include <sstream>
+#include <algorithm>
+#include <vector>
+#include <unordered_map>
 
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
+#include "perfetto/base/scoped_file.h"
 #include "perfetto/base/time.h"
 #include "perfetto/trace_processor/trace_processor.h"
-#include "perfetto/base/scoped_file.h"
 
 #include "perfetto/trace_processor/raw_query.pb.h"
 
@@ -55,136 +58,365 @@ namespace trace_processor {
 namespace {
 TraceProcessor* g_tp;
 
-#if PERFETTO_BUILDFLAG(PERFETTO_STANDALONE_BUILD)
-
-#else
-
-void SetupLineEditor() {}
-
-void FreeLine(char* line) {
-  delete[] line;
-}
-
-char* GetLine(const char* prompt) {
-  printf("\r%80s\r%s", "", prompt);
-  fflush(stdout);
-  char* line = new char[1024];
-  if (!fgets(line, 1024 - 1, stdin)) {
-    FreeLine(line);
-    return nullptr;
-  }
-  if (strlen(line) > 0)
-    line[strlen(line) - 1] = 0;
-  return line;
-}
-
-#endif
+using ::google::protobuf::int64;
 
 void PrintUsage(char** argv) {
-  PERFETTO_ELOG("Usage: %s [-d] [-q query.sql] trace_file.pb", argv[0]);
+  PERFETTO_ELOG("Usage: %s trace_file.json", argv[0]);
 }
 
-// Convenience function to avoid the callback boilerplate.
-protos::RawQueryResult ExecuteQuerySync(
-    TraceProcessor* tp,  std::string query) {
+/********************************************************************
+ * First some convenience function to avoid boilerplate. These will
+ * generally be part of a better written library. None of this is
+ * specific to TTI.
+ * *****************************************************************/
+
+// This converts the callback based ExecuteQuery API of the trace processor
+// to a return value based API. Makes writing and reading code simpler.
+protos::RawQueryResult ExecuteQuerySync(TraceProcessor* tp, std::string query) {
   protos::RawQueryArgs args;
   args.set_sql_query(query);
   protos::RawQueryResult res;
-  // std::cout << "Running query: " << query << std::endl;
-  tp->ExecuteQuery(args, [&res](const protos::RawQueryResult& cb_res) {
-    res = cb_res;
-  });
+  tp->ExecuteQuery(
+      args, [&res](const protos::RawQueryResult& cb_res) { res = std::move(cb_res); });
   if (res.has_error()) {
     PERFETTO_ELOG("SQLite error: %s", res.error().c_str());
+    PERFETTO_ELOG("Query: %s", query.c_str());
   }
   PERFETTO_CHECK(res.columns_size() == res.column_descriptors_size());
   return res;
 }
 
-// NOTE: tp can currenty be accessed directly through g_tp, but pretending
-// g_tp won't be eventually available.
-void ComputeTTI(TraceProcessor* tp) {
-  std::ostringstream nav_q_str;
-  nav_q_str << "select ts, utid from slices where name = \"navigationStart\""
-    << "and json_extract(args, \"$.data.isLoadingMainFrame\") = 1";
-  auto nav_start_q = ExecuteQuerySync(tp, nav_q_str.str());
-  if (nav_start_q.num_records() == 0)
-    PERFETTO_FATAL("No records found");
-  for (unsigned int i = 0; i < nav_start_q.num_records(); i++) {
-    int64_t utid = nav_start_q.columns(1).long_values(static_cast<int>(i));
-    int64_t cur_nav_start =
-        nav_start_q.columns(0).long_values(static_cast<int>(i));
-    int64_t next_nav_start =
-        i + 1 == nav_start_q.num_records()
-            ? -1
-            : nav_start_q.columns(0).long_values(static_cast<int>(i + 1));
 
-    std::ostringstream dcl_q_str;
-    dcl_q_str
-        << "select ts from slices where name = \"domContentLoadedEventEnd\""
-        << " and ts > " << cur_nav_start;
-    if (next_nav_start != -1) {
-      dcl_q_str << " and ts < " << next_nav_start;
+// Returns the ColumnValues for column |col_name|. Crashes if |col_name| not
+// found.
+const protos::RawQueryResult_ColumnValues& GetColumn(const protos::RawQueryResult& res,
+                                              const std::string& col_name) {
+  for (int i = 0; i < res.column_descriptors_size(); i++) {
+    if (res.column_descriptors(i).name() == col_name) {
+      return res.columns(i);
     }
-
-    // TODO: Instead of iterating through all the slices multiple time, can we
-    // come up with some kind of filter-on-a-stream approach?
-    auto dcl_q = ExecuteQuerySync(tp, dcl_q_str.str());
-    int64_t dcl;
-    if (dcl_q.num_records() == 0)
-      dcl = -1;
-    else
-      dcl = dcl_q.columns(0).long_values(0);
-
-    std::ostringstream fcp_q_str;
-    fcp_q_str << "select ts from slices where name = \"firstContentfulPaint\""
-              << " and ts > " << cur_nav_start;
-    if (next_nav_start != -1) {
-      fcp_q_str << " and ts < " << next_nav_start;
-    }
-    auto fcp_q = ExecuteQuerySync(tp, fcp_q_str.str());
-    int64_t fcp;
-    if (fcp_q.num_records() == 0)
-      fcp = -1;
-    else
-      fcp = fcp_q.columns(0).long_values(0);
-
-    std::ostringstream long_tasks_q_str;
-    long_tasks_q_str << "select ts, dur from slices where dur > "
-                     << 50 * 1000000 << " and utid = " << utid << " and ts > "
-                     << fcp;
-    if (next_nav_start != -1) {
-      long_tasks_q_str << " and ts < " << next_nav_start;
-    }
-
-    auto long_tasks_q = ExecuteQuerySync(tp, long_tasks_q_str.str());
-    uint64_t long_tasks_count = long_tasks_q.num_records();
-
-    if (fcp == -1) continue;
-    std::cout << "Navigation " << i << std::endl;
-    std::cout << "utid: " << utid << std::endl;
-    std::cout << "Nav start: " << cur_nav_start << std::endl;
-    std::cout << "DCLEnd: " << dcl << std::endl;
-    std::cout << "FCP: " << fcp << std::endl;
-    std::cout << "Long tasks: " << long_tasks_count << std::endl;
-
-
-    int64_t tti;
-    if (long_tasks_q.num_records() == 0) {
-      uint64_t last_index = long_tasks_q.num_records() - 1;
-
-      int64_t long_task_end =
-        static_cast<int64_t>(
-          long_tasks_q.columns(0).long_values(static_cast<int>(last_index))) +
-        long_tasks_q.columns(1).long_values(static_cast<int>(last_index));
-
-      tti = std::max(long_task_end, dcl);
-    } else {
-      tti = std::max(fcp, dcl);
-    }
-
-    std::cout << "TTI: " << tti << std::endl;
   }
+
+  // Column not found.
+  PERFETTO_ELOG("Column not found %s", col_name.c_str());
+  PERFETTO_IMMEDIATE_CRASH();
+}
+
+void PrintQueryResultAsCsv(const protos::RawQueryResult& res, FILE* output) {
+  PERFETTO_CHECK(res.columns_size() == res.column_descriptors_size());
+
+  for (int r = 0; r < static_cast<int>(res.num_records()); r++) {
+    if (r == 0) {
+      for (int c = 0; c < res.column_descriptors_size(); c++) {
+        const auto& col = res.column_descriptors(c);
+        if (c > 0)
+          fprintf(output, ",");
+        fprintf(output, "\"%s\"", col.name().c_str());
+      }
+      fprintf(output, "\n");
+    }
+
+    for (int c = 0; c < res.columns_size(); c++) {
+      if (c > 0)
+        fprintf(output, ",");
+      switch (res.column_descriptors(c).type()) {
+        case protos::RawQueryResult_ColumnDesc_Type_STRING:
+          fprintf(output, "\"%s\"", res.columns(c).string_values(r).c_str());
+          break;
+        case protos::RawQueryResult_ColumnDesc_Type_DOUBLE:
+          fprintf(output, "%f", res.columns(c).double_values(r));
+          break;
+        case protos::RawQueryResult_ColumnDesc_Type_LONG: {
+          auto value = res.columns(c).long_values(r);
+          fprintf(output, "%lld", value);
+          break;
+        }
+      }
+    }
+    printf("\n");
+  }
+}
+
+// Thin wrapper around RawQueryResult to make accessing columns and printing
+// slightly easier.
+struct QueryResult {
+  QueryResult(protos::RawQueryResult&& res) : result(std::move(res)) {}
+  protos::RawQueryResult result;
+  const protos::RawQueryResult_ColumnValues& Column(const std::string& col_name) {
+    return GetColumn(result, col_name);
+  }
+  int num_records() {
+    return static_cast<int>(result.num_records());
+  }
+  void Print() {
+    PrintQueryResultAsCsv(result, stdout);
+  }
+};
+
+// Thin wrapper around TraceProcessor to make querying slighly easier.
+struct TraceProcessorWrapper {
+  TraceProcessorWrapper(TraceProcessor* tp) : tp_(tp) {}
+  QueryResult Query(const std::string& query) const {
+    return QueryResult((ExecuteQuerySync(tp_, query)));
+  }
+
+  // This function is here because it's quick and easy to replace the string
+  // 'Query' witih 'LogAndQuery' :)
+  QueryResult LogAndQuery(const std::string& query) const {
+    PERFETTO_ELOG("Executing query: %s", query.c_str());
+    return Query(query);
+  }
+
+  TraceProcessor* tp_;
+};
+
+/*********************************************************************
+ * TTI Metric code starts from here. We have a few helper function
+ * and data structures, and then the main metric function ComputeTTI.
+ ********************************************************************/
+static const int ACTIVE_REQUEST_TOLERANCE = 2;
+static constexpr int64 TTI_WINDOW_SIZE_NS = 5L * 1000L * 1000L * 1000L;
+
+// A timestamp, tagged with what the timestamp represents.
+struct Endpoint {
+  enum EndpointType {
+    TaskStart,
+    TaskEnd,
+    LoadStart,
+    LoadEnd,
+    NavigationEnd,
+  };
+  Endpoint(EndpointType type_, int64 ts_) : type(type_), ts(ts_) {}
+  EndpointType type;
+  int64 ts;
+};
+
+// Given a column |col| of timestamps, and a tag |type|, putted all the
+// tagged timestamps ("endpoint"s) in the |endpoints| vector.
+void ExtractEndpoints(std::vector<Endpoint>& endpoints,
+    const protos::RawQueryResult_ColumnValues& col,
+    Endpoint::EndpointType type) {
+  for (auto ts: col.long_values()) {
+    endpoints.emplace_back(type, ts);
+  }
+}
+
+// Returns true iff sufficiently long both main thread and network quiet
+// windows have been found.
+bool ReachedQuiescence(int64 mt_quiet_window_start,
+    int64 net_quiet_window_start, int64 curr_ts) {
+  if (mt_quiet_window_start == -1 || net_quiet_window_start == -1) {
+    // Currently not in a quiet window.
+    return false;
+  }
+
+  return (curr_ts - mt_quiet_window_start > TTI_WINDOW_SIZE_NS &&
+      curr_ts - net_quiet_window_start > TTI_WINDOW_SIZE_NS);
+}
+
+// Returns the max ts of event in nav_range with given id and frame.
+// Assumes frame is available in args in the from args = {frame: string}.
+// Returns -1 if event not found.
+int64 GetMaxEventTs(const TraceProcessorWrapper& tpw,
+                    const std::pair<int64, int64>& nav_range,
+                    int64 utid, const std::string& frame,
+                    const std::string& slice_name) {
+  auto query = tpw.Query((std::ostringstream()
+    << "select max(ts) as event_ts from slices"
+    << " where name = '" << slice_name << "'"
+    << " and ts > " << nav_range.first
+    << " and ts < " << nav_range.second
+    << " and utid = " << utid
+    << " and json_extract(args, \"$.frame\") = '" << frame << "'"
+    << " group by ts")  // Otherwise we get a null row when no event_ts.
+  .str());
+  return query.num_records() > 0 ?
+    query.Column("event_ts").long_values(0) : -1;
+}
+
+typedef std::unordered_map<std::string, std::vector<int64>> StringToIntVector;
+
+// Return a map of frame to all the navigationStart timestamps of that frame.
+StringToIntVector GetFrameToNavs(const TraceProcessorWrapper& tpw, int64 utid) {
+  StringToIntVector frame_to_nav;
+
+  auto main_frame_navs = tpw.Query((std::ostringstream()
+    << "select ts, dur, json_extract(args, \"$.frame\") as frame from slices"
+    << " where utid = " << utid
+    << " and name = \"navigationStart\""
+    << " and json_extract(args, \"$.data.isLoadingMainFrame\")"
+    << " order by ts")
+  .str());
+
+  for (int i = 0; i < main_frame_navs.num_records(); i++) {
+    frame_to_nav[main_frame_navs.Column("frame").string_values(i)]
+      .push_back(main_frame_navs.Column("ts").long_values(i));
+  }
+
+  return frame_to_nav;
+}
+
+// Iterates over the tagged timestamps (endpoints) and calculates TTI.
+// Returns -1 if TTI was not reached.
+int64 GetInteractiveCandidate(std::vector<Endpoint>& endpoints, int64 fcp) {
+  int64 net_quiet_window_start = fcp;
+  int64 mt_quiet_window_start = fcp;
+  int num_active_requests = 0;
+  int64 interactive_candidate = -1;
+
+  std::sort(endpoints.begin(), endpoints.end(),
+    [](const Endpoint& lhs, const Endpoint& rhs) { return lhs.ts < rhs.ts;});
+
+  for (auto& endpoint: endpoints) {
+    if (ReachedQuiescence(mt_quiet_window_start,
+          net_quiet_window_start, endpoint.ts)) {
+      interactive_candidate = mt_quiet_window_start;
+      break;
+    }
+
+    switch (endpoint.type) {
+      case Endpoint::TaskStart: {
+        mt_quiet_window_start = -1;
+        break;
+      }
+      case Endpoint::TaskEnd: {
+        mt_quiet_window_start = endpoint.ts;
+        break;
+      }
+      case Endpoint::LoadStart: {
+        num_active_requests++;
+        if (num_active_requests > ACTIVE_REQUEST_TOLERANCE) {
+          net_quiet_window_start = -1;
+        }
+        break;
+      }
+      case Endpoint::LoadEnd: {
+        num_active_requests--;
+        if (num_active_requests == ACTIVE_REQUEST_TOLERANCE) {
+          // Just became network quiet.
+          net_quiet_window_start = endpoint.ts;
+        }
+        break;
+      }
+      case Endpoint::NavigationEnd: {
+        // Do nothing.
+        break;
+      }
+    }
+  }
+
+  return interactive_candidate;
+}
+
+void ComputeTTI(TraceProcessor* tp) {
+  TraceProcessorWrapper tpw(tp);
+
+  // This metric table will be populated.
+  tpw.Query(
+    "create table tti_metric(nav_start, nav_end, upid, frame, TTI)"
+  );
+
+  // Get trace bounds. Ideally this table will already be created.
+  auto traceBounds = tpw.Query(
+      "select min(ts) as traceStart, max(ts + dur) as traceEnd from"
+      "(select ts, dur from slices "
+      "union all select ts, dur from async_slices);");
+
+  int64 traceEnd = traceBounds.Column("traceEnd").long_values(0);
+
+  auto renderers_query = tpw.Query(
+    "select upid from process where name = \'Renderer\'");
+
+  for (int64 upid: renderers_query.Column("upid").long_values()) {
+    int64 utid = tpw.Query((std::ostringstream()
+      << "select utid from thread where upid = " << upid
+      << " and tid = 1"
+    ).str()).Column("utid").long_values(0);
+
+    StringToIntVector frame_to_nav = GetFrameToNavs(tpw, utid);
+
+    for (auto& frame_navs: frame_to_nav) {
+      const std::string& frame = frame_navs.first;
+      std::vector<std::pair<int64, int64>> nav_ranges;
+
+      const std::vector<int64>& navs = frame_navs.second;
+      for (size_t i = 0; i < navs.size() - 1; i++) {
+        nav_ranges.emplace_back(navs[i], navs[i + 1]);
+      }
+      nav_ranges.emplace_back(navs[navs.size() - 1], traceEnd);
+
+      for (auto& nav_range: nav_ranges) {
+        // First, get DomContentLoadedEnd and FirstContentfulPaint events.
+        // Ideally there should be only one DCL event in nav_range, but there
+        // are edge cases where there can be more. We take the max to keep
+        // things simple.
+        int64 dcl = GetMaxEventTs(tpw, nav_range, utid, frame, "domContentLoadedEventEnd");
+        if (dcl == -1) continue;  // Cannot compute TTI without DCL.
+        int64 fcp = GetMaxEventTs(tpw, nav_range, utid, frame, "firstContentfulPaint");
+        if (fcp == -1) continue;  // Cannot compute TTI without FCP.
+
+        // Get all the long tasks we care about.
+        auto long_tasks_query = tpw.Query((std::ostringstream()
+          << "select ts as task_start, ts + dur as task_end from slices"
+          << " where name in ('ThreadControllerImpl::RunTask',"
+          << "   'ThreadControllerImpl::DoWork',"
+          << "   'TaskQueueManager::ProcessWorkFromTaskQueue')"
+          << " and cat = 'toplevel'"
+          << " and dur > 50000000"  // Tasks > 50ms = Long tasks.
+          << " and utid = " << utid
+          << " and task_start < " << nav_range.second
+          << " and task_end > " << fcp  // Only care about tasks after FCP.
+        ).str());
+
+        // Get all the resource loads we care about.
+        auto resource_load_query = tpw.Query((std::ostringstream()
+          << "select ts as load_start, ts + dur as load_end from async_slices"
+          << " where name = 'ResourceLoad'"
+          << " and upid = " << upid
+          << " and load_start < " << nav_range.second
+          // Need network requests before FCP as well since we need to count
+          // # of in flight requests at each timestamp of interest.
+          << " and load_end > " << nav_range.first
+        ).str());
+
+        // Extract timestamps where a quiet window can possibly change.
+        // We extract start and end of long tasks and resource loads, and the
+        // end of navigation event.
+        std::vector<Endpoint> endpoints;
+        ExtractEndpoints(endpoints,
+            long_tasks_query.Column("task_start"),
+            Endpoint::TaskStart);
+        ExtractEndpoints(endpoints,
+            long_tasks_query.Column("task_end"),
+            Endpoint::TaskEnd);
+        ExtractEndpoints(endpoints,
+            resource_load_query.Column("load_start"),
+            Endpoint::LoadStart);
+        ExtractEndpoints(endpoints,
+            resource_load_query.Column("load_end"),
+            Endpoint::LoadEnd);
+        endpoints.emplace_back(Endpoint::NavigationEnd, nav_range.second);
+
+        int64 interactive_candidate = GetInteractiveCandidate(endpoints, fcp);
+
+        if (interactive_candidate == -1) continue;  // TTI not found.
+
+        const int64 tti = std::max(dcl, interactive_candidate) - nav_range.first;
+
+        // Insert the computed TTI value into the metrics table.
+        tpw.Query((std::ostringstream()
+          << "insert into tti_metric values ("
+          << nav_range.first << ", "
+          << nav_range.second << ", "
+          << upid << ", "
+          << "'" << frame << "', "
+          << tti << ")"
+        ).str());
+      }
+    }
+  }
+
+  tpw.LogAndQuery("select * from tti_metric").Print();
 }
 
 int RunMetricMain(int argc, char** argv) {
@@ -226,7 +458,7 @@ int RunMetricMain(int argc, char** argv) {
   // at each iteration, we parse the current chunk and asynchronously start
   // reading the next chunk.
 
-  // 1MB chunk size seems the best tradeoff on a MacBook Pro 2013 - i7 2.8 GHz.
+  // 1MB chunk size seems the best tradeoff on a MacBook Pro 20: - i7 2.8 GHz.
   constexpr size_t kChunkSize = 1024 * 1024;
   struct aiocb cb {};
   cb.aio_nbytes = kChunkSize;
@@ -272,7 +504,11 @@ int RunMetricMain(int argc, char** argv) {
   signal(SIGINT, [](int) { g_tp->InterruptQuery(); });
 #endif
 
+  /////////////////////////////////////////////
+  // Call to compute metric.
   ComputeTTI(g_tp);
+  /////////////////////////////////////////////
+
   return 0;
 }
 
