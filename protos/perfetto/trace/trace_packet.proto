@@ -26,6 +26,7 @@ import "perfetto/trace/filesystem/inode_file_map.proto";
 import "perfetto/trace/ftrace/ftrace_event_bundle.proto";
 import "perfetto/trace/ftrace/ftrace_stats.proto";
 import "perfetto/trace/power/battery_counters.proto";
+import "perfetto/trace/power/power_rails.proto";
 import "perfetto/trace/profiling/profile_packet.proto";
 import "perfetto/trace/ps/process_stats.proto";
 import "perfetto/trace/ps/process_tree.proto";
@@ -37,7 +38,8 @@ package perfetto.protos;
 // The root object emitted by Perfetto. A perfetto trace is just a stream of
 // TracePacket(s).
 //
-// Next id: 40.
+// Next reserved id: 11.
+// Next id: 41.
 message TracePacket {
   // TODO(primiano): in future we should add a timestamp_clock_domain field to
   // allow mixing timestamps from different clock domains.
@@ -60,6 +62,7 @@ message TracePacket {
     TraceStats trace_stats = 35;
     ProfilePacket profile_packet = 37;
     BatteryCounters battery = 38;
+    PowerRails power_rails = 40;
     AndroidLogPacket android_log = 39;
 
     // This field is emitted at periodic intervals (~10s) and
@@ -74,5 +77,16 @@ message TracePacket {
 
   // Trusted user id of the producer which generated this packet. Keep in sync
   // with TrustedPacket.trusted_uid.
+  //
+  // TODO(eseckler): Emit this field in a PacketSequenceDescriptor message
+  // instead.
   oneof optional_trusted_uid { int32 trusted_uid = 3; };
+
+  // Service-assigned identifier of the packet sequence this packet belongs to.
+  // Uniquely identifies a producer + writer pair within the tracing session. A
+  // value of zero denotes an invalid ID. Keep in sync with
+  // TrustedPacket.trusted_packet_sequence_id.
+  oneof optional_trusted_packet_sequence_id {
+    uint32 trusted_packet_sequence_id = 10;
+  }
 }
