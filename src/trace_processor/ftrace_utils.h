@@ -18,10 +18,10 @@
 #define SRC_TRACE_PROCESSOR_FTRACE_UTILS_H_
 
 #include <stddef.h>
-
 #include <array>
 
-#include "perfetto/base/optional.h"
+#include "perfetto/base/logging.h"
+#include "perfetto/base/string_view.h"
 
 namespace perfetto {
 namespace trace_processor {
@@ -81,6 +81,14 @@ class TaskState {
  private:
   uint16_t state_ = 0;
 };
+
+int FormatSystracePrefix(int64_t timestamp,
+                         uint32_t cpu,
+                         uint32_t pid,
+                         uint32_t tgid,
+                         base::StringView name,
+                         char* output,
+                         size_t n);
 
 }  // namespace ftrace_utils
 }  // namespace trace_processor

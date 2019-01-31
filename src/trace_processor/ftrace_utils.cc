@@ -16,6 +16,7 @@
 
 #include "src/trace_processor/ftrace_utils.h"
 
+#include <inttypes.h>
 #include <algorithm>
 
 #include "perfetto/base/logging.h"
@@ -23,6 +24,16 @@
 namespace perfetto {
 namespace trace_processor {
 namespace ftrace_utils {
+
+namespace {
+int64_t TimestampToSeconds(int64_t timestamp) {
+  return timestamp / 1000000000l;
+}
+
+int64_t TimestampToMicroseconds(int64_t timestamp) {
+  return (timestamp / 1000) % 1000000l;
+}
+}  // namespace
 
 TaskState::TaskState(const char* state_str) {
   bool invalid_char = false;
@@ -136,6 +147,31 @@ TaskState::TaskStateStr TaskState::ToString() const {
   TaskStateStr output{};
   memcpy(output.data(), buffer, std::min(pos, output.size() - 1));
   return output;
+}
+
+int FormatSystracePrefix(int64_t timestamp,
+                         uint32_t cpu,
+                         uint32_t pid,
+                         uint32_t tgid,
+                         base::StringView name,
+                         char* output,
+                         size_t n) {
+  int64_t seconds = TimestampToSeconds(timestamp);
+  int64_t useconds = TimestampToMicroseconds(timestamp);
+  if (pid == 0) {
+    name = "<idle>";
+  }
+  if (tgid == 0) {
+    return snprintf(output, n,
+                    "%s-%" PRIu32 "     (-----) [%03" PRIu32 "] d..3 %" PRIi64
+                    ".%.6" PRIi64 ": ",
+                    name.data(), pid, cpu, seconds, useconds);
+  } else {
+    return snprintf(output, n,
+                    "%s-%" PRIu32 "     (%5" PRIu32 ") [%03" PRIu32
+                    "] d..3 %" PRIi64 ".%.6" PRIi64 ": ",
+                    name.data(), pid, tgid, cpu, seconds, useconds);
+  }
 }
 
 }  // namespace ftrace_utils
