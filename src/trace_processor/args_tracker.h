@@ -17,32 +17,29 @@
 #ifndef SRC_TRACE_PROCESSOR_ARGS_TRACKER_H_
 #define SRC_TRACE_PROCESSOR_ARGS_TRACKER_H_
 
-#include <unordered_map>
-
 #include "src/trace_processor/trace_processor_context.h"
 #include "src/trace_processor/trace_storage.h"
 
 namespace perfetto {
 namespace trace_processor {
 
+// Tracks and stores args for rows until the end of the packet. This allows
+// allows args to pushed as a group into storage.
 class ArgsTracker {
  public:
   using Variadic = TraceStorage::Args::Variadic;
 
   explicit ArgsTracker(TraceProcessorContext*);
 
+  // Adds a arg for this row id with the given key and value.
   void AddArg(RowId row_id, StringId flat_key, StringId key, Variadic);
+
+  // Commits the added args to storage.
   void Flush();
 
  private:
-  struct RowIdArgs {
-    RowId row_id = 0;
-    TraceStorage::Args::ArgSet args;
-    uint8_t size = 0;
-  };
-
-  std::vector<RowIdArgs> row_id_args_;
-  TraceProcessorContext* context_;
+  std::vector<TraceStorage::Args::Arg> args_;
+  TraceProcessorContext* const context_;
 };
 
 }  // namespace trace_processor
