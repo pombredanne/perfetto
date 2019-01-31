@@ -246,7 +246,7 @@ void SharedMemoryArbiterImpl::FlushPendingCommitDataRequests(
   // properly. With C++14 we could instead have a unique_ptr and transfer
   // ownership to the lambda.
   //
-  // |req_ptr| could be a nullptr if |commit_data_req_| became a nullptr. For
+  // |req| could be a nullptr if |commit_data_req_| became a nullptr. For
   // example when a forced sync flush happens in GetNewChunk().
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
   auto commit_data = [weak_this, req, callback]() {
