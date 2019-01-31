@@ -77,7 +77,8 @@ export class NotesPanel extends Panel {
 
       const isHovered =
           this.hoveredX && x <= this.hoveredX && this.hoveredX < x + FLAG_WIDTH;
-      const isSelected = globals.state.selectedNote === note.id;
+      const s = globals.state.currentSelection;
+      const isSelected = s && s.kind === "NOTE" &&  s.args === note.id;
       const left = Math.floor(x + TRACK_SHELL_WIDTH);
       const flagHeightPx = Math.ceil(size.height / 3);
 

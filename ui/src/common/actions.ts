@@ -280,7 +280,9 @@ export const StateActions = {
   },
 
   selectNote(state: StateDraft, args: {id: string | null}): void {
-    state.selectedNote = args.id;
+    if (args.id) {
+      state.currentSelection = {kind: "NOTE", args: args.id};
+    }
   },
 
   addNote(state: StateDraft, args: {timestamp: number}): void {
@@ -308,14 +310,14 @@ export const StateActions = {
 
   removeNote(state: StateDraft, args: {id: string}): void {
     delete state.notes[args.id];
-    if (args.id === state.selectedNote) {
-      state.selectedNote = null;
+    if (state.currentSelection === {kind: "NOTE", args: args.id}) {
+      state.currentSelection = null;
     }
   },
 
   selectSlice(state: StateDraft,
               args: {utid: number, id: number}): void {
-    state.selectedSlice = args;
+    state.currentSelection = {kind: "SLICE", args};
   },
 
 };

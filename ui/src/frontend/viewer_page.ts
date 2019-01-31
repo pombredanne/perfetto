@@ -33,6 +33,7 @@ import {computeZoom} from './time_scale';
 import {TRACK_SHELL_WIDTH} from './track_constants';
 import {TrackGroupPanel} from './track_group_panel';
 import {TrackPanel} from './track_panel';
+import {SliceSelection} from '../common/state';
 
 const DRAG_HANDLE_HEIGHT_PX = 12;
 
@@ -235,18 +236,20 @@ class TraceViewer implements m.ClassComponent {
     scrollingPanels.unshift(m(QueryTable));
 
     const detailsPanels: AnyAttrsVnode[] = [];
-    if (globals.state.selectedNote) {
-      detailsPanels.push(m(NotesEditorPanel, {
-        key: 'notes',
-        id: globals.state.selectedNote,
-      }));
-    }
+    if (globals.state.currentSelection) {
+      if (globals.state.currentSelection.kind === "NOTE") {
+        detailsPanels.push(m(NotesEditorPanel, {
+          key: 'notes',
+          id: globals.state.currentSelection.args as string,
+        }));
+      }
 
-    if (globals.state.selectedSlice) {
-      detailsPanels.push(m(SliceDetailsPanel, {
-        key: 'slice',
-        selection: globals.state.selectedSlice,
-      }));
+      if (globals.state.currentSelection.kind === "SLICE") {
+        detailsPanels.push(m(SliceDetailsPanel, {
+          key: 'slice',
+          selection: globals.state.currentSelection.args as SliceSelection,
+        }));
+      }
     }
 
     return m(

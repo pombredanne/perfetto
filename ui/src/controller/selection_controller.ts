@@ -32,11 +32,13 @@ export class SelectionController extends Controller<'main'> {
   }
 
   run() {
-    if (globals.state.selectedSlice === null ||
-        globals.state.selectedSlice === this.lastSelectedSlice) {
+    if (globals.state.currentSelection  == null ||
+        globals.state.currentSelection.kind !== 'SLICE' ||
+        globals.state.currentSelection.args === this.lastSelectedSlice) {
       return;
     }
-    const selectedSlice = assertExists(globals.state.selectedSlice);
+    const selectedSlice =
+      assertExists(globals.state.currentSelection.args as SliceSelection);
     this.lastSelectedSlice = selectedSlice;
 
     const id = selectedSlice.id;
@@ -44,8 +46,8 @@ export class SelectionController extends Controller<'main'> {
       const sqlQuery = `SELECT ts, dur, priority, end_state FROM sched
                         WHERE row_id = ${id}`;
       this.args.engine.query(sqlQuery).then(result => {
-        if (result.numRecords === 1 ||
-            globals.state.selectedSlice !== selectedSlice) {
+        if (result.numRecords === 1 && globals.state.currentSelection &&
+            globals.state.currentSelection.args === selectedSlice) {
           const ts = fromNs(result.columns[0].longValues![0] as number);
           const dur = fromNs(result.columns[1].longValues![0] as number);
           const priority = result.columns[2].longValues![0] as number;
