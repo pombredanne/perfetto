@@ -13,8 +13,6 @@ tools/heap_profile --name system_server
 ```
 
 This will create a heap dump when Ctrl+C is pressed.
-Googlers: Head to http://pprof/ and upload the gzipped protos to get a
-visualization.
 
 The resulting profile proto contains four views on the data
 
@@ -26,6 +24,9 @@ The resulting profile proto contains four views on the data
   callstack.
 * alloc\_objects: how many allocations (including ones with matching frees) were
   done at this callstack.
+
+**Googlers:** Head to http://pprof/ and upload the gzipped protos to get a
+visualization.
 
 [Speedscope](https://speedscope.app) can also be used to visualize the heap
 dump, but will only show the space view.
