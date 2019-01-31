@@ -42,6 +42,7 @@ void UnixTaskRunner::WakeUp() {
 
 void UnixTaskRunner::Run() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
+  created_thread_id_ = GetThreadId();
   quit_ = false;
   for (;;) {
     int poll_timeout_ms;

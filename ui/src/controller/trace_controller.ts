@@ -259,7 +259,7 @@ export class TraceController extends Controller<States> {
           trackGroup: SCROLLING_TRACK_GROUP,
           config: {
             cpu,
-            maximumValue: maxFreq.columns[0].longValues![0],
+            maximumValue: +maxFreq.columns[0].doubleValues![0],
           }
         }));
       }
@@ -352,7 +352,7 @@ export class TraceController extends Controller<States> {
       const upid = row.upid;
       const pid = row.pid;
       const threadName = row.threadName;
-      const processName = row.threadName;
+      const processName = row.processName;
 
       const maxDepth = utid === null ? undefined : utidToMaxDepth.get(utid);
       if (maxDepth === undefined &&

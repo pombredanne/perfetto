@@ -55,7 +55,6 @@ class UnixTaskRunner : public TaskRunner {
   void PostDelayedTask(std::function<void()>, uint32_t delay_ms) override;
   void AddFileDescriptorWatch(int fd, std::function<void()>) override;
   void RemoveFileDescriptorWatch(int fd) override;
-
   bool RunsTasksOnCurrentThread() const override;
 
  private:
@@ -69,7 +68,7 @@ class UnixTaskRunner : public TaskRunner {
   void RunFileDescriptorWatch(int fd);
 
   ThreadChecker thread_checker_;
-  const PlatformThreadID created_thread_id_ = GetThreadId();
+  PlatformThreadID created_thread_id_ = GetThreadId();
 
   // On Linux, an eventfd(2) used to waking up the task runner when a new task
   // is posted. Otherwise the read end of a pipe used for the same purpose.
