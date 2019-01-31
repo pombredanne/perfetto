@@ -269,7 +269,9 @@ void ProtoTraceParser::ParseTracePacket(int64_t ts, TraceBlobView packet) {
         break;
     }
   }
-  // TODO(lalitm): move this to the flush method once we have it.
+  // TODO(lalitm): maybe move this to the flush method once we have it. This may
+  // reduce performance in the ArgsTracker though so needs to be handled
+  // carefully.
   context_->args_tracker->Flush();
 
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
@@ -688,7 +690,9 @@ void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
         break;
     }
   }
-  // TODO(lalitm): move this to the flush method once we have it.
+  // TODO(lalitm): maybe move this to the flush method once we have it. This may
+  // reduce performance in the ArgsTracker though so needs to be handled
+  // carefully.
   context_->args_tracker->Flush();
 
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
