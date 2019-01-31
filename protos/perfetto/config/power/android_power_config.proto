@@ -29,4 +29,5 @@ message AndroidPowerConfig {
   }
   optional uint32 battery_poll_ms = 1;
   repeated BatteryCounters battery_counters = 2;
+  optional bool collect_rail_data = 3;
 }

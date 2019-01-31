@@ -56,6 +56,11 @@ void AndroidPowerConfig::FromProto(
     battery_counters_.back() =
         static_cast<decltype(battery_counters_)::value_type>(field);
   }
+
+  static_assert(sizeof(collect_rail_data_) == sizeof(proto.collect_rail_data()),
+                "size mismatch");
+  collect_rail_data_ =
+      static_cast<decltype(collect_rail_data_)>(proto.collect_rail_data());
   unknown_fields_ = proto.unknown_fields();
 }
 
@@ -74,6 +79,12 @@ void AndroidPowerConfig::ToProto(
     static_assert(sizeof(it) == sizeof(proto->battery_counters(0)),
                   "size mismatch");
   }
+
+  static_assert(
+      sizeof(collect_rail_data_) == sizeof(proto->collect_rail_data()),
+      "size mismatch");
+  proto->set_collect_rail_data(
+      static_cast<decltype(proto->collect_rail_data())>(collect_rail_data_));
   *(proto->mutable_unknown_fields()) = unknown_fields_;
 }
 
