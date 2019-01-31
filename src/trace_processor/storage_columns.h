@@ -187,15 +187,11 @@ class NumericColumn : public StorageColumn {
   void FilterIntegerIndexEq(sqlite3_value* value,
                             FilteredRowIndex* index) const {
     auto raw = sqlite_utils::ExtractSqliteValue<int64_t>(value);
-    if (raw < kTMin || raw > kTMax) {
-      // If the compared value is out of bounds for T, we will never match any
-      // rows. Just return an empty result set.
+    if (raw < 0 || raw >= static_cast<int64_t>(index_->size())) {
       index->IntersectRows({});
       return;
     }
-
-    // Otherwise, lookup the cast value in the index and return the results.
-    index->IntersectRows((*index_)[static_cast<uint64_t>(raw)]);
+    index->IntersectRows((*index_)[static_cast<size_t>(raw)]);
   }
 
   template <typename C>
