@@ -78,13 +78,13 @@ class PERFETTO_EXPORT AndroidPowerConfig {
     return &battery_counters_.back();
   }
 
-  bool collect_rail_data() const { return collect_rail_data_; }
-  void set_collect_rail_data(bool value) { collect_rail_data_ = value; }
+  bool collect_power_rails() const { return collect_power_rails_; }
+  void set_collect_power_rails(bool value) { collect_power_rails_ = value; }
 
  private:
   uint32_t battery_poll_ms_ = {};
   std::vector<BatteryCounters> battery_counters_;
-  bool collect_rail_data_ = {};
+  bool collect_power_rails_ = {};
 
   // Allows to preserve unknown protobuf fields for compatibility
   // with future versions of .proto files.

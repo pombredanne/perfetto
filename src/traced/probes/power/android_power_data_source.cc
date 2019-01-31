@@ -127,7 +127,8 @@ AndroidPowerDataSource::AndroidPowerDataSource(
     : ProbesDataSource(session_id, kTypeId),
       task_runner_(task_runner),
       poll_rate_ms_(cfg.android_power_config().battery_poll_ms()),
-      rails_collection_enabled_(cfg.android_power_config().collect_rail_data()),
+      rails_collection_enabled_(
+          cfg.android_power_config().collect_power_rails()),
       rail_descriptors_logged_(false),
       writer_(std::move(writer)),
       weak_factory_(this) {
@@ -185,7 +186,7 @@ void AndroidPowerDataSource::Tick() {
 }
 
 void AndroidPowerDataSource::WriteBatteryCounters() {
-  if (counters_enabled_.size() == 0)
+  if (counters_enabled_.none())
     return;
 
   auto packet = writer_->NewTracePacket();
@@ -236,16 +237,14 @@ void AndroidPowerDataSource::WritePowerRailsData() {
     // We only add the rail descriptors to the first package, to avoid logging
     // all rail names etc. on each one.
     rail_descriptors_logged_ = true;
-    std::vector<android_internal::RailDescriptor> rail_descriptors =
-        lib_->GetRailDescriptors();
+    auto rail_descriptors = lib_->GetRailDescriptors();
     if (rail_descriptors.size() == 0) {
       // No rails to collect data for. Don't try again in the next iteration.
       rails_collection_enabled_ = false;
       return;
     }
 
-    for (const android_internal::RailDescriptor& rail_descriptor :
-         rail_descriptors) {
+    for (const auto& rail_descriptor : rail_descriptors) {
       auto* descriptor = rails_proto->add_rail_descriptor();
       descriptor->set_index(rail_descriptor.index);
       descriptor->set_rail_name(rail_descriptor.rail_name);
@@ -254,11 +253,10 @@ void AndroidPowerDataSource::WritePowerRailsData() {
     }
   }
 
-  for (const android_internal::RailEnergyData& energy_data :
-       lib_->GetRailEnergyData()) {
+  for (const auto& energy_data : lib_->GetRailEnergyData()) {
     auto* data = rails_proto->add_energy_data();
     data->set_index(energy_data.index);
-    data->set_timestamp(energy_data.timestamp);
+    data->set_timestamp_ms(energy_data.timestamp);
     data->set_energy(energy_data.energy);
   }
 }

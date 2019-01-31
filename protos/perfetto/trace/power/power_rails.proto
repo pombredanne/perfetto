@@ -31,13 +31,14 @@ message PowerRails {
     optional uint32 sampling_rate = 4;
   }
 
+  // This is only emitted at the beginning of the trace.
   repeated RailDescriptor rail_descriptor = 1;
 
   message EnergyData {
     // Index corresponding to RailDescriptor.index
     optional uint32 index = 1;
     // Time since device boot(CLOCK_BOOTTIME) in milli-seconds
-    optional uint64 timestamp = 2;
+    optional uint64 timestamp_ms = 2;
     // Accumulated energy since device boot in microwatt-seconds (uWs)
     optional uint64 energy = 3;
   }
