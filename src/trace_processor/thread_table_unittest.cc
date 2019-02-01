@@ -15,6 +15,8 @@
  */
 
 #include "src/trace_processor/thread_table.h"
+
+#include "src/trace_processor/args_tracker.h"
 #include "src/trace_processor/event_tracker.h"
 #include "src/trace_processor/process_table.h"
 #include "src/trace_processor/process_tracker.h"
@@ -36,6 +38,7 @@ class ThreadTableUnittest : public ::testing::Test {
     db_.reset(db);
 
     context_.storage.reset(new TraceStorage());
+    context_.args_tracker.reset(new ArgsTracker(&context_));
     context_.process_tracker.reset(new ProcessTracker(&context_));
     context_.event_tracker.reset(new EventTracker(&context_));
 

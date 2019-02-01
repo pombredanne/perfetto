@@ -15,9 +15,12 @@
  */
 
 #include "src/trace_processor/process_tracker.h"
+
+#include "src/trace_processor/args_tracker.h"
+#include "src/trace_processor/event_tracker.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "src/trace_processor/event_tracker.h"
 
 namespace perfetto {
 namespace trace_processor {
@@ -31,6 +34,7 @@ class ProcessTrackerTest : public ::testing::Test {
  public:
   ProcessTrackerTest() {
     context.storage.reset(new TraceStorage());
+    context.args_tracker.reset(new ArgsTracker(&context));
     context.process_tracker.reset(new ProcessTracker(&context));
     context.event_tracker.reset(new EventTracker(&context));
   }

@@ -15,13 +15,15 @@
  */
 
 #include "src/trace_processor/sched_slice_table.h"
+
+#include "src/trace_processor/args_tracker.h"
 #include "src/trace_processor/event_tracker.h"
 #include "src/trace_processor/process_tracker.h"
+#include "src/trace_processor/scoped_db.h"
 #include "src/trace_processor/trace_processor_context.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "src/trace_processor/scoped_db.h"
 
 namespace perfetto {
 namespace trace_processor {
@@ -39,6 +41,7 @@ class SchedSliceTableTest : public ::testing::Test {
     db_.reset(db);
 
     context_.storage.reset(new TraceStorage());
+    context_.args_tracker.reset(new ArgsTracker(&context_));
     context_.process_tracker.reset(new ProcessTracker(&context_));
     context_.event_tracker.reset(new EventTracker(&context_));
 

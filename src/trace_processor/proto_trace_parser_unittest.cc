@@ -143,15 +143,15 @@ TEST_F(ProtoTraceParserTest, LoadSingleEvent) {
   auto* sched_switch = event->mutable_sched_switch();
   sched_switch->set_prev_pid(10);
   sched_switch->set_prev_comm(kProc2Name);
-  sched_switch->set_next_prio(256);
+  sched_switch->set_prev_prio(256);
   sched_switch->set_prev_state(32);
   sched_switch->set_next_comm(kProc1Name);
   sched_switch->set_next_pid(100);
   sched_switch->set_next_prio(1024);
 
   EXPECT_CALL(*event_,
-              PushSchedSwitch(10, 1000, 10, base::StringView(kProc1Name), 256,
-                              32, 100, base::StringView(kProc2Name), 1024));
+              PushSchedSwitch(10, 1000, 10, base::StringView(kProc2Name), 256,
+                              32, 100, base::StringView(kProc1Name), 1024));
   Tokenize(trace);
 }
 
@@ -184,22 +184,7 @@ TEST_F(ProtoTraceParserTest, LoadEventsIntoRaw) {
   static const char buf_value[] = "This is a print event";
   print->set_buf(buf_value);
 
-  static const char pid[] = "pid";
-  static const char comm[] = "comm";
-  static const char clone[] = "clone_flags";
-  static const char oom[] = "oom_score_adj";
-  static const char print_event[] = "print";
-  static const char ip[] = "ip";
-  static const char buf[] = "buf";
-
-  EXPECT_CALL(*storage_, InternString(base::StringView(task_newtask))).Times(2);
-  EXPECT_CALL(*storage_, InternString(base::StringView(pid)));
-  EXPECT_CALL(*storage_, InternString(base::StringView(comm)));
-  EXPECT_CALL(*storage_, InternString(base::StringView(clone)));
-  EXPECT_CALL(*storage_, InternString(base::StringView(oom)));
-  EXPECT_CALL(*storage_, InternString(base::StringView(print_event)));
-  EXPECT_CALL(*storage_, InternString(base::StringView(ip)));
-  EXPECT_CALL(*storage_, InternString(base::StringView(buf)));
+  EXPECT_CALL(*storage_, InternString(base::StringView(task_newtask)));
   EXPECT_CALL(*storage_, InternString(base::StringView(buf_value)));
 
   Tokenize(trace);
@@ -291,7 +276,7 @@ TEST_F(ProtoTraceParserTest, LoadMultipleEvents) {
   auto* sched_switch = event->mutable_sched_switch();
   sched_switch->set_prev_pid(10);
   sched_switch->set_prev_comm(kProcName2);
-  sched_switch->set_next_prio(256);
+  sched_switch->set_prev_prio(256);
   sched_switch->set_prev_state(32);
   sched_switch->set_next_comm(kProcName1);
   sched_switch->set_next_pid(100);
@@ -304,7 +289,7 @@ TEST_F(ProtoTraceParserTest, LoadMultipleEvents) {
   sched_switch = event->mutable_sched_switch();
   sched_switch->set_prev_pid(100);
   sched_switch->set_prev_comm(kProcName1);
-  sched_switch->set_next_prio(256);
+  sched_switch->set_prev_prio(256);
   sched_switch->set_prev_state(32);
   sched_switch->set_next_comm(kProcName2);
   sched_switch->set_next_pid(10);
@@ -336,7 +321,7 @@ TEST_F(ProtoTraceParserTest, LoadMultiplePackets) {
   auto* sched_switch = event->mutable_sched_switch();
   sched_switch->set_prev_pid(10);
   sched_switch->set_prev_comm(kProcName2);
-  sched_switch->set_next_prio(256);
+  sched_switch->set_prev_prio(256);
   sched_switch->set_prev_state(32);
   sched_switch->set_next_comm(kProcName1);
   sched_switch->set_next_pid(100);
@@ -352,7 +337,7 @@ TEST_F(ProtoTraceParserTest, LoadMultiplePackets) {
   sched_switch = event->mutable_sched_switch();
   sched_switch->set_prev_pid(100);
   sched_switch->set_prev_comm(kProcName1);
-  sched_switch->set_next_prio(256);
+  sched_switch->set_prev_prio(256);
   sched_switch->set_prev_state(32);
   sched_switch->set_next_comm(kProcName2);
   sched_switch->set_next_pid(10);
@@ -380,7 +365,7 @@ TEST_F(ProtoTraceParserTest, RepeatedLoadSinglePacket) {
   auto* sched_switch = event->mutable_sched_switch();
   sched_switch->set_prev_pid(10);
   sched_switch->set_prev_comm(kProcName2);
-  sched_switch->set_next_prio(256);
+  sched_switch->set_prev_prio(256);
   sched_switch->set_prev_state(32);
   sched_switch->set_next_comm(kProcName1);
   sched_switch->set_next_pid(100);
@@ -395,7 +380,7 @@ TEST_F(ProtoTraceParserTest, RepeatedLoadSinglePacket) {
   sched_switch = event->mutable_sched_switch();
   sched_switch->set_prev_pid(100);
   sched_switch->set_prev_comm(kProcName1);
-  sched_switch->set_next_prio(256);
+  sched_switch->set_prev_prio(256);
   sched_switch->set_prev_state(32);
   sched_switch->set_next_comm(kProcName2);
   sched_switch->set_next_pid(10);
