@@ -178,7 +178,7 @@ def main(argv):
   if not args.no_start:
     heapprofd_prop = subprocess.check_output(
         ['adb', 'shell', 'getprop persist.heapprofd.enable'])
-    if heapprofd_prop.strip() == '0':
+    if heapprofd_prop.strip() != '1':
       subprocess.check_call(
           ['adb', 'shell', 'setprop persist.heapprofd.enable 1'])
       atexit.register(subprocess.check_call,
