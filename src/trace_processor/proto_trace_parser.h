@@ -104,6 +104,7 @@ class ProtoTraceParser {
                              TraceBlobView view);
   void ParseTraceStats(TraceBlobView);
   void ParseFtraceStats(TraceBlobView);
+  void ParseProfilePacket(TraceBlobView);
 
  private:
   TraceProcessorContext* context_;

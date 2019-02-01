@@ -66,37 +66,36 @@ int RawTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
   return SQLITE_OK;
 }
 
-int RawTable::FormatSystraceArgs(ArgSetId arg_set_id, char* line, size_t) {
+int RawTable::FormatSystraceArgs(ArgSetId arg_set_id,
+                                 ftrace_utils::StringWriter* writer) {
   const auto& args = storage_->args();
 
   const auto& set_ids = args.set_ids();
   auto lb = std::lower_bound(set_ids.begin(), set_ids.end(), arg_set_id);
-  auto ub = std::upper_bound(lb, set_ids.end(), arg_set_id);
+  auto ub = std::find(lb, set_ids.end(), arg_set_id + 1);
 
   int n = 0;
-  for (auto it = lb; it < ub; it++) {
+  for (auto it = lb; it != ub; it++) {
     auto arg_row = static_cast<uint32_t>(std::distance(set_ids.begin(), it));
     if (it != lb)
-      line[n++] = ' ';
+      writer->WriteChar(' ');
 
     const auto& key = storage_->GetString(args.keys()[arg_row]);
-    memcpy(&line[n], key.c_str(), key.size());
-    n += key.size();
+    writer->WriteString(key.c_str(), key.length());
 
-    line[n++] = '=';
+    writer->WriteChar('=');
 
     const auto& value = args.arg_values()[arg_row];
     switch (value.type) {
       case TraceStorage::Args::Variadic::kInt:
-        n += sprintf(&line[n], "%" PRId64, value.int_value);
+        writer->WriteInt(value.int_value);
         break;
       case TraceStorage::Args::Variadic::kReal:
-        n += sprintf(&line[n], "%f", value.real_value);
+        // n += sprintf(&line[n], "%f", value.real_value);
         break;
       case TraceStorage::Args::Variadic::kString: {
         const auto& str = storage_->GetString(value.string_value);
-        memcpy(&line[n], str.c_str(), str.size());
-        n += str.size();
+        writer->WriteString(str.c_str(), str.size());
       }
     }
   }
@@ -125,23 +124,21 @@ void RawTable::ToSystrace(sqlite3_context* ctx,
   const auto& name = storage_->GetString(thread.name_id);
 
   char line[2048];
-  int n = 0;
-  n += ftrace_utils::FormatSystracePrefix(
-      raw.timestamps()[row], raw.cpus()[row], thread.tid, tgid,
-      base::StringView(name), line, sizeof(line));
-  PERFETTO_CHECK(static_cast<size_t>(n) < sizeof(line));
+  ftrace_utils::StringWriter writer(line, sizeof(line));
+
+  ftrace_utils::FormatSystracePrefix(raw.timestamps()[row], raw.cpus()[row],
+                                     thread.tid, tgid, base::StringView(name),
+                                     &writer);
 
   const auto& str = storage_->GetString(raw.name_ids()[row]);
-  memcpy(&line[n], str.c_str(), str.size());
-  n += str.size();
+  writer.WriteString(str.c_str(), str.size());
 
   constexpr char kNameSuffix[] = ": ";
-  memcpy(&line[n], kNameSuffix, sizeof(kNameSuffix));
-  n += sizeof(kNameSuffix);
+  writer.WriteString(kNameSuffix, sizeof(kNameSuffix) - 1);
 
-  FormatSystraceArgs(raw.arg_set_ids()[row], &line[n],
-                     sizeof(line) - static_cast<size_t>(n));
-  sqlite3_result_text(ctx, line, -1, sqlite_utils::kSqliteTransient);
+  FormatSystraceArgs(raw.arg_set_ids()[row], &writer);
+  sqlite3_result_text(ctx, writer.GetCString(), -1,
+                      sqlite_utils::kSqliteTransient);
 }
 
 }  // namespace trace_processor

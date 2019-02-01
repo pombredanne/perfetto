@@ -82,13 +82,81 @@ class TaskState {
   uint16_t state_ = 0;
 };
 
-int FormatSystracePrefix(int64_t timestamp,
-                         uint32_t cpu,
-                         uint32_t pid,
-                         uint32_t tgid,
-                         base::StringView name,
-                         char* output,
-                         size_t n);
+class StringWriter {
+ public:
+  StringWriter(char* buffer, size_t n) : buffer_(buffer), n_(n) {}
+
+  void WriteChar(const char in) {
+    PERFETTO_DCHECK(pos_ + 1 < n_);
+    buffer_[pos_++] = in;
+  }
+
+  void WriteString(const char* in, size_t n) {
+    PERFETTO_DCHECK(pos_ + n < n_);
+    memcpy(&buffer_[pos_], in, n);
+    pos_ += n;
+  }
+
+  void WriteString(base::StringView data) {
+    PERFETTO_DCHECK(pos_ + data.size() < n_);
+    memcpy(&buffer_[pos_], data.data(), data.size());
+    pos_ += data.size();
+  }
+
+  void WriteInt(int64_t value) { WriteZeroPrefixedInt<0>(value); }
+
+  template <size_t PrefixZeros>
+  void WriteZeroPrefixedInt(int64_t value) {
+    constexpr auto kBufferSize =
+        std::numeric_limits<uint64_t>::digits10 + 1 + PrefixZeros;
+    PERFETTO_DCHECK(pos_ + kBufferSize + 1 < n_);
+
+    char data[kBufferSize];
+
+    bool negate = value < 0;
+    if (negate)
+      value = 0 - value;
+
+    uint64_t val = static_cast<uint64_t>(value);
+    size_t idx;
+    for (idx = kBufferSize - 1; val >= 10;) {
+      char digit = val % 10;
+      val /= 10;
+      data[idx--] = digit + '0';
+    }
+    data[idx--] = static_cast<char>(val) + '0';
+
+    if (PrefixZeros > 0) {
+      size_t num_digits = kBufferSize - 1 - idx;
+      for (size_t i = num_digits; i < PrefixZeros; i++) {
+        data[idx--] = '0';
+      }
+    }
+
+    if (negate)
+      buffer_[pos_++] = '-';
+    for (size_t i = idx + 1; i < kBufferSize; i++)
+      buffer_[pos_++] = data[i];
+  }
+
+  char* GetCString() {
+    PERFETTO_DCHECK(pos_ < n_);
+    buffer_[pos_] = '\0';
+    return buffer_;
+  }
+
+ private:
+  char* buffer_ = nullptr;
+  size_t n_ = 0;
+  size_t pos_ = 0;
+};
+
+void FormatSystracePrefix(int64_t timestamp,
+                          uint32_t cpu,
+                          uint32_t pid,
+                          uint32_t tgid,
+                          base::StringView name,
+                          StringWriter* writer);
 
 }  // namespace ftrace_utils
 }  // namespace trace_processor

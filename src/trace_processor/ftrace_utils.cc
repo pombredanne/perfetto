@@ -149,29 +149,42 @@ TaskState::TaskStateStr TaskState::ToString() const {
   return output;
 }
 
-int FormatSystracePrefix(int64_t timestamp,
-                         uint32_t cpu,
-                         uint32_t pid,
-                         uint32_t tgid,
-                         base::StringView name,
-                         char* output,
-                         size_t n) {
+void FormatSystracePrefix(int64_t timestamp,
+                          uint32_t cpu,
+                          uint32_t pid,
+                          uint32_t tgid,
+                          base::StringView name,
+                          StringWriter* writer) {
   int64_t seconds = TimestampToSeconds(timestamp);
   int64_t useconds = TimestampToMicroseconds(timestamp);
   if (pid == 0) {
     name = "<idle>";
   }
+
+  writer->WriteString(name);
+  writer->WriteChar('-');
+  writer->WriteInt(pid);
+
+  constexpr char kTgidPrefix[] = "     (";
+  writer->WriteString(kTgidPrefix, sizeof(kTgidPrefix) - 1);
   if (tgid == 0) {
-    return snprintf(output, n,
-                    "%s-%" PRIu32 "     (-----) [%03" PRIu32 "] d..3 %" PRIi64
-                    ".%.6" PRIi64 ": ",
-                    name.data(), pid, cpu, seconds, useconds);
+    constexpr char kNoTgid[] = "-----";
+    writer->WriteString(kNoTgid, sizeof(kNoTgid) - 1);
   } else {
-    return snprintf(output, n,
-                    "%s-%" PRIu32 "     (%5" PRIu32 ") [%03" PRIu32
-                    "] d..3 %" PRIi64 ".%.6" PRIi64 ": ",
-                    name.data(), pid, tgid, cpu, seconds, useconds);
+    writer->WriteInt(tgid);
   }
+  constexpr char kTgidSuffix[] = ") [";
+  writer->WriteString(kTgidSuffix, sizeof(kTgidSuffix) - 1);
+
+  writer->WriteZeroPrefixedInt<3>(cpu);
+
+  constexpr char kCpuSuffix[] = "] d..3 ";
+  writer->WriteString(kCpuSuffix, sizeof(kCpuSuffix) - 1);
+
+  writer->WriteInt(seconds);
+  writer->WriteChar('.');
+  writer->WriteZeroPrefixedInt<6>(useconds);
+  writer->WriteChar(' ');
 }
 
 }  // namespace ftrace_utils
