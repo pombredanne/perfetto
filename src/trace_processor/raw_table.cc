@@ -67,7 +67,7 @@ int RawTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
 }
 
 int RawTable::FormatSystraceArgs(ArgSetId arg_set_id,
-                                 ftrace_utils::StringWriter* writer) {
+                                 base::StringWriter* writer) {
   const auto& args = storage_->args();
 
   const auto& set_ids = args.set_ids();
@@ -124,13 +124,14 @@ void RawTable::ToSystrace(sqlite3_context* ctx,
   const auto& name = storage_->GetString(thread.name_id);
 
   char line[2048];
-  ftrace_utils::StringWriter writer(line, sizeof(line));
+  base::StringWriter writer(line, sizeof(line));
 
   ftrace_utils::FormatSystracePrefix(raw.timestamps()[row], raw.cpus()[row],
                                      thread.tid, tgid, base::StringView(name),
                                      &writer);
 
   const auto& str = storage_->GetString(raw.name_ids()[row]);
+  writer.WriteChar(' ');
   writer.WriteString(str.c_str(), str.size());
 
   constexpr char kNameSuffix[] = ": ";

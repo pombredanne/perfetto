@@ -154,7 +154,7 @@ void FormatSystracePrefix(int64_t timestamp,
                           uint32_t pid,
                           uint32_t tgid,
                           base::StringView name,
-                          StringWriter* writer) {
+                          base::StringWriter* writer) {
   int64_t seconds = TimestampToSeconds(timestamp);
   int64_t useconds = TimestampToMicroseconds(timestamp);
   if (pid == 0) {
@@ -176,15 +176,14 @@ void FormatSystracePrefix(int64_t timestamp,
   constexpr char kTgidSuffix[] = ") [";
   writer->WriteString(kTgidSuffix, sizeof(kTgidSuffix) - 1);
 
-  writer->WriteZeroPrefixedInt<3>(cpu);
+  writer->WriteZeroPaddedInt<3>(cpu);
 
   constexpr char kCpuSuffix[] = "] d..3 ";
   writer->WriteString(kCpuSuffix, sizeof(kCpuSuffix) - 1);
 
   writer->WriteInt(seconds);
   writer->WriteChar('.');
-  writer->WriteZeroPrefixedInt<6>(useconds);
-  writer->WriteChar(' ');
+  writer->WriteZeroPaddedInt<6>(useconds);
 }
 
 }  // namespace ftrace_utils
