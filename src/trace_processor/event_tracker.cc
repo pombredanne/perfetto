@@ -36,7 +36,7 @@ EventTracker::EventTracker(TraceProcessorContext* context) : context_(context) {
       GetMessageDescriptorForId(protos::FtraceEvent::kSchedSwitchFieldNumber);
   PERFETTO_CHECK(descriptor->max_field_id == kSchedSwitchMaxFieldId);
 
-  for (size_t i = 1; i < kSchedSwitchMaxFieldId; i++) {
+  for (size_t i = 1; i <= kSchedSwitchMaxFieldId; i++) {
     sched_switch_field_ids_[i] =
         context->storage->InternString(descriptor->fields[i].name);
   }
