@@ -169,17 +169,18 @@ cc_library_shared {
   ],
   shared_libs: [
     "libbase",
-    "liblog",
     "libprocinfo",
     "libunwindstack",
   ],
   static_libs: [
+    "libasync_safe",
     "libgtest_prod",
   ],
   defaults: [
     "perfetto_defaults",
   ],
   cflags: [
+    "-DPERFETTO_ANDROID_ASYNC_SAFE_LOG",
     "-DPERFETTO_BUILD_WITH_ANDROID",
   ],
   include_dirs: [
@@ -335,9 +336,11 @@ cc_library_shared {
   name: "libperfetto_android_internal",
   srcs: [
     "src/android_internal/health_hal.cc",
+    "src/android_internal/power_stats_hal.cc",
   ],
   shared_libs: [
     "android.hardware.health@2.0",
+    "android.hardware.power.stats@1.0",
     "libbase",
     "libhidlbase",
     "libhidltransport",
@@ -345,25 +348,8 @@ cc_library_shared {
     "liblog",
     "libutils",
   ],
-  defaults: [
-    "perfetto_defaults",
-  ],
-  cflags: [
-    "-DPERFETTO_BUILD_WITH_ANDROID",
-  ],
   static_libs: [
     "libhealthhalutils",
-  ],
-}
-
-// GN target: //:notify_traceur
-cc_binary {
-  name: "notify_traceur",
-  srcs: [
-    "src/android_internal/notify_traceur.cc",
-  ],
-  shared_libs: [
-    "liblog",
   ],
   defaults: [
     "perfetto_defaults",
@@ -2396,7 +2382,6 @@ cc_library_static {
     "src/tracing/ipc/service/service_ipc_host_impl.cc",
   ],
   shared_libs: [
-    "liblog",
     "libprotobuf-cpp-lite",
   ],
   static_libs: [
@@ -2471,7 +2456,6 @@ cc_library_static {
     ":perfetto_protos_perfetto_trace_sys_stats_lite_gen",
   ],
   shared_libs: [
-    "liblog",
     "libprotobuf-cpp-lite",
   ],
   host_supported: true,
@@ -2897,9 +2881,6 @@ cc_binary {
   ],
   cflags: [
     "-DPERFETTO_BUILD_WITH_ANDROID",
-  ],
-  required: [
-    "notify_traceur",
   ],
 }
 

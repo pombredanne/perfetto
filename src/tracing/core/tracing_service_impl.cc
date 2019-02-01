@@ -25,8 +25,11 @@
 
 #if !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 #include <sys/uio.h>
-#include <sys/wait.h>
 #include <unistd.h>
+#endif
+
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+#include <sys/system_properties.h>
 #endif
 
 #include <algorithm>
@@ -100,29 +103,6 @@ uid_t geteuid() {
   return 0;
 }
 #endif  // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
-
-void NotifyTraceur() {
-#if !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
-  // TODO(primiano): switch to Process API.
-  auto pid = fork();
-  if (pid < 0) {
-    PERFETTO_PLOG("fork() failed");
-  } else if (pid == 0) {
-    // Child process.
-    for (int i = 0; i < 512; i++)
-      close(i);  // Avoid leaking FDs accidentally not marked as O_CLOEXEC.
-    char argv0[] = "notify_traceur";
-    char* argv[] = {argv0, nullptr};
-    execvp(argv0, argv);
-    _exit(126);
-  } else {
-    int status = 0;
-    waitpid(pid, &status, 0);
-    int exit_status = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
-    PERFETTO_LOG("Notifying Traceur, retcode=%d", exit_status);
-  }
-#endif
-}
 
 }  // namespace
 
@@ -1200,8 +1180,13 @@ void TracingServiceImpl::FreeBuffers(TracingSessionID tsid) {
   PERFETTO_LOG("Tracing session %" PRIu64 " ended, total sessions:%zu", tsid,
                tracing_sessions_.size());
 
-  if (notify_traceur)
-    NotifyTraceur();
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+  static const char kTraceurProp[] = "sys.traceur.trace_end_signal";
+  if (notify_traceur && __system_property_set(kTraceurProp, "1"))
+    PERFETTO_ELOG("Failed to setprop %s=1", kTraceurProp);
+#else
+  base::ignore_result(notify_traceur);
+#endif
 }
 
 void TracingServiceImpl::RegisterDataSource(ProducerID producer_id,
