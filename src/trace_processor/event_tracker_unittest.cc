@@ -47,15 +47,17 @@ TEST_F(EventTrackerTest, InsertSecondSched) {
   static const char kCommProc1[] = "process1";
   static const char kCommProc2[] = "process2";
   uint32_t pid_2 = 4;
-  int32_t next_prio = 1024;
+  int32_t prio = 1024;
 
   const auto& timestamps = context.storage->slices().start_ns();
-  context.event_tracker->PushSchedSwitch(cpu, timestamp, pid_1, prev_state,
-                                         pid_2, kCommProc1, next_prio);
+  context.event_tracker->PushSchedSwitch(cpu, timestamp, pid_1, kCommProc2,
+                                         prio, prev_state, pid_2, kCommProc1,
+                                         prio);
   ASSERT_EQ(timestamps.size(), 1);
 
-  context.event_tracker->PushSchedSwitch(cpu, timestamp + 1, pid_2, prev_state,
-                                         pid_1, kCommProc2, next_prio);
+  context.event_tracker->PushSchedSwitch(cpu, timestamp + 1, pid_2, kCommProc1,
+                                         prio, prev_state, pid_1, kCommProc2,
+                                         prio);
 
   ASSERT_EQ(timestamps.size(), 2ul);
   ASSERT_EQ(timestamps[0], timestamp);
@@ -73,22 +75,23 @@ TEST_F(EventTrackerTest, InsertThirdSched_SameThread) {
   int64_t prev_state = 32;
   static const char kCommProc1[] = "process1";
   static const char kCommProc2[] = "process2";
-  int32_t next_prio = 1024;
+  int32_t prio = 1024;
 
   const auto& timestamps = context.storage->slices().start_ns();
-  context.event_tracker->PushSchedSwitch(cpu, timestamp, /*tid=*/4, prev_state,
-                                         /*tid=*/2, kCommProc1, next_prio);
+  context.event_tracker->PushSchedSwitch(cpu, timestamp, /*tid=*/4, kCommProc2,
+                                         prio, prev_state,
+                                         /*tid=*/2, kCommProc1, prio);
   ASSERT_EQ(timestamps.size(), 1);
 
   context.event_tracker->PushSchedSwitch(cpu, timestamp + 1, /*tid=*/2,
-                                         prev_state,
-                                         /*tid=*/4, kCommProc1, next_prio);
+                                         kCommProc1, prio, prev_state,
+                                         /*tid=*/4, kCommProc2, prio);
   context.event_tracker->PushSchedSwitch(cpu, timestamp + 11, /*tid=*/4,
-                                         prev_state,
-                                         /*tid=*/2, kCommProc2, next_prio);
+                                         kCommProc2, prio, prev_state,
+                                         /*tid=*/2, kCommProc1, prio);
   context.event_tracker->PushSchedSwitch(cpu, timestamp + 31, /*tid=*/4,
-                                         prev_state,
-                                         /*tid=*/2, kCommProc1, next_prio);
+                                         kCommProc1, prio, prev_state,
+                                         /*tid=*/2, kCommProc2, prio);
 
   ASSERT_EQ(timestamps.size(), 4ul);
   ASSERT_EQ(timestamps[0], timestamp);
