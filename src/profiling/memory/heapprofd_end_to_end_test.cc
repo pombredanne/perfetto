@@ -123,6 +123,8 @@ void __attribute__((noreturn)) ContinuousMalloc(size_t bytes) {
 }
 
 pid_t ForkContinuousMalloc(size_t bytes) {
+  // Make sure forked process does not get reparented to init.
+  setsid();
   pid_t pid = fork();
   switch (pid) {
     case -1:
@@ -161,7 +163,17 @@ class HeapprofdEndToEnd : public ::testing::Test {
  protected:
   base::TestTaskRunner task_runner;
 
-  void Validate(TestHelper* helper, pid_t pid, uint64_t alloc_size) {
+  void TraceAndValidate(const TraceConfig& trace_config,
+                        pid_t pid,
+                        uint64_t alloc_size) {
+    auto helper = GetHelper(&task_runner);
+
+    helper->StartTracing(trace_config);
+    helper->WaitForTracingDisabled(10000);
+
+    helper->ReadData();
+    helper->WaitForReadData();
+
     const auto& packets = helper->trace();
     ASSERT_GT(packets.size(), 0u);
     size_t profile_packets = 0;
@@ -191,20 +203,6 @@ class HeapprofdEndToEnd : public ::testing::Test {
     EXPECT_GT(samples, 0);
     EXPECT_GT(last_allocated, 0);
     EXPECT_GT(last_freed, 0);
-  }
-
-  void TraceAndValidate(const TraceConfig& trace_config,
-                        pid_t pid,
-                        uint64_t alloc_size) {
-    auto helper = GetHelper(&task_runner);
-
-    helper->StartTracing(trace_config);
-    helper->WaitForTracingDisabled(10000);
-
-    helper->ReadData();
-    helper->WaitForReadData();
-
-    Validate(helper.get(), pid, alloc_size);
   }
 
 #if PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
@@ -293,6 +291,8 @@ TEST_F(HeapprofdEndToEnd, NativeStartup) {
   // has received the trace config.
   sleep(1);
 
+  // Make sure the forked process does not get reparented to init.
+  setsid();
   pid_t pid = fork();
   switch (pid) {
     case -1:
@@ -306,21 +306,46 @@ TEST_F(HeapprofdEndToEnd, NativeStartup) {
       // TODO(fmayer): Use a dedicated test binary rather than relying on find
       // doing allocations.
       PERFETTO_CHECK(execle("/proc/self/exe", "heapprofd_continuous_malloc",
-                            "/", nullptr, envp) == 0);
+                            nullptr, envp) == 0);
       break;
     }
     default:
       break;
   }
 
-  helper->WaitForTracingDisabled(10000);
+  helper->WaitForTracingDisabled(20000);
 
   helper->ReadData();
   helper->WaitForReadData();
 
   PERFETTO_CHECK(kill(pid, SIGKILL) == 0);
   PERFETTO_CHECK(waitpid(pid, nullptr, 0) == pid);
-  Validate(helper.get(), pid, kStartupAllocSize);
+
+  const auto& packets = helper->trace();
+  ASSERT_GT(packets.size(), 0u);
+  size_t profile_packets = 0;
+  size_t samples = 0;
+  uint64_t total_allocated = 0;
+  uint64_t total_freed = 0;
+  for (const protos::TracePacket& packet : packets) {
+    if (packet.has_profile_packet() &&
+        packet.profile_packet().process_dumps().size() > 0) {
+      const auto& dumps = packet.profile_packet().process_dumps();
+      ASSERT_EQ(dumps.size(), 1);
+      const protos::ProfilePacket_ProcessHeapSamples& dump = dumps.Get(0);
+      EXPECT_EQ(dump.pid(), pid);
+      profile_packets++;
+      for (const auto& sample : dump.samples()) {
+        samples++;
+        total_allocated += sample.self_allocated();
+        total_freed += sample.self_freed();
+      }
+    }
+  }
+  EXPECT_EQ(profile_packets, 1);
+  EXPECT_GT(samples, 0);
+  EXPECT_GT(total_allocated, 0);
+  EXPECT_GT(total_freed, 0);
 }
 
 TEST_F(HeapprofdEndToEnd, ReInit) {
