@@ -279,11 +279,11 @@ export const StateActions = {
     state.displayConfigAsPbtxt = !state.displayConfigAsPbtxt;
   },
 
-  selectNote(state: StateDraft, args: {id: string | null}): void {
+  selectNote(state: StateDraft, args: {id: string}): void {
     if (args.id) {
       state.currentSelection = {
         kind: 'NOTE',
-        args: args.id
+        id: args.id
       };
     }
   },
@@ -313,7 +313,9 @@ export const StateActions = {
 
   removeNote(state: StateDraft, args: {id: string}): void {
     delete state.notes[args.id];
-    if (state.currentSelection === {kind: 'NOTE', args: args.id}) {
+    if (state.currentSelection === null) return;
+    if (state.currentSelection.kind === 'NOTE' &&
+        state.currentSelection.id === args.id) {
       state.currentSelection = null;
     }
   },
@@ -322,7 +324,8 @@ export const StateActions = {
               args: {utid: number, id: number}): void {
     state.currentSelection = {
       kind: 'SLICE',
-      args
+      utid: args.utid,
+      id: args.id,
     };
   },
 

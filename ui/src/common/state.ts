@@ -124,15 +124,18 @@ export interface Note {
   text: string;
 }
 
-export interface Selection {
-  kind: 'SLICE'|'NOTE';
-  args: SliceSelection | string;
+export interface NoteSelection {
+  kind: 'NOTE';
+  id: string;
 }
 
 export interface SliceSelection {
+  kind: 'SLICE';
   utid: number;
   id: number;
 }
+
+type Selection = NoteSelection|SliceSelection;
 
 export interface State {
   route: string|null;
