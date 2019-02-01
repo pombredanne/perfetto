@@ -107,26 +107,35 @@ StartSystemHeapprofdIfRequired() {
       new std::string(prev_property_value));
 }
 
-pid_t ForkContinousMalloc(size_t bytes) {
+void __attribute__((noreturn)) ContinuousMalloc(size_t bytes) {
+  for (;;) {
+    // This volatile is needed to prevent the compiler from trying to be
+    // helpful and compiling a "useless" malloc + free into a noop.
+    volatile char* x = static_cast<char*>(malloc(bytes));
+    if (x) {
+      x[1] = 'x';
+      free(const_cast<char*>(x));
+    }
+    usleep(10 * kMsToUs);
+  }
+}
+
+pid_t ForkContinuousMalloc(size_t bytes) {
   pid_t pid = fork();
   switch (pid) {
     case -1:
       PERFETTO_FATAL("Failed to fork.");
     case 0:
-      for (;;) {
-        // This volatile is needed to prevent the compiler from trying to be
-        // helpful and compiling a "useless" malloc + free into a noop.
-        volatile char* x = static_cast<char*>(malloc(bytes));
-        if (x) {
-          x[1] = 'x';
-          free(const_cast<char*>(x));
-        }
-        usleep(10 * kMsToUs);
-      }
+      ContinuousMalloc(bytes);
     default:
       break;
   }
   return pid;
+}
+
+void __attribute__((constructor)) RunContinuousMalloc() {
+  if (getenv("HEAPPROFD_TESTING_RUN_MALLOC") != nullptr)
+    ContinuousMalloc(10);
 }
 
 std::unique_ptr<TestHelper> GetHelper(base::TestTaskRunner* task_runner) {
@@ -204,7 +213,7 @@ class HeapprofdEndToEnd : public ::testing::Test {
 TEST_F(HeapprofdEndToEnd, Smoke) {
   constexpr size_t kAllocSize = 1024;
 
-  pid_t pid = ForkContinousMalloc(kAllocSize);
+  pid_t pid = ForkContinuousMalloc(kAllocSize);
 
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(10 * 1024);
@@ -231,7 +240,7 @@ TEST_F(HeapprofdEndToEnd, Smoke) {
 TEST_F(HeapprofdEndToEnd, FinalFlush) {
   constexpr size_t kAllocSize = 1024;
 
-  pid_t pid = ForkContinousMalloc(kAllocSize);
+  pid_t pid = ForkContinuousMalloc(kAllocSize);
 
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(10 * 1024);
@@ -266,7 +275,7 @@ TEST_F(HeapprofdEndToEnd, NativeStartup) {
 
   auto* heapprofd_config = ds_config->mutable_heapprofd_config();
   heapprofd_config->set_sampling_interval_bytes(1);
-  *heapprofd_config->add_process_cmdline() = "find";
+  *heapprofd_config->add_process_cmdline() = "heapprofd_continuous_malloc";
   heapprofd_config->set_all(false);
 
   helper->StartTracing(trace_config);
@@ -283,13 +292,15 @@ TEST_F(HeapprofdEndToEnd, NativeStartup) {
     case -1:
       PERFETTO_FATAL("Failed to fork.");
     case 0: {
+      const char* envp[] = {"HEAPPROFD_TESTING_RUN_MALLOC=1", nullptr};
       int null = open("/dev/null", O_RDWR);
       dup2(null, STDIN_FILENO);
       dup2(null, STDOUT_FILENO);
       dup2(null, STDERR_FILENO);
       // TODO(fmayer): Use a dedicated test binary rather than relying on find
       // doing allocations.
-      PERFETTO_CHECK(execl("/system/bin/find", "find", "/", nullptr) == 0);
+      PERFETTO_CHECK(execle("/proc/self/exe", "heapprofd_continuous_malloc",
+                            "/", nullptr, envp) == 0);
       break;
     }
     default:
