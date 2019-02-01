@@ -33,6 +33,7 @@ import {computeZoom} from './time_scale';
 import {TRACK_SHELL_WIDTH} from './track_constants';
 import {TrackGroupPanel} from './track_group_panel';
 import {TrackPanel} from './track_panel';
+import {Actions} from '../common/actions';
 
 const DRAG_HANDLE_HEIGHT_PX = 12;
 
@@ -256,7 +257,12 @@ class TraceViewer implements m.ClassComponent {
 
     return m(
         '.page',
-        m('.pan-and-zoom-content',
+        m('.pan-and-zoom-content', {
+          onclick: () =>
+          {
+            globals.dispatch(Actions.deselect({}));
+            globals.rafScheduler.scheduleRedraw();
+          }},
           m('.pinned-panel-container', m(PanelContainer, {
               doesScroll: false,
               panels: [
