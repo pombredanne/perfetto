@@ -303,8 +303,6 @@ TEST_F(HeapprofdEndToEnd, NativeStartup) {
       dup2(null, STDIN_FILENO);
       dup2(null, STDOUT_FILENO);
       dup2(null, STDERR_FILENO);
-      // TODO(fmayer): Use a dedicated test binary rather than relying on find
-      // doing allocations.
       PERFETTO_CHECK(execle("/proc/self/exe", "heapprofd_continuous_malloc",
                             nullptr, envp) == 0);
       break;
