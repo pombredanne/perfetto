@@ -155,6 +155,7 @@ class TraceStorage {
         uint64_t hash = 0xcbf29ce484222325;  // FNV-1a-64 offset basis.
         hash ^= static_cast<decltype(hash)>(arg.key);
         hash *= 1099511628211;  // FNV-1a-64 prime.
+        // We don't has arg.flat_key because it's a subsequence of arg.key.
         switch (arg.value.type) {
           case Variadic::Type::kInt:
             hash ^= static_cast<decltype(hash)>(arg.value.int_value);
@@ -179,9 +180,11 @@ class TraceStorage {
       return static_cast<uint32_t>(set_ids_.size());
     }
 
-    ArgSetId AddArgs(const std::vector<Arg>& args, uint32_t b, uint32_t e) {
+    ArgSetId AddArgSet(const std::vector<Arg>& args,
+                       uint32_t begin,
+                       uint32_t end) {
       ArgSetHash hash = 0xcbf29ce484222325;  // FNV-1a-64 offset basis.
-      for (uint32_t i = b; i < e; i++) {
+      for (uint32_t i = begin; i < end; i++) {
         hash ^= ArgHasher()(args[i]);
         hash *= 1099511628211;  // FNV-1a-64 prime.
       }
@@ -194,7 +197,7 @@ class TraceStorage {
       // The +1 ensures that nothing has an id == kInvalidArgSetId == 0.
       ArgSetId id = static_cast<uint32_t>(arg_row_for_hash_.size()) + 1;
       arg_row_for_hash_.emplace(hash, args_count());
-      for (uint32_t i = b; i < e; i++) {
+      for (uint32_t i = begin; i < end; i++) {
         const auto& arg = args[i];
         set_ids_.emplace_back(id);
         flat_keys_.emplace_back(arg.flat_key);

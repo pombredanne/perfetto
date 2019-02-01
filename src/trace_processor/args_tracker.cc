@@ -36,6 +36,9 @@ void ArgsTracker::AddArg(RowId row_id,
 
 void ArgsTracker::Flush() {
   using Arg = TraceStorage::Args::Arg;
+
+  // We sort here because a single packet may add multiple args with different
+  // rowids.
   auto comparator = [](const Arg& f, const Arg& s) {
     return f.row_id < s.row_id;
   };
@@ -50,7 +53,7 @@ void ArgsTracker::Flush() {
     while (next_rid_idx < args_.size() && rid == args_[next_rid_idx].row_id)
       next_rid_idx++;
 
-    auto set_id = storage->mutable_args()->AddArgs(args_, i, next_rid_idx);
+    auto set_id = storage->mutable_args()->AddArgSet(args_, i, next_rid_idx);
     auto pair = TraceStorage::ParseRowId(rid);
     switch (pair.first) {
       case TableId::kRawEvents:
