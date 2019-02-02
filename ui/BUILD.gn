@@ -334,21 +334,24 @@ copy("query_dist") {
 
 copy("assets_dist") {
   sources = [
+              "src/assets/battery_counters.png",
+              "src/assets/board_voltage.png",
+              "src/assets/cpu_freq.png",
+              "src/assets/cpu_voltage.png",
+              "src/assets/lmk.png",
               "src/assets/logo-3d.png",
               "src/assets/logo.png",
-              "src/assets/rec_ring_buf.png",
-              "src/assets/rec_one_shot.png",
-              "src/assets/rec_long_trace.png",
+              "src/assets/meminfo.png",
+              "src/assets/ps_stats.png",
+              "src/assets/rec_atrace.png",
               "src/assets/rec_cpu_coarse.png",
               "src/assets/rec_cpu_fine.png",
               "src/assets/rec_cpu_wakeup.png",
-              "src/assets/battery_counters.png",
-              "src/assets/cpu_freq.png",
-              "src/assets/cpu_voltage.png",
-              "src/assets/board_voltage.png",
-              "src/assets/meminfo.png",
+              "src/assets/rec_ftrace.png",
+              "src/assets/rec_long_trace.png",
+              "src/assets/rec_one_shot.png",
+              "src/assets/rec_ring_buf.png",
               "src/assets/vmstat.png",
-              "src/assets/lmk.png",
             ] + [ scss_root ] + scss_srcs
   outputs = [
     "$ui_dir/assets/{{source_file_part}}",

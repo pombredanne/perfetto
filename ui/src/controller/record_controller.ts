@@ -12,17 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {TraceConfig} from '../common/protos';
 import {
-  BatteryCounters,
-  IAndroidPowerConfig,
-  IProcessStatsConfig,
-  ISysStatsConfig,
-  ITraceConfig,
-  MeminfoCounters,
-  StatCounters,
-  VmstatCounters
+  AndroidPowerConfig,
+  BufferConfig,
+  DataSourceConfig,
+  FtraceConfig,
+  ProcessStatsConfig,
+  SysStatsConfig,
+  TraceConfig
 } from '../common/protos';
+import {MeminfoCounters, VmstatCounters} from '../common/protos';
 import {RecordConfig} from '../common/state';
 
 import {Controller} from './controller';
@@ -32,116 +31,161 @@ export function uint8ArrayToBase64(buffer: Uint8Array): string {
   return btoa(String.fromCharCode.apply(null, buffer));
 }
 
-export function encodeConfig(config: RecordConfig): Uint8Array {
-  const sizeKb = config.bufferSizeMb * 1024;
-  const durationMs = config.durationSeconds * 1000;
-
-  const dataSources = [];
-  if (config.ftrace) {
-    const drainPeriodMs =
-        config.ftraceDrainPeriodMs ? config.ftraceDrainPeriodMs : null;
-    const bufferSizeKb =
-        config.ftraceBufferSizeKb ? config.ftraceBufferSizeKb : null;
-    dataSources.push({
-      config: {
-        name: 'linux.ftrace',
-        targetBuffer: 0,
-        ftraceConfig: {
-          ftraceEvents: config.ftraceEvents,
-          atraceApps: config.atraceApps,
-          atraceCategories: config.atraceCategories,
-          drainPeriodMs,
-          bufferSizeKb,
-        },
-      },
-    });
+export function genConfigProto(uiCfg: RecordConfig): Uint8Array {
+  const protoCfg = new TraceConfig();
+  // TODO check stuff unsupported on P.
+  protoCfg.durationMs = uiCfg.durationMs;
+  protoCfg.buffers.push(new BufferConfig());
+  protoCfg.buffers[0].sizeKb = uiCfg.bufferSizeMb * 1024;
+  if (uiCfg.mode === 'STOP_WHEN_FULL') {
+    protoCfg.buffers[0].fillPolicy = BufferConfig.FillPolicy.DISCARD;
+  } else {
+    protoCfg.buffers[0].fillPolicy = BufferConfig.FillPolicy.RING_BUFFER;
+    if (uiCfg.mode === 'LONG_TRACE') {
+      protoCfg.writeIntoFile = true;
+      protoCfg.fileWritePeriodMs = uiCfg.fileWritePeriodMs;
+      protoCfg.maxFileSizeBytes = uiCfg.maxFileSizeMb * 1e6;
+    }
   }
 
-  if (config.processMetadata) {
-    const processStatsConfig: IProcessStatsConfig = {
-      scanAllProcessesOnStart: config.scanAllProcessesOnStart
-    };
+  const ftraceEvents = new Set<string>(uiCfg.ftrace ? uiCfg.ftraceEvents : []);
+  const atraceCats = new Set<string>(uiCfg.atrace ? uiCfg.atraceCats : []);
+  const atraceApps = new Set<string>(uiCfg.atrace ? uiCfg.atraceApps : []);
+  let enableProcScraping = false;
+  let trackProcLifetime = false;
+  let trackInitialOomScore = false;
 
-    if (config.procStatusPeriodMs) {
-      processStatsConfig.procStatsPollMs = config.procStatusPeriodMs;
-    }
-
-    dataSources.push({
-      config: {
-        name: 'linux.process_stats',
-        processStatsConfig,
-        targetBuffer: 0,
-      },
-    });
+  if (uiCfg.cpuSched) {
+    trackProcLifetime = true;
+    enableProcScraping = true;
+    ftraceEvents.add('sched/sched_switch');
+    ftraceEvents.add('power/suspend_resume');
   }
 
-  if (config.sysStats) {
-    const sysStatsConfig: ISysStatsConfig = {};
-
-    if (config.meminfoPeriodMs) {
-      sysStatsConfig.meminfoPeriodMs = config.meminfoPeriodMs;
-      sysStatsConfig.meminfoCounters = config.meminfoCounters.map(name => {
-        // tslint:disable-next-line no-any
-        return MeminfoCounters[name as any as number] as any as number;
-      });
-    }
-    if (config.vmstatPeriodMs) {
-      sysStatsConfig.vmstatPeriodMs = config.vmstatPeriodMs;
-      sysStatsConfig.vmstatCounters = config.vmstatCounters.map(name => {
-        // tslint:disable-next-line no-any
-        return VmstatCounters[name as any as number] as any as number;
-      });
-    }
-    if (config.statPeriodMs) {
-      sysStatsConfig.statPeriodMs = config.statPeriodMs;
-      sysStatsConfig.statCounters = config.statCounters.map(name => {
-        // tslint:disable-next-line no-any
-        return StatCounters[name as any as number] as any as number;
-      });
-    }
-
-    dataSources.push({
-      config: {
-        name: 'linux.sys_stats',
-        sysStatsConfig,
-      },
-    });
+  if (uiCfg.cpuLatency) {
+    trackProcLifetime = true;
+    enableProcScraping = true;
+    ftraceEvents.add('sched/sched_wakeup');
+    ftraceEvents.add('sched/sched_wakeup_new');
+    ftraceEvents.add('power/suspend_resume');
   }
 
-  if (config.power) {
-    const androidPowerConfig: IAndroidPowerConfig = {};
-    androidPowerConfig.batteryPollMs = config.batteryPeriodMs;
-    androidPowerConfig.batteryCounters = config.batteryCounters.map(name => {
+  if (uiCfg.cpuFreq) {
+    ftraceEvents.add('power/cpu_frequency');
+    ftraceEvents.add('power/suspend_resume');
+  }
+
+  if (trackProcLifetime) {
+    ftraceEvents.add('sched/sched_process_exit');
+    ftraceEvents.add('sched/sched_process_fork');
+    ftraceEvents.add('sched/sched_process_free');
+    ftraceEvents.add('task/task_rename');
+  }
+
+  if (uiCfg.batteryDrain) {
+    const ds = new TraceConfig.DataSource();
+    ds.config = new DataSourceConfig();
+    ds.config.name = 'android.power';
+    ds.config.androidPowerConfig = new AndroidPowerConfig();
+    ds.config.androidPowerConfig.batteryPollMs = uiCfg.batteryDrainPollMs;
+    ds.config.androidPowerConfig.batteryCounters = [
+      AndroidPowerConfig.BatteryCounters.BATTERY_COUNTER_CAPACITY_PERCENT,
+      AndroidPowerConfig.BatteryCounters.BATTERY_COUNTER_CHARGE,
+      AndroidPowerConfig.BatteryCounters.BATTERY_COUNTER_CURRENT,
+    ];
+    protoCfg.dataSources.push(ds);
+  }
+
+  if (uiCfg.boardSensors) {
+    ftraceEvents.add('regulator/regulator_set_voltage');
+    ftraceEvents.add('regulator/regulator_set_voltage_complete');
+    ftraceEvents.add('power/clock_enable');
+    ftraceEvents.add('power/clock_disable');
+    ftraceEvents.add('power/clock_set_rate');
+    ftraceEvents.add('power/suspend_resume');
+  }
+
+  let sysStatsCfg: SysStatsConfig|undefined = undefined;
+
+  if (uiCfg.cpuCoarse) {
+    if (sysStatsCfg === undefined) sysStatsCfg = new SysStatsConfig();
+    sysStatsCfg.statPeriodMs = uiCfg.cpuCoarsePollMs;
+    sysStatsCfg.statCounters = [
+      SysStatsConfig.StatCounters.STAT_CPU_TIMES,
+      SysStatsConfig.StatCounters.STAT_FORK_COUNT,
+    ];
+  }
+
+  if (uiCfg.meminfo) {
+    if (sysStatsCfg === undefined) sysStatsCfg = new SysStatsConfig();
+    sysStatsCfg.meminfoPeriodMs = uiCfg.meminfoPeriodMs;
+    sysStatsCfg.meminfoCounters = uiCfg.meminfoCounters.map(name => {
       // tslint:disable-next-line no-any
-      return BatteryCounters[name as any as number] as any as number;
-    });
-
-    dataSources.push({
-      config: {
-        name: 'android.power',
-        androidPowerConfig,
-      },
+      return MeminfoCounters[name as any as number] as any as number;
     });
   }
 
-  const proto: ITraceConfig = {
-    durationMs,
-    buffers: [
-      {
-        sizeKb,
-      },
-    ],
-    dataSources,
-  };
+  if (uiCfg.vmstat) {
+    if (sysStatsCfg === undefined) sysStatsCfg = new SysStatsConfig();
+    sysStatsCfg.vmstatPeriodMs = uiCfg.vmstatPeriodMs;
+    sysStatsCfg.vmstatCounters = uiCfg.vmstatCounters.map(name => {
+      // tslint:disable-next-line no-any
+      return VmstatCounters[name as any as number] as any as number;
+    });
+  }
 
-  if (config.writeIntoFile) {
-    proto.writeIntoFile = true;
-    if (config.fileWritePeriodMs) {
-      proto.fileWritePeriodMs = config.fileWritePeriodMs;
+  if (uiCfg.memLmk) {
+    // For in-kernel LMK (roughly older devices until Go and Pixel 3).
+    ftraceEvents.add('sched/lowmemorykiller/lowmemory_kill');
+
+    // For userspace LMKd (newer devices).
+    // 'lmkd' is not really required because the code in lmkd.c emits events
+    // with ATRACE_TAG_ALWAYS. We need something just to ensure that the final
+    // config will enable atrace userspace events.
+    atraceApps.add('lmkd');
+
+    ftraceEvents.add('oom/oom_score_adj_update');
+    trackInitialOomScore = true;
+  }
+
+  // TODO here, think also to ps tree.
+  if (uiCfg.procStats || trackInitialOomScore) {
+    const ds = new TraceConfig.DataSource();
+    ds.config = new DataSourceConfig();
+    ds.config.name = 'linux.process_stats';
+    ds.config.processStatsConfig = new ProcessStatsConfig();
+    ds.config.processStatsConfig.procStatsPollMs = uiCfg.procStatsPeriodMs;
+    if (trackInitialOomScore) {
+      ds.config.processStatsConfig.scanAllProcessesOnStart = true;
     }
+    protoCfg.dataSources.push(ds);
   }
 
-  const buffer = TraceConfig.encode(proto).finish();
+  // Keep these last. The stages above can enrich them.
+
+  if (sysStatsCfg !== undefined) {
+    const ds = new TraceConfig.DataSource();
+    ds.config = new DataSourceConfig();
+    ds.config.name = 'linux.sys_stats';
+    ds.config.sysStatsConfig = sysStatsCfg;
+    protoCfg.dataSources.push(ds);
+  }
+
+  if (ftraceEvents.size > 0 || atraceCats.size > 0 || atraceApps.size > 0) {
+    const ds = new TraceConfig.DataSource();
+    ds.config = new DataSourceConfig();
+    ds.config.name = 'linux.ftrace';
+    ds.config.ftraceConfig = new FtraceConfig();
+    ds.config.ftraceConfig.bufferSizeKb = uiCfg.ftraceBufferSizeKb;
+    ds.config.ftraceConfig.ftraceEvents = Array.from(ftraceEvents);
+    ds.config.ftraceConfig.atraceCategories = Array.from(atraceCats);
+    ds.config.ftraceConfig.atraceApps = uiCfg.atraceApps;
+    protoCfg.dataSources.push(ds);
+  }
+
+  // TODO ion and rss_stat.
+
+  const buffer = TraceConfig.encode(protoCfg).finish();
   return buffer;
 }
 
@@ -155,7 +199,8 @@ export function toPbtxt(configBuffer: Uint8Array): string {
   // fields are enums.
   function looksLikeEnum(value: string): boolean {
     return value.startsWith('MEMINFO_') || value.startsWith('VMSTAT_') ||
-        value.startsWith('STAT_') || value.startsWith('BATTERY_COUNTER_');
+        value.startsWith('STAT_') || value.startsWith('BATTERY_COUNTER_') ||
+        value === 'DISCARD' || value === 'RING_BUFFER';
   }
   function* message(msg: {}, indent: number): IterableIterator<string> {
     for (const [key, value] of Object.entries(msg)) {
@@ -193,7 +238,7 @@ export class RecordController extends Controller<'main'> {
   run() {
     if (this.app.state.recordConfig === this.config) return;
     this.config = this.app.state.recordConfig;
-    const configProto = encodeConfig(this.config);
+    const configProto = genConfigProto(this.config);
     const configProtoText = toPbtxt(configProto);
     const commandline = `
       echo '${uint8ArrayToBase64(configProto)}' |

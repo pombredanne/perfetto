@@ -85,6 +85,11 @@ export interface Note {
   text: string;
 }
 
+export interface SliceSelection {
+  utid: number;
+  id: number;
+}
+
 export interface State {
   route: string|null;
   nextId: number;
@@ -109,6 +114,7 @@ export interface State {
   notes: ObjectById<Note>;
   status: Status;
   selectedNote: string|null;
+  selectedSlice: SliceSelection|null;
 
   /**
    * This state is updated on the frontend at 60Hz and eventually syncronised to
@@ -124,7 +130,8 @@ export const defaultTraceTime = {
   endSec: 10,
 };
 
-export declare type RecordMode = 'STOP_WHEN_FULL' | 'RING_BUFFER' | 'LONG_TRACE';
+export declare type RecordMode =
+    'STOP_WHEN_FULL' | 'RING_BUFFER' | 'LONG_TRACE';
 
 export interface RecordConfig {
   [key: string]: null|number|boolean|string|string[];
@@ -132,105 +139,93 @@ export interface RecordConfig {
   // Global settings
   mode: RecordMode;
   durationMs: number;
-  durationSeconds: number;
-  writeIntoFile: boolean;
-  maxFileSizeMb: number;
-  fileWritePeriodMs: number|null;
-
-  // Buffer setup
   bufferSizeMb: number;
 
+  // Valid only when mode == 'LONG_TRACE'.
+  maxFileSizeMb: number;
+  fileWritePeriodMs: number;
+
   // CPU probes
-  cpuCoarse: boolean;
   cpuSched: boolean;
   cpuLatency: boolean;
-
-  // Power probes
-  batteryDrain: boolean;
-  boardSensors: boolean;
   cpuFreq: boolean;
 
-  // Memory probes
-  memMeminfo: boolean;
-  memVmstat: boolean;
-  memLmk: boolean;
-  memProcStat: boolean;
+  cpuCoarse: boolean;
+  cpuCoarsePollMs: number;
 
-  // Ftrace
+  // Ftrace and atrace.
   ftrace: boolean;
   atrace: boolean;
   ftraceEvents: string[];
-  atraceCategories: string[];
+  atraceCats: string[];
   atraceApps: string[];
-  ftraceDrainPeriodMs: number;
   ftraceBufferSizeKb: number;
 
-  // Ps
-  processMetadata: boolean;
-  scanAllProcessesOnStart: boolean;
-  procStatusPeriodMs: number;
+  batteryDrain: boolean;
+  batteryDrainPollMs: number;
 
-  // SysStats
-  sysStats: boolean;
+  boardSensors: boolean;
+
+  // Memory probes
+  meminfo: boolean;
   meminfoPeriodMs: number;
   meminfoCounters: string[];
+
+  vmstat: boolean;
   vmstatPeriodMs: number;
   vmstatCounters: string[];
-  statPeriodMs: number;
-  statCounters: string[];
 
-  // Battery and power
-  power: boolean;
-  batteryPeriodMs: number;
-  batteryCounters: string[];
+  memLmk: boolean;
+
+  // Ps
+  procStats: boolean;
+  procStatsPeriodMs: number;
+  processMetadata: boolean;
+  scanAllProcessesOnStart: boolean;
 }
 
 export function createEmptyRecordConfig(): RecordConfig {
   return {
     mode: 'STOP_WHEN_FULL',
     durationMs: 10000.0,
-    durationSeconds: 10.0,
-    writeIntoFile: false,
     maxFileSizeMb: 100,
-    fileWritePeriodMs: null,
+    fileWritePeriodMs: 2500,
     bufferSizeMb: 10.0,
 
-    cpuCoarse: false,
     cpuSched: false,
     cpuLatency: false,
-
-    batteryDrain: false,
-    boardSensors: false,
     cpuFreq: false,
-
-    memMeminfo: false,
-    memVmstat: false,
-    memLmk: false,
-    memProcStat: false,
 
     ftrace: false,
     atrace: false,
     ftraceEvents: [],
     atraceApps: [],
-    atraceCategories: [],
-    ftraceDrainPeriodMs: null,
+    atraceCats: [],
     ftraceBufferSizeKb: 2 * 1024,
+
+    cpuCoarse: false,
+    cpuCoarsePollMs: 1000,
+
+    batteryDrain: false,
+    batteryDrainPollMs: 1000,
+
+    boardSensors: false,
+
+    meminfo: false,
+    meminfoPeriodMs: 1000,
+    meminfoCounters: [],
+
+    vmstat: false,
+    vmstatPeriodMs: 1000,
+    vmstatCounters: [],
+
+    memLmk: false,
+    procStats: false,
+    procStatsPeriodMs: 1000,
+    ///
 
     processMetadata: false,
     scanAllProcessesOnStart: false,
-    procStatusPeriodMs: 1000,
-
-    sysStats: false,
-    meminfoPeriodMs: 1000,
-    meminfoCounters: [],
-    vmstatPeriodMs: 1000,
-    vmstatCounters: [],
-    statPeriodMs: 1000,
-    statCounters: [],
-
-    power: false,
-    batteryPeriodMs: 1000,
-    batteryCounters: [],
   };
 }
 
@@ -258,5 +253,6 @@ export function createEmptyState(): State {
 
     status: {msg: '', timestamp: 0},
     selectedNote: null,
+    selectedSlice: null,
   };
 }

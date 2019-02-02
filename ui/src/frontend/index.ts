@@ -20,7 +20,7 @@ import {forwardRemoteCalls} from '../base/remote';
 import {Actions} from '../common/actions';
 import {State} from '../common/state';
 
-import {globals, QuantizedLoad, ThreadDesc} from './globals';
+import {globals, QuantizedLoad, ThreadDesc, SliceDetails} from './globals';
 import {HomePage} from './home_page';
 import {openBufferWithLegacyTraceViewer} from './legacy_trace_viewer';
 import {RecordPage} from './record_page';
@@ -61,7 +61,7 @@ class FrontendApi {
   }
 
   publishTrackData(args: {id: string, data: {}}) {
-    globals.trackDataStore.set(args.id, args.data);
+    globals.setTrackData(args.id, args.data);
     globals.rafScheduler.scheduleRedraw();
   }
 
@@ -75,6 +75,11 @@ class FrontendApi {
     data.forEach(thread => {
       globals.threads.set(thread.utid, thread);
     });
+    this.redraw();
+  }
+
+  publishSliceDetails(click: SliceDetails) {
+    globals.sliceDetails = click;
     this.redraw();
   }
 
@@ -109,11 +114,6 @@ function main() {
         '/': HomePage,
         '/viewer': ViewerPage,
         '/record': RecordPage,
-        '/record/advanced': RecordPage,
-        '/record/buffers': RecordPage,
-        '/record/cpu': RecordPage,
-        '/record/memory': RecordPage,
-        '/record/power': RecordPage,
       },
       dispatch);
   forwardRemoteCalls(channel.port2, new FrontendApi(router));
@@ -128,7 +128,7 @@ function main() {
   (window as {} as {globals: {}}).globals = globals;
 
   // /?s=xxxx for permalinks.
-  const stateHash = router.param('s');
+  const stateHash = Router.param('s');
   if (stateHash) {
     globals.dispatch(Actions.loadPermalink({
       hash: stateHash,

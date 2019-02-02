@@ -19,8 +19,10 @@ import {Actions} from '../common/actions';
 import {MeminfoCounters, VmstatCounters} from '../common/protos';
 import {RecordConfig, RecordMode} from '../common/state';
 
+import {copyToClipboard} from './clipboard';
 import {globals} from './globals';
 import {createPage} from './pages';
+import {Router} from './router';
 
 const BUF_SIZES_MB = [4, 8, 16, 32, 64, 128, 256, 512];
 const DURATIONS_MS = [
@@ -36,7 +38,7 @@ const DURATIONS_MS = [
   3600000 * 12
 ];
 const FILE_SIZES_MB = [5, 25, 50, 100, 500, 1000, 1000 * 5, 1000 * 10];
-const FTRACE_BUF_MB = [1, 2, 4, 8, 16, 32, 64, 128];
+const FTRACE_BUF_MB = [1, 2, 4, 8, 16, 32];
 const FTRACE_FLUSH_MS = [100, 250, 500, 1000, 2500, 5000];
 const POLL_RATE_MS = [250, 500, 1000, 2500, 5000, 30000, 60000];
 
@@ -258,7 +260,7 @@ function RecSettings() {
         m('.wizard',
 
           Slider({
-            title: 'Ftrace kernel buffer size',
+            title: 'Ftrace kernel buffer size (per-cpu)',
             icon: 'donut_large',
             predefinedValues: FTRACE_BUF_MB,
             unit: 'MB',
@@ -303,9 +305,9 @@ function PowerSettings() {
               predefinedValues: POLL_RATE_MS,
               unit: 'ms',
               set: (cfg, val) => {
-                cfg.batteryPeriodMs = val;
+                cfg.batteryDrainPollMs = val;
               },
-              get: (cfg) => cfg.batteryPeriodMs
+              get: (cfg) => cfg.batteryDrainPollMs
             })),
         Probe({
           title: 'CPU frequency and idle states',
@@ -348,9 +350,9 @@ function CpuSettings() {
               predefinedValues: POLL_RATE_MS,
               unit: 'ms',
               set: (cfg, val) => {
-                cfg.statPeriodMs = val;
+                cfg.cpuCoarsePollMs = val;
               },
-              get: (cfg) => cfg.statPeriodMs
+              get: (cfg) => cfg.cpuCoarsePollMs
             })),
         Probe({
           title: 'Scheduling details',
@@ -398,9 +400,9 @@ function MemorySettings() {
               img: 'meminfo.png',
               descr: 'Polling of /proc/meminfo',
               setEnabled: (cfg, val) => {
-                cfg.memMeminfo = val;
+                cfg.meminfo = val;
               },
-              isEnabled: (cfg) => cfg.memMeminfo
+              isEnabled: (cfg) => cfg.meminfo
             },
             Slider({
               title: 'Poll rate',
@@ -426,9 +428,9 @@ function MemorySettings() {
               img: 'vmstat.png',
               descr: 'Polling of /proc/vmstat. TODO ftrace counters',
               setEnabled: (cfg, val) => {
-                cfg.memVmstat = val;
+                cfg.vmstat = val;
               },
-              isEnabled: (cfg) => cfg.memVmstat
+              isEnabled: (cfg) => cfg.vmstat
             },
             Slider({
               title: 'Poll rate',
@@ -454,7 +456,9 @@ function MemorySettings() {
         Probe({
           title: 'Low memory killer',
           img: 'lmk.png',
-          descr: 'TODO descr',
+          descr: `Record LMK events. Works both with the old in-kernel LMK
+                  and the newer userspace lmkd. It also tracks OOM score
+                  adjustments.`,
           setEnabled: (cfg, val) => {
             cfg.memLmk = val;
           },
@@ -464,12 +468,12 @@ function MemorySettings() {
         Probe(
             {
               title: 'Per process stats',
-              img: 'procstats.png',
-              descr: 'TODO poll /proc/*/stat.descr',
+              img: 'ps_stats.png',
+              descr: 'TODO description poll /proc/*/stat.',
               setEnabled: (cfg, val) => {
-                cfg.memProcStat = val;
+                cfg.procStats = val;
               },
-              isEnabled: (cfg) => cfg.memProcStat
+              isEnabled: (cfg) => cfg.procStats
             },
             Slider({
               title: 'Poll rate',
@@ -477,9 +481,9 @@ function MemorySettings() {
               predefinedValues: POLL_RATE_MS,
               unit: 'ms',
               set: (cfg, val) => {
-                cfg.procStatusPeriodMs = val;
+                cfg.procStatsPeriodMs = val;
               },
-              get: (cfg) => cfg.procStatusPeriodMs
+              get: (cfg) => cfg.procStatsPeriodMs
             }), )));
 }
 
@@ -513,6 +517,26 @@ function AdvancedSettings() {
   ATRACE_CATEGORIES.set('nnapi', 'Neural Network API');
   ATRACE_CATEGORIES.set('rro', 'Resource Overlay');
 
+  const FTRACE_CATEGORIES = new Map<string, string>();
+  FTRACE_CATEGORIES.set('binder/*', 'binder');
+  FTRACE_CATEGORIES.set('block/*', 'block');
+  FTRACE_CATEGORIES.set('clk/*', 'clk');
+  FTRACE_CATEGORIES.set('ext4/*', 'ext4');
+  FTRACE_CATEGORIES.set('f2fs/*', 'f2fs');
+  FTRACE_CATEGORIES.set('i2c/*', 'i2c');
+  FTRACE_CATEGORIES.set('irq/*', 'irq');
+  FTRACE_CATEGORIES.set('kmem/*', 'kmem');
+  FTRACE_CATEGORIES.set('memory_bus/*', 'memory_bus');
+  FTRACE_CATEGORIES.set('mmc/*', 'mmc');
+  FTRACE_CATEGORIES.set('oom/*', 'oom');
+  FTRACE_CATEGORIES.set('power/*', 'power');
+  FTRACE_CATEGORIES.set('regulator/*', 'regulator');
+  FTRACE_CATEGORIES.set('sched/*', 'sched');
+  FTRACE_CATEGORIES.set('sync/*', 'sync');
+  FTRACE_CATEGORIES.set('task/*', 'task');
+  FTRACE_CATEGORIES.set('task/*', 'task');
+  FTRACE_CATEGORIES.set('vmscan/*', 'vmscan');
+
   return m(
       'div',
       m('.container',
@@ -532,29 +556,97 @@ function AdvancedSettings() {
               cssClass: '.multicolumn.atrace_categories',
               options: ATRACE_CATEGORIES,
               set: (cfg, val) => {
-                cfg.atraceCategories = val;
+                cfg.atraceCats = val;
               },
-              get: (cfg) => cfg.atraceCategories
+              get: (cfg) => cfg.atraceCats
             }), ),
-        Probe({
-          title: 'Extra kernel events',
-          img: 'rec_ftrace.png',
-          descr: `Enables extra events from the ftrace kernel tracer.`,
-          setEnabled: (cfg, val) => {
-            cfg.ftrace = val;
+        Probe(
+            {
+              title: 'Extra kernel events',
+              img: 'rec_ftrace.png',
+              descr: `Enables extra events from the ftrace kernel tracer.`,
+              setEnabled: (cfg, val) => {
+                cfg.ftrace = val;
+              },
+              isEnabled: (cfg) => cfg.ftrace
+            },
+            Dropdown({
+              title: 'Event groups',
+              cssClass: '.multicolumn.ftrace_events',
+              options: FTRACE_CATEGORIES,
+              set: (cfg, val) => {
+                cfg.ftraceEvents = val;
+              },
+              get: (cfg) => cfg.ftraceEvents
+            }), )));
+}
+
+interface CodeSampleAttrs {
+  text: string;
+  hardWhitespace?: boolean;
+}
+
+
+class CodeSample implements m.ClassComponent<CodeSampleAttrs> {
+  view({attrs}: m.CVnode<CodeSampleAttrs>) {
+    return m(
+        '.example-code',
+        m('button',
+          {
+            title: 'Copy to clipboard',
+            onclick: () => copyToClipboard(attrs.text),
           },
-          isEnabled: (cfg) => cfg.ftrace
-        }, )));
+          m('i.material-icons', 'assignment')),
+        m('code',
+          {
+            style: {
+              'white-space': attrs.hardWhitespace ? 'pre' : null,
+            },
+          },
+          attrs.text), );
+  }
+}
+
+function Instructions() {
+  const data = globals.trackDataStore.get('config') as {
+    commandline: string,
+    pbtxt: string,
+  } | null;
+
+  const pbtx = data ? data.pbtxt : '';
+  let cmd = '';
+  cmd += 'adb shell perfetto \\\n';
+  cmd += '  -c - --txt  # Read config from stdin (text mode) \\\n';
+  cmd += '  -o /data/misc/perfetto-traces/trace \\\n';
+  cmd += '<<EOF\n';
+  cmd += pbtx;
+  cmd += '\nEOF\n';
+
+  return m(
+      'div',
+      m('.container',
+        m('header', 'Instructions'),
+        m('label',
+          'Select target platform',
+          m('select',
+            m('option', 'Android Q+'),
+            m('option', 'Android P'),
+            m('option', 'Android O-'),
+            m('option', 'Linux desktop'))),
+
+        m(CodeSample, {text: cmd, hardWhitespace: true}),
+
+        ));
 }
 
 export const RecordPage = createPage({
   view() {
-    let routePage = '';
+    let routePage = Router.param('p');
     let page = undefined;
-    if (globals.state.route) {
-      routePage = globals.state.route.split('/').splice(-1)[0] || '';
-    }
     switch (routePage) {
+      case 'instructions':
+        page = Instructions();
+        break;
       case 'cpu':
         page = CpuSettings();
         break;
@@ -578,44 +670,48 @@ export const RecordPage = createPage({
           m('.menu',
             m('header', 'Global settings'),
             m('ul',
-              m('a[href="#!/record/buffers"]',
+              m('a[href="#!/record?p=buffers"]',
                 m(`li${routePage === 'buffers' ? '.active' : ''}`,
                   m('i.material-icons', 'tune'),
                   m('.title', 'Recording options'),
                   m('.sub', 'Buffer mode, size and duration'))),
-              m('a[href="#!/record/advanced"]',
+              m('a[href="#!/record?p=instructions"]',
+                m(`li${routePage === 'instructions' ? '.active' : ''}`,
+                  m('i.material-icons.rec', 'fiber_manual_record'),
+                  m('.title', 'Start recording'),
+                  m('.sub', 'Generate config and instructions'))),
+              m('a[href="#!/record?p=advanced"]',
                 m(`li${routePage === 'advanced' ? '.active' : ''}`,
                   m('i.material-icons', 'settings'),
                   m('.title', 'Advanced'),
                   m('.sub', 'Advanced ftrace & atrace settings'))), ),
             m('header', 'Platform probes'),
             m('ul',
-              m('a[href="#!/record/cpu"]',
+              m('a[href="#!/record?p=cpu"]',
                 m(`li${routePage === 'cpu' ? '.active' : ''}`,
                   m('i.material-icons', 'subtitles'),
                   m('.title', 'CPU'),
                   m('.sub', 'CPU usage, scheduling, wakeups'))),
-              m('a[href="#!/record/power"]',
+              m('a[href="#!/record?p=power"]',
                 m(`li${routePage === 'power' ? '.active' : ''}`,
                   m('i.material-icons', 'battery_charging_full'),
                   m('.title', 'Power'),
                   m('.sub', 'Battery and other energy counters'))),
-              m('a[href="#!/record/memory"]',
+              m('a[href="#!/record?p=memory"]',
                 m(`li${routePage === 'memory' ? '.active' : ''}`,
                   m('i.material-icons', 'memory'),
                   m('.title', 'Memory'),
                   m('.sub', 'Physical mem, VM, LMK'))),
-              //     m('a[href="#!/record/io"]',
-              //   m(`li${routePage === 'io' ? '.active' : ''}`,
-              //     m('i.material-icons', 'sd_storage'),
-              //     m('.title', 'Disk I/O'),
-              //     m('.sub', 'TODO'))),
-              // m('a[href="#!/record/peripherals"]',
-              //   m(`li${routePage === 'peripherals' ? '.active' : ''}`,
-              //     m('i.material-icons', 'developer_board'),
-              //     m('.title', 'Peripherals'),
-              //     m('.sub', 'I2C, radio and other stuff'))),
-              ),
+              m('a[href="#!/record?p=io"]',
+                m(`li${routePage === 'io' ? '.active' : ''}`,
+                  m('i.material-icons', 'sd_storage'),
+                  m('.title', 'Disk I/O'),
+                  m('.sub', 'TODO'))),
+              m('a[href="#!/record?p=peripherals"]',
+                m(`li${routePage === 'peripherals' ? '.active' : ''}`,
+                  m('i.material-icons', 'developer_board'),
+                  m('.title', 'Peripherals'),
+                  m('.sub', 'I2C, radio and other stuff'))), ),
             m('header', 'Android'),
             m('li',
               m('i.material-icons', 'android'),

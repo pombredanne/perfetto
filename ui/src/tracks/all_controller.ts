@@ -20,3 +20,4 @@ import './vsync/controller';
 import './process_summary/controller';
 import './counter/controller';
 import './cpu_freq/controller';
+import './android_log/controller';
