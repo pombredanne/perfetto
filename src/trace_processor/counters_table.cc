@@ -129,27 +129,21 @@ int CountersTable::RefColumn::CompareRefsAsc(uint32_t f, uint32_t s) const {
   auto type_f = storage_->counters().types()[f];
   auto type_s = storage_->counters().types()[s];
 
+  int64_t val_f = ref_f;
+  int64_t val_s = ref_s;
   if (type_f == RefType::kRefUtidLookupUpid) {
     auto upid_f = storage_->GetThread(static_cast<uint32_t>(ref_f)).upid;
-    if (type_s == RefType::kRefUtidLookupUpid) {
-      auto upid_s = storage_->GetThread(static_cast<uint32_t>(ref_s)).upid;
-      if (!upid_f.has_value() && !upid_s.has_value()) {
-        return 0;
-      } else if (!upid_f.has_value()) {
-        return -1;
-      } else if (!upid_s.has_value()) {
-        return 1;
-      }
-      return sqlite_utils::CompareValuesAsc(upid_f.value(), upid_s.value());
-    }
     if (!upid_f.has_value())
       return -1;
-  } else if (type_s == RefType::kRefUtidLookupUpid) {
+    val_f = upid_f.value();
+  }
+  if (type_s == RefType::kRefUtidLookupUpid) {
     auto upid_s = storage_->GetThread(static_cast<uint32_t>(ref_s)).upid;
     if (!upid_s.has_value())
-      return 1;
+      return -1;
+    val_s = upid_s.value();
   }
-  return sqlite_utils::CompareValuesAsc(ref_f, ref_s);
+  return sqlite_utils::CompareValuesAsc(val_f, val_s);
 }
 
 }  // namespace trace_processor
