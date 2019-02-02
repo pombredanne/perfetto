@@ -17,7 +17,9 @@ import * as protos from '../gen/protos';
 
 // Aliases protos to avoid the super nested namespaces.
 // See https://www.typescriptlang.org/docs/handbook/namespaces.html#aliases
+import AndroidLogConfig = protos.perfetto.protos.AndroidLogConfig;
 import AndroidPowerConfig = protos.perfetto.protos.AndroidPowerConfig;
+import AndroidLogId = protos.perfetto.protos.AndroidLogId;
 import BatteryCounters =
     protos.perfetto.protos.AndroidPowerConfig.BatteryCounters;
 import BufferConfig = protos.perfetto.protos.TraceConfig.BufferConfig;
@@ -191,6 +193,8 @@ export function*
 }
 
 export {
+  AndroidLogConfig,
+  AndroidLogId,
   AndroidPowerConfig,
   BatteryCounters,
   BufferConfig,

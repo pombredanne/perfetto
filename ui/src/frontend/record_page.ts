@@ -38,7 +38,7 @@ const DURATIONS_MS = [
   3600000 * 12
 ];
 const FILE_SIZES_MB = [5, 25, 50, 100, 500, 1000, 1000 * 5, 1000 * 10];
-const FTRACE_BUF_MB = [1, 2, 4, 8, 16, 32];
+const FTRACE_BUF_KB = [512, 1024, 2 * 1024, 4 * 1024, 16 * 1024, 32 * 1024];
 const FTRACE_FLUSH_MS = [100, 250, 500, 1000, 2500, 5000];
 const POLL_RATE_MS = [250, 500, 1000, 2500, 5000, 30000, 60000];
 
@@ -70,6 +70,38 @@ interface DropdownConfig {
   options: Map<string, string>;
   get: Getter<string[]>;
   set: Setter<string[]>;
+}
+
+interface TextareaConfig {
+  placeholder: string;
+  cssClass?: string;
+  get: Getter<string>;
+  set: Setter<string>;
+}
+
+interface CodeSampleAttrs {
+  text: string;
+  hardWhitespace?: boolean;
+}
+
+class CodeSample implements m.ClassComponent<CodeSampleAttrs> {
+  view({attrs}: m.CVnode<CodeSampleAttrs>) {
+    return m(
+        '.example-code',
+        m('button',
+          {
+            title: 'Copy to clipboard',
+            onclick: () => copyToClipboard(attrs.text),
+          },
+          m('i.material-icons', 'assignment')),
+        m('code',
+          {
+            style: {
+              'white-space': attrs.hardWhitespace ? 'pre' : null,
+            },
+          },
+          attrs.text), );
+  }
 }
 
 function Dropdown(cfg: DropdownConfig) {
@@ -110,11 +142,24 @@ function Dropdown(cfg: DropdownConfig) {
         onblur: resetScroll,
         onmouseleave: resetScroll,
         oninput: onChange,
-        oncreate: (vnode) => {
-          resetScroll.bind(vnode.dom as HTMLSelectElement)();
-        }
+        oncreate: (vnode) => resetScroll.bind(vnode.dom as HTMLSelectElement)(),
       },
       m('optgroup', {label}, options));
+}
+
+
+function Textarea(cfg: TextareaConfig) {
+  const onChange = function(this: HTMLSelectElement) {
+    const traceCfg = produce(globals.state.recordConfig, draft => {
+      cfg.set(draft, this.value);
+    });
+    globals.dispatch(Actions.setConfig({config: traceCfg}));
+  };
+  return m(`textarea.extra_input${cfg.cssClass || ''}`, {
+    onchange: onChange,
+    placeholder: cfg.placeholder,
+    value: cfg.get(globals.state.recordConfig)
+  });
 }
 
 function Probe(cfg: ProbeConfig, ...children: m.Children[]) {
@@ -129,11 +174,7 @@ function Probe(cfg: ProbeConfig, ...children: m.Children[]) {
 
   return m(
       `.probe${enabled ? '.enabled' : ''}`,
-      m(`img[src=assets/${cfg.img}]`, {
-        onclick: () => {
-          onToggle(!enabled);
-        }
-      }),
+      m(`img[src=assets/${cfg.img}]`, {onclick: () => onToggle(!enabled)}),
       m('label',
         m(`input[type=checkbox]`,
           {checked: enabled, oninput: m.withAttr('checked', onToggle)}),
@@ -226,9 +267,7 @@ function RecSettings() {
             icon: '360',
             predefinedValues: BUF_SIZES_MB,
             unit: 'MB',
-            set: (cfg, val) => {
-              cfg.bufferSizeMb = val;
-            },
+            set: (cfg, val) => cfg.bufferSizeMb = val,
             get: (cfg) => cfg.bufferSizeMb
           }),
 
@@ -238,47 +277,25 @@ function RecSettings() {
             predefinedValues: DURATIONS_MS,
             isTime: true,
             unit: 'h:m:s',
-            set: (cfg, val) => {
-              cfg.durationMs = val;
-            },
+            set: (cfg, val) => cfg.durationMs = val,
             get: (cfg) => cfg.durationMs
           }),
-
-
           Slider({
             title: 'Max file size',
             icon: 'save',
             cssClass: cfg.mode !== 'LONG_TRACE' ? '.hide' : '',
             predefinedValues: FILE_SIZES_MB,
             unit: 'MB',
-            set: (cfg, val) => {
-              cfg.maxFileSizeMb = val;
-            },
+            set: (cfg, val) => cfg.maxFileSizeMb = val,
             get: (cfg) => cfg.maxFileSizeMb
-          })),
-
-        m('.wizard',
-
-          Slider({
-            title: 'Ftrace kernel buffer size (per-cpu)',
-            icon: 'donut_large',
-            predefinedValues: FTRACE_BUF_MB,
-            unit: 'MB',
-            set: (cfg, val) => {
-              cfg.ftraceBufferSizeKb = val * 1024;
-            },
-            get: (cfg) => Math.ceil(cfg.ftraceBufferSizeKb / 1024)
           }),
-
           Slider({
             title: 'Flush on disk every',
             cssClass: cfg.mode !== 'LONG_TRACE' ? '.hide' : '',
             icon: 'av_timer',
             predefinedValues: FTRACE_FLUSH_MS,
             unit: 'ms',
-            set: (cfg, val) => {
-              cfg.fileWritePeriodMs = val;
-            },
+            set: (cfg, val) => cfg.fileWritePeriodMs = val,
             get: (cfg) => cfg.fileWritePeriodMs || 0
           }))));
 }
@@ -294,9 +311,7 @@ function PowerSettings() {
               descr:
                   'Polls charge counters and instantaneous power draw from ' +
                   'the battery power management IC.',
-              setEnabled: (cfg, val) => {
-                cfg.batteryDrain = val;
-              },
+              setEnabled: (cfg, val) => cfg.batteryDrain = val,
               isEnabled: (cfg) => cfg.batteryDrain
             },
             Slider({
@@ -304,27 +319,21 @@ function PowerSettings() {
               cssClass: '.thin',
               predefinedValues: POLL_RATE_MS,
               unit: 'ms',
-              set: (cfg, val) => {
-                cfg.batteryDrainPollMs = val;
-              },
+              set: (cfg, val) => cfg.batteryDrainPollMs = val,
               get: (cfg) => cfg.batteryDrainPollMs
             })),
         Probe({
           title: 'CPU frequency and idle states',
           img: 'cpu_freq.png',
           descr: 'Records cpu frequency and idle state changes via ftrace',
-          setEnabled: (cfg, val) => {
-            cfg.cpuFreq = val;
-          },
+          setEnabled: (cfg, val) => cfg.cpuFreq = val,
           isEnabled: (cfg) => cfg.cpuFreq
         }),
         Probe({
           title: 'Board voltages & frequencies',
           img: 'board_voltage.png',
           descr: 'Tracks voltage and frequency changes from board sensors',
-          setEnabled: (cfg, val) => {
-            cfg.boardSensors = val;
-          },
+          setEnabled: (cfg, val) => cfg.boardSensors = val,
           isEnabled: (cfg) => cfg.boardSensors
         }), ));
 }
@@ -339,9 +348,7 @@ function CpuSettings() {
               img: 'rec_cpu_coarse.png',
               descr: `Lightweight polling of CPU usage counters via /proc/stat.
                       Allows to monitor CPU usage over fixed periods of time.`,
-              setEnabled: (cfg, val) => {
-                cfg.cpuCoarse = val;
-              },
+              setEnabled: (cfg, val) => cfg.cpuCoarse = val,
               isEnabled: (cfg) => cfg.cpuCoarse
             },
             Slider({
@@ -349,18 +356,14 @@ function CpuSettings() {
               cssClass: '.thin',
               predefinedValues: POLL_RATE_MS,
               unit: 'ms',
-              set: (cfg, val) => {
-                cfg.cpuCoarsePollMs = val;
-              },
+              set: (cfg, val) => cfg.cpuCoarsePollMs = val,
               get: (cfg) => cfg.cpuCoarsePollMs
             })),
         Probe({
           title: 'Scheduling details',
           img: 'rec_cpu_fine.png',
           descr: 'Enables high-detailed tracking of scheduling events',
-          setEnabled: (cfg, val) => {
-            cfg.cpuSched = val;
-          },
+          setEnabled: (cfg, val) => cfg.cpuSched = val,
           isEnabled: (cfg) => cfg.cpuSched
         }),
         Probe({
@@ -369,9 +372,7 @@ function CpuSettings() {
           descr: `Tracks causality of scheduling transitions. When a task
                   X transitions from blocked -> runnable, keeps track of the
                   task Y that X's transition (e.g. posting a semaphore).`,
-          setEnabled: (cfg, val) => {
-            cfg.cpuLatency = val;
-          },
+          setEnabled: (cfg, val) => cfg.cpuLatency = val,
           isEnabled: (cfg) => cfg.cpuLatency
         }), ));
 }
@@ -399,9 +400,7 @@ function MemorySettings() {
               title: 'Kernel meminfo',
               img: 'meminfo.png',
               descr: 'Polling of /proc/meminfo',
-              setEnabled: (cfg, val) => {
-                cfg.meminfo = val;
-              },
+              setEnabled: (cfg, val) => cfg.meminfo = val,
               isEnabled: (cfg) => cfg.meminfo
             },
             Slider({
@@ -409,70 +408,42 @@ function MemorySettings() {
               cssClass: '.thin',
               predefinedValues: POLL_RATE_MS,
               unit: 'ms',
-              set: (cfg, val) => {
-                cfg.meminfoPeriodMs = val;
-              },
+              set: (cfg, val) => cfg.meminfoPeriodMs = val,
               get: (cfg) => cfg.meminfoPeriodMs
             }),
             Dropdown({
               title: 'Select counters',
+              cssClass: '.multicolumn',
               options: meminfoOpts,
-              set: (cfg, val) => {
-                cfg.meminfoCounters = val;
-              },
+              set: (cfg, val) => cfg.meminfoCounters = val,
               get: (cfg) => cfg.meminfoCounters
             })),
-        Probe(
-            {
-              title: 'Virtual memory stats',
-              img: 'vmstat.png',
-              descr: 'Polling of /proc/vmstat. TODO ftrace counters',
-              setEnabled: (cfg, val) => {
-                cfg.vmstat = val;
-              },
-              isEnabled: (cfg) => cfg.vmstat
-            },
-            Slider({
-              title: 'Poll rate',
-              cssClass: '.thin',
-              predefinedValues: POLL_RATE_MS,
-              unit: 'ms',
-              set: (cfg, val) => {
-                cfg.vmstatPeriodMs = val;
-              },
-              get: (cfg) => cfg.vmstatPeriodMs
-            }),
-            Dropdown({
-              title: 'Select counters',
-              options: vmstatOpts,
-              set: (cfg, val) => {
-                cfg.vmstatCounters = val;
-              },
-              get: (cfg) => cfg.vmstatCounters
-            }),  //
-            ),
-        m('header', 'Per-process probes'),
-
+        Probe({
+          title: 'High-frequency memory events',
+          img: 'mem_hifreq.png',
+          descr: `Allows to track short memory spikes and transitories through
+                  ftrace's mm_event, rss_stat and ion events. Avialable only
+                  on recent Android Q+ kernels`,
+          setEnabled: (cfg, val) => cfg.memHiFreq = val,
+          isEnabled: (cfg) => cfg.memHiFreq
+        }),
         Probe({
           title: 'Low memory killer',
           img: 'lmk.png',
           descr: `Record LMK events. Works both with the old in-kernel LMK
                   and the newer userspace lmkd. It also tracks OOM score
                   adjustments.`,
-          setEnabled: (cfg, val) => {
-            cfg.memLmk = val;
-          },
+          setEnabled: (cfg, val) => cfg.memLmk = val,
           isEnabled: (cfg) => cfg.memLmk
         }),
-
         Probe(
             {
               title: 'Per process stats',
               img: 'ps_stats.png',
-              descr: 'TODO description poll /proc/*/stat.',
-              setEnabled: (cfg, val) => {
-                cfg.procStats = val;
-              },
+              descr: `Periodically samples all processes in the system tracking:
+                      their thread list, memory counters (RSS, swap and other
+                      /proc/status counters) and oom_score_adj.`,
+              setEnabled: (cfg, val) => cfg.procStats = val,
               isEnabled: (cfg) => cfg.procStats
             },
             Slider({
@@ -480,15 +451,38 @@ function MemorySettings() {
               cssClass: '.thin',
               predefinedValues: POLL_RATE_MS,
               unit: 'ms',
-              set: (cfg, val) => {
-                cfg.procStatsPeriodMs = val;
-              },
+              set: (cfg, val) => cfg.procStatsPeriodMs = val,
               get: (cfg) => cfg.procStatsPeriodMs
-            }), )));
+            })),
+        Probe(
+            {
+              title: 'Virtual memory stats',
+              img: 'vmstat.png',
+              descr: `Periodically polls virtual memory stats from /proc/vmstat.
+                      Allows to gather statistics about swap, eviction,
+                      compression and pagecache efficiency`,
+              setEnabled: (cfg, val) => cfg.vmstat = val,
+              isEnabled: (cfg) => cfg.vmstat
+            },
+            Slider({
+              title: 'Poll rate',
+              cssClass: '.thin',
+              predefinedValues: POLL_RATE_MS,
+              unit: 'ms',
+              set: (cfg, val) => cfg.vmstatPeriodMs = val,
+              get: (cfg) => cfg.vmstatPeriodMs
+            }),
+            Dropdown({
+              title: 'Select counters',
+              cssClass: '.multicolumn',
+              options: vmstatOpts,
+              set: (cfg, val) => cfg.vmstatCounters = val,
+              get: (cfg) => cfg.vmstatCounters
+            }), ), ));
 }
 
 
-function AdvancedSettings() {
+function AndroidSettings() {
   const ATRACE_CATEGORIES = new Map<string, string>();
   ATRACE_CATEGORIES.set('gfx', 'Graphics');
   ATRACE_CATEGORIES.set('input', 'Input');
@@ -517,6 +511,63 @@ function AdvancedSettings() {
   ATRACE_CATEGORIES.set('nnapi', 'Neural Network API');
   ATRACE_CATEGORIES.set('rro', 'Resource Overlay');
 
+  const LOG_BUFFERS = new Map<string, string>();
+  LOG_BUFFERS.set('LID_RADIO', 'Radio');
+  LOG_BUFFERS.set('LID_EVENTS', 'Binary events');
+  LOG_BUFFERS.set('LID_SYSTEM', 'System');
+  LOG_BUFFERS.set('LID_CRASH', 'Crash');
+  LOG_BUFFERS.set('LID_SECURITY', 'Security');
+  LOG_BUFFERS.set('LID_KERNEL', 'Kernel');
+
+  return m(
+      'div',
+      m('.container',
+        Probe(
+            {
+              title: 'Atrace userspace annotations',
+              img: 'rec_atrace.png',
+              descr:
+                  `Enables C++ / Java codebase annotations via TRACE / os.Trace() `,
+              setEnabled: (cfg, val) => cfg.atrace = val,
+              isEnabled: (cfg) => cfg.atrace
+            },
+            Dropdown({
+              title: 'Categories',
+              cssClass: '.multicolumn.atrace_categories',
+              options: ATRACE_CATEGORIES,
+              set: (cfg, val) => cfg.atraceCats = val,
+              get: (cfg) => cfg.atraceCats
+            }),
+            Textarea({
+              placeholder: 'Extra apps to profile, one per line, e.g.:\n' +
+                  'com.android.phone\n' +
+                  'com.android.nfc',
+              set: (cfg, val) => cfg.atraceApps = val,
+              get: (cfg) => cfg.atraceApps
+            }),  //
+            ),
+        Probe(
+            {
+              title: 'Event log (logcat)',
+              img: 'rec_logcat.png',
+              descr:
+                  `Streams the event log into the trace. If no buffer filter is
+                  specified, all buffers are selected.`,
+              setEnabled: (cfg, val) => cfg.androidLogs = val,
+              isEnabled: (cfg) => cfg.androidLogs
+            },
+            Dropdown({
+              title: 'Buffers',
+              options: LOG_BUFFERS,
+              set: (cfg, val) => cfg.androidLogBuffers = val,
+              get: (cfg) => cfg.androidLogBuffers
+            }),
+
+            ), ));
+}
+
+
+function AdvancedSettings() {
   const FTRACE_CATEGORIES = new Map<string, string>();
   FTRACE_CATEGORIES.set('binder/*', 'binder');
   FTRACE_CATEGORIES.set('block/*', 'block');
@@ -542,69 +593,44 @@ function AdvancedSettings() {
       m('.container',
         Probe(
             {
-              title: 'Atrace userspace annotations',
-              img: 'rec_atrace.png',
-              descr:
-                  `Enables C++ / Java codebase annotations via TRACE / os.Trace() `,
-              setEnabled: (cfg, val) => {
-                cfg.atrace = val;
-              },
-              isEnabled: (cfg) => cfg.atrace
-            },
-            Dropdown({
-              title: 'Categories',
-              cssClass: '.multicolumn.atrace_categories',
-              options: ATRACE_CATEGORIES,
-              set: (cfg, val) => {
-                cfg.atraceCats = val;
-              },
-              get: (cfg) => cfg.atraceCats
-            }), ),
-        Probe(
-            {
-              title: 'Extra kernel events',
+              title: 'Advanced ftrace config',
               img: 'rec_ftrace.png',
-              descr: `Enables extra events from the ftrace kernel tracer.`,
-              setEnabled: (cfg, val) => {
-                cfg.ftrace = val;
-              },
+              descr: `Tunes the kernel-tracing (ftrace) module and allows to
+                      enable extra events. The events enabled here are on top
+                      of the ones derived when enabling the other probes.`,
+              setEnabled: (cfg, val) => cfg.ftrace = val,
               isEnabled: (cfg) => cfg.ftrace
             },
+            Slider({
+              title: 'Buf size',
+              cssClass: '.thin',
+              predefinedValues: FTRACE_BUF_KB,
+              unit: 'KB',
+              set: (cfg, val) => cfg.ftraceBufferSizeKb = val,
+              get: (cfg) => cfg.ftraceBufferSizeKb
+            }),
+            Slider({
+              title: 'Drain rate',
+              cssClass: '.thin',
+              predefinedValues: FTRACE_FLUSH_MS,
+              unit: 'ms',
+              set: (cfg, val) => cfg.ftraceDrainPeriodMs = val,
+              get: (cfg) => cfg.ftraceDrainPeriodMs
+            }),
             Dropdown({
               title: 'Event groups',
               cssClass: '.multicolumn.ftrace_events',
               options: FTRACE_CATEGORIES,
-              set: (cfg, val) => {
-                cfg.ftraceEvents = val;
-              },
+              set: (cfg, val) => cfg.ftraceEvents = val,
               get: (cfg) => cfg.ftraceEvents
+            }),
+            Textarea({
+              placeholder: 'Add extra events, one per line, e.g.:\n' +
+                  'sched/sched_switch\n' +
+                  'kmem/*',
+              set: (cfg, val) => cfg.ftraceExtraEvents = val,
+              get: (cfg) => cfg.ftraceExtraEvents
             }), )));
-}
-
-interface CodeSampleAttrs {
-  text: string;
-  hardWhitespace?: boolean;
-}
-
-
-class CodeSample implements m.ClassComponent<CodeSampleAttrs> {
-  view({attrs}: m.CVnode<CodeSampleAttrs>) {
-    return m(
-        '.example-code',
-        m('button',
-          {
-            title: 'Copy to clipboard',
-            onclick: () => copyToClipboard(attrs.text),
-          },
-          m('i.material-icons', 'assignment')),
-        m('code',
-          {
-            style: {
-              'white-space': attrs.hardWhitespace ? 'pre' : null,
-            },
-          },
-          attrs.text), );
-  }
 }
 
 function Instructions() {
@@ -659,6 +685,9 @@ export const RecordPage = createPage({
       case 'advanced':
         page = AdvancedSettings();
         break;
+      case 'android':
+        page = AndroidSettings();
+        break;
       default:
         page = RecSettings();
         routePage = 'buffers';
@@ -668,24 +697,19 @@ export const RecordPage = createPage({
         '.record-page',
         m('.record-container',
           m('.menu',
-            m('header', 'Global settings'),
+            m('header', 'Trace config'),
             m('ul',
               m('a[href="#!/record?p=buffers"]',
                 m(`li${routePage === 'buffers' ? '.active' : ''}`,
                   m('i.material-icons', 'tune'),
-                  m('.title', 'Recording options'),
+                  m('.title', 'Recording settings'),
                   m('.sub', 'Buffer mode, size and duration'))),
               m('a[href="#!/record?p=instructions"]',
                 m(`li${routePage === 'instructions' ? '.active' : ''}`,
                   m('i.material-icons.rec', 'fiber_manual_record'),
                   m('.title', 'Start recording'),
-                  m('.sub', 'Generate config and instructions'))),
-              m('a[href="#!/record?p=advanced"]',
-                m(`li${routePage === 'advanced' ? '.active' : ''}`,
-                  m('i.material-icons', 'settings'),
-                  m('.title', 'Advanced'),
-                  m('.sub', 'Advanced ftrace & atrace settings'))), ),
-            m('header', 'Platform probes'),
+                  m('.sub', 'Generate config and instructions'))), ),
+            m('header', 'Probes'),
             m('ul',
               m('a[href="#!/record?p=cpu"]',
                 m(`li${routePage === 'cpu' ? '.active' : ''}`,
@@ -702,25 +726,16 @@ export const RecordPage = createPage({
                   m('i.material-icons', 'memory'),
                   m('.title', 'Memory'),
                   m('.sub', 'Physical mem, VM, LMK'))),
-              m('a[href="#!/record?p=io"]',
-                m(`li${routePage === 'io' ? '.active' : ''}`,
-                  m('i.material-icons', 'sd_storage'),
-                  m('.title', 'Disk I/O'),
-                  m('.sub', 'TODO'))),
-              m('a[href="#!/record?p=peripherals"]',
-                m(`li${routePage === 'peripherals' ? '.active' : ''}`,
-                  m('i.material-icons', 'developer_board'),
-                  m('.title', 'Peripherals'),
-                  m('.sub', 'I2C, radio and other stuff'))), ),
-            m('header', 'Android'),
-            m('li',
-              m('i.material-icons', 'android'),
-              m('.title', 'Android framework'),
-              m('.sub', 'TODO'), ),
-            m('li',
-              m('i.material-icons', 'receipt'),
-              m('.title', 'Event logs'),
-              m('.sub', 'App & sys logs seen in logcat'), ), ),
+              m('a[href="#!/record?p=android"]',
+                m(`li${routePage === 'android' ? '.active' : ''}`,
+                  m('i.material-icons', 'android'),
+                  m('.title', 'Android apps & svcs'),
+                  m('.sub', 'atrace and logcat'))),
+              m('a[href="#!/record?p=advanced"]',
+                m(`li${routePage === 'advanced' ? '.active' : ''}`,
+                  m('i.material-icons', 'settings'),
+                  m('.title', 'Advanced settings'),
+                  m('.sub', 'Complicated stuff for wizards'))), )),
           m('.content', page)));
   }
 });

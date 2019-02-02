@@ -140,48 +140,42 @@ export interface RecordConfig {
   mode: RecordMode;
   durationMs: number;
   bufferSizeMb: number;
+  maxFileSizeMb: number;      // Only for mode == 'LONG_TRACE'.
+  fileWritePeriodMs: number;  // Only for mode == 'LONG_TRACE'.
 
-  // Valid only when mode == 'LONG_TRACE'.
-  maxFileSizeMb: number;
-  fileWritePeriodMs: number;
-
-  // CPU probes
   cpuSched: boolean;
   cpuLatency: boolean;
   cpuFreq: boolean;
-
   cpuCoarse: boolean;
   cpuCoarsePollMs: number;
 
-  // Ftrace and atrace.
   ftrace: boolean;
   atrace: boolean;
   ftraceEvents: string[];
+  ftraceExtraEvents: string;
   atraceCats: string[];
-  atraceApps: string[];
+  atraceApps: string;
   ftraceBufferSizeKb: number;
+  ftraceDrainPeriodMs: number;
+  androidLogs: boolean;
+  androidLogBuffers: string[];
 
   batteryDrain: boolean;
   batteryDrainPollMs: number;
 
   boardSensors: boolean;
 
-  // Memory probes
+  memHiFreq: boolean;
+  memLmk: boolean;
   meminfo: boolean;
   meminfoPeriodMs: number;
   meminfoCounters: string[];
-
   vmstat: boolean;
   vmstatPeriodMs: number;
   vmstatCounters: string[];
 
-  memLmk: boolean;
-
-  // Ps
   procStats: boolean;
   procStatsPeriodMs: number;
-  processMetadata: boolean;
-  scanAllProcessesOnStart: boolean;
 }
 
 export function createEmptyRecordConfig(): RecordConfig {
@@ -199,9 +193,13 @@ export function createEmptyRecordConfig(): RecordConfig {
     ftrace: false,
     atrace: false,
     ftraceEvents: [],
-    atraceApps: [],
+    ftraceExtraEvents: '',
     atraceCats: [],
+    atraceApps: '',
     ftraceBufferSizeKb: 2 * 1024,
+    ftraceDrainPeriodMs: 250,
+    androidLogs: false,
+    androidLogBuffers: [],
 
     cpuCoarse: false,
     cpuCoarsePollMs: 1000,
@@ -211,6 +209,7 @@ export function createEmptyRecordConfig(): RecordConfig {
 
     boardSensors: false,
 
+    memHiFreq: false,
     meminfo: false,
     meminfoPeriodMs: 1000,
     meminfoCounters: [],
@@ -222,10 +221,6 @@ export function createEmptyRecordConfig(): RecordConfig {
     memLmk: false,
     procStats: false,
     procStatsPeriodMs: 1000,
-    ///
-
-    processMetadata: false,
-    scanAllProcessesOnStart: false,
   };
 }
 

@@ -327,11 +327,13 @@
     grid-template-columns: 40px 1fr 130px 0;
     grid-template-rows: 30px 1fr;
     grid-template-areas: "hdr hdr hdr hdr" "icon slider label unit";
+    margin-top: 20px;
 
     &.thin {
       grid-template-columns: 1fr 3fr 100px 0;
       grid-template-rows: 45px;
       grid-template-areas: "hdr slider label unit";
+      margin-top: initial;
     }
 
     >* {
@@ -341,7 +343,7 @@
 
     >header {
       @include transition(0.3s);
-      opacity: 0;
+      opacity: 0.6;
       color: #333;
       grid-area: hdr;
     }
@@ -458,26 +460,8 @@
     }
   }
 
-
   .rec_sliders {
     padding: 0 20px;
-  }
-
-  .wizard {
-    margin-top: 40px;
-    background-color: #f5f5f5;
-    min-height: 200px;
-    padding: 0 20px;
-
-    &::before {
-      content: 'Complicated stuff for wizards';
-      text-align: center;
-      color: #666;
-      font-family: 'Roboto Mono';
-      font-weight: 200;
-      display: block;
-      margin: 10px auto;
-    }
   }
 
   .wakeups {
@@ -609,6 +593,19 @@
     height: 152px;
   }
 
+  textarea.extra_input {
+    width: 100%;
+    height: 60px;
+    border: 1px solid #eee;
+    resize: none;
+    outline: none;
+    font-family: var(--monospace-font);
+
+    &::placeholder {
+      color: #aaa;
+      text-align: right;
+    }
+  }
 
   .example-code {
     display: block;

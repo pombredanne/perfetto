@@ -19,7 +19,7 @@ import {createEmptyRecordConfig} from '../common/state';
 
 import {App} from './globals';
 import {
-  encodeConfig,
+  genConfigProto,
   RecordController,
   toPbtxt,
   uint8ArrayToBase64
@@ -34,7 +34,7 @@ test('uint8ArrayToBase64', () => {
 test('encodeConfig', () => {
   const config = createEmptyRecordConfig();
   config.durationSeconds = 10;
-  const result = TraceConfig.decode(encodeConfig(config));
+  const result = TraceConfig.decode(genConfigProto(config));
   expect(result.durationMs).toBe(10000);
 });
 

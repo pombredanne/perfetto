@@ -13,6 +13,8 @@
 // limitations under the License.
 
 import {
+  AndroidLogConfig,
+  AndroidLogId,
   AndroidPowerConfig,
   BufferConfig,
   DataSourceConfig,
@@ -34,13 +36,31 @@ export function uint8ArrayToBase64(buffer: Uint8Array): string {
 export function genConfigProto(uiCfg: RecordConfig): Uint8Array {
   const protoCfg = new TraceConfig();
   // TODO check stuff unsupported on P.
+
   protoCfg.durationMs = uiCfg.durationMs;
+
+
+  // Auxiliary buffer for slow-rate events.
+  // Set to 1/8th of the main buffer size, with reasonable limits.
+  let slowBufSizeKb = uiCfg.bufferSizeMb * (1024 / 8);
+  slowBufSizeKb = Math.min(slowBufSizeKb, 2 * 1024);
+  slowBufSizeKb = Math.max(slowBufSizeKb, 256);
+
+  // Main buffer for ftrace and other high-freq events.
+  const fastBufSizeKb = uiCfg.bufferSizeMb * 1024 - slowBufSizeKb;
+
   protoCfg.buffers.push(new BufferConfig());
-  protoCfg.buffers[0].sizeKb = uiCfg.bufferSizeMb * 1024;
+  protoCfg.buffers.push(new BufferConfig());
+  protoCfg.buffers[1].sizeKb = slowBufSizeKb;
+  protoCfg.buffers[0].sizeKb = fastBufSizeKb;
+
   if (uiCfg.mode === 'STOP_WHEN_FULL') {
     protoCfg.buffers[0].fillPolicy = BufferConfig.FillPolicy.DISCARD;
+    protoCfg.buffers[1].fillPolicy = BufferConfig.FillPolicy.DISCARD;
   } else {
     protoCfg.buffers[0].fillPolicy = BufferConfig.FillPolicy.RING_BUFFER;
+    protoCfg.buffers[1].fillPolicy = BufferConfig.FillPolicy.RING_BUFFER;
+    protoCfg.flushPeriodMs = 30000;
     if (uiCfg.mode === 'LONG_TRACE') {
       protoCfg.writeIntoFile = true;
       protoCfg.fileWritePeriodMs = uiCfg.fileWritePeriodMs;
@@ -50,24 +70,21 @@ export function genConfigProto(uiCfg: RecordConfig): Uint8Array {
 
   const ftraceEvents = new Set<string>(uiCfg.ftrace ? uiCfg.ftraceEvents : []);
   const atraceCats = new Set<string>(uiCfg.atrace ? uiCfg.atraceCats : []);
-  const atraceApps = new Set<string>(uiCfg.atrace ? uiCfg.atraceApps : []);
-  let enableProcScraping = false;
-  let trackProcLifetime = false;
+  const atraceApps = new Set<string>();
+  let procThreadAssociationPolling = false;
+  let procThreadAssociationFtrace = false;
   let trackInitialOomScore = false;
 
-  if (uiCfg.cpuSched) {
-    trackProcLifetime = true;
-    enableProcScraping = true;
+  if (uiCfg.cpuSched || uiCfg.cpuLatency) {
+    procThreadAssociationPolling = true;
+    procThreadAssociationFtrace = true;
     ftraceEvents.add('sched/sched_switch');
     ftraceEvents.add('power/suspend_resume');
-  }
-
-  if (uiCfg.cpuLatency) {
-    trackProcLifetime = true;
-    enableProcScraping = true;
-    ftraceEvents.add('sched/sched_wakeup');
-    ftraceEvents.add('sched/sched_wakeup_new');
-    ftraceEvents.add('power/suspend_resume');
+    if (uiCfg.cpuLatency) {
+      ftraceEvents.add('sched/sched_wakeup');
+      ftraceEvents.add('sched/sched_wakeup_new');
+      ftraceEvents.add('power/suspend_resume');
+    }
   }
 
   if (uiCfg.cpuFreq) {
@@ -75,7 +92,7 @@ export function genConfigProto(uiCfg: RecordConfig): Uint8Array {
     ftraceEvents.add('power/suspend_resume');
   }
 
-  if (trackProcLifetime) {
+  if (procThreadAssociationFtrace) {
     ftraceEvents.add('sched/sched_process_exit');
     ftraceEvents.add('sched/sched_process_fork');
     ftraceEvents.add('sched/sched_process_free');
@@ -116,6 +133,15 @@ export function genConfigProto(uiCfg: RecordConfig): Uint8Array {
     ];
   }
 
+  if (uiCfg.memHiFreq) {
+    procThreadAssociationPolling = true;
+    procThreadAssociationFtrace = true;
+    ftraceEvents.add('kmem/rss_stat');
+    ftraceEvents.add('kmem/mm_event');
+    ftraceEvents.add('kmem/ion_heap_grow');
+    ftraceEvents.add('kmem/ion_heap_shrink');
+  }
+
   if (uiCfg.meminfo) {
     if (sysStatsCfg === undefined) sysStatsCfg = new SysStatsConfig();
     sysStatsCfg.meminfoPeriodMs = uiCfg.meminfoPeriodMs;
@@ -145,19 +171,35 @@ export function genConfigProto(uiCfg: RecordConfig): Uint8Array {
     atraceApps.add('lmkd');
 
     ftraceEvents.add('oom/oom_score_adj_update');
+    procThreadAssociationPolling = true;
     trackInitialOomScore = true;
   }
 
-  // TODO here, think also to ps tree.
-  if (uiCfg.procStats || trackInitialOomScore) {
+  if (uiCfg.procStats || procThreadAssociationPolling || trackInitialOomScore) {
     const ds = new TraceConfig.DataSource();
     ds.config = new DataSourceConfig();
+    ds.config.targetBuffer = 1;  // Aux
     ds.config.name = 'linux.process_stats';
     ds.config.processStatsConfig = new ProcessStatsConfig();
-    ds.config.processStatsConfig.procStatsPollMs = uiCfg.procStatsPeriodMs;
-    if (trackInitialOomScore) {
+    if (uiCfg.procStats) {
+      ds.config.processStatsConfig.procStatsPollMs = uiCfg.procStatsPeriodMs;
+    }
+    if (procThreadAssociationPolling || trackInitialOomScore) {
       ds.config.processStatsConfig.scanAllProcessesOnStart = true;
     }
+    protoCfg.dataSources.push(ds);
+  }
+
+  if (uiCfg.androidLogs) {
+    const ds = new TraceConfig.DataSource();
+    ds.config = new DataSourceConfig();
+    ds.config.name = 'android.log';
+    ds.config.androidLogConfig = new AndroidLogConfig();
+    ds.config.androidLogConfig.logIds = uiCfg.androidLogBuffers.map(name => {
+      // tslint:disable-next-line no-any
+      return AndroidLogId[name as any as number] as any as number;
+    });
+
     protoCfg.dataSources.push(ds);
   }
 
@@ -171,19 +213,29 @@ export function genConfigProto(uiCfg: RecordConfig): Uint8Array {
     protoCfg.dataSources.push(ds);
   }
 
-  if (ftraceEvents.size > 0 || atraceCats.size > 0 || atraceApps.size > 0) {
+  if (uiCfg.ftrace || uiCfg.atraceApps.length > 0 || ftraceEvents.size > 0 ||
+      atraceCats.size > 0 || atraceApps.size > 0) {
     const ds = new TraceConfig.DataSource();
     ds.config = new DataSourceConfig();
     ds.config.name = 'linux.ftrace';
     ds.config.ftraceConfig = new FtraceConfig();
-    ds.config.ftraceConfig.bufferSizeKb = uiCfg.ftraceBufferSizeKb;
+    // Override the advanced ftrace parameters only if the user has ticked the
+    // "Advanced ftrace config" tab.
+    if (uiCfg.ftrace) {
+      ds.config.ftraceConfig.bufferSizeKb = uiCfg.ftraceBufferSizeKb;
+      ds.config.ftraceConfig.drainPeriodMs = uiCfg.ftraceDrainPeriodMs;
+      for (const line of uiCfg.ftraceExtraEvents.split('\n')) {
+        if (line.trim().length > 0) ftraceEvents.add(line.trim());
+      }
+    }
+    for (const line of uiCfg.atraceApps.split('\n')) {
+      if (line.trim().length > 0) atraceApps.add(line.trim());
+    }
     ds.config.ftraceConfig.ftraceEvents = Array.from(ftraceEvents);
     ds.config.ftraceConfig.atraceCategories = Array.from(atraceCats);
-    ds.config.ftraceConfig.atraceApps = uiCfg.atraceApps;
+    ds.config.ftraceConfig.atraceApps = Array.from(atraceApps);
     protoCfg.dataSources.push(ds);
   }
-
-  // TODO ion and rss_stat.
 
   const buffer = TraceConfig.encode(protoCfg).finish();
   return buffer;
@@ -199,8 +251,9 @@ export function toPbtxt(configBuffer: Uint8Array): string {
   // fields are enums.
   function looksLikeEnum(value: string): boolean {
     return value.startsWith('MEMINFO_') || value.startsWith('VMSTAT_') ||
-        value.startsWith('STAT_') || value.startsWith('BATTERY_COUNTER_') ||
-        value === 'DISCARD' || value === 'RING_BUFFER';
+        value.startsWith('STAT_') || value.startsWith('LID_') ||
+        value.startsWith('BATTERY_COUNTER_') || value === 'DISCARD' ||
+        value === 'RING_BUFFER';
   }
   function* message(msg: {}, indent: number): IterableIterator<string> {
     for (const [key, value] of Object.entries(msg)) {
