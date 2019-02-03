@@ -137,7 +137,7 @@ function Dropdown(cfg: DropdownConfig) {
   };
   const label = `${cfg.title} ${numSelected ? `(${numSelected})` : ''}`;
   return m(
-      `select.checkboxes${cfg.cssClass || ''}[multiple=multiple]`,
+      `select.dropdown${cfg.cssClass || ''}[multiple=multiple]`,
       {
         onblur: resetScroll,
         onmouseleave: resetScroll,
@@ -179,7 +179,7 @@ function Probe(cfg: ProbeConfig, ...children: m.Children[]) {
         m(`input[type=checkbox]`,
           {checked: enabled, oninput: m.withAttr('checked', onToggle)}),
         m('span', cfg.title)),
-      m('div', m('div', cfg.descr), m('.settings', children)));
+      m('div', m('div', cfg.descr), m('.probe-config', children)));
 }
 
 function Slider(cfg: SliderConfig) {
@@ -253,128 +253,123 @@ function RecSettings() {
   };
 
   return m(
-      'div',
-      m('.container',
-        m('header', 'Recording mode'),
-        m('.rec_sliders',
-          m('.g3',
-            recButton('STOP_WHEN_FULL', 'Stop when full', 'rec_one_shot.png'),
-            recButton('RING_BUFFER', 'Ring buffer', 'rec_ring_buf.png'),
-            recButton('LONG_TRACE', 'Long trace', 'rec_long_trace.png'), ),
+      '.record-section',
+      m('header', 'Recording mode'),
+      m('.record-mode',
+        recButton('STOP_WHEN_FULL', 'Stop when full', 'rec_one_shot.png'),
+        recButton('RING_BUFFER', 'Ring buffer', 'rec_ring_buf.png'),
+        recButton('LONG_TRACE', 'Long trace', 'rec_long_trace.png'), ),
 
-          Slider({
-            title: 'In-memory buffer size',
-            icon: '360',
-            predefinedValues: BUF_SIZES_MB,
-            unit: 'MB',
-            set: (cfg, val) => cfg.bufferSizeMb = val,
-            get: (cfg) => cfg.bufferSizeMb
-          }),
+      Slider({
+        title: 'In-memory buffer size',
+        icon: '360',
+        predefinedValues: BUF_SIZES_MB,
+        unit: 'MB',
+        set: (cfg, val) => cfg.bufferSizeMb = val,
+        get: (cfg) => cfg.bufferSizeMb
+      }),
 
-          Slider({
-            title: 'Max duration',
-            icon: 'timer',
-            predefinedValues: DURATIONS_MS,
-            isTime: true,
-            unit: 'h:m:s',
-            set: (cfg, val) => cfg.durationMs = val,
-            get: (cfg) => cfg.durationMs
-          }),
-          Slider({
-            title: 'Max file size',
-            icon: 'save',
-            cssClass: cfg.mode !== 'LONG_TRACE' ? '.hide' : '',
-            predefinedValues: FILE_SIZES_MB,
-            unit: 'MB',
-            set: (cfg, val) => cfg.maxFileSizeMb = val,
-            get: (cfg) => cfg.maxFileSizeMb
-          }),
-          Slider({
-            title: 'Flush on disk every',
-            cssClass: cfg.mode !== 'LONG_TRACE' ? '.hide' : '',
-            icon: 'av_timer',
-            predefinedValues: FTRACE_FLUSH_MS,
-            unit: 'ms',
-            set: (cfg, val) => cfg.fileWritePeriodMs = val,
-            get: (cfg) => cfg.fileWritePeriodMs || 0
-          }))));
+      Slider({
+        title: 'Max duration',
+        icon: 'timer',
+        predefinedValues: DURATIONS_MS,
+        isTime: true,
+        unit: 'h:m:s',
+        set: (cfg, val) => cfg.durationMs = val,
+        get: (cfg) => cfg.durationMs
+      }),
+      Slider({
+        title: 'Max file size',
+        icon: 'save',
+        cssClass: cfg.mode !== 'LONG_TRACE' ? '.hide' : '',
+        predefinedValues: FILE_SIZES_MB,
+        unit: 'MB',
+        set: (cfg, val) => cfg.maxFileSizeMb = val,
+        get: (cfg) => cfg.maxFileSizeMb
+      }),
+      Slider({
+        title: 'Flush on disk every',
+        cssClass: cfg.mode !== 'LONG_TRACE' ? '.hide' : '',
+        icon: 'av_timer',
+        predefinedValues: FTRACE_FLUSH_MS,
+        unit: 'ms',
+        set: (cfg, val) => cfg.fileWritePeriodMs = val,
+        get: (cfg) => cfg.fileWritePeriodMs || 0
+      }));
 }
 
 function PowerSettings() {
   return m(
-      'div',
-      m('.container',
-        Probe(
-            {
-              title: 'Battery drain',
-              img: 'battery_counters.png',
-              descr:
-                  'Polls charge counters and instantaneous power draw from ' +
-                  'the battery power management IC.',
-              setEnabled: (cfg, val) => cfg.batteryDrain = val,
-              isEnabled: (cfg) => cfg.batteryDrain
-            },
-            Slider({
-              title: 'Poll rate',
-              cssClass: '.thin',
-              predefinedValues: POLL_RATE_MS,
-              unit: 'ms',
-              set: (cfg, val) => cfg.batteryDrainPollMs = val,
-              get: (cfg) => cfg.batteryDrainPollMs
-            })),
-        Probe({
-          title: 'CPU frequency and idle states',
-          img: 'cpu_freq.png',
-          descr: 'Records cpu frequency and idle state changes via ftrace',
-          setEnabled: (cfg, val) => cfg.cpuFreq = val,
-          isEnabled: (cfg) => cfg.cpuFreq
-        }),
-        Probe({
-          title: 'Board voltages & frequencies',
-          img: 'board_voltage.png',
-          descr: 'Tracks voltage and frequency changes from board sensors',
-          setEnabled: (cfg, val) => cfg.boardSensors = val,
-          isEnabled: (cfg) => cfg.boardSensors
-        }), ));
+      '.record-section',
+      Probe(
+          {
+            title: 'Battery drain',
+            img: 'battery_counters.png',
+            descr: 'Polls charge counters and instantaneous power draw from ' +
+                'the battery power management IC.',
+            setEnabled: (cfg, val) => cfg.batteryDrain = val,
+            isEnabled: (cfg) => cfg.batteryDrain
+          },
+          Slider({
+            title: 'Poll rate',
+            cssClass: '.thin',
+            predefinedValues: POLL_RATE_MS,
+            unit: 'ms',
+            set: (cfg, val) => cfg.batteryDrainPollMs = val,
+            get: (cfg) => cfg.batteryDrainPollMs
+          })),
+      Probe({
+        title: 'CPU frequency and idle states',
+        img: 'cpu_freq.png',
+        descr: 'Records cpu frequency and idle state changes via ftrace',
+        setEnabled: (cfg, val) => cfg.cpuFreq = val,
+        isEnabled: (cfg) => cfg.cpuFreq
+      }),
+      Probe({
+        title: 'Board voltages & frequencies',
+        img: 'board_voltage.png',
+        descr: 'Tracks voltage and frequency changes from board sensors',
+        setEnabled: (cfg, val) => cfg.boardSensors = val,
+        isEnabled: (cfg) => cfg.boardSensors
+      }));
 }
 
 function CpuSettings() {
   return m(
-      'div',
-      m('.container',
-        Probe(
-            {
-              title: 'Coarse CPU usage counter',
-              img: 'rec_cpu_coarse.png',
-              descr: `Lightweight polling of CPU usage counters via /proc/stat.
-                      Allows to monitor CPU usage over fixed periods of time.`,
-              setEnabled: (cfg, val) => cfg.cpuCoarse = val,
-              isEnabled: (cfg) => cfg.cpuCoarse
-            },
-            Slider({
-              title: 'Poll rate',
-              cssClass: '.thin',
-              predefinedValues: POLL_RATE_MS,
-              unit: 'ms',
-              set: (cfg, val) => cfg.cpuCoarsePollMs = val,
-              get: (cfg) => cfg.cpuCoarsePollMs
-            })),
-        Probe({
-          title: 'Scheduling details',
-          img: 'rec_cpu_fine.png',
-          descr: 'Enables high-detailed tracking of scheduling events',
-          setEnabled: (cfg, val) => cfg.cpuSched = val,
-          isEnabled: (cfg) => cfg.cpuSched
-        }),
-        Probe({
-          title: 'Scheduling chains / latency analysis',
-          img: 'rec_cpu_wakeup.png',
-          descr: `Tracks causality of scheduling transitions. When a task
+      '.record-section',
+      Probe(
+          {
+            title: 'Coarse CPU usage counter',
+            img: 'rec_cpu_coarse.png',
+            descr: `Lightweight polling of CPU usage counters via /proc/stat.
+                    Allows to periodically monitor CPU usage.`,
+            setEnabled: (cfg, val) => cfg.cpuCoarse = val,
+            isEnabled: (cfg) => cfg.cpuCoarse
+          },
+          Slider({
+            title: 'Poll rate',
+            cssClass: '.thin',
+            predefinedValues: POLL_RATE_MS,
+            unit: 'ms',
+            set: (cfg, val) => cfg.cpuCoarsePollMs = val,
+            get: (cfg) => cfg.cpuCoarsePollMs
+          })),
+      Probe({
+        title: 'Scheduling details',
+        img: 'rec_cpu_fine.png',
+        descr: 'Enables high-detailed tracking of scheduling events',
+        setEnabled: (cfg, val) => cfg.cpuSched = val,
+        isEnabled: (cfg) => cfg.cpuSched
+      }),
+      Probe({
+        title: 'Scheduling chains / latency analysis',
+        img: 'rec_cpu_wakeup.png',
+        descr: `Tracks causality of scheduling transitions. When a task
                   X transitions from blocked -> runnable, keeps track of the
                   task Y that X's transition (e.g. posting a semaphore).`,
-          setEnabled: (cfg, val) => cfg.cpuLatency = val,
-          isEnabled: (cfg) => cfg.cpuLatency
-        }), ));
+        setEnabled: (cfg, val) => cfg.cpuLatency = val,
+        isEnabled: (cfg) => cfg.cpuLatency
+      }));
 }
 
 function MemorySettings() {
@@ -393,92 +388,91 @@ function MemorySettings() {
     }
   }
   return m(
-      'div',
-      m('.container',
-        Probe(
-            {
-              title: 'Kernel meminfo',
-              img: 'meminfo.png',
-              descr: 'Polling of /proc/meminfo',
-              setEnabled: (cfg, val) => cfg.meminfo = val,
-              isEnabled: (cfg) => cfg.meminfo
-            },
-            Slider({
-              title: 'Poll rate',
-              cssClass: '.thin',
-              predefinedValues: POLL_RATE_MS,
-              unit: 'ms',
-              set: (cfg, val) => cfg.meminfoPeriodMs = val,
-              get: (cfg) => cfg.meminfoPeriodMs
-            }),
-            Dropdown({
-              title: 'Select counters',
-              cssClass: '.multicolumn',
-              options: meminfoOpts,
-              set: (cfg, val) => cfg.meminfoCounters = val,
-              get: (cfg) => cfg.meminfoCounters
-            })),
-        Probe({
-          title: 'High-frequency memory events',
-          img: 'mem_hifreq.png',
-          descr: `Allows to track short memory spikes and transitories through
+      '.record-section',
+      Probe(
+          {
+            title: 'Kernel meminfo',
+            img: 'meminfo.png',
+            descr: 'Polling of /proc/meminfo',
+            setEnabled: (cfg, val) => cfg.meminfo = val,
+            isEnabled: (cfg) => cfg.meminfo
+          },
+          Slider({
+            title: 'Poll rate',
+            cssClass: '.thin',
+            predefinedValues: POLL_RATE_MS,
+            unit: 'ms',
+            set: (cfg, val) => cfg.meminfoPeriodMs = val,
+            get: (cfg) => cfg.meminfoPeriodMs
+          }),
+          Dropdown({
+            title: 'Select counters',
+            cssClass: '.multicolumn',
+            options: meminfoOpts,
+            set: (cfg, val) => cfg.meminfoCounters = val,
+            get: (cfg) => cfg.meminfoCounters
+          })),
+      Probe({
+        title: 'High-frequency memory events',
+        img: 'mem_hifreq.png',
+        descr: `Allows to track short memory spikes and transitories through
                   ftrace's mm_event, rss_stat and ion events. Avialable only
                   on recent Android Q+ kernels`,
-          setEnabled: (cfg, val) => cfg.memHiFreq = val,
-          isEnabled: (cfg) => cfg.memHiFreq
-        }),
-        Probe({
-          title: 'Low memory killer',
-          img: 'lmk.png',
-          descr: `Record LMK events. Works both with the old in-kernel LMK
+        setEnabled: (cfg, val) => cfg.memHiFreq = val,
+        isEnabled: (cfg) => cfg.memHiFreq
+      }),
+      Probe({
+        title: 'Low memory killer',
+        img: 'lmk.png',
+        descr: `Record LMK events. Works both with the old in-kernel LMK
                   and the newer userspace lmkd. It also tracks OOM score
                   adjustments.`,
-          setEnabled: (cfg, val) => cfg.memLmk = val,
-          isEnabled: (cfg) => cfg.memLmk
-        }),
-        Probe(
-            {
-              title: 'Per process stats',
-              img: 'ps_stats.png',
-              descr: `Periodically samples all processes in the system tracking:
+        setEnabled: (cfg, val) => cfg.memLmk = val,
+        isEnabled: (cfg) => cfg.memLmk
+      }),
+      Probe(
+          {
+            title: 'Per process stats',
+            img: 'ps_stats.png',
+            descr: `Periodically samples all processes in the system tracking:
                       their thread list, memory counters (RSS, swap and other
                       /proc/status counters) and oom_score_adj.`,
-              setEnabled: (cfg, val) => cfg.procStats = val,
-              isEnabled: (cfg) => cfg.procStats
-            },
-            Slider({
-              title: 'Poll rate',
-              cssClass: '.thin',
-              predefinedValues: POLL_RATE_MS,
-              unit: 'ms',
-              set: (cfg, val) => cfg.procStatsPeriodMs = val,
-              get: (cfg) => cfg.procStatsPeriodMs
-            })),
-        Probe(
-            {
-              title: 'Virtual memory stats',
-              img: 'vmstat.png',
-              descr: `Periodically polls virtual memory stats from /proc/vmstat.
+            setEnabled: (cfg, val) => cfg.procStats = val,
+            isEnabled: (cfg) => cfg.procStats
+          },
+          Slider({
+            title: 'Poll rate',
+            cssClass: '.thin',
+            predefinedValues: POLL_RATE_MS,
+            unit: 'ms',
+            set: (cfg, val) => cfg.procStatsPeriodMs = val,
+            get: (cfg) => cfg.procStatsPeriodMs
+          })),
+      Probe(
+          {
+            title: 'Virtual memory stats',
+            img: 'vmstat.png',
+            descr: `Periodically polls virtual memory stats from /proc/vmstat.
                       Allows to gather statistics about swap, eviction,
                       compression and pagecache efficiency`,
-              setEnabled: (cfg, val) => cfg.vmstat = val,
-              isEnabled: (cfg) => cfg.vmstat
-            },
-            Slider({
-              title: 'Poll rate',
-              cssClass: '.thin',
-              predefinedValues: POLL_RATE_MS,
-              unit: 'ms',
-              set: (cfg, val) => cfg.vmstatPeriodMs = val,
-              get: (cfg) => cfg.vmstatPeriodMs
-            }),
-            Dropdown({
-              title: 'Select counters',
-              cssClass: '.multicolumn',
-              options: vmstatOpts,
-              set: (cfg, val) => cfg.vmstatCounters = val,
-              get: (cfg) => cfg.vmstatCounters
-            }), ), ));
+            setEnabled: (cfg, val) => cfg.vmstat = val,
+            isEnabled: (cfg) => cfg.vmstat
+          },
+          Slider({
+            title: 'Poll rate',
+            cssClass: '.thin',
+            predefinedValues: POLL_RATE_MS,
+            unit: 'ms',
+            set: (cfg, val) => cfg.vmstatPeriodMs = val,
+            get: (cfg) => cfg.vmstatPeriodMs
+          }),
+          Dropdown({
+            title: 'Select counters',
+            cssClass: '.multicolumn',
+            options: vmstatOpts,
+            set: (cfg, val) => cfg.vmstatCounters = val,
+            get: (cfg) => cfg.vmstatCounters
+          })));
 }
 
 
@@ -520,50 +514,48 @@ function AndroidSettings() {
   LOG_BUFFERS.set('LID_KERNEL', 'Kernel');
 
   return m(
-      'div',
-      m('.container',
-        Probe(
-            {
-              title: 'Atrace userspace annotations',
-              img: 'rec_atrace.png',
-              descr:
-                  `Enables C++ / Java codebase annotations via TRACE / os.Trace() `,
-              setEnabled: (cfg, val) => cfg.atrace = val,
-              isEnabled: (cfg) => cfg.atrace
-            },
-            Dropdown({
-              title: 'Categories',
-              cssClass: '.multicolumn.atrace_categories',
-              options: ATRACE_CATEGORIES,
-              set: (cfg, val) => cfg.atraceCats = val,
-              get: (cfg) => cfg.atraceCats
-            }),
-            Textarea({
-              placeholder: 'Extra apps to profile, one per line, e.g.:\n' +
-                  'com.android.phone\n' +
-                  'com.android.nfc',
-              set: (cfg, val) => cfg.atraceApps = val,
-              get: (cfg) => cfg.atraceApps
-            }),  //
-            ),
-        Probe(
-            {
-              title: 'Event log (logcat)',
-              img: 'rec_logcat.png',
-              descr:
-                  `Streams the event log into the trace. If no buffer filter is
+      '.record-section',
+      Probe(
+          {
+            title: 'Atrace userspace annotations',
+            img: 'rec_atrace.png',
+            descr:
+                `Enables C++ / Java codebase annotations via TRACE / os.Trace() `,
+            setEnabled: (cfg, val) => cfg.atrace = val,
+            isEnabled: (cfg) => cfg.atrace
+          },
+          Dropdown({
+            title: 'Categories',
+            cssClass: '.multicolumn.atrace_categories',
+            options: ATRACE_CATEGORIES,
+            set: (cfg, val) => cfg.atraceCats = val,
+            get: (cfg) => cfg.atraceCats
+          }),
+          Textarea({
+            placeholder: 'Extra apps to profile, one per line, e.g.:\n' +
+                'com.android.phone\n' +
+                'com.android.nfc',
+            set: (cfg, val) => cfg.atraceApps = val,
+            get: (cfg) => cfg.atraceApps
+          }),  //
+          ),
+      Probe(
+          {
+            title: 'Event log (logcat)',
+            img: 'rec_logcat.png',
+            descr: `Streams the event log into the trace. If no buffer filter is
                   specified, all buffers are selected.`,
-              setEnabled: (cfg, val) => cfg.androidLogs = val,
-              isEnabled: (cfg) => cfg.androidLogs
-            },
-            Dropdown({
-              title: 'Buffers',
-              options: LOG_BUFFERS,
-              set: (cfg, val) => cfg.androidLogBuffers = val,
-              get: (cfg) => cfg.androidLogBuffers
-            }),
+            setEnabled: (cfg, val) => cfg.androidLogs = val,
+            isEnabled: (cfg) => cfg.androidLogs
+          },
+          Dropdown({
+            title: 'Buffers',
+            options: LOG_BUFFERS,
+            set: (cfg, val) => cfg.androidLogBuffers = val,
+            get: (cfg) => cfg.androidLogBuffers
+          }),
 
-            ), ));
+          ));
 }
 
 
@@ -589,48 +581,47 @@ function AdvancedSettings() {
   FTRACE_CATEGORIES.set('vmscan/*', 'vmscan');
 
   return m(
-      'div',
-      m('.container',
-        Probe(
-            {
-              title: 'Advanced ftrace config',
-              img: 'rec_ftrace.png',
-              descr: `Tunes the kernel-tracing (ftrace) module and allows to
+      '.record-section',
+      Probe(
+          {
+            title: 'Advanced ftrace config',
+            img: 'rec_ftrace.png',
+            descr: `Tunes the kernel-tracing (ftrace) module and allows to
                       enable extra events. The events enabled here are on top
                       of the ones derived when enabling the other probes.`,
-              setEnabled: (cfg, val) => cfg.ftrace = val,
-              isEnabled: (cfg) => cfg.ftrace
-            },
-            Slider({
-              title: 'Buf size',
-              cssClass: '.thin',
-              predefinedValues: FTRACE_BUF_KB,
-              unit: 'KB',
-              set: (cfg, val) => cfg.ftraceBufferSizeKb = val,
-              get: (cfg) => cfg.ftraceBufferSizeKb
-            }),
-            Slider({
-              title: 'Drain rate',
-              cssClass: '.thin',
-              predefinedValues: FTRACE_FLUSH_MS,
-              unit: 'ms',
-              set: (cfg, val) => cfg.ftraceDrainPeriodMs = val,
-              get: (cfg) => cfg.ftraceDrainPeriodMs
-            }),
-            Dropdown({
-              title: 'Event groups',
-              cssClass: '.multicolumn.ftrace_events',
-              options: FTRACE_CATEGORIES,
-              set: (cfg, val) => cfg.ftraceEvents = val,
-              get: (cfg) => cfg.ftraceEvents
-            }),
-            Textarea({
-              placeholder: 'Add extra events, one per line, e.g.:\n' +
-                  'sched/sched_switch\n' +
-                  'kmem/*',
-              set: (cfg, val) => cfg.ftraceExtraEvents = val,
-              get: (cfg) => cfg.ftraceExtraEvents
-            }), )));
+            setEnabled: (cfg, val) => cfg.ftrace = val,
+            isEnabled: (cfg) => cfg.ftrace
+          },
+          Slider({
+            title: 'Buf size',
+            cssClass: '.thin',
+            predefinedValues: FTRACE_BUF_KB,
+            unit: 'KB',
+            set: (cfg, val) => cfg.ftraceBufferSizeKb = val,
+            get: (cfg) => cfg.ftraceBufferSizeKb
+          }),
+          Slider({
+            title: 'Drain rate',
+            cssClass: '.thin',
+            predefinedValues: FTRACE_FLUSH_MS,
+            unit: 'ms',
+            set: (cfg, val) => cfg.ftraceDrainPeriodMs = val,
+            get: (cfg) => cfg.ftraceDrainPeriodMs
+          }),
+          Dropdown({
+            title: 'Event groups',
+            cssClass: '.multicolumn.ftrace_events',
+            options: FTRACE_CATEGORIES,
+            set: (cfg, val) => cfg.ftraceEvents = val,
+            get: (cfg) => cfg.ftraceEvents
+          }),
+          Textarea({
+            placeholder: 'Add extra events, one per line, e.g.:\n' +
+                'sched/sched_switch\n' +
+                'kmem/*',
+            set: (cfg, val) => cfg.ftraceExtraEvents = val,
+            get: (cfg) => cfg.ftraceExtraEvents
+          })));
 }
 
 function Instructions() {
@@ -649,20 +640,16 @@ function Instructions() {
   cmd += '\nEOF\n';
 
   return m(
-      'div',
-      m('.container',
-        m('header', 'Instructions'),
-        m('label',
-          'Select target platform',
-          m('select',
-            m('option', 'Android Q+'),
-            m('option', 'Android P'),
-            m('option', 'Android O-'),
-            m('option', 'Linux desktop'))),
-
-        m(CodeSample, {text: cmd, hardWhitespace: true}),
-
-        ));
+      '.record-section',
+      m('header', 'Instructions'),
+      m('label',
+        'Select target platform',
+        m('select',
+          m('option', 'Android Q+'),
+          m('option', 'Android P'),
+          m('option', 'Android O-'),
+          m('option', 'Linux desktop'))),
+      m(CodeSample, {text: cmd, hardWhitespace: true}), );
 }
 
 export const RecordPage = createPage({
@@ -696,7 +683,7 @@ export const RecordPage = createPage({
     return m(
         '.record-page',
         m('.record-container',
-          m('.menu',
+          m('.record-menu',
             m('header', 'Trace config'),
             m('ul',
               m('a[href="#!/record?p=buffers"]',
@@ -736,6 +723,6 @@ export const RecordPage = createPage({
                   m('i.material-icons', 'settings'),
                   m('.title', 'Advanced settings'),
                   m('.sub', 'Complicated stuff for wizards'))), )),
-          m('.content', page)));
+          page));
   }
 });
