@@ -127,15 +127,18 @@
 
 .record-section {
   grid-area: section;
+  background: #fff;
+  transition: opacity 0.25s ease;
+  opacity: 0;
+  visibility: hidden;
 
-  >header {
-    text-align: center;
-    font-family: 'Raleway';
-    font-size: 20px;
-    // background: hsl(208, 29%, 84%);
-    padding: 15px 10px;
-    color: #333;
-    letter-spacing: 0.5px;
+  &:not(.active) {
+    max-height: 0;
+  }
+
+  &.active {
+    visibility: visible;
+    opacity: 1;
   }
 
   // By default space all section elements by the same amount.
@@ -146,6 +149,16 @@
     padding-right: var(--record-section-padding);
     &:first-child { padding-top: 20px; }
     &:last-child { padding-bottom: 20px; }
+  }
+
+  >header {
+    text-align: center;
+    font-family: 'Raleway';
+    font-size: 20px;
+    // background: hsl(208, 29%, 84%);
+    padding: 15px 10px;
+    color: #333;
+    letter-spacing: 0.5px;
   }
 
   .hide {
@@ -576,8 +589,11 @@
       font-family: var(--monospace-font);
       font-size: 12px;
       line-height: 20px;
-      max-height: 500px;
       overflow-y: auto;
+
+      // 510px and not 500px, so the overflowing line gets truncated, giving
+      // a clear indication that the code box scrolls.
+      max-height: 510px;
     }
 
     >button {
@@ -585,7 +601,7 @@
       display: inline-block;
       position: absolute;
       top: 30px;
-      right: 10px;
+      right: 20px;
       color: white;
       border-radius: 100%;
       background-color: #333;
@@ -611,4 +627,35 @@
       transform: scale(0.9);
     }
   }  // example-code
+
+  &.instructions {
+    label, select {
+      font-weight: 100;
+      color: #333;
+      font-size: 16px;
+      font-family: 'Roboto', sans-serif;
+    }
+
+    .note {
+      border: 1px dashed #ddd;
+      background: #f9eeba;
+      margin: var(--record-section-padding);
+      padding: 10px;
+      font-family: 'Roboto', sans-serif;
+      font-size: 14px;
+      line-height: 20px;
+    }
+
+    select {
+      @include transition();
+      margin-left: 10px;
+      border-radius: 0;
+      border: 1px solid #eee;
+      outline: none;
+
+      &:hover, &:active {
+        box-shadow: 0 0 6px #ccc;
+      }
+    }
+  }
 }  // record-section

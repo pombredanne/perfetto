@@ -24,24 +24,6 @@ import {globals} from './globals';
 import {createPage} from './pages';
 import {Router} from './router';
 
-const BUF_SIZES_MB = [4, 8, 16, 32, 64, 128, 256, 512];
-const DURATIONS_MS = [
-  5000,
-  10000,
-  15000,
-  30000,
-  60000,
-  60000 * 5,
-  60000 * 30,
-  3600000,
-  3600000 * 6,
-  3600000 * 12
-];
-const FILE_SIZES_MB = [5, 25, 50, 100, 500, 1000, 1000 * 5, 1000 * 10];
-const FTRACE_BUF_KB = [512, 1024, 2 * 1024, 4 * 1024, 16 * 1024, 32 * 1024];
-const FTRACE_FLUSH_MS = [100, 250, 500, 1000, 2500, 5000];
-const POLL_RATE_MS = [250, 500, 1000, 2500, 5000, 30000, 60000];
-
 declare type Setter<T> = (draft: DraftObject<RecordConfig>, val: T) => void;
 declare type Getter<T> = (cfg: RecordConfig) => T;
 
@@ -51,7 +33,7 @@ interface SliderConfig {
   cssClass?: string;
   isTime?: boolean;
   unit: string;
-  predefinedValues: number[];
+  values: number[];
   get: Getter<number>;
   set: Setter<number>;
 }
@@ -104,6 +86,10 @@ class CodeSample implements m.ClassComponent<CodeSampleAttrs> {
   }
 }
 
+const POLL_RATE_MS = [250, 500, 1000, 2500, 5000, 30000, 60000];
+
+let targetOS = '';
+
 function Dropdown(cfg: DropdownConfig) {
   const resetScroll = function(this: HTMLElement) {
     // Chrome seems to override the scroll offset on creation without this, even
@@ -127,8 +113,7 @@ function Dropdown(cfg: DropdownConfig) {
   const onChange = function(this: HTMLSelectElement) {
     const selKeys: string[] = [];
     for (let i = 0; i < this.selectedOptions.length; i++) {
-      const opt = this.selectedOptions.item(i)!;
-      selKeys.push(opt.value);
+      selKeys.push(this.selectedOptions.item(i).value);
     }
     const traceCfg = produce(globals.state.recordConfig, draft => {
       cfg.set(draft, selKeys);
@@ -193,17 +178,17 @@ function Slider(cfg: SliderConfig) {
   };
 
   const onSliderChange = (newIdx: number) => {
-    onValueChange(cfg.predefinedValues[newIdx]);
+    onValueChange(cfg.values[newIdx]);
   };
 
-  const maxIdx = cfg.predefinedValues.length - 1;
+  const maxIdx = cfg.values.length - 1;
   const val = cfg.get(globals.state.recordConfig);
 
   // Find the index of the closest value in the slider.
   let idx = 0;
-  for (let i = 0; i < cfg.predefinedValues.length; i++) {
+  for (let i = 0; i < cfg.values.length; i++) {
     idx = i;
-    if (cfg.predefinedValues[i] >= val) break;
+    if (cfg.values[i] >= val) break;
   }
   let spinnerCfg = {};
   if (cfg.isTime === true) {
@@ -229,7 +214,11 @@ function Slider(cfg: SliderConfig) {
       m('.unit', cfg.unit));
 }
 
-function RecSettings() {
+function RecSettings(cssClass: string) {
+  const S = (x: number) => x * 1000;
+  const M = (x: number) => x * 1000 * 60;
+  const H = (x: number) => x * 1000 * 60 * 60;
+
   const cfg = globals.state.recordConfig;
 
   const recButton = (mode: RecordMode, title: string, img: string) => {
@@ -253,7 +242,7 @@ function RecSettings() {
   };
 
   return m(
-      '.record-section',
+      `.record-section${cssClass}`,
       m('header', 'Recording mode'),
       m('.record-mode',
         recButton('STOP_WHEN_FULL', 'Stop when full', 'rec_one_shot.png'),
@@ -263,7 +252,7 @@ function RecSettings() {
       Slider({
         title: 'In-memory buffer size',
         icon: '360',
-        predefinedValues: BUF_SIZES_MB,
+        values: [4, 8, 16, 32, 64, 128, 256, 512],
         unit: 'MB',
         set: (cfg, val) => cfg.bufferSizeMb = val,
         get: (cfg) => cfg.bufferSizeMb
@@ -272,7 +261,7 @@ function RecSettings() {
       Slider({
         title: 'Max duration',
         icon: 'timer',
-        predefinedValues: DURATIONS_MS,
+        values: [S(10), S(15), S(30), S(60), M(5), M(30), H(1), H(6), H(12)],
         isTime: true,
         unit: 'h:m:s',
         set: (cfg, val) => cfg.durationMs = val,
@@ -282,7 +271,7 @@ function RecSettings() {
         title: 'Max file size',
         icon: 'save',
         cssClass: cfg.mode !== 'LONG_TRACE' ? '.hide' : '',
-        predefinedValues: FILE_SIZES_MB,
+        values: [5, 25, 50, 100, 500, 1000, 1000 * 5, 1000 * 10],
         unit: 'MB',
         set: (cfg, val) => cfg.maxFileSizeMb = val,
         get: (cfg) => cfg.maxFileSizeMb
@@ -291,20 +280,20 @@ function RecSettings() {
         title: 'Flush on disk every',
         cssClass: cfg.mode !== 'LONG_TRACE' ? '.hide' : '',
         icon: 'av_timer',
-        predefinedValues: FTRACE_FLUSH_MS,
+        values: [100, 250, 500, 1000, 2500, 5000],
         unit: 'ms',
         set: (cfg, val) => cfg.fileWritePeriodMs = val,
         get: (cfg) => cfg.fileWritePeriodMs || 0
       }));
 }
 
-function PowerSettings() {
+function PowerSettings(cssClass: string) {
   return m(
-      '.record-section',
+      `.record-section${cssClass}`,
       Probe(
           {
             title: 'Battery drain',
-            img: 'battery_counters.png',
+            img: 'rec_battery_counters.png',
             descr: 'Polls charge counters and instantaneous power draw from ' +
                 'the battery power management IC.',
             setEnabled: (cfg, val) => cfg.batteryDrain = val,
@@ -313,30 +302,30 @@ function PowerSettings() {
           Slider({
             title: 'Poll rate',
             cssClass: '.thin',
-            predefinedValues: POLL_RATE_MS,
+            values: POLL_RATE_MS,
             unit: 'ms',
             set: (cfg, val) => cfg.batteryDrainPollMs = val,
             get: (cfg) => cfg.batteryDrainPollMs
           })),
       Probe({
         title: 'CPU frequency and idle states',
-        img: 'cpu_freq.png',
+        img: 'rec_cpu_freq.png',
         descr: 'Records cpu frequency and idle state changes via ftrace',
         setEnabled: (cfg, val) => cfg.cpuFreq = val,
         isEnabled: (cfg) => cfg.cpuFreq
       }),
       Probe({
         title: 'Board voltages & frequencies',
-        img: 'board_voltage.png',
+        img: 'rec_board_voltage.png',
         descr: 'Tracks voltage and frequency changes from board sensors',
         setEnabled: (cfg, val) => cfg.boardSensors = val,
         isEnabled: (cfg) => cfg.boardSensors
       }));
 }
 
-function CpuSettings() {
+function CpuSettings(cssClass: string) {
   return m(
-      '.record-section',
+      `.record-section${cssClass}`,
       Probe(
           {
             title: 'Coarse CPU usage counter',
@@ -349,7 +338,7 @@ function CpuSettings() {
           Slider({
             title: 'Poll rate',
             cssClass: '.thin',
-            predefinedValues: POLL_RATE_MS,
+            values: POLL_RATE_MS,
             unit: 'ms',
             set: (cfg, val) => cfg.cpuCoarsePollMs = val,
             get: (cfg) => cfg.cpuCoarsePollMs
@@ -372,7 +361,7 @@ function CpuSettings() {
       }));
 }
 
-function MemorySettings() {
+function MemorySettings(cssClass: string) {
   const meminfoOpts = new Map<string, string>();
   for (const x in MeminfoCounters) {
     if (typeof MeminfoCounters[x] === 'number' &&
@@ -388,11 +377,11 @@ function MemorySettings() {
     }
   }
   return m(
-      '.record-section',
+      `.record-section${cssClass}`,
       Probe(
           {
             title: 'Kernel meminfo',
-            img: 'meminfo.png',
+            img: 'rec_meminfo.png',
             descr: 'Polling of /proc/meminfo',
             setEnabled: (cfg, val) => cfg.meminfo = val,
             isEnabled: (cfg) => cfg.meminfo
@@ -400,7 +389,7 @@ function MemorySettings() {
           Slider({
             title: 'Poll rate',
             cssClass: '.thin',
-            predefinedValues: POLL_RATE_MS,
+            values: POLL_RATE_MS,
             unit: 'ms',
             set: (cfg, val) => cfg.meminfoPeriodMs = val,
             get: (cfg) => cfg.meminfoPeriodMs
@@ -414,7 +403,7 @@ function MemorySettings() {
           })),
       Probe({
         title: 'High-frequency memory events',
-        img: 'mem_hifreq.png',
+        img: 'rec_mem_hifreq.png',
         descr: `Allows to track short memory spikes and transitories through
                   ftrace's mm_event, rss_stat and ion events. Avialable only
                   on recent Android Q+ kernels`,
@@ -423,7 +412,7 @@ function MemorySettings() {
       }),
       Probe({
         title: 'Low memory killer',
-        img: 'lmk.png',
+        img: 'rec_lmk.png',
         descr: `Record LMK events. Works both with the old in-kernel LMK
                   and the newer userspace lmkd. It also tracks OOM score
                   adjustments.`,
@@ -433,7 +422,7 @@ function MemorySettings() {
       Probe(
           {
             title: 'Per process stats',
-            img: 'ps_stats.png',
+            img: 'rec_ps_stats.png',
             descr: `Periodically samples all processes in the system tracking:
                       their thread list, memory counters (RSS, swap and other
                       /proc/status counters) and oom_score_adj.`,
@@ -443,7 +432,7 @@ function MemorySettings() {
           Slider({
             title: 'Poll rate',
             cssClass: '.thin',
-            predefinedValues: POLL_RATE_MS,
+            values: POLL_RATE_MS,
             unit: 'ms',
             set: (cfg, val) => cfg.procStatsPeriodMs = val,
             get: (cfg) => cfg.procStatsPeriodMs
@@ -451,7 +440,7 @@ function MemorySettings() {
       Probe(
           {
             title: 'Virtual memory stats',
-            img: 'vmstat.png',
+            img: 'rec_vmstat.png',
             descr: `Periodically polls virtual memory stats from /proc/vmstat.
                       Allows to gather statistics about swap, eviction,
                       compression and pagecache efficiency`,
@@ -461,7 +450,7 @@ function MemorySettings() {
           Slider({
             title: 'Poll rate',
             cssClass: '.thin',
-            predefinedValues: POLL_RATE_MS,
+            values: POLL_RATE_MS,
             unit: 'ms',
             set: (cfg, val) => cfg.vmstatPeriodMs = val,
             get: (cfg) => cfg.vmstatPeriodMs
@@ -476,7 +465,7 @@ function MemorySettings() {
 }
 
 
-function AndroidSettings() {
+function AndroidSettings(cssClass: string) {
   const ATRACE_CATEGORIES = new Map<string, string>();
   ATRACE_CATEGORIES.set('gfx', 'Graphics');
   ATRACE_CATEGORIES.set('input', 'Input');
@@ -514,13 +503,13 @@ function AndroidSettings() {
   LOG_BUFFERS.set('LID_KERNEL', 'Kernel');
 
   return m(
-      '.record-section',
+      `.record-section${cssClass}`,
       Probe(
           {
             title: 'Atrace userspace annotations',
             img: 'rec_atrace.png',
-            descr:
-                `Enables C++ / Java codebase annotations via TRACE / os.Trace() `,
+            descr: `Enables C++ / Java codebase annotations (ATRACE_BEGIN() /
+                    os.Trace())`,
             setEnabled: (cfg, val) => cfg.atrace = val,
             isEnabled: (cfg) => cfg.atrace
           },
@@ -559,7 +548,7 @@ function AndroidSettings() {
 }
 
 
-function AdvancedSettings() {
+function AdvancedSettings(cssClass: string) {
   const FTRACE_CATEGORIES = new Map<string, string>();
   FTRACE_CATEGORIES.set('binder/*', 'binder');
   FTRACE_CATEGORIES.set('block/*', 'block');
@@ -581,7 +570,7 @@ function AdvancedSettings() {
   FTRACE_CATEGORIES.set('vmscan/*', 'vmscan');
 
   return m(
-      '.record-section',
+      `.record-section${cssClass}`,
       Probe(
           {
             title: 'Advanced ftrace config',
@@ -595,7 +584,7 @@ function AdvancedSettings() {
           Slider({
             title: 'Buf size',
             cssClass: '.thin',
-            predefinedValues: FTRACE_BUF_KB,
+            values: [512, 1024, 2 * 1024, 4 * 1024, 16 * 1024, 32 * 1024],
             unit: 'KB',
             set: (cfg, val) => cfg.ftraceBufferSizeKb = val,
             get: (cfg) => cfg.ftraceBufferSizeKb
@@ -603,7 +592,7 @@ function AdvancedSettings() {
           Slider({
             title: 'Drain rate',
             cssClass: '.thin',
-            predefinedValues: FTRACE_FLUSH_MS,
+            values: [100, 250, 500, 1000, 2500, 5000],
             unit: 'ms',
             set: (cfg, val) => cfg.ftraceDrainPeriodMs = val,
             get: (cfg) => cfg.ftraceDrainPeriodMs
@@ -624,7 +613,7 @@ function AdvancedSettings() {
           })));
 }
 
-function Instructions() {
+function Instructions(cssClass: string) {
   const data = globals.trackDataStore.get('config') as {
     commandline: string,
     pbtxt: string,
@@ -635,49 +624,87 @@ function Instructions() {
   cmd += 'adb shell perfetto \\\n';
   cmd += '  -c - --txt  # Read config from stdin (text mode) \\\n';
   cmd += '  -o /data/misc/perfetto-traces/trace \\\n';
-  cmd += '<<EOF\n';
+  cmd += '<<EOF\n\n';
   cmd += pbtx;
   cmd += '\nEOF\n';
+  const docUrl = '//docs.perfetto.dev/#/build-instructions?id=get-the-code';
+
+
+  const notes: m.Children = [];
+  const doc =
+      m('span', 'Follow the ', m('a', {href: docUrl}, 'instructions here'));
+
+  const msgFeatNotSupported =
+      m('div', `Some of the probes are only supported in the
+      last version of perfetto running on Android Q+`);
+
+  const msgPerfettoNotSupported =
+      m('div', `Perfetto is not supported natively before Android P.`);
+
+  const msgSideload =
+      m('div',
+        `If you have a rooted device you can sideload the latest version of
+         perfetto. `,
+        doc);
+
+  const msgLinux =
+      m('div', `In order to use perfetto on Linux you need to
+      compile it and run from the standalone build. `, doc);
+
+  switch (targetOS) {
+    case 'Q':
+      break;
+    case 'P':
+      notes.push(msgFeatNotSupported);
+      notes.push(msgSideload);
+      break;
+    case 'O':
+      notes.push(msgPerfettoNotSupported);
+      notes.push(msgSideload);
+      break;
+    case 'L':
+      notes.push(msgLinux);
+      break;
+    default:
+  }
+
+  const onOsChange = (os: string) => {
+    targetOS = os;
+    globals.rafScheduler.scheduleFullRedraw();
+  };
 
   return m(
-      '.record-section',
+      `.record-section.instructions${cssClass}`,
       m('header', 'Instructions'),
       m('label',
         'Select target platform',
         m('select',
-          m('option', 'Android Q+'),
-          m('option', 'Android P'),
-          m('option', 'Android O-'),
-          m('option', 'Linux desktop'))),
+          {onchange: m.withAttr('value', onOsChange)},
+          m('option', {value: 'Q'}, 'Android Q+'),
+          m('option', {value: 'P'}, 'Android P'),
+          m('option', {value: 'O'}, 'Android O-'),
+          m('option', {value: 'L'}, 'Linux desktop'))),
+      notes.length > 0 ? m('.note', notes) : [],
       m(CodeSample, {text: cmd, hardWhitespace: true}), );
 }
 
 export const RecordPage = createPage({
   view() {
-    let routePage = Router.param('p');
-    let page = undefined;
-    switch (routePage) {
-      case 'instructions':
-        page = Instructions();
-        break;
-      case 'cpu':
-        page = CpuSettings();
-        break;
-      case 'power':
-        page = PowerSettings();
-        break;
-      case 'memory':
-        page = MemorySettings();
-        break;
-      case 'advanced':
-        page = AdvancedSettings();
-        break;
-      case 'android':
-        page = AndroidSettings();
-        break;
-      default:
-        page = RecSettings();
-        routePage = 'buffers';
+    const SECTIONS: {[property: string]: (cssClass: string) => m.Child} = {
+      buffers: RecSettings,
+      instructions: Instructions,
+      cpu: CpuSettings,
+      power: PowerSettings,
+      memory: MemorySettings,
+      android: AndroidSettings,
+      advanced: AdvancedSettings,
+    };
+
+    const pages: m.Children = [];
+    const routePage = Router.param('p');
+    for (const key of Object.keys(SECTIONS)) {
+      const cssClass = routePage === key ? '.active' : '';
+      pages.push(SECTIONS[key](cssClass));
     }
 
     return m(
@@ -723,6 +750,6 @@ export const RecordPage = createPage({
                   m('i.material-icons', 'settings'),
                   m('.title', 'Advanced settings'),
                   m('.sub', 'Complicated stuff for wizards'))), )),
-          page));
+          pages));
   }
 });
