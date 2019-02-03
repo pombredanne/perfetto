@@ -194,6 +194,28 @@ TEST_F(CountersTableUnittest, UtidLookupUpidSort) {
   ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_DONE);
 }
 
+TEST_F(CountersTableUnittest, RefColumnComparator) {
+  int64_t timestamp = 1000;
+
+  UniquePid upid = context_.process_tracker->UpdateProcess(100);
+  // To ensure that upid and utid are not the same number
+  context_.process_tracker->UpdateThread(timestamp, 101, 0);
+  UniqueTid utid = context_.process_tracker->UpdateThread(timestamp, 102, 0);
+  context_.storage->GetMutableThread(utid)->upid = upid;
+  ASSERT_NE(upid, utid);
+
+  context_.storage->mutable_counters()->AddCounter(timestamp, 0 /* dur */, 0,
+                                                   1 /* value */, utid,
+                                                   RefType::kRefUtidLookupUpid);
+
+  context_.storage->mutable_counters()->AddCounter(
+      timestamp + 1, 0 /* dur */, 0, 1 /* value */, upid, RefType::kRefUpid);
+
+  CountersTable::RefColumn ref_column("ref", context_.storage.get());
+  auto comparator = ref_column.Sort(QueryConstraints::OrderBy());
+  ASSERT_EQ(comparator(0, 1), 0);
+}
+
 }  // namespace
 }  // namespace trace_processor
 }  // namespace perfetto
