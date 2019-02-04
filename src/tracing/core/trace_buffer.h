@@ -208,9 +208,11 @@ class TraceBuffer {
   // Reads in the TraceBuffer are NOT idempotent.
   void BeginRead();
 
-  // Returns the next packet in the buffer, if any, and the uid of the producer
-  // that wrote it (as passed in the CopyChunkUntrusted() call). Returns false
-  // if no packets can be read at this point.
+  // Returns the next packet in the buffer, if any, and the producer_id,
+  // producer_uid, and writer_id of the producer/writer that wrote it (as passed
+  // in the CopyChunkUntrusted() call). Returns false if no packets can be read
+  // at this point.
+  //
   // This function returns only complete packets. Specifically:
   // When there is at least one complete packet in the buffer, this function
   // returns true and populates the TracePacket argument with the boundaries of
@@ -230,7 +232,10 @@ class TraceBuffer {
   //   P1, P4, P7, P2, P3, P5, P8, P9, P6
   // But the following is guaranteed to NOT happen:
   //   P1, P5, P7, P4 (P4 cannot come after P5)
-  bool ReadNextTracePacket(TracePacket*, uid_t* producer_uid);
+  bool ReadNextTracePacket(TracePacket*,
+                           ProducerID*,
+                           uid_t* producer_uid,
+                           WriterID*);
 
   const TraceStats::BufferStats& stats() const { return stats_; }
   size_t size() const { return size_; }

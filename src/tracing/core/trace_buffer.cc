@@ -542,7 +542,9 @@ void TraceBuffer::SequenceIterator::MoveNext() {
 }
 
 bool TraceBuffer::ReadNextTracePacket(TracePacket* packet,
-                                      uid_t* producer_uid) {
+                                      ProducerID* producer_id,
+                                      uid_t* producer_uid,
+                                      WriterID* writer_id) {
   // Note: MoveNext() moves only within the next chunk within the same
   // {ProducerID, WriterID} sequence. Here we want to:
   // - return the next patched+complete packet in the current sequence, if any.
@@ -550,7 +552,9 @@ bool TraceBuffer::ReadNextTracePacket(TracePacket* packet,
   // - return false if none of the above is found.
   TRACE_BUFFER_DLOG("ReadNextTracePacket()");
 
-  // Just in case we forget to initialize it below.
+  // Just in case we forget to initialize these below.
+  *producer_id = 0;
+  *writer_id = 0;
   *producer_uid = kInvalidUid;
 
 #if PERFETTO_DCHECK_IS_ON()
@@ -580,6 +584,8 @@ bool TraceBuffer::ReadNextTracePacket(TracePacket* packet,
       continue;
     }
 
+    const ProducerID trusted_producer_id = read_iter_.producer_id();
+    const WriterID trusted_writer_id = read_iter_.writer_id();
     const uid_t trusted_uid = chunk_meta->trusted_uid;
 
     // At this point we have a chunk in |chunk_meta| that has not been fully
@@ -643,6 +649,8 @@ bool TraceBuffer::ReadNextTracePacket(TracePacket* packet,
       if (action == kReadOnePacket) {
         // The easy peasy case B.
         if (PERFETTO_LIKELY(ReadNextPacketInChunk(chunk_meta, packet))) {
+          *producer_id = trusted_producer_id;
+          *writer_id = trusted_writer_id;
           *producer_uid = trusted_uid;
           return true;
         }
@@ -659,6 +667,8 @@ bool TraceBuffer::ReadNextTracePacket(TracePacket* packet,
       ReadAheadResult ra_res = ReadAhead(packet);
       if (ra_res == ReadAheadResult::kSucceededReturnSlices) {
         stats_.set_readaheads_succeeded(stats_.readaheads_succeeded() + 1);
+        *producer_id = trusted_producer_id;
+        *writer_id = trusted_writer_id;
         *producer_uid = trusted_uid;
         return true;
       }

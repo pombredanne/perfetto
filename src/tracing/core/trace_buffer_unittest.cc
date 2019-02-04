@@ -74,8 +74,12 @@ class TraceBufferTest : public testing::Test {
     std::vector<FakePacketFragment> fragments;
     TracePacket packet;
     uint32_t ignore;
-    if (!trace_buffer_->ReadNextTracePacket(&packet, uid ? uid : &ignore))
+    ProducerID producer_id = 0;
+    WriterID writer_id = 0;
+    if (!trace_buffer_->ReadNextTracePacket(&packet, &producer_id,
+                                            uid ? uid : &ignore, &writer_id)) {
       return fragments;
+    }
     for (const Slice& slice : packet.slices())
       fragments.emplace_back(slice.start, slice.size);
     return fragments;

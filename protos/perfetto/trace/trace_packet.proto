@@ -38,7 +38,7 @@ package perfetto.protos;
 // The root object emitted by Perfetto. A perfetto trace is just a stream of
 // TracePacket(s).
 //
-// Next id: 41.
+// Next id: 42.
 message TracePacket {
   // TODO(primiano): in future we should add a timestamp_clock_domain field to
   // allow mixing timestamps from different clock domains.
@@ -77,4 +77,12 @@ message TracePacket {
   // Trusted user id of the producer which generated this packet. Keep in sync
   // with TrustedPacket.trusted_uid.
   oneof optional_trusted_uid { int32 trusted_uid = 3; };
+
+  // Service-assigned identifier of the packet sequence this packet belongs to.
+  // Uniquely identifies a producer + writer pair within the tracing session. A
+  // value of zero denotes an invalid ID. Keep in sync with
+  // TrustedPacket.trusted_packet_sequence_id.
+  oneof optional_trusted_packet_sequence_id {
+    uint32 trusted_packet_sequence_id = 41;
+  };
 }
