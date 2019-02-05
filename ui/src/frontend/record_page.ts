@@ -701,7 +701,10 @@ export const RecordPage = createPage({
     };
 
     const pages: m.Children = [];
-    const routePage = Router.param('p');
+    let routePage = Router.param('p');
+    if (Object.keys(SECTIONS).indexOf(routePage) < 0) {
+      routePage = 'buffers';
+    }
     for (const key of Object.keys(SECTIONS)) {
       const cssClass = routePage === key ? '.active' : '';
       pages.push(SECTIONS[key](cssClass));
