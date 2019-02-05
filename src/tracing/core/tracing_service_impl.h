@@ -305,7 +305,9 @@ class TracingServiceImpl : public TracingService {
         return it->second;
       // We shouldn't run out of sequence IDs (producer ID is 16 bit, writer IDs
       // are limited to 1024).
-      static_assert(kMaxPacketSequenceID > (kMaxProducerID * kMaxWriterID), "");
+      static_assert(kMaxPacketSequenceID > kMaxProducerID * kMaxWriterID + 1,
+                    "PacketSequenceID value space doesn't cover service "
+                    "sequence ID and all producer/writer ID combinations!");
       PERFETTO_DCHECK(last_packet_sequence_id < kMaxPacketSequenceID);
       PacketSequenceID sequence_id = ++last_packet_sequence_id;
       packet_sequence_ids[key] = sequence_id;
