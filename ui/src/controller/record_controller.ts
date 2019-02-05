@@ -35,10 +35,7 @@ export function uint8ArrayToBase64(buffer: Uint8Array): string {
 
 export function genConfigProto(uiCfg: RecordConfig): Uint8Array {
   const protoCfg = new TraceConfig();
-  // TODO check stuff unsupported on P.
-
   protoCfg.durationMs = uiCfg.durationMs;
-
 
   // Auxiliary buffer for slow-rate events.
   // Set to 1/8th of the main buffer size, with reasonable limits.

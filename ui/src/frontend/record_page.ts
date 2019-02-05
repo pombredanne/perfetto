@@ -294,8 +294,8 @@ function PowerSettings(cssClass: string) {
           {
             title: 'Battery drain',
             img: 'rec_battery_counters.png',
-            descr: 'Polls charge counters and instantaneous power draw from ' +
-                'the battery power management IC.',
+            descr: `Polls charge counters and instantaneous power draw from
+                    the battery power management IC.`,
             setEnabled: (cfg, val) => cfg.batteryDrain = val,
             isEnabled: (cfg) => cfg.batteryDrain
           },
@@ -354,8 +354,8 @@ function CpuSettings(cssClass: string) {
         title: 'Scheduling chains / latency analysis',
         img: 'rec_cpu_wakeup.png',
         descr: `Tracks causality of scheduling transitions. When a task
-                  X transitions from blocked -> runnable, keeps track of the
-                  task Y that X's transition (e.g. posting a semaphore).`,
+                X transitions from blocked -> runnable, keeps track of the
+                task Y that X's transition (e.g. posting a semaphore).`,
         setEnabled: (cfg, val) => cfg.cpuLatency = val,
         isEnabled: (cfg) => cfg.cpuLatency
       }));
@@ -405,8 +405,8 @@ function MemorySettings(cssClass: string) {
         title: 'High-frequency memory events',
         img: 'rec_mem_hifreq.png',
         descr: `Allows to track short memory spikes and transitories through
-                  ftrace's mm_event, rss_stat and ion events. Avialable only
-                  on recent Android Q+ kernels`,
+                ftrace's mm_event, rss_stat and ion events. Avialable only
+                on recent Android Q+ kernels`,
         setEnabled: (cfg, val) => cfg.memHiFreq = val,
         isEnabled: (cfg) => cfg.memHiFreq
       }),
@@ -414,8 +414,8 @@ function MemorySettings(cssClass: string) {
         title: 'Low memory killer',
         img: 'rec_lmk.png',
         descr: `Record LMK events. Works both with the old in-kernel LMK
-                  and the newer userspace lmkd. It also tracks OOM score
-                  adjustments.`,
+                and the newer userspace lmkd. It also tracks OOM score
+                adjustments.`,
         setEnabled: (cfg, val) => cfg.memLmk = val,
         isEnabled: (cfg) => cfg.memLmk
       }),
@@ -424,8 +424,8 @@ function MemorySettings(cssClass: string) {
             title: 'Per process stats',
             img: 'rec_ps_stats.png',
             descr: `Periodically samples all processes in the system tracking:
-                      their thread list, memory counters (RSS, swap and other
-                      /proc/status counters) and oom_score_adj.`,
+                    their thread list, memory counters (RSS, swap and other
+                    /proc/status counters) and oom_score_adj.`,
             setEnabled: (cfg, val) => cfg.procStats = val,
             isEnabled: (cfg) => cfg.procStats
           },
@@ -442,8 +442,8 @@ function MemorySettings(cssClass: string) {
             title: 'Virtual memory stats',
             img: 'rec_vmstat.png',
             descr: `Periodically polls virtual memory stats from /proc/vmstat.
-                      Allows to gather statistics about swap, eviction,
-                      compression and pagecache efficiency`,
+                    Allows to gather statistics about swap, eviction,
+                    compression and pagecache efficiency`,
             setEnabled: (cfg, val) => cfg.vmstat = val,
             isEnabled: (cfg) => cfg.vmstat
           },
@@ -533,7 +533,7 @@ function AndroidSettings(cssClass: string) {
             title: 'Event log (logcat)',
             img: 'rec_logcat.png',
             descr: `Streams the event log into the trace. If no buffer filter is
-                  specified, all buffers are selected.`,
+                    specified, all buffers are selected.`,
             setEnabled: (cfg, val) => cfg.androidLogs = val,
             isEnabled: (cfg) => cfg.androidLogs
           },
@@ -576,8 +576,8 @@ function AdvancedSettings(cssClass: string) {
             title: 'Advanced ftrace config',
             img: 'rec_ftrace.png',
             descr: `Tunes the kernel-tracing (ftrace) module and allows to
-                      enable extra events. The events enabled here are on top
-                      of the ones derived when enabling the other probes.`,
+                    enable extra events. The events enabled here are on top
+                    of the ones derived when enabling the other probes.`,
             setEnabled: (cfg, val) => cfg.ftrace = val,
             isEnabled: (cfg) => cfg.ftrace
           },
