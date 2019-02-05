@@ -2552,7 +2552,9 @@ message TracePacket {
   // Uniquely identifies a producer + writer pair within the tracing session. A
   // value of zero denotes an invalid ID. Keep in sync with
   // TrustedPacket.trusted_packet_sequence_id.
-  optional uint32 trusted_packet_sequence_id = 41;
+  oneof optional_trusted_packet_sequence_id {
+    uint32 trusted_packet_sequence_id = 41;
+  }
 }
 
 // End of protos/perfetto/trace/trace_packet.proto

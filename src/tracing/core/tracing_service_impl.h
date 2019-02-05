@@ -303,10 +303,10 @@ class TracingServiceImpl : public TracingService {
       auto it = packet_sequence_ids.find(key);
       if (it != packet_sequence_ids.end())
         return it->second;
-      // Return an invalid ID when we run out of IDs. This shouldn't really ever
-      // happen in practice.
-      if (last_packet_sequence_id == kMaxPacketSequenceID)
-        return kInvalidPacketSequenceID;
+      // We shouldn't run out of sequence IDs (producer ID is 16 bit, writer IDs
+      // are limited to 1024).
+      static_assert(kMaxPacketSequenceID > (kMaxProducerID * kMaxWriterID), "");
+      PERFETTO_DCHECK(last_packet_sequence_id < kMaxPacketSequenceID);
       PacketSequenceID sequence_id = ++last_packet_sequence_id;
       packet_sequence_ids[key] = sequence_id;
       return sequence_id;
