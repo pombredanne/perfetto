@@ -541,10 +541,9 @@ void TraceBuffer::SequenceIterator::MoveNext() {
     cur = seq_end;
 }
 
-bool TraceBuffer::ReadNextTracePacket(TracePacket* packet,
-                                      ProducerID* producer_id,
-                                      uid_t* producer_uid,
-                                      WriterID* writer_id) {
+bool TraceBuffer::ReadNextTracePacket(
+    TracePacket* packet,
+    PacketSequenceProperties* sequence_properties) {
   // Note: MoveNext() moves only within the next chunk within the same
   // {ProducerID, WriterID} sequence. Here we want to:
   // - return the next patched+complete packet in the current sequence, if any.
@@ -553,9 +552,7 @@ bool TraceBuffer::ReadNextTracePacket(TracePacket* packet,
   TRACE_BUFFER_DLOG("ReadNextTracePacket()");
 
   // Just in case we forget to initialize these below.
-  *producer_id = 0;
-  *writer_id = 0;
-  *producer_uid = kInvalidUid;
+  *sequence_properties = {0, kInvalidUid, 0};
 
 #if PERFETTO_DCHECK_IS_ON()
   PERFETTO_DCHECK(!changed_since_last_read_);
@@ -585,7 +582,7 @@ bool TraceBuffer::ReadNextTracePacket(TracePacket* packet,
     }
 
     const ProducerID trusted_producer_id = read_iter_.producer_id();
-    const WriterID trusted_writer_id = read_iter_.writer_id();
+    const WriterID writer_id = read_iter_.writer_id();
     const uid_t trusted_uid = chunk_meta->trusted_uid;
 
     // At this point we have a chunk in |chunk_meta| that has not been fully
@@ -649,9 +646,7 @@ bool TraceBuffer::ReadNextTracePacket(TracePacket* packet,
       if (action == kReadOnePacket) {
         // The easy peasy case B.
         if (PERFETTO_LIKELY(ReadNextPacketInChunk(chunk_meta, packet))) {
-          *producer_id = trusted_producer_id;
-          *writer_id = trusted_writer_id;
-          *producer_uid = trusted_uid;
+          *sequence_properties = {trusted_producer_id, trusted_uid, writer_id};
           return true;
         }
 
@@ -667,9 +662,7 @@ bool TraceBuffer::ReadNextTracePacket(TracePacket* packet,
       ReadAheadResult ra_res = ReadAhead(packet);
       if (ra_res == ReadAheadResult::kSucceededReturnSlices) {
         stats_.set_readaheads_succeeded(stats_.readaheads_succeeded() + 1);
-        *producer_id = trusted_producer_id;
-        *writer_id = trusted_writer_id;
-        *producer_uid = trusted_uid;
+        *sequence_properties = {trusted_producer_id, trusted_uid, writer_id};
         return true;
       }
 

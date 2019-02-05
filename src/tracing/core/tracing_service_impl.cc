@@ -1012,16 +1012,13 @@ void TracingServiceImpl::ReadBuffers(TracingSessionID tsid,
     tbuf.BeginRead();
     while (!did_hit_threshold) {
       TracePacket packet;
-      ProducerID producer_id = 0;
-      WriterID writer_id = 0;
-      uid_t producer_uid = kInvalidUid;
-      if (!tbuf.ReadNextTracePacket(&packet, &producer_id, &producer_uid,
-                                    &writer_id)) {
+      TraceBuffer::PacketSequenceProperties sequence_properties;
+      if (!tbuf.ReadNextTracePacket(&packet, &sequence_properties)) {
         break;
       }
-      PERFETTO_DCHECK(producer_id != 0);
-      PERFETTO_DCHECK(writer_id != 0);
-      PERFETTO_DCHECK(producer_uid != kInvalidUid);
+      PERFETTO_DCHECK(sequence_properties.producer_id_trusted != 0);
+      PERFETTO_DCHECK(sequence_properties.writer_id != 0);
+      PERFETTO_DCHECK(sequence_properties.producer_uid_trusted != kInvalidUid);
       PERFETTO_DCHECK(packet.size() > 0);
       if (!PacketStreamValidator::Validate(packet.slices())) {
         PERFETTO_DLOG("Dropping invalid packet");
@@ -1037,9 +1034,12 @@ void TracingServiceImpl::ReadBuffers(TracingSessionID tsid,
       // partial packet (e.g., a truncated string) which only becomes valid when
       // the trusted data is appended here.
       protos::TrustedPacket trusted_packet;
-      trusted_packet.set_trusted_uid(static_cast<int32_t>(producer_uid));
+      trusted_packet.set_trusted_uid(
+          static_cast<int32_t>(sequence_properties.producer_uid_trusted));
       trusted_packet.set_trusted_packet_sequence_id(
-          tracing_session->GetWriterSequenceID(producer_id, writer_id));
+          tracing_session->GetPacketSequenceID(
+              sequence_properties.producer_id_trusted,
+              sequence_properties.writer_id));
       static constexpr size_t kTrustedBufSize = 16;
       Slice slice = Slice::Allocate(kTrustedBufSize);
       PERFETTO_CHECK(

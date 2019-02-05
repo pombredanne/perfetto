@@ -152,6 +152,13 @@ class TraceBuffer {
     std::array<uint8_t, kSize> data;
   };
 
+  // Identifiers that are constant for a packet sequence.
+  struct PacketSequenceProperties {
+    ProducerID producer_id_trusted;
+    uid_t producer_uid_trusted;
+    WriterID writer_id;
+  };
+
   // Can return nullptr if the memory allocation fails.
   static std::unique_ptr<TraceBuffer> Create(size_t size_in_bytes,
                                              OverwritePolicy = kOverwrite);
@@ -233,9 +240,7 @@ class TraceBuffer {
   // But the following is guaranteed to NOT happen:
   //   P1, P5, P7, P4 (P4 cannot come after P5)
   bool ReadNextTracePacket(TracePacket*,
-                           ProducerID*,
-                           uid_t* producer_uid,
-                           WriterID*);
+                           PacketSequenceProperties* sequence_properties);
 
   const TraceStats::BufferStats& stats() const { return stats_; }
   size_t size() const { return size_; }
