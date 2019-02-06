@@ -89,6 +89,16 @@ class StringWriter {
       buffer_[pos_++] = data[i];
   }
 
+  // Writes a double to the buffer.
+  void WriteDouble(double value) {
+    // TODO(lalitm): trying to optimize this is premature given we almost never
+    // print doubles. Reevaluate this in the future if we do print them more.
+    size_t res =
+        static_cast<size_t>(snprintf(buffer_, n_ - pos_, "%lf", value));
+    PERFETTO_DCHECK(pos_ + res < n_);
+    pos_ += res;
+  }
+
   char* GetCString() {
     PERFETTO_DCHECK(pos_ < n_);
     buffer_[pos_] = '\0';
