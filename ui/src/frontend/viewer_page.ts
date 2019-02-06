@@ -149,6 +149,8 @@ class TraceViewer implements m.ClassComponent {
   private onResize: () => void = () => {};
   private zoomContent?: PanAndZoomHandler;
   private detailsHeight = DRAG_HANDLE_HEIGHT_PX;
+  // Used to prevent global deselection if a pan occurred.
+  private panOccurred = false;
 
   oncreate(vnode: m.CVnodeDOM) {
     const frontendLocalState = globals.frontendLocalState;
@@ -176,6 +178,7 @@ class TraceViewer implements m.ClassComponent {
       element: panZoomEl,
       contentOffsetX: TRACK_SHELL_WIDTH,
       onPanned: (pannedPx: number) => {
+        this.panOccurred = true;
         const traceTime = globals.state.traceTime;
         const vizTime = globals.frontendLocalState.visibleWindowTime;
         const origDelta = vizTime.duration;
@@ -260,6 +263,11 @@ class TraceViewer implements m.ClassComponent {
         m('.pan-and-zoom-content', {
           onclick: () =>
           {
+            // We don't want to deselect when panning.
+            if (this.panOccurred) {
+              this.panOccurred = false;
+              return;
+            }
             globals.dispatch(Actions.deselect({}));
             globals.rafScheduler.scheduleRedraw();
           }},
