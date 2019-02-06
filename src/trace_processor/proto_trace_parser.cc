@@ -21,6 +21,7 @@
 #include <string>
 
 #include "perfetto/base/logging.h"
+#include "perfetto/base/optional.h"
 #include "perfetto/base/string_view.h"
 #include "perfetto/base/utils.h"
 #include "perfetto/protozero/proto_decoder.h"
@@ -261,6 +262,11 @@ void ProtoTraceParser::ParseTracePacket(int64_t ts, TraceBlobView packet) {
       case protos::TracePacket::kAndroidLogFieldNumber: {
         const size_t fld_off = packet.offset_of(fld.data());
         ParseAndroidLogPacket(packet.slice(fld_off, fld.size()));
+        break;
+      }
+      case protos::TracePacket::kProfilePacketFieldNumber: {
+        const size_t fld_off = packet.offset_of(fld.data());
+        ParseProfilePacket(packet.slice(fld_off, fld.size()));
         break;
       }
       default:
@@ -965,13 +971,15 @@ void ProtoTraceParser::ParsePrint(uint32_t,
           context_->storage->mutable_instants()->AddInstantEvent(
               timestamp, lmk_id_, 0, killed_upid, RefType::kRefUpid);
         }
-        // TODO(tilal6991): we should not add LMK events to the counters table
+        // TODO(lalitm): we should not add LMK events to the counters table
         // once the UI has support for displaying instants.
       }
-      UniqueTid utid = context_->process_tracker->UpdateThread(pid, point.tgid);
+      // This is per upid on purpose. Some counters are pushed from arbitrary
+      // threads but are really per process.
+      UniquePid upid = context_->process_tracker->UpdateProcess(point.tgid);
       StringId name_id = context_->storage->InternString(point.name);
       context_->event_tracker->PushCounter(timestamp, point.value, name_id,
-                                           utid, RefType::kRefUtid);
+                                           upid, RefType::kRefUpid);
     }
   }
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
@@ -1349,13 +1357,15 @@ void ProtoTraceParser::ParseAndroidLogEvent(TraceBlobView event) {
     msg_id = context_->storage->InternString(&arg_msg[1]);
   }
   UniquePid utid = tid ? context_->process_tracker->UpdateThread(tid, pid) : 0;
-  int64_t trace_time =
+  base::Optional<int64_t> opt_trace_time =
       context_->clock_tracker->ToTraceTime(ClockDomain::kRealTime, ts);
+  if (!opt_trace_time)
+    return;
 
   // Log events are NOT required to be sorted by trace_time. The virtual table
   // will take care of sorting on-demand.
-  context_->storage->mutable_android_log()->AddLogEvent(trace_time, utid, prio,
-                                                        tag_id, msg_id);
+  context_->storage->mutable_android_log()->AddLogEvent(
+      opt_trace_time.value(), utid, prio, tag_id, msg_id);
 }
 
 void ProtoTraceParser::ParseAndroidLogBinaryArg(TraceBlobView arg,
@@ -1597,6 +1607,55 @@ void ProtoTraceParser::ParseFtraceStats(TraceBlobView packet) {
       }
       default:
         break;
+    }
+  }
+  PERFETTO_DCHECK(decoder.IsEndOfBuffer());
+}
+
+void ProtoTraceParser::ParseProfilePacket(TraceBlobView packet) {
+  ProtoDecoder decoder(packet.data(), packet.length());
+  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    switch (fld.id) {
+      case protos::ProfilePacket::kStringsFieldNumber: {
+        const size_t fld_off = packet.offset_of(fld.data());
+        TraceBlobView nestedPacket = packet.slice(fld_off, fld.size());
+        ProtoDecoder nested(nestedPacket.data(), nestedPacket.length());
+        for (auto sub = nested.ReadField(); sub.id != 0;
+             sub = nested.ReadField()) {
+          switch (sub.id) {
+            case protos::ProfilePacket::InternedString::kIdFieldNumber: {
+              break;
+            }
+            case protos::ProfilePacket::InternedString::kStrFieldNumber: {
+              context_->storage->InternString(sub.as_string());
+              break;
+            }
+          }
+        }
+        break;
+      }
+      case protos::ProfilePacket::kFramesFieldNumber: {
+        break;
+      }
+      case protos::ProfilePacket::kCallstacksFieldNumber: {
+        break;
+      }
+      case protos::ProfilePacket::kMappingsFieldNumber: {
+        break;
+      }
+      case protos::ProfilePacket::kProcessDumpsFieldNumber: {
+        break;
+      }
+      case protos::ProfilePacket::kContinuedFieldNumber: {
+        bool continued = fld.as_bool();
+        base::ignore_result(continued);
+        break;
+      }
+      case protos::ProfilePacket::kIndexFieldNumber: {
+        int64_t index = fld.as_int64();
+        base::ignore_result(index);
+        break;
+      }
     }
   }
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
