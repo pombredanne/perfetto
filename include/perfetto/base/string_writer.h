@@ -94,7 +94,7 @@ class StringWriter {
     // TODO(lalitm): trying to optimize this is premature given we almost never
     // print doubles. Reevaluate this in the future if we do print them more.
     size_t res =
-        static_cast<size_t>(snprintf(buffer_, n_ - pos_, "%lf", value));
+        static_cast<size_t>(snprintf(buffer_ + pos_, n_ - pos_, "%lf", value));
     PERFETTO_DCHECK(pos_ + res < n_);
     pos_ += res;
   }
