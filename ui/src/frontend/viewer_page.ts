@@ -269,7 +269,6 @@ class TraceViewer implements m.ClassComponent {
               return;
             }
             globals.dispatch(Actions.deselect({}));
-            globals.rafScheduler.scheduleRedraw();
           }},
           m('.pinned-panel-container', m(PanelContainer, {
               doesScroll: false,
