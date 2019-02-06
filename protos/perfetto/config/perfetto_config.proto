@@ -360,7 +360,7 @@ message ProcessStatsConfig {
   optional bool record_thread_names = 3;
 
   // If > 0 samples counters (see process_stats.proto) from
-  // /proc/pid/status every X ms.
+  // /proc/pid/status and oom_score_adj every X ms.
   // This is required to be > 100ms to avoid excessive CPU usage.
   // TODO(primiano): add CPU cost for change this value.
   optional uint32 proc_stats_poll_ms = 4;
@@ -491,9 +491,17 @@ message TraceConfig {
 
     enum FillPolicy {
       UNSPECIFIED = 0;
+
+      // Default behavior. The buffer operates as a conventional ring buffer.
+      // If the writer is faster than the reader (or if the reader reads only
+      // after tracing is stopped) newly written packets will overwrite old
+      // packets.
       RING_BUFFER = 1;
-      // TODO: not implemented yet.
-      // STOP_WHEN_FULL = 2;
+
+      // Behaves like RING_BUFFER as long as there is space in the buffer or
+      // the reader catches up with the writer. As soon as the writer hits
+      // an unread chunk, it stops accepting new data in the buffer.
+      DISCARD = 2;
     }
     optional FillPolicy fill_policy = 4;
   }
@@ -559,6 +567,8 @@ message TraceConfig {
     optional int32 triggering_config_uid = 2;
     // The identifier of the config which triggered the alert.
     optional int64 triggering_config_id = 3;
+    // The identifier of the subscription which triggered this trace.
+    optional int64 triggering_subscription_id = 4;
   }
 
   // Statsd-specific metadata.
@@ -605,6 +615,9 @@ message TraceConfig {
   // Wait for this long for producers to acknowledge flush requests.
   // Default 5s.
   optional uint32 flush_timeout_ms = 14;
+
+  // Disable emitting clock timestamps into the trace.
+  optional bool disable_clock_snapshotting = 15;
 }
 
 // End of protos/perfetto/config/trace_config.proto

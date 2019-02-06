@@ -29,13 +29,13 @@ namespace perfetto {
 namespace profiling {
 namespace {
 
-std::string ToString(const SharedRingBuffer::ReadBuffer& buf_and_size) {
-  return std::string(reinterpret_cast<const char*>(&buf_and_size.data()[0]),
-                     buf_and_size.size());
+std::string ToString(const SharedRingBuffer::Buffer& buf_and_size) {
+  return std::string(reinterpret_cast<const char*>(&buf_and_size.data[0]),
+                     buf_and_size.size);
 }
 
 bool TryWrite(SharedRingBuffer* wr, const char* src, size_t size) {
-  SharedRingBuffer::WriteBuffer buf;
+  SharedRingBuffer::Buffer buf;
   {
     auto lock = wr->AcquireLock(ScopedSpinlock::Mode::Try);
     if (!lock.locked())
@@ -44,7 +44,7 @@ bool TryWrite(SharedRingBuffer* wr, const char* src, size_t size) {
   }
   if (!buf)
     return false;
-  memcpy(buf.buf(), src, size);
+  memcpy(buf.data, src, size);
   wr->EndWrite(buf);
   return true;
 }
@@ -60,20 +60,22 @@ void StructuredTest(SharedRingBuffer* wr, SharedRingBuffer* rd) {
   ASSERT_TRUE(TryWrite(wr, "bar", 4));
 
   {
-    auto buf_and_size = rd->Read();
-    ASSERT_EQ(buf_and_size.size(), 4);
-    ASSERT_STREQ(reinterpret_cast<const char*>(&buf_and_size.data()[0]), "foo");
+    auto buf_and_size = rd->BeginRead();
+    ASSERT_EQ(buf_and_size.size, 4);
+    ASSERT_STREQ(reinterpret_cast<const char*>(&buf_and_size.data[0]), "foo");
+    rd->EndRead(buf_and_size);
   }
   {
-    auto buf_and_size = rd->Read();
-    ASSERT_EQ(buf_and_size.size(), 4);
-    ASSERT_STREQ(reinterpret_cast<const char*>(&buf_and_size.data()[0]), "bar");
+    auto buf_and_size = rd->BeginRead();
+    ASSERT_EQ(buf_and_size.size, 4);
+    ASSERT_STREQ(reinterpret_cast<const char*>(&buf_and_size.data[0]), "bar");
+    rd->EndRead(buf_and_size);
   }
 
   for (int i = 0; i < 3; i++) {
-    auto buf_and_size = rd->Read();
-    ASSERT_EQ(buf_and_size.data(), nullptr);
-    ASSERT_EQ(buf_and_size.size(), 0);
+    auto buf_and_size = rd->BeginRead();
+    ASSERT_EQ(buf_and_size.data, nullptr);
+    ASSERT_EQ(buf_and_size.size, 0);
   }
 
   // Test extremely large writes (fill the buffer)
@@ -85,8 +87,9 @@ void StructuredTest(SharedRingBuffer* wr, SharedRingBuffer* rd) {
     ASSERT_FALSE(TryWrite(wr, "?", 1));
 
     // And read it back
-    auto buf_and_size = rd->Read();
+    auto buf_and_size = rd->BeginRead();
     ASSERT_EQ(ToString(buf_and_size), data);
+    rd->EndRead(buf_and_size);
   }
 
   // Test large writes that wrap.
@@ -94,17 +97,19 @@ void StructuredTest(SharedRingBuffer* wr, SharedRingBuffer* rd) {
   ASSERT_TRUE(TryWrite(wr, data.data(), data.size()));
   ASSERT_FALSE(TryWrite(wr, data.data(), data.size()));
   {
-    auto buf_and_size = rd->Read();
+    auto buf_and_size = rd->BeginRead();
     ASSERT_EQ(ToString(buf_and_size), data);
+    rd->EndRead(buf_and_size);
   }
   data = std::string(base::kPageSize - sizeof(uint64_t), '#');
   for (int i = 0; i < 4; i++)
     ASSERT_TRUE(TryWrite(wr, data.data(), data.size()));
 
   for (int i = 0; i < 4; i++) {
-    auto buf_and_size = rd->Read();
-    ASSERT_EQ(buf_and_size.size(), data.size());
+    auto buf_and_size = rd->BeginRead();
+    ASSERT_EQ(buf_and_size.size, data.size());
     ASSERT_EQ(ToString(buf_and_size), data);
+    rd->EndRead(buf_and_size);
   }
 
   // Test misaligned writes.
@@ -114,24 +119,29 @@ void StructuredTest(SharedRingBuffer* wr, SharedRingBuffer* rd) {
   ASSERT_TRUE(TryWrite(wr, "55555", 5));
   ASSERT_TRUE(TryWrite(wr, "7777777", 7));
   {
-    auto buf_and_size = rd->Read();
+    auto buf_and_size = rd->BeginRead();
     ASSERT_EQ(ToString(buf_and_size), "1");
+    rd->EndRead(buf_and_size);
   }
   {
-    auto buf_and_size = rd->Read();
+    auto buf_and_size = rd->BeginRead();
     ASSERT_EQ(ToString(buf_and_size), "22");
+    rd->EndRead(buf_and_size);
   }
   {
-    auto buf_and_size = rd->Read();
+    auto buf_and_size = rd->BeginRead();
     ASSERT_EQ(ToString(buf_and_size), "333");
+    rd->EndRead(buf_and_size);
   }
   {
-    auto buf_and_size = rd->Read();
+    auto buf_and_size = rd->BeginRead();
     ASSERT_EQ(ToString(buf_and_size), "55555");
+    rd->EndRead(buf_and_size);
   }
   {
-    auto buf_and_size = rd->Read();
+    auto buf_and_size = rd->BeginRead();
     ASSERT_EQ(ToString(buf_and_size), "7777777");
+    rd->EndRead(buf_and_size);
   }
 }
 
@@ -182,7 +192,7 @@ TEST(SharedRingBufferTest, MultiThreadingTest) {
 
   auto reader_thread_fn = [&rd, &expected_contents, &mutex, &writers_enabled] {
     for (;;) {
-      auto buf_and_size = rd.Read();
+      auto buf_and_size = rd.BeginRead();
       if (!buf_and_size) {
         if (!writers_enabled.load()) {
           // Failing to read after the writers are done means that there is no
@@ -193,10 +203,11 @@ TEST(SharedRingBufferTest, MultiThreadingTest) {
           continue;
         }
       }
-      ASSERT_GT(buf_and_size.size(), 0);
+      ASSERT_GT(buf_and_size.size, 0);
       std::string data = ToString(buf_and_size);
       std::lock_guard<std::mutex> lock(mutex);
       expected_contents[std::move(data)]--;
+      rd.EndRead(buf_and_size);
     }
   };
 

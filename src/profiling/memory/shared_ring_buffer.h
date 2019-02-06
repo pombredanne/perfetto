@@ -32,15 +32,13 @@ namespace profiling {
 
 class ScopedSpinlock {
  public:
-  friend void swap(ScopedSpinlock&, ScopedSpinlock&);
-
   enum class Mode { Try, Blocking };
 
   ScopedSpinlock(std::atomic<bool>* lock, Mode mode);
   ScopedSpinlock(const ScopedSpinlock&) = delete;
   ScopedSpinlock& operator=(const ScopedSpinlock&) = delete;
 
-  ScopedSpinlock(ScopedSpinlock&&);
+  ScopedSpinlock(ScopedSpinlock&&) noexcept;
   ScopedSpinlock& operator=(ScopedSpinlock&&);
 
   ~ScopedSpinlock();
@@ -60,8 +58,6 @@ class ScopedSpinlock {
   bool locked_ = false;
 };
 
-void swap(ScopedSpinlock&, ScopedSpinlock&);
-
 // A concurrent, multi-writer single-reader ring buffer FIFO, based on a
 // circular buffer over shared memory. It has similar semantics to a SEQ_PACKET
 // + O_NONBLOCK socket, specifically:
@@ -80,53 +76,15 @@ void swap(ScopedSpinlock&, ScopedSpinlock&);
 // - Make the stats ifdef-able.
 class SharedRingBuffer {
  public:
-  class WriteBuffer {
+  class Buffer {
    public:
-    friend class SharedRingBuffer;
-    uint8_t* buf();
-    size_t size() { return size_; }
+    Buffer() {}
+    Buffer(uint8_t* d, size_t s) : data(d), size(s) {}
 
-    operator bool() { return wr_ptr_ != nullptr; }
+    operator bool() const { return data != nullptr; }
 
-   private:
-    size_t size_ = 0;
-    uint8_t* wr_ptr_ = nullptr;
-    uint64_t write_pos_ = 0;
-    size_t size_with_header_ = 0;
-  };
-
-  class ReadBuffer {
-   public:
-    friend class SharedRingBuffer;
-    friend void swap(ReadBuffer&, ReadBuffer&);
-
-    ReadBuffer() = default;
-    ~ReadBuffer();
-
-    ReadBuffer(const ReadBuffer&) = delete;
-    ReadBuffer& operator=(const ReadBuffer&) = delete;
-
-    ReadBuffer(ReadBuffer&&) noexcept;
-    ReadBuffer& operator=(ReadBuffer&&) noexcept;
-
-    uint8_t* data() const { return data_; }
-    size_t size() const { return size_; }
-    operator bool() const { return ring_buffer_ != nullptr; }
-
-   private:
-    ReadBuffer(uint8_t* data,
-               size_t size,
-               size_t size_with_header,
-               SharedRingBuffer* ring_buffer)
-        : data_(data),
-          size_(size),
-          size_with_header_(size_with_header),
-          ring_buffer_(ring_buffer) {}
-
-    uint8_t* data_ = nullptr;
-    size_t size_ = 0;
-    size_t size_with_header_ = 0;
-    SharedRingBuffer* ring_buffer_ = nullptr;
+    uint8_t* data = nullptr;
+    size_t size = 0;
   };
 
   static base::Optional<SharedRingBuffer> Create(size_t);
@@ -140,10 +98,11 @@ class SharedRingBuffer {
   size_t size() const { return size_; }
   int fd() const { return *mem_fd_; }
 
-  WriteBuffer BeginWrite(const ScopedSpinlock& spinlock, size_t size);
-  void EndWrite(const WriteBuffer& buf);
+  Buffer BeginWrite(const ScopedSpinlock& spinlock, size_t size);
+  void EndWrite(const Buffer& buf);
 
-  ReadBuffer Read();
+  Buffer BeginRead();
+  void EndRead(const Buffer&);
   ScopedSpinlock AcquireLock(ScopedSpinlock::Mode mode) {
     return ScopedSpinlock(&meta_->spinlock, mode);
   }
@@ -175,7 +134,6 @@ class SharedRingBuffer {
 
   void Initialize(base::ScopedFile mem_fd);
   bool IsCorrupt();
-  void EndRead(const ReadBuffer&);
 
   inline size_t read_avail(const ScopedSpinlock&) {
     PERFETTO_DCHECK(meta_->write_pos >= meta_->read_pos);
@@ -201,8 +159,6 @@ class SharedRingBuffer {
 
   // Remember to update the move ctor when adding new fields.
 };
-
-void swap(SharedRingBuffer::ReadBuffer&, SharedRingBuffer::ReadBuffer&);
 
 }  // namespace profiling
 }  // namespace perfetto

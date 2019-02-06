@@ -17,6 +17,7 @@
 #include "src/profiling/memory/client.h"
 
 #include <inttypes.h>
+#include <sys/prctl.h>
 #include <sys/syscall.h>
 #include <unistd.h>
 
@@ -46,6 +47,8 @@ namespace {
 
 constexpr std::chrono::seconds kLockTimeout{1};
 
+// TODO(rsavitski): consider setting a receive timeout as well, otherwise the
+// constructor can block indefinitely (while waiting on the client config).
 std::vector<base::UnixSocketRaw> ConnectPool(const std::string& sock_name,
                                              size_t n) {
   std::vector<base::UnixSocketRaw> res;
@@ -90,6 +93,11 @@ char* FindMainThreadStack() {
   return nullptr;
 }
 
+int UnsetDumpable(int) {
+  prctl(PR_SET_DUMPABLE, 0);
+  return 0;
+}
+
 }  // namespace
 
 bool FreePage::Add(const uint64_t addr,
@@ -99,10 +107,10 @@ bool FreePage::Add(const uint64_t addr,
   if (!l.owns_lock())
     return false;
   if (offset_ == kFreePageSize) {
-    bool success = FlushLocked(pool);
+    if (!FlushLocked(pool))
+      return false;
     // Now that we have flushed, reset to after the header.
     offset_ = 0;
-    return success;
   }
   FreePageEntry& current_entry = free_page_.entries[offset_++];
   current_entry.sequence_number = sequence_number;
@@ -117,7 +125,7 @@ bool FreePage::FlushLocked(SocketPool* pool) {
   msg.free_header = &free_page_;
   BorrowedSocket sock(pool->Borrow());
   if (!sock || !SendWireMessage(sock.get(), msg)) {
-    PERFETTO_ELOG("Failed to send wire message");
+    PERFETTO_PLOG("Failed to send wire message");
     sock.Shutdown();
     return false;
   }
@@ -198,13 +206,33 @@ Client::Client(std::vector<base::UnixSocketRaw> socks)
       main_thread_stack_base_(FindMainThreadStack()) {
   PERFETTO_DCHECK(pthread_key_.valid());
 
-  uint64_t size = 0;
+  // We might be running in a process that is not dumpable (such as app
+  // processes on user builds), in which case the /proc/self/mem will be chown'd
+  // to root:root, and will not be accessible even to the process itself (see
+  // man 5 proc). In such situations, temporarily mark the process dumpable to
+  // be able to open the files, unsetting dumpability immediately afterwards.
+  int orig_dumpable = prctl(PR_GET_DUMPABLE);
+
+  enum { kNop, kDoUnset };
+  base::ScopedResource<int, UnsetDumpable, kNop, false> unset_dumpable(kNop);
+  if (orig_dumpable == 0) {
+    unset_dumpable.reset(kDoUnset);
+    prctl(PR_SET_DUMPABLE, 1);
+  }
+
   base::ScopedFile maps(base::OpenFile("/proc/self/maps", O_RDONLY));
-  base::ScopedFile mem(base::OpenFile("/proc/self/mem", O_RDONLY));
-  if (!maps || !mem) {
-    PERFETTO_DFATAL("Failed to open /proc/self/{maps,mem}");
+  if (!maps) {
+    PERFETTO_DFATAL("Failed to open /proc/self/maps");
     return;
   }
+  base::ScopedFile mem(base::OpenFile("/proc/self/mem", O_RDONLY));
+  if (!mem) {
+    PERFETTO_DFATAL("Failed to open /proc/self/mem");
+    return;
+  }
+  // Restore original dumpability value if we overrode it.
+  unset_dumpable.reset();
+
   int fds[2];
   fds[0] = *maps;
   fds[1] = *mem;
@@ -213,6 +241,7 @@ Client::Client(std::vector<base::UnixSocketRaw> socks)
     return;
   // Send an empty record to transfer fds for /proc/self/maps and
   // /proc/self/mem.
+  uint64_t size = 0;
   if (sock->Send(&size, sizeof(size), fds, 2) != sizeof(size)) {
     PERFETTO_DFATAL("Failed to send file descriptors.");
     return;
@@ -286,7 +315,7 @@ void Client::RecordMalloc(uint64_t alloc_size,
 
   BorrowedSocket sock = socket_pool_.Borrow();
   if (!sock || !SendWireMessage(sock.get(), msg)) {
-    PERFETTO_ELOG("Failed to send wire message.");
+    PERFETTO_PLOG("Failed to send wire message.");
     sock.Shutdown();
     Shutdown();
   }
