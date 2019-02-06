@@ -69,33 +69,24 @@ int RawTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
   return SQLITE_OK;
 }
 
-int RawTable::FormatSystraceArgs(const std::string& event_name,
-                                 ArgSetId arg_set_id,
-                                 base::StringWriter* writer) {
-  const auto& args = storage_->args();
-
-  const auto& set_ids = args.set_ids();
+void RawTable::FormatSystraceArgs(const std::string& event_name,
+                                  ArgSetId arg_set_id,
+                                  base::StringWriter* writer) {
+  const auto& set_ids = storage_->args().set_ids();
   auto lb = std::lower_bound(set_ids.begin(), set_ids.end(), arg_set_id);
   auto ub = std::find(lb, set_ids.end(), arg_set_id + 1);
 
   auto start_row = static_cast<uint32_t>(std::distance(set_ids.begin(), lb));
 
-  auto write_row = [this, &args, writer, start_row](uint32_t arg_row) {
-    if (arg_row != start_row)
-      writer->WriteChar(' ');
-    const auto& key = storage_->GetString(args.keys()[arg_row]);
-    const auto& value = args.arg_values()[arg_row];
-
-    writer->WriteString(key.c_str(), key.length());
-
-    writer->WriteChar('=');
-
+  using Variadic = TraceStorage::Args::Variadic;
+  using ValueWriter = std::function<void(const Variadic&)>;
+  auto write_value = [this, writer](const Variadic& value) {
     switch (value.type) {
       case TraceStorage::Args::Variadic::kInt:
         writer->WriteInt(value.int_value);
         break;
       case TraceStorage::Args::Variadic::kReal:
-        // n += sprintf(&line[n], "%f", value.real_value);
+        writer->WriteDouble(value.real_value);
         break;
       case TraceStorage::Args::Variadic::kString: {
         const auto& str = storage_->GetString(value.string_value);
@@ -103,37 +94,42 @@ int RawTable::FormatSystraceArgs(const std::string& event_name,
       }
     }
   };
+  auto write_arg = [this, writer, start_row](uint32_t arg_idx,
+                                             ValueWriter value_fn) {
+    uint32_t arg_row = start_row + arg_idx;
+    if (arg_row != 0)
+      writer->WriteChar(' ');
+
+    const auto& args = storage_->args();
+    const auto& key = storage_->GetString(args.keys()[arg_row]);
+    const auto& value = args.arg_values()[arg_row];
+
+    writer->WriteString(key.c_str(), key.length());
+    writer->WriteChar('=');
+    value_fn(value);
+  };
 
   if (event_name == "sched_switch") {
     using SS = protos::SchedSwitchFtraceEvent;
-    write_row(start_row + SS::kPrevCommFieldNumber - 1);
-    write_row(start_row + SS::kPrevPidFieldNumber - 1);
-    write_row(start_row + SS::kPrevPrioFieldNumber - 1);
-
-    const auto& key = storage_->GetString(
-        args.keys()[start_row + SS::kPrevStateFieldNumber - 1]);
-    writer->WriteChar(' ');
-    writer->WriteString(key.c_str(), key.length());
-    writer->WriteChar('=');
-
-    const auto& value =
-        args.arg_values()[start_row + SS::kPrevStateFieldNumber - 1];
-    auto state = static_cast<uint16_t>(value.int_value);
-    writer->WriteString(ftrace_utils::TaskState(state).ToString().data());
+    write_arg(SS::kPrevCommFieldNumber - 1, write_value);
+    write_arg(SS::kPrevPidFieldNumber - 1, write_value);
+    write_arg(SS::kPrevPrioFieldNumber - 1, write_value);
+    write_arg(SS::kPrevStateFieldNumber - 1, [writer](const Variadic& value) {
+      auto state = static_cast<uint16_t>(value.int_value);
+      writer->WriteString(ftrace_utils::TaskState(state).ToString().data());
+    });
 
     constexpr char kDelimiter[] = " ==>";
     writer->WriteString(kDelimiter, sizeof(kDelimiter) - 1);
-    write_row(start_row + SS::kNextCommFieldNumber - 1);
-    write_row(start_row + SS::kNextPidFieldNumber - 1);
-    write_row(start_row + SS::kNextPrioFieldNumber - 1);
-    return 0;
+    write_arg(SS::kNextCommFieldNumber - 1, write_value);
+    write_arg(SS::kNextPidFieldNumber - 1, write_value);
+    write_arg(SS::kNextPrioFieldNumber - 1, write_value);
   }
 
-  uint32_t current_row = start_row;
+  uint32_t arg = 0;
   for (auto it = lb; it != ub; it++) {
-    write_row(current_row++);
+    write_arg(arg++, write_value);
   }
-  return 0;
 }
 
 void RawTable::ToSystrace(sqlite3_context* ctx,

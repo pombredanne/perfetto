@@ -35,9 +35,9 @@ class RawTable : public StorageTable {
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
 
  private:
-  int FormatSystraceArgs(const std::string& event_name,
-                         ArgSetId arg_set_id,
-                         base::StringWriter* writer);
+  void FormatSystraceArgs(const std::string& event_name,
+                          ArgSetId arg_set_id,
+                          base::StringWriter* writer);
   void ToSystrace(sqlite3_context* ctx, int argc, sqlite3_value** argv);
 
   const TraceStorage* const storage_;
