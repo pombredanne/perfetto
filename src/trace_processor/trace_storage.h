@@ -152,22 +152,22 @@ class TraceStorage {
 
     struct ArgHasher {
       uint64_t operator()(const Arg& arg) const noexcept {
-        uint64_t hash = 0xcbf29ce484222325;  // FNV-1a-64 offset basis.
+        uint64_t hash = kFnv1a64OffsetBasis;
         hash ^= static_cast<decltype(hash)>(arg.key);
         hash *= 1099511628211;  // FNV-1a-64 prime.
-        // We don't has arg.flat_key because it's a subsequence of arg.key.
+        // We don't hash arg.flat_key because it's a subsequence of arg.key.
         switch (arg.value.type) {
           case Variadic::Type::kInt:
-            hash ^= static_cast<decltype(hash)>(arg.value.int_value);
+            hash ^= static_cast<uint64_t>(arg.value.int_value);
             break;
           case Variadic::Type::kString:
-            hash ^= static_cast<decltype(hash)>(arg.value.string_value);
+            hash ^= static_cast<uint64_t>(arg.value.string_value);
             break;
           case Variadic::Type::kReal:
-            hash ^= static_cast<decltype(hash)>(arg.value.real_value);
+            hash ^= static_cast<uint64_t>(arg.value.real_value);
             break;
         }
-        hash *= 1099511628211;  // FNV-1a-64 prime.
+        hash *= kFnv1a64Prime;
         return hash;
       }
     };
@@ -183,10 +183,10 @@ class TraceStorage {
     ArgSetId AddArgSet(const std::vector<Arg>& args,
                        uint32_t begin,
                        uint32_t end) {
-      ArgSetHash hash = 0xcbf29ce484222325;  // FNV-1a-64 offset basis.
+      ArgSetHash hash = kFnv1a64OffsetBasis;
       for (uint32_t i = begin; i < end; i++) {
         hash ^= ArgHasher()(args[i]);
-        hash *= 1099511628211;  // FNV-1a-64 prime.
+        hash *= kFnv1a64Prime;
       }
 
       auto it = arg_row_for_hash_.find(hash);
@@ -209,6 +209,9 @@ class TraceStorage {
 
    private:
     using ArgSetHash = uint64_t;
+
+    static constexpr uint64_t kFnv1a64OffsetBasis = 0xcbf29ce484222325;
+    static constexpr uint64_t kFnv1a64Prime = 0xcbf29ce484222325;
 
     std::deque<ArgSetId> set_ids_;
     std::deque<StringId> flat_keys_;
@@ -579,15 +582,13 @@ class TraceStorage {
   }
 
   static RowId CreateRowId(TableId table, uint32_t row) {
-    static constexpr uint8_t kRowIdTableShift = 32;
     return (static_cast<RowId>(table) << kRowIdTableShift) | row;
   }
 
   static std::pair<int8_t /*table*/, uint32_t /*row*/> ParseRowId(RowId rowid) {
-    static constexpr uint8_t kRowIdTableShift = 32;
     auto id = static_cast<uint64_t>(rowid);
     auto table_id = static_cast<uint8_t>(id >> kRowIdTableShift);
-    auto row = static_cast<uint32_t>(id & ((1ul << kRowIdTableShift) - 1));
+    auto row = static_cast<uint32_t>(id & ((1ull << kRowIdTableShift) - 1));
     return std::make_pair(table_id, row);
   }
 
@@ -635,9 +636,11 @@ class TraceStorage {
   std::pair<int64_t, int64_t> GetTraceTimestampBoundsNs() const;
 
  private:
-  TraceStorage& operator=(const TraceStorage&) = default;
+  static constexpr uint8_t kRowIdTableShift = 32;
 
   using StringHash = uint64_t;
+
+  TraceStorage& operator=(const TraceStorage&) = default;
 
   // Stats about parsing the trace.
   StatsMap stats_{};
