@@ -184,6 +184,8 @@ class TraceBuffer {
   // not have finished writing the latest packet. Reading from a sequence will
   // also not progress past any incomplete chunks until they were rewritten with
   // |chunk_complete = true|, e.g. after a producer's commit.
+  //
+  // TODO(eseckler): Pass in a PacketStreamProperties instead of individual IDs.
   void CopyChunkUntrusted(ProducerID producer_id_trusted,
                           uid_t producer_uid_trusted,
                           WriterID writer_id,
