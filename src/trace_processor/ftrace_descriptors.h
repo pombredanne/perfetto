@@ -38,8 +38,8 @@ struct FieldDescriptor {
 
 struct MessageDescriptor {
   const char* name;
-  FieldDescriptor fields[32];
   size_t max_field_id;
+  FieldDescriptor fields[32];
 };
 
 MessageDescriptor* GetMessageDescriptorForId(size_t id);
