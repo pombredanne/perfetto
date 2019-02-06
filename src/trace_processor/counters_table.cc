@@ -108,8 +108,8 @@ void CountersTable::RefColumn::Filter(int op,
   bool op_is_null = sqlite_utils::IsOpIsNull(op);
   auto predicate = sqlite_utils::CreateNumericPredicate<int64_t>(op, value);
   index->FilterRows([this, &predicate, op_is_null](uint32_t row) {
-    auto ref = storage_->counters().refs()[row];
-    auto type = storage_->counters().types()[row];
+    auto ref = (*refs_)[row];
+    auto type = (*types_)[row];
     if (type == RefType::kRefUtidLookupUpid) {
       auto upid = storage_->GetThread(static_cast<uint32_t>(ref)).upid;
       // Trying to filter null with any operation we currently handle
