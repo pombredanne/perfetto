@@ -86,10 +86,12 @@ void ShutdownClient() {
 
   // The operations on the refcount are relaxed as we do not need consistency
   // with other state.
-  while (g_client_users.load(std::memory_order_relaxed) != 1)
+  for (size_t i = 0;
+       i < 100 && g_client_users.load(std::memory_order_relaxed) != 1; ++i)
     usleep(10000);
 
-  delete client;
+  if (i != 100)
+    delete client;
 }
 
 // This is so we can make an so that we can swap out with the existing
