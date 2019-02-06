@@ -15,8 +15,6 @@
  */
 
 #include "src/trace_processor/thread_table.h"
-
-#include "src/trace_processor/args_tracker.h"
 #include "src/trace_processor/event_tracker.h"
 #include "src/trace_processor/process_table.h"
 #include "src/trace_processor/process_tracker.h"
@@ -38,7 +36,6 @@ class ThreadTableUnittest : public ::testing::Test {
     db_.reset(db);
 
     context_.storage.reset(new TraceStorage());
-    context_.args_tracker.reset(new ArgsTracker(&context_));
     context_.process_tracker.reset(new ProcessTracker(&context_));
     context_.event_tracker.reset(new EventTracker(&context_));
 
@@ -72,14 +69,13 @@ TEST_F(ThreadTableUnittest, Select) {
   uint32_t prev_state = 32;
   static const char kThreadName1[] = "thread1";
   static const char kThreadName2[] = "thread2";
-  int32_t prio = 1024;
+  int32_t next_prio = 1024;
 
-  context_.event_tracker->PushSchedSwitch(cpu, timestamp, /*tid=*/1,
-                                          kThreadName2, prio, prev_state,
-                                          /*tid=*/4, kThreadName1, prio);
+  context_.event_tracker->PushSchedSwitch(cpu, timestamp, /*tid=*/1, prev_state,
+                                          /*tid=*/4, kThreadName1, next_prio);
   context_.event_tracker->PushSchedSwitch(cpu, timestamp + 1, /*tid=*/4,
-                                          kThreadName1, prio, prev_state,
-                                          /*tid=*/1, kThreadName2, prio);
+                                          prev_state, /*tid=*/1, kThreadName2,
+                                          next_prio);
 
   context_.process_tracker->UpdateProcess(2, "test");
   context_.process_tracker->UpdateThread(4 /*tid*/, 2 /*pid*/);
@@ -100,17 +96,16 @@ TEST_F(ThreadTableUnittest, SelectWhere) {
   uint32_t prev_state = 32;
   static const char kThreadName1[] = "thread1";
   static const char kThreadName2[] = "thread2";
-  int32_t prio = 1024;
+  int32_t next_prio = 1024;
 
-  context_.event_tracker->PushSchedSwitch(cpu, timestamp, /*tid=*/1,
-                                          kThreadName2, prio, prev_state,
-                                          /*tid=*/4, kThreadName1, prio);
+  context_.event_tracker->PushSchedSwitch(cpu, timestamp, /*tid=*/1, prev_state,
+                                          /*tid=*/4, kThreadName1, next_prio);
   context_.event_tracker->PushSchedSwitch(cpu, timestamp + 1, /*tid=*/4,
-                                          kThreadName1, prio, prev_state,
-                                          /*tid=*/1, kThreadName2, prio);
+                                          prev_state,
+                                          /*tid=*/1, kThreadName2, next_prio);
   context_.event_tracker->PushSchedSwitch(cpu, timestamp + 2, /*tid=*/1,
-                                          kThreadName2, prio, prev_state,
-                                          /*tid=*/4, kThreadName1, prio);
+                                          prev_state, /*tid=*/4, kThreadName1,
+                                          next_prio);
 
   context_.process_tracker->UpdateProcess(2, "test");
   context_.process_tracker->UpdateThread(4 /*tid*/, 2 /*pid*/);
@@ -133,14 +128,13 @@ TEST_F(ThreadTableUnittest, JoinWithProcess) {
   uint32_t prev_state = 32;
   static const char kThreadName1[] = "thread1";
   static const char kThreadName2[] = "thread2";
-  int32_t prio = 1024;
+  int32_t next_prio = 1024;
 
-  context_.event_tracker->PushSchedSwitch(cpu, timestamp, /*tid=*/1,
-                                          kThreadName2, prio, prev_state,
-                                          /*tid=*/4, kThreadName1, prio);
+  context_.event_tracker->PushSchedSwitch(cpu, timestamp, /*tid=*/1, prev_state,
+                                          /*tid=*/4, kThreadName1, next_prio);
   context_.event_tracker->PushSchedSwitch(cpu, timestamp + 1, /*tid=*/4,
-                                          kThreadName1, prio, prev_state,
-                                          /*tid=*/1, kThreadName2, prio);
+                                          prev_state,
+                                          /*tid=*/1, kThreadName2, next_prio);
 
   // Also create a process for which we haven't seen any thread.
   context_.process_tracker->UpdateProcess(7, "pid7");

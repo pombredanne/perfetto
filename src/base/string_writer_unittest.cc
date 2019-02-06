@@ -60,6 +60,11 @@ TEST(StringWriterTest, BasicCases) {
     writer.WritePaddedInt<' ', 5>(123);
     ASSERT_STREQ(writer.GetCString(), "  123");
   }
+  {
+    base::StringWriter writer(buffer, sizeof(buffer));
+    writer.WriteDouble(123.25);
+    ASSERT_STREQ(writer.GetCString(), "123.250000");
+  }
 
   constexpr char kTestStr[] = "test";
   {
@@ -85,12 +90,13 @@ TEST(StringWriterTest, WriteAllTypes) {
   writer.WritePaddedInt<'0', 2>(1);
   writer.WritePaddedInt<'0', 3>(1);
   writer.WritePaddedInt<' ', 5>(123);
+  writer.WriteDouble(123.25);
 
   constexpr char kTestStr[] = "test";
   writer.WriteString(kTestStr, sizeof(kTestStr) - 1);
   writer.WriteString(kTestStr);
 
-  ASSERT_STREQ(writer.GetCString(), "01325451000101001  123testtest");
+  ASSERT_STREQ(writer.GetCString(), "01325451000101001  123123.250000testtest");
 }
 
 }  // namespace
