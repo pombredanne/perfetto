@@ -20,6 +20,7 @@ import {colorForThread, hueForCpu} from '../../frontend/colorizer';
 import {globals} from '../../frontend/globals';
 import {Track} from '../../frontend/track';
 import {trackRegistry} from '../../frontend/track_registry';
+import {search} from '../../base/binary_search';
 
 import {
   Config,
@@ -49,12 +50,6 @@ function cropText(str: string, charWidth: number, rectWidth: number) {
   return displayText;
 }
 
-function getCurResolution() {
-  // Truncate the resolution to the closest power of 10.
-  const resolution = globals.frontendLocalState.timeScale.deltaPxToDuration(1);
-  return Math.pow(10, Math.floor(Math.log10(resolution)));
-}
-
 class CpuSliceTrack extends Track<Config, Data> {
   static readonly kind = CPU_SLICE_TRACK_KIND;
   static create(trackState: TrackState): CpuSliceTrack {
@@ -62,27 +57,12 @@ class CpuSliceTrack extends Track<Config, Data> {
   }
 
   private mouseXpos?: number;
-  private reqPending = false;
   private hue: number;
   private utidHoveredInThisTrack = -1;
 
   constructor(trackState: TrackState) {
     super(trackState);
     this.hue = hueForCpu(this.config.cpu);
-  }
-
-  reqDataDeferred() {
-    const {visibleWindowTime} = globals.frontendLocalState;
-    const reqStart = visibleWindowTime.start - visibleWindowTime.duration;
-    const reqEnd = visibleWindowTime.end + visibleWindowTime.duration;
-    const reqRes = getCurResolution();
-    this.reqPending = false;
-    globals.dispatch(Actions.reqTrackData({
-      trackId: this.trackState.id,
-      start: reqStart,
-      end: reqEnd,
-      resolution: reqRes
-    }));
   }
 
   renderCanvas(ctx: CanvasRenderingContext2D): void {
@@ -96,11 +76,8 @@ class CpuSliceTrack extends Track<Config, Data> {
         (visibleWindowTime.start >= data.start &&
          visibleWindowTime.end <= data.end);
     if (!inRange || data === undefined ||
-        data.resolution !== getCurResolution()) {
-      if (!this.reqPending) {
-        this.reqPending = true;
-        setTimeout(() => this.reqDataDeferred(), 50);
-      }
+        data.resolution !== globals.getCurResolution()) {
+      globals.requestTrackData(this.trackState.id);
     }
     if (data === undefined) return;  // Can't possibly draw anything.
 
@@ -275,6 +252,19 @@ class CpuSliceTrack extends Track<Config, Data> {
     this.utidHoveredInThisTrack = -1;
     globals.frontendLocalState.setHoveredUtidAndPid(-1, -1);
     this.mouseXpos = 0;
+  }
+
+  onMouseClick({x}: {x: number}) {
+    const data = this.data();
+    if (data === undefined || data.kind === 'summary') return;
+    const {timeScale} = globals.frontendLocalState;
+    const time = timeScale.pxToTime(x);
+    const index = search(data.starts, time);
+    const id = index === -1 ? undefined : data.ids[index];
+    if (id && this.utidHoveredInThisTrack !== -1) {
+      globals.dispatch(Actions.selectSlice(
+        {utid: this.utidHoveredInThisTrack, id}));
+    }
   }
 }
 

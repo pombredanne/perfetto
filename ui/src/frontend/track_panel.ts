@@ -130,6 +130,10 @@ export class TrackContent implements m.ClassComponent<TrackContentAttrs> {
         attrs.track.onMouseOut();
         globals.rafScheduler.scheduleRedraw();
       },
+      onclick: (e:MouseEvent) => {
+        attrs.track.onMouseClick({x: e.layerX, y: e.layerY});
+        globals.rafScheduler.scheduleRedraw();
+      }
     });
   }
 }

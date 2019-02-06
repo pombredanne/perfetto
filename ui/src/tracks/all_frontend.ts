@@ -14,6 +14,7 @@
 
 // Import all currently implemented tracks. After implemeting a new track, an
 // import statement for it needs to be added here.
+import './android_log/frontend';
 import './chrome_slices/frontend';
 import './counter/frontend';
 import './cpu_freq/frontend';
