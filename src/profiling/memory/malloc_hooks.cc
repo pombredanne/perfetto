@@ -271,7 +271,10 @@ std::unique_ptr<perfetto::profiling::Client> CreateClientAndPrivateDaemon() {
 bool HEAPPROFD_ADD_PREFIX(_initialize)(const MallocDispatch* malloc_dispatch,
                                        int*,
                                        const char*) {
-  UseClient([](perfetto::profiling::Client*) { ShutdownClient(); });
+  UseClient([](perfetto::profiling::Client* client) {
+    client->Shutdown();
+    ShutdownClient();
+  });
   // Table of pointers to backing implementation.
   g_dispatch.store(malloc_dispatch, write_order);
 
@@ -290,7 +293,10 @@ bool HEAPPROFD_ADD_PREFIX(_initialize)(const MallocDispatch* malloc_dispatch,
 
 void HEAPPROFD_ADD_PREFIX(_finalize)() {
   // TODO(fmayer): This should not leak.
-  UseClient([](perfetto::profiling::Client* client) { ShutdownClient(); });
+  UseClient([](perfetto::profiling::Client* client) {
+    client->Shutdown();
+    ShutdownClient();
+  });
 }
 
 void HEAPPROFD_ADD_PREFIX(_dump_heap)(const char*) {}
