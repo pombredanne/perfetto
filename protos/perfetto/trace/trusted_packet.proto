@@ -47,7 +47,7 @@ message TrustedPacket {
   oneof optional_trusted_uid { int32 trusted_uid = 3; };
 
   oneof optional_trusted_packet_sequence_id {
-    uint32 trusted_packet_sequence_id = 41;
+    uint32 trusted_packet_sequence_id = 10;
   }
 
   ClockSnapshot clock_snapshot = 6;

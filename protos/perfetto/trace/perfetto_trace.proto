@@ -2505,7 +2505,8 @@ message Trace {
 // The root object emitted by Perfetto. A perfetto trace is just a stream of
 // TracePacket(s).
 //
-// Next id: 42.
+// Next reserved id: 11.
+// Next id: 41.
 message TracePacket {
   // TODO(primiano): in future we should add a timestamp_clock_domain field to
   // allow mixing timestamps from different clock domains.
@@ -2553,7 +2554,7 @@ message TracePacket {
   // value of zero denotes an invalid ID. Keep in sync with
   // TrustedPacket.trusted_packet_sequence_id.
   oneof optional_trusted_packet_sequence_id {
-    uint32 trusted_packet_sequence_id = 41;
+    uint32 trusted_packet_sequence_id = 10;
   }
 }
 

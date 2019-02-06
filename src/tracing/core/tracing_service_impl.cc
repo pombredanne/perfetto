@@ -1012,7 +1012,7 @@ void TracingServiceImpl::ReadBuffers(TracingSessionID tsid,
     tbuf.BeginRead();
     while (!did_hit_threshold) {
       TracePacket packet;
-      TraceBuffer::PacketSequenceProperties sequence_properties;
+      TraceBuffer::PacketSequenceProperties sequence_properties{};
       if (!tbuf.ReadNextTracePacket(&packet, &sequence_properties)) {
         break;
       }

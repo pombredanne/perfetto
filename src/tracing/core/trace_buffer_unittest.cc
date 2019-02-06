@@ -74,7 +74,7 @@ class TraceBufferTest : public testing::Test {
       TraceBuffer::PacketSequenceProperties* sequence_properties = nullptr) {
     std::vector<FakePacketFragment> fragments;
     TracePacket packet;
-    TraceBuffer::PacketSequenceProperties ignore;
+    TraceBuffer::PacketSequenceProperties ignore{};
     if (!trace_buffer_->ReadNextTracePacket(
             &packet, sequence_properties ? sequence_properties : &ignore)) {
       return fragments;
