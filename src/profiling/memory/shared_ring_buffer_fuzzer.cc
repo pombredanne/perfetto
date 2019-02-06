@@ -46,8 +46,7 @@ int FuzzRingBuffer(const uint8_t* data, size_t size) {
       lseek(*fd, base::kPageSize + base::AlignUp<base::kPageSize>(payload_size),
             SEEK_SET) != -1);
   auto buf = SharedRingBuffer::Attach(std::move(fd));
-  if (!buf)
-    return 0;
+  PERFETTO_CHECK(!!buf);
   auto read_buf = buf->BeginRead();
   buf->EndRead(read_buf);
   return 0;
@@ -55,8 +54,6 @@ int FuzzRingBuffer(const uint8_t* data, size_t size) {
 
 }  // namespace profiling
 }  // namespace perfetto
-
-extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size);
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   return perfetto::profiling::FuzzRingBuffer(data, size);
