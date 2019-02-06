@@ -18,7 +18,10 @@
 
 #include <inttypes.h>
 
+#include "src/trace_processor/ftrace_descriptors.h"
 #include "src/trace_processor/sqlite_utils.h"
+
+#include "perfetto/trace/ftrace/ftrace_event.pb.h"
 
 namespace perfetto {
 namespace trace_processor {
@@ -66,7 +69,8 @@ int RawTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
   return SQLITE_OK;
 }
 
-int RawTable::FormatSystraceArgs(ArgSetId arg_set_id,
+int RawTable::FormatSystraceArgs(const std::string& event_name,
+                                 ArgSetId arg_set_id,
                                  base::StringWriter* writer) {
   const auto& args = storage_->args();
 
@@ -74,18 +78,18 @@ int RawTable::FormatSystraceArgs(ArgSetId arg_set_id,
   auto lb = std::lower_bound(set_ids.begin(), set_ids.end(), arg_set_id);
   auto ub = std::find(lb, set_ids.end(), arg_set_id + 1);
 
-  int n = 0;
-  for (auto it = lb; it != ub; it++) {
-    auto arg_row = static_cast<uint32_t>(std::distance(set_ids.begin(), it));
-    if (it != lb)
-      writer->WriteChar(' ');
+  auto start_row = static_cast<uint32_t>(std::distance(set_ids.begin(), lb));
 
+  auto write_row = [this, &args, writer, start_row](uint32_t arg_row) {
+    if (arg_row != start_row)
+      writer->WriteChar(' ');
     const auto& key = storage_->GetString(args.keys()[arg_row]);
+    const auto& value = args.arg_values()[arg_row];
+
     writer->WriteString(key.c_str(), key.length());
 
     writer->WriteChar('=');
 
-    const auto& value = args.arg_values()[arg_row];
     switch (value.type) {
       case TraceStorage::Args::Variadic::kInt:
         writer->WriteInt(value.int_value);
@@ -98,8 +102,38 @@ int RawTable::FormatSystraceArgs(ArgSetId arg_set_id,
         writer->WriteString(str.c_str(), str.size());
       }
     }
+  };
+
+  if (event_name == "sched_switch") {
+    using SS = protos::SchedSwitchFtraceEvent;
+    write_row(start_row + SS::kPrevCommFieldNumber - 1);
+    write_row(start_row + SS::kPrevPidFieldNumber - 1);
+    write_row(start_row + SS::kPrevPrioFieldNumber - 1);
+
+    const auto& key = storage_->GetString(
+        args.keys()[start_row + SS::kPrevStateFieldNumber - 1]);
+    writer->WriteChar(' ');
+    writer->WriteString(key.c_str(), key.length());
+    writer->WriteChar('=');
+
+    const auto& value =
+        args.arg_values()[start_row + SS::kPrevStateFieldNumber - 1];
+    auto state = static_cast<uint16_t>(value.int_value);
+    writer->WriteString(ftrace_utils::TaskState(state).ToString().data());
+
+    constexpr char kDelimiter[] = " ==>";
+    writer->WriteString(kDelimiter, sizeof(kDelimiter) - 1);
+    write_row(start_row + SS::kNextCommFieldNumber - 1);
+    write_row(start_row + SS::kNextPidFieldNumber - 1);
+    write_row(start_row + SS::kNextPrioFieldNumber - 1);
+    return 0;
   }
-  return n;
+
+  uint32_t current_row = start_row;
+  for (auto it = lb; it != ub; it++) {
+    write_row(current_row++);
+  }
+  return 0;
 }
 
 void RawTable::ToSystrace(sqlite3_context* ctx,
@@ -130,14 +164,14 @@ void RawTable::ToSystrace(sqlite3_context* ctx,
                                      thread.tid, tgid, base::StringView(name),
                                      &writer);
 
-  const auto& str = storage_->GetString(raw.name_ids()[row]);
+  const auto& event_name = storage_->GetString(raw.name_ids()[row]);
   writer.WriteChar(' ');
-  writer.WriteString(str.c_str(), str.size());
+  writer.WriteString(event_name.c_str(), event_name.size());
 
   constexpr char kNameSuffix[] = ": ";
   writer.WriteString(kNameSuffix, sizeof(kNameSuffix) - 1);
 
-  FormatSystraceArgs(raw.arg_set_ids()[row], &writer);
+  FormatSystraceArgs(event_name, raw.arg_set_ids()[row], &writer);
   sqlite3_result_text(ctx, writer.GetCString(), -1,
                       sqlite_utils::kSqliteTransient);
 }

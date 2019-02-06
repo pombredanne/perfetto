@@ -171,19 +171,20 @@ void FormatSystracePrefix(int64_t timestamp,
     constexpr char kNoTgid[] = "-----";
     writer->WriteString(kNoTgid, sizeof(kNoTgid) - 1);
   } else {
-    writer->WriteInt(tgid);
+    writer->WritePaddedInt<' ', 5>(tgid);
   }
   constexpr char kTgidSuffix[] = ") [";
   writer->WriteString(kTgidSuffix, sizeof(kTgidSuffix) - 1);
 
-  writer->WriteZeroPaddedInt<3>(cpu);
+  writer->WritePaddedInt<'0', 3>(cpu);
 
   constexpr char kCpuSuffix[] = "] d..3 ";
   writer->WriteString(kCpuSuffix, sizeof(kCpuSuffix) - 1);
 
   writer->WriteInt(seconds);
   writer->WriteChar('.');
-  writer->WriteZeroPaddedInt<6>(useconds);
+  writer->WritePaddedInt<'0', 6>(useconds);
+  writer->WriteChar(':');
 }
 
 }  // namespace ftrace_utils

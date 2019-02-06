@@ -50,16 +50,16 @@ class StringWriter {
   }
 
   // Writes an integer to the buffer.
-  void WriteInt(int64_t value) { WriteZeroPaddedInt<0>(value); }
+  void WriteInt(int64_t value) { WritePaddedInt<'0', 0>(value); }
 
-  // Writes an integer to the buffer, padding with zeros if the number of digits
-  // of the integer is less than PaddingZeros.
-  template <size_t PaddingZeros>
-  void WriteZeroPaddedInt(int64_t value) {
+  // Writes an integer to the buffer, padding with |PadChar| if the number of
+  // digits of the integer is less than Padding.
+  template <char PadChar, size_t Padding>
+  void WritePaddedInt(int64_t value) {
     // Need to add 2 to the number of digits to account for minus sign and
     // rounding down of digits10.
     constexpr auto kBufferSize =
-        std::numeric_limits<uint64_t>::digits10 + 2 + PaddingZeros;
+        std::numeric_limits<uint64_t>::digits10 + 2 + Padding;
     PERFETTO_DCHECK(pos_ + kBufferSize <= n_);
 
     char data[kBufferSize];
@@ -76,10 +76,10 @@ class StringWriter {
     }
     data[idx--] = static_cast<char>(val) + '0';
 
-    if (PaddingZeros > 0) {
+    if (Padding > 0) {
       size_t num_digits = kBufferSize - 1 - idx;
-      for (size_t i = num_digits; i < PaddingZeros; i++) {
-        data[idx--] = '0';
+      for (size_t i = num_digits; i < Padding; i++) {
+        data[idx--] = PadChar;
       }
     }
 

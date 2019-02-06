@@ -37,23 +37,28 @@ TEST(StringWriterTest, BasicCases) {
   }
   {
     base::StringWriter writer(buffer, sizeof(buffer));
-    writer.WriteZeroPaddedInt<3>(0);
+    writer.WritePaddedInt<'0', 3>(0);
     ASSERT_STREQ(writer.GetCString(), "000");
   }
   {
     base::StringWriter writer(buffer, sizeof(buffer));
-    writer.WriteZeroPaddedInt<1>(1);
+    writer.WritePaddedInt<'0', 1>(1);
     ASSERT_STREQ(writer.GetCString(), "1");
   }
   {
     base::StringWriter writer(buffer, sizeof(buffer));
-    writer.WriteZeroPaddedInt<3>(1);
+    writer.WritePaddedInt<'0', 3>(1);
     ASSERT_STREQ(writer.GetCString(), "001");
   }
   {
     base::StringWriter writer(buffer, sizeof(buffer));
-    writer.WriteZeroPaddedInt<0>(1);
+    writer.WritePaddedInt<'0', 0>(1);
     ASSERT_STREQ(writer.GetCString(), "1");
+  }
+  {
+    base::StringWriter writer(buffer, sizeof(buffer));
+    writer.WritePaddedInt<' ', 5>(123);
+    ASSERT_STREQ(writer.GetCString(), "  123");
   }
 
   constexpr char kTestStr[] = "test";
@@ -74,17 +79,18 @@ TEST(StringWriterTest, WriteAllTypes) {
   base::StringWriter writer(buffer, sizeof(buffer));
   writer.WriteChar('0');
   writer.WriteInt(132545);
-  writer.WriteZeroPaddedInt<0>(1);
-  writer.WriteZeroPaddedInt<3>(0);
-  writer.WriteZeroPaddedInt<1>(1);
-  writer.WriteZeroPaddedInt<2>(1);
-  writer.WriteZeroPaddedInt<3>(1);
+  writer.WritePaddedInt<'0', 0>(1);
+  writer.WritePaddedInt<'0', 3>(0);
+  writer.WritePaddedInt<'0', 1>(1);
+  writer.WritePaddedInt<'0', 2>(1);
+  writer.WritePaddedInt<'0', 3>(1);
+  writer.WritePaddedInt<' ', 5>(123);
 
   constexpr char kTestStr[] = "test";
   writer.WriteString(kTestStr, sizeof(kTestStr) - 1);
   writer.WriteString(kTestStr);
 
-  ASSERT_STREQ(writer.GetCString(), "01325451000101001testtest");
+  ASSERT_STREQ(writer.GetCString(), "01325451000101001  123testtest");
 }
 
 }  // namespace
