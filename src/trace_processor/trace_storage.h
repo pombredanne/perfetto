@@ -588,7 +588,7 @@ class TraceStorage {
   static std::pair<int8_t /*table*/, uint32_t /*row*/> ParseRowId(RowId rowid) {
     auto id = static_cast<uint64_t>(rowid);
     auto table_id = static_cast<uint8_t>(id >> kRowIdTableShift);
-    auto row = static_cast<uint32_t>(id & ((1ul << kRowIdTableShift) - 1));
+    auto row = static_cast<uint32_t>(id & ((1ull << kRowIdTableShift) - 1));
     return std::make_pair(table_id, row);
   }
 
