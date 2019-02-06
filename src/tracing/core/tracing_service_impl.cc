@@ -1181,7 +1181,7 @@ void TracingServiceImpl::FreeBuffers(TracingSessionID tsid) {
                tracing_sessions_.size());
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
-  static const char kTraceurProp[] = "sys.traceur.trace_end_signal";
+  static const char kTraceurProp[] = "sys.trace.trace_end_signal";
   if (notify_traceur && __system_property_set(kTraceurProp, "1"))
     PERFETTO_ELOG("Failed to setprop %s=1", kTraceurProp);
 #else
