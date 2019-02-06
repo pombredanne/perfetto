@@ -108,6 +108,8 @@ class SharedRingBuffer {
   }
 
  private:
+  friend int FuzzRingBuffer(const uint8_t* data, size_t size);
+
   struct alignas(base::kPageSize) MetadataPage {
     std::atomic<bool> spinlock;
     uint64_t read_pos;
@@ -137,6 +139,9 @@ class SharedRingBuffer {
 
   inline size_t read_avail(const ScopedSpinlock&) {
     PERFETTO_DCHECK(meta_->write_pos >= meta_->read_pos);
+    if (meta_->read_pos > meta_->write_pos)
+      return 0;
+
     auto res = static_cast<size_t>(meta_->write_pos - meta_->read_pos);
     PERFETTO_DCHECK(res <= size_);
     return res;
@@ -151,7 +156,6 @@ class SharedRingBuffer {
   base::ScopedFile mem_fd_;
   MetadataPage* meta_ = nullptr;  // Start of the mmaped region.
   uint8_t* mem_ = nullptr;  // Start of the contents (i.e. meta_ + kPageSize).
-  uint8_t* mem_end_ = nullptr;
 
   // Size of the ring buffer contents, without including metadata or the 2nd
   // mmap.

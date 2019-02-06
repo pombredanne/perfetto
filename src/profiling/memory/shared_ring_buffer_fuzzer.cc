@@ -23,21 +23,36 @@
 
 namespace perfetto {
 namespace profiling {
-namespace {
 
+// This cannot be in the anonymous namespace as it is a friend of
+// SharedRingBuffer so that it can access MetadataPage.
 int FuzzRingBuffer(const uint8_t* data, size_t size) {
+  using MetadataPage = SharedRingBuffer::MetadataPage;
+  if (size < sizeof(MetadataPage))
+    return 0;
+
   auto fd = base::TempFile::CreateUnlinked().ReleaseFD();
   PERFETTO_CHECK(fd);
-  PERFETTO_CHECK(base::WriteAll(*fd, data, size) == static_cast<ssize_t>(size));
-  PERFETTO_CHECK(lseek(*fd, 0, SEEK_SET) != -1);
+  PERFETTO_CHECK(base::WriteAll(*fd, data, sizeof(MetadataPage)) != -1);
+  PERFETTO_CHECK(lseek(*fd, base::kPageSize, SEEK_SET) != -1);
+
+  size_t payload_size = size - sizeof(MetadataPage);
+  const uint8_t* payload = data + sizeof(MetadataPage);
+  if (payload_size == 0)
+    return 0;
+
+  PERFETTO_CHECK(base::WriteAll(*fd, payload, payload_size) != -1);
+  PERFETTO_CHECK(
+      lseek(*fd, base::kPageSize + base::AlignUp<base::kPageSize>(payload_size),
+            SEEK_SET) != -1);
   auto buf = SharedRingBuffer::Attach(std::move(fd));
   if (!buf)
     return 0;
-  auto read_buf = buf->Read();
+  auto read_buf = buf->BeginRead();
+  buf->EndRead(read_buf);
   return 0;
 }
 
-}  // namespace
 }  // namespace profiling
 }  // namespace perfetto
 

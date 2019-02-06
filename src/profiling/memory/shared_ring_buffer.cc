@@ -173,7 +173,6 @@ void SharedRingBuffer::Initialize(base::ScopedFile mem_fd) {
   size_ = size;
   meta_ = new (region) MetadataPage();
   mem_ = region + kMetaPageSize;
-  mem_end_ = region + size_with_meta + size;
   mem_fd_ = std::move(mem_fd);
 }
 
@@ -234,7 +233,7 @@ SharedRingBuffer::Buffer SharedRingBuffer::BeginRead() {
     return Buffer();
   const size_t size_with_header = base::AlignUp<kAlignment>(size + kHeaderSize);
 
-  if (size_with_header > avail_read || rd_ptr + size_with_header > mem_end_) {
+  if (size_with_header > avail_read) {
     PERFETTO_ELOG(
         "Corrupted header detected, size=%zu"
         ", read_avail=%zu, rd=%" PRIu64 ", wr=%" PRIu64,
