@@ -72,16 +72,20 @@ TEST_F(CountersTableUnittest, SelectWhereCpu) {
   context_.storage->mutable_counters()->AddCounter(
       timestamp + 2, 1, freq + 2000, 2 /* cpu */, RefType::kRefCpuId);
 
-  PrepareValidStatement("SELECT ts, dur, value FROM counters where ref = 1");
+  PrepareValidStatement(
+      "SELECT ts, "
+      "lead(ts) over (partition by name, ref order by ts) - ts as dur, "
+      "value "
+      "FROM counters where ref = 1");
 
   ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_ROW);
   ASSERT_EQ(sqlite3_column_int(*stmt_, 0), timestamp);
-  ASSERT_EQ(sqlite3_column_int(*stmt_, 1), 0);
+  ASSERT_EQ(sqlite3_column_int(*stmt_, 1), 1);
   ASSERT_EQ(sqlite3_column_int(*stmt_, 2), freq);
 
   ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_ROW);
   ASSERT_EQ(sqlite3_column_int(*stmt_, 0), timestamp + 1);
-  ASSERT_EQ(sqlite3_column_int(*stmt_, 1), 1);
+  ASSERT_EQ(sqlite3_column_int(*stmt_, 1), 0);
   ASSERT_EQ(sqlite3_column_int(*stmt_, 2), freq + 1000);
 
   ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_DONE);
@@ -100,8 +104,15 @@ TEST_F(CountersTableUnittest, GroupByFreq) {
       timestamp + 3, name_id, freq, 1 /* cpu */, RefType::kRefCpuId);
 
   PrepareValidStatement(
-      "SELECT value, sum(dur) as dur_sum FROM counters where value > 0 group "
-      "by value order by dur_sum desc");
+      "SELECT value, sum(dur) as dur_sum "
+      "FROM ( "
+      "select value, "
+      "lead(ts) over (partition by name, ref order by ts) - ts as dur "
+      "from counters"
+      ") "
+      "where value > 0 "
+      "group by value "
+      "order by dur_sum desc");
 
   ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_ROW);
   ASSERT_EQ(sqlite3_column_int(*stmt_, 0), freq + 1000);
