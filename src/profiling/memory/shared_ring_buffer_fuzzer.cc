@@ -23,6 +23,7 @@
 
 namespace perfetto {
 namespace profiling {
+namespace {
 
 struct MetadataHeader {
   std::atomic<bool> spinlock;
@@ -30,8 +31,6 @@ struct MetadataHeader {
   uint64_t write_pos;
 };
 
-// This cannot be in the anonymous namespace as it is a friend of
-// SharedRingBuffer so that it can access MetadataPage.
 int FuzzRingBuffer(const uint8_t* data, size_t size) {
   if (size < sizeof(MetadataHeader))
     return 0;
@@ -73,6 +72,7 @@ int FuzzRingBuffer(const uint8_t* data, size_t size) {
   return 0;
 }
 
+}  // namespace
 }  // namespace profiling
 }  // namespace perfetto
 
