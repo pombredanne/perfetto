@@ -101,6 +101,10 @@ RowId EventTracker::PushCounter(int64_t timestamp,
   auto counter_it = pending_counters_per_key_.find(key);
   if (counter_it != pending_counters_per_key_.end()) {
     size_t idx = counter_it->second;
+
+    // TODO(lalitm): use this index to dedupe counters in the future when value
+    // is the same with the same ref, ref_type and name.
+    // Need to be careful about how to handle args however.
     perfetto::base::ignore_result(idx);
   }
 
