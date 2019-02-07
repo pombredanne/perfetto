@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,8 @@
 namespace {
 
 // Must be kept in sync with heapprofd_test_cts.cc
-const int kIndividualAllocSz = 4153;
+constexpr int kIndividualAllocSz = 4153;
+constexpr int kAllocationIntervalUs = 10 * 1000;
 
 __attribute__((noreturn)) void perfetto_test_allocations() {
   for (;;) {
@@ -31,7 +32,7 @@ __attribute__((noreturn)) void perfetto_test_allocations() {
       x[0] = '\0';
       free(const_cast<char*>(x));
     }
-    usleep(10 * 1000);
+    usleep(kAllocationIntervalUs);
   }
 }
 

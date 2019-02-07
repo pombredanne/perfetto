@@ -1,4 +1,3 @@
-//
 // Copyright (C) 2019 The Android Open Source Project
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,19 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-cc_library_shared {
-  name: "libperfettocts_debuggable",
-  srcs: [
-    "target.cc",
-  ],
-  static_libs: [
-    "perfetto_cts_jni_deps",
-  ],
-  shared_libs: [
-    "libandroid",
-    "liblog",
-    "libnativehelper_compat_libc++",
-  ],
-  compile_multilib: "both",
-  stl: "libc++_static",
+android_test {
+    name: "CtsPerfettoDebuggableApp",
+    // tag this module as a cts test artifact
+    test_suites: [
+        "cts",
+        "vts",
+        "general-tests",
+    ],
+
+    compile_multilib: "both",
+    srcs: ["src/**/*.java"],
+    sdk_version: "current",
+    jni_libs: [
+        "libperfettocts_debuggable",
+        "libnativehelper_compat_libc++",
+    ],
 }
+

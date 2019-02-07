@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,14 +25,16 @@
 #include "test/test_helper.h"
 
 namespace perfetto {
+namespace {
 
 // Size of individual (repeated) allocations done by the test apps (must be kept
 // in sync with their sources).
-const uint64_t kTestSamplingInterval = 4096;
-const uint64_t kExpectedIndividualAllocSz = 4153;
+constexpr uint64_t kTestSamplingInterval = 4096;
+constexpr uint64_t kExpectedIndividualAllocSz = 4153;
 // Tests rely on the sampling behaviour where allocations larger than the
 // sampling interval are recorded at their actual size.
-static_assert(kExpectedIndividualAllocSz > kTestSamplingInterval);
+static_assert(kExpectedIndividualAllocSz > kTestSamplingInterval,
+              "kTestSamplingInterval invalid");
 
 // note: cannot use gtest macros due to return type
 bool IsAppRunning(const std::string& name) {
@@ -49,7 +51,7 @@ bool IsAppRunning(const std::string& name) {
 
 // invokes |callback| once the target app is in the desired state
 void PollRunState(bool desired_run_state,
-                  base::TestTaskRunner& task_runner,
+                  base::TestTaskRunner* task_runner,
                   const std::string& name,
                   std::function<void()> callback) {
   bool app_running = IsAppRunning(name);
@@ -57,40 +59,42 @@ void PollRunState(bool desired_run_state,
     callback();
     return;
   }
-  task_runner.PostTask([desired_run_state, &task_runner, &name, callback] {
-    PollRunState(desired_run_state, task_runner, name, callback);
+  task_runner->PostTask([desired_run_state, task_runner, &name, &callback] {
+    PollRunState(desired_run_state, task_runner, name, std::move(callback));
   });
 }
 
 void StartAppActivity(const std::string& app_name,
                       const std::string& checkpoint_name,
-                      base::TestTaskRunner& task_runner,
+                      base::TestTaskRunner* task_runner,
                       int delay_ms = 1) {
   std::string start_cmd = "am start " + app_name + "/.MainActivity";
   int status = system(start_cmd.c_str());
   ASSERT_TRUE(status >= 0 && WEXITSTATUS(status) == 0) << "status: " << status;
 
   bool desired_run_state = true;
-  const auto checkpoint = task_runner.CreateCheckpoint(checkpoint_name);
-  task_runner.PostDelayedTask(
-      [desired_run_state, &task_runner, &app_name, checkpoint] {
-        PollRunState(desired_run_state, task_runner, app_name, checkpoint);
+  const auto checkpoint = task_runner->CreateCheckpoint(checkpoint_name);
+  task_runner->PostDelayedTask(
+      [desired_run_state, task_runner, &app_name, checkpoint] {
+        PollRunState(desired_run_state, task_runner, app_name,
+                     std::move(checkpoint));
       },
       delay_ms);
 }
 
 void StopApp(const std::string& app_name,
              const std::string& checkpoint_name,
-             base::TestTaskRunner& task_runner) {
+             base::TestTaskRunner* task_runner) {
   std::string stop_cmd = "am force-stop " + app_name;
   int status = system(stop_cmd.c_str());
   ASSERT_TRUE(status >= 0 && WEXITSTATUS(status) == 0) << "status: " << status;
 
   bool desired_run_state = false;
-  auto checkpoint = task_runner.CreateCheckpoint(checkpoint_name);
-  task_runner.PostTask(
-      [desired_run_state, &task_runner, &app_name, checkpoint] {
-        PollRunState(desired_run_state, task_runner, app_name, checkpoint);
+  auto checkpoint = task_runner->CreateCheckpoint(checkpoint_name);
+  task_runner->PostTask(
+      [desired_run_state, task_runner, &app_name, checkpoint] {
+        PollRunState(desired_run_state, task_runner, app_name,
+                     std::move(checkpoint));
       });
 }
 
@@ -99,10 +103,10 @@ void TestAppRuntime(std::string app_name) {
 
   // (re)start the target app's main activity
   if (IsAppRunning(app_name)) {
-    StopApp(app_name, "old.app.stopped", task_runner);
+    StopApp(app_name, "old.app.stopped", &task_runner);
     task_runner.RunUntilCheckpoint("old.app.stopped", 1000 /*ms*/);
   }
-  StartAppActivity(app_name, "target.app.running", task_runner,
+  StartAppActivity(app_name, "target.app.running", &task_runner,
                    /*delay_ms=*/100);
   task_runner.RunUntilCheckpoint("target.app.running", 1000 /*ms*/);
 
@@ -158,7 +162,7 @@ void TestAppStartup(std::string app_name) {
   base::TestTaskRunner task_runner;
 
   if (IsAppRunning(app_name)) {
-    StopApp(app_name, "old.app.stopped", task_runner);
+    StopApp(app_name, "old.app.stopped", &task_runner);
     task_runner.RunUntilCheckpoint("old.app.stopped", 1000 /*ms*/);
   }
 
@@ -184,7 +188,7 @@ void TestAppStartup(std::string app_name) {
   helper.StartTracing(trace_config);
 
   // start app
-  StartAppActivity(app_name, "target.app.running", task_runner,
+  StartAppActivity(app_name, "target.app.running", &task_runner,
                    /*delay_ms=*/100);
   task_runner.RunUntilCheckpoint("target.app.running", 2000 /*ms*/);
 
@@ -224,4 +228,5 @@ TEST(HeapprofdCtsTest, DebuggableAppStartup) {
   TestAppStartup("android.perfetto.debuggable.app");
 }
 
+}  // namespace
 }  // namespace perfetto
