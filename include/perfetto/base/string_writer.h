@@ -18,6 +18,7 @@
 #define INCLUDE_PERFETTO_BASE_STRING_WRITER_H_
 
 #include <math.h>
+#include <limits>
 
 #include "perfetto/base/logging.h"
 #include "perfetto/base/string_view.h"
