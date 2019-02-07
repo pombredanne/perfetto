@@ -59,7 +59,8 @@ class TrackShell implements m.ClassComponent<TrackShellAttrs> {
           {
             title: attrs.trackState.name,
           },
-          attrs.trackState.name),
+          attrs.trackState.name,
+          m.trust('&#x200E;')),
         m(TrackButton, {
           action: Actions.toggleTrackPinned({trackId: attrs.trackState.id}),
           i: isPinned(attrs.trackState.id) ? 'star' : 'star_border',
@@ -117,10 +118,8 @@ class TrackShell implements m.ClassComponent<TrackShellAttrs> {
   }
 }
 
-interface TrackContentAttrs {
-  track: Track;
-}
-class TrackContent implements m.ClassComponent<TrackContentAttrs> {
+export interface TrackContentAttrs { track: Track; }
+export class TrackContent implements m.ClassComponent<TrackContentAttrs> {
   view({attrs}: m.CVnode<TrackContentAttrs>) {
     return m('.track-content', {
       onmousemove: (e: MouseEvent) => {
@@ -131,6 +130,12 @@ class TrackContent implements m.ClassComponent<TrackContentAttrs> {
         attrs.track.onMouseOut();
         globals.rafScheduler.scheduleRedraw();
       },
+      onclick: (e:MouseEvent) => {
+        if (attrs.track.onMouseClick({x: e.layerX, y: e.layerY})) {
+          e.stopPropagation();
+        }
+        globals.rafScheduler.scheduleRedraw();
+      }
     });
   }
 }

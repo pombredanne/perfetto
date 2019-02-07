@@ -16,6 +16,7 @@
 
 #include "src/trace_processor/trace_processor_impl.h"
 
+#include <inttypes.h>
 #include <sqlite3.h>
 #include <algorithm>
 #include <functional>
@@ -23,6 +24,7 @@
 #include "perfetto/base/time.h"
 #include "src/trace_processor/android_logs_table.h"
 #include "src/trace_processor/args_table.h"
+#include "src/trace_processor/args_tracker.h"
 #include "src/trace_processor/clock_tracker.h"
 #include "src/trace_processor/counters_table.h"
 #include "src/trace_processor/event_tracker.h"
@@ -69,6 +71,26 @@ void CreateBuiltinTables(sqlite3* db) {
     PERFETTO_ELOG("Error initializing: %s", error);
     sqlite3_free(error);
   }
+  sqlite3_exec(db,
+               "CREATE TABLE trace_bounds(start_ts BIG INT, end_ts BIG INT)", 0,
+               0, &error);
+  if (error) {
+    PERFETTO_ELOG("Error initializing: %s", error);
+    sqlite3_free(error);
+  }
+}
+
+void BuildBoundsTable(sqlite3* db, std::pair<int64_t, int64_t> bounds) {
+  char* insert_sql = sqlite3_mprintf("INSERT INTO trace_bounds VALUES(%" PRId64
+                                     ", %" PRId64 ")",
+                                     bounds.first, bounds.second);
+  char* error = nullptr;
+  sqlite3_exec(db, insert_sql, 0, 0, &error);
+  sqlite3_free(insert_sql);
+  if (error) {
+    PERFETTO_ELOG("Error inserting bounds table: %s", error);
+    sqlite3_free(error);
+  }
 }
 }  // namespace
 
@@ -109,6 +131,7 @@ TraceProcessorImpl::TraceProcessorImpl(const Config& cfg) {
   db_.reset(std::move(db));
 
   context_.storage.reset(new TraceStorage());
+  context_.args_tracker.reset(new ArgsTracker(&context_));
   context_.slice_tracker.reset(new SliceTracker(&context_));
   context_.event_tracker.reset(new EventTracker(&context_));
   context_.proto_parser.reset(new ProtoTraceParser(&context_));
@@ -166,6 +189,7 @@ bool TraceProcessorImpl::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
 
 void TraceProcessorImpl::NotifyEndOfFile() {
   context_.sorter->FlushEventsForced();
+  BuildBoundsTable(*db_, context_.storage->GetTraceTimestampBoundsNs());
 }
 
 void TraceProcessorImpl::ExecuteQuery(

@@ -22,6 +22,7 @@ import {DragGestureHandler} from './drag_gesture_handler';
 import {globals} from './globals';
 import {HeaderPanel} from './header_panel';
 import {NotesEditorPanel, NotesPanel} from './notes_panel';
+import {SliceDetailsPanel} from './slice_panel';
 import {OverviewTimelinePanel} from './overview_timeline_panel';
 import {createPage} from './pages';
 import {PanAndZoomHandler} from './pan_and_zoom_handler';
@@ -32,6 +33,7 @@ import {computeZoom} from './time_scale';
 import {TRACK_SHELL_WIDTH} from './track_constants';
 import {TrackGroupPanel} from './track_group_panel';
 import {TrackPanel} from './track_panel';
+import {Actions} from '../common/actions';
 
 const DRAG_HANDLE_HEIGHT_PX = 12;
 
@@ -147,6 +149,8 @@ class TraceViewer implements m.ClassComponent {
   private onResize: () => void = () => {};
   private zoomContent?: PanAndZoomHandler;
   private detailsHeight = DRAG_HANDLE_HEIGHT_PX;
+  // Used to prevent global deselection if a pan occurred.
+  private panOccurred = false;
 
   oncreate(vnode: m.CVnodeDOM) {
     const frontendLocalState = globals.frontendLocalState;
@@ -174,6 +178,7 @@ class TraceViewer implements m.ClassComponent {
       element: panZoomEl,
       contentOffsetX: TRACK_SHELL_WIDTH,
       onPanned: (pannedPx: number) => {
+        this.panOccurred = true;
         const traceTime = globals.state.traceTime;
         const vizTime = globals.frontendLocalState.visibleWindowTime;
         const origDelta = vizTime.duration;
@@ -234,16 +239,37 @@ class TraceViewer implements m.ClassComponent {
     scrollingPanels.unshift(m(QueryTable));
 
     const detailsPanels: AnyAttrsVnode[] = [];
-    if (globals.state.selectedNote) {
-      detailsPanels.push(m(NotesEditorPanel, {
-        key: 'notes',
-        id: globals.state.selectedNote,
-      }));
+    if (globals.state.currentSelection) {
+      switch (globals.state.currentSelection.kind) {
+        case 'NOTE':
+          detailsPanels.push(m(NotesEditorPanel, {
+            key: 'notes',
+            id: globals.state.currentSelection.id,
+          }));
+          break;
+        case 'SLICE':
+          detailsPanels.push(m(SliceDetailsPanel, {
+            key: 'slice',
+            utid: globals.state.currentSelection.utid,
+          }));
+          break;
+        default:
+          break;
+      }
     }
 
     return m(
         '.page',
-        m('.pan-and-zoom-content',
+        m('.pan-and-zoom-content', {
+          onclick: () =>
+          {
+            // We don't want to deselect when panning.
+            if (this.panOccurred) {
+              this.panOccurred = false;
+              return;
+            }
+            globals.dispatch(Actions.deselect({}));
+          }},
           m('.pinned-panel-container', m(PanelContainer, {
               doesScroll: false,
               panels: [

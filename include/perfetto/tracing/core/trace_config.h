@@ -71,6 +71,7 @@ class PERFETTO_EXPORT TraceConfig {
     enum FillPolicy {
       UNSPECIFIED = 0,
       RING_BUFFER = 1,
+      DISCARD = 2,
     };
     BufferConfig();
     ~BufferConfig();
@@ -330,6 +331,9 @@ class PERFETTO_EXPORT TraceConfig {
     disable_clock_snapshotting_ = value;
   }
 
+  bool notify_traceur() const { return notify_traceur_; }
+  void set_notify_traceur(bool value) { notify_traceur_ = value; }
+
  private:
   std::vector<BufferConfig> buffers_;
   std::vector<DataSource> data_sources_;
@@ -346,6 +350,7 @@ class PERFETTO_EXPORT TraceConfig {
   uint32_t flush_period_ms_ = {};
   uint32_t flush_timeout_ms_ = {};
   bool disable_clock_snapshotting_ = {};
+  bool notify_traceur_ = {};
 
   // Allows to preserve unknown protobuf fields for compatibility
   // with future versions of .proto files.

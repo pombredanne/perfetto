@@ -28,6 +28,10 @@
 #include <unistd.h>
 #endif
 
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+#include <sys/system_properties.h>
+#endif
+
 #include <algorithm>
 
 #include "perfetto/base/build_config.h"
@@ -99,6 +103,7 @@ uid_t geteuid() {
   return 0;
 }
 #endif  // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+
 }  // namespace
 
 // These constants instead are defined in the header because are used by tests.
@@ -379,8 +384,12 @@ bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
     tracing_session->buffers_index.push_back(global_id);
     const size_t buf_size_bytes = buffer_cfg.size_kb() * 1024u;
     total_buf_size_kb += buffer_cfg.size_kb();
-    auto it_and_inserted =
-        buffers_.emplace(global_id, TraceBuffer::Create(buf_size_bytes));
+    TraceBuffer::OverwritePolicy policy =
+        buffer_cfg.fill_policy() == TraceConfig::BufferConfig::DISCARD
+            ? TraceBuffer::kDiscard
+            : TraceBuffer::kOverwrite;
+    auto it_and_inserted = buffers_.emplace(
+        global_id, TraceBuffer::Create(buf_size_bytes, policy));
     PERFETTO_DCHECK(it_and_inserted.second);  // buffers_.count(global_id) == 0.
     std::unique_ptr<TraceBuffer>& trace_buffer = it_and_inserted.first->second;
     if (!trace_buffer) {
@@ -1164,11 +1173,20 @@ void TracingServiceImpl::FreeBuffers(TracingSessionID tsid) {
     PERFETTO_DCHECK(buffers_.count(buffer_id) == 1);
     buffers_.erase(buffer_id);
   }
+  bool notify_traceur = tracing_session->config.notify_traceur();
   tracing_sessions_.erase(tsid);
   UpdateMemoryGuardrail();
 
   PERFETTO_LOG("Tracing session %" PRIu64 " ended, total sessions:%zu", tsid,
                tracing_sessions_.size());
+
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+  static const char kTraceurProp[] = "sys.trace.trace_end_signal";
+  if (notify_traceur && __system_property_set(kTraceurProp, "1"))
+    PERFETTO_ELOG("Failed to setprop %s=1", kTraceurProp);
+#else
+  base::ignore_result(notify_traceur);
+#endif
 }
 
 void TracingServiceImpl::RegisterDataSource(ProducerID producer_id,
@@ -1576,6 +1594,12 @@ void TracingServiceImpl::SnapshotClocks(std::vector<TracePacket>* packets) {
       PERFETTO_DLOG("clock_gettime failed for clock %d", clock.id);
   }
   for (auto& clock : clocks) {
+    // Put a timestamp in the base packet for sorting on the
+    // trace processor side.
+    if (clock.type == protos::ClockSnapshot::Clock::BOOTTIME) {
+      packet.set_timestamp(
+          static_cast<uint64_t>(base::FromPosixTimespec(clock.ts).count()));
+    };
     protos::ClockSnapshot::Clock* c = clock_snapshot->add_clocks();
     c->set_type(clock.type);
     c->set_timestamp(
