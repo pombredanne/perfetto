@@ -1845,6 +1845,7 @@ void ProtoTraceParser::ParseChromeTraceEvent(
     // PERFETTO_DLOG("X %u ts: %.3f c:'%s' n:'%s'", utid, ts/1e6,
                   // context_->storage->GetString(cat_id).c_str(),
                   // context_->storage->GetString(name_id).c_str());
+    /// THIS IS THE PROBLEM, comment out the line below to make it work-ish!!!!!!!
     slice_tracker->Scoped(ts, utid, cat_id, name_id, dur);
   } else if (phase == 'M') {
     if (name_id == thread_name_id_) {
