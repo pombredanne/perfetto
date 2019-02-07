@@ -52,8 +52,8 @@ class StringWriter {
   // Appends an integer to the buffer.
   void AppendInt(int64_t value) { AppendPaddedInt<'0', 0>(value); }
 
-  // Appends an integer to the buffer, padding with |PadChar| if the number of
-  // digits of the integer is less than Padding.
+  // Appends an integer to the buffer, padding with |padchar| if the number of
+  // digits of the integer is less than |padding|.
   template <char padchar, uint64_t padding>
   void AppendPaddedInt(int64_t sign_value) {
     // Need to add 2 to the number of digits to account for minus sign and
@@ -64,7 +64,7 @@ class StringWriter {
 
     char data[kSizeNeeded];
     const bool negate = signbit(sign_value);
-    uint64_t value = static_cast<uint64_t>(std::abs(sign_value));
+    uint64_t value = static_cast<uint64_t>(abs(sign_value));
 
     size_t idx;
     for (idx = kSizeNeeded - 1; value >= 10;) {
@@ -83,10 +83,7 @@ class StringWriter {
 
     if (negate)
       buffer_[pos_++] = '-';
-
-    size_t num_chars = kSizeNeeded - idx - 1;
-    memmove(&buffer_[pos_], &data[idx + 1], num_chars);
-    pos_ += num_chars;
+    AppendString(&data[idx + 1], kSizeNeeded - idx - 1);
   }
 
   // Appends a double to the buffer.
