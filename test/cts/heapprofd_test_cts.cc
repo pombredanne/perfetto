@@ -147,6 +147,10 @@ void TestAppRuntime(std::string app_name) {
         if (sample.self_allocated() > 0 &&
             sample.self_allocated() % kExpectedIndividualAllocSz == 0) {
           found_alloc = true;
+
+          EXPECT_TRUE(sample.self_freed() > 0 &&
+                      sample.self_freed() % kExpectedIndividualAllocSz == 0)
+              << "self_freed: " << sample.self_freed();
         }
       }
     }
@@ -209,6 +213,10 @@ void TestAppStartup(std::string app_name) {
         if (sample.self_allocated() > 0 &&
             sample.self_allocated() % kExpectedIndividualAllocSz == 0) {
           found_alloc = true;
+
+          EXPECT_TRUE(sample.self_freed() > 0 &&
+                      sample.self_freed() % kExpectedIndividualAllocSz == 0)
+              << "self_freed: " << sample.self_freed();
         }
       }
     }
