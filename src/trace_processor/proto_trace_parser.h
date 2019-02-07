@@ -105,6 +105,9 @@ class ProtoTraceParser {
   void ParseTraceStats(TraceBlobView);
   void ParseFtraceStats(TraceBlobView);
   void ParseProfilePacket(TraceBlobView);
+  void ParseChromeBundlePacket(TraceBlobView);
+  void ParseChromeTraceEvent(TraceBlobView, const std::vector<StringId>&);
+  void ParseChromeStringTable(TraceBlobView, std::vector<StringId>*);
 
  private:
   TraceProcessorContext* context_;
@@ -134,6 +137,8 @@ class ProtoTraceParser {
   const StringId oom_score_adj_id_;
   const StringId ion_total_unknown_id_;
   const StringId ion_change_unknown_id_;
+  const StringId thread_name_id_;
+  const StringId process_name_id_;
   std::vector<StringId> meminfo_strs_id_;
   std::vector<StringId> vmstat_strs_id_;
   std::vector<StringId> rss_members_;

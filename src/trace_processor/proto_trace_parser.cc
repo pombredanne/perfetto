@@ -154,7 +154,9 @@ ProtoTraceParser::ProtoTraceParser(TraceProcessorContext* context)
       oom_score_adj_id_(context->storage->InternString("oom_score_adj")),
       ion_total_unknown_id_(context->storage->InternString("mem.ion.unknown")),
       ion_change_unknown_id_(
-          context->storage->InternString("mem.ion_change.unknown")) {
+          context->storage->InternString("mem.ion_change.unknown")),
+      thread_name_id_(context->storage->InternString("thread_name")),
+      process_name_id_(context->storage->InternString("process_name")) {
   for (const auto& name : BuildMeminfoCounterNames()) {
     meminfo_strs_id_.emplace_back(context->storage->InternString(name));
   }
@@ -291,6 +293,11 @@ void ProtoTraceParser::ParseTracePacket(int64_t ts, TraceBlobView packet) {
       case protos::TracePacket::kProfilePacketFieldNumber: {
         const size_t fld_off = packet.offset_of(fld.data());
         ParseProfilePacket(packet.slice(fld_off, fld.size()));
+        break;
+      }
+      case protos::TracePacket::kChromeEventsFieldNumber: {
+        const size_t fld_off = packet.offset_of(fld.data());
+        ParseChromeBundlePacket(packet.slice(fld_off, fld.size()));
         break;
       }
       default:
@@ -1690,6 +1697,164 @@ void ProtoTraceParser::ParseProfilePacket(TraceBlobView packet) {
     }
   }
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
+}
+
+void ProtoTraceParser::ParseChromeBundlePacket(TraceBlobView packet) {
+  ProtoDecoder decoder(packet.data(), packet.length());
+  std::vector<StringId> string_table;
+  TraceBlobView events(nullptr, 0, 0);
+  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    switch (fld.id) {
+      case protos::ChromeEventBundle::kTraceEventsFieldNumber: {
+        const size_t fld_off = packet.offset_of(fld.data());
+        events = packet.slice(fld_off, fld.size());
+        break;
+      }
+      case protos::ChromeEventBundle::kStringTableFieldNumber: {
+        const size_t fld_off = packet.offset_of(fld.data());
+        ParseChromeStringTable(packet.slice(fld_off, fld.size()),
+                               &string_table);
+        break;
+      }
+    }
+  }
+
+  // We need to parse events after having parsed the string table.
+  ParseChromeTraceEvent(std::move(events), string_table);
+}
+
+void ProtoTraceParser::ParseChromeStringTable(
+    TraceBlobView table,
+    std::vector<StringId>* string_table) {
+  ProtoDecoder decoder(table.data(), table.length());
+  StringId value_id = 0;
+  uint32_t index = 0;
+  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    switch (fld.id) {
+      case protos::ChromeStringTableEntry::kValueFieldNumber:
+        value_id = context_->storage->InternString(fld.as_string());
+        break;
+      case protos::ChromeStringTableEntry::kIndexFieldNumber:
+        index = fld.as_uint32();
+        break;
+    }
+  }
+  if (index >= string_table->size()) {
+    PERFETTO_DCHECK(index >= 0);
+    string_table->resize(index + 1);
+  }
+  StringId* cur_value = &(*string_table)[index];
+  if (*cur_value != 0 && *cur_value != value_id) {
+    PERFETTO_ELOG("Chrome string table collision @ index %d (%s vs %s)", index,
+                  context_->storage->GetString(*cur_value).c_str(),
+                  context_->storage->GetString(value_id).c_str());
+  }
+  *cur_value = value_id;
+}
+
+void ProtoTraceParser::ParseChromeTraceEvent(
+    TraceBlobView event,
+    const std::vector<StringId>& string_table) {
+  ProtoDecoder decoder(event.data(), event.length());
+  StringId name_id = 0;
+  StringId cat_id = 0;
+  std::string arg_value;
+  uint32_t name_intern_id = 0;
+  uint32_t cat_intern_id = 0;
+  int64_t ts = 0;    // Timestamp, unit: ns.
+  int64_t tts = 0;   // Thread timestamp, unit: ns.
+  int64_t dur = 0;   // Duration, unit: ns.
+  int64_t tdur = 0;  // Thread duration, unit: ns.
+  uint32_t pid = 0;
+  uint32_t tid = 0;
+  int phase = 0;
+
+  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    switch (fld.id) {
+      case protos::ChromeTraceEvent::kNameFieldNumber:
+        name_id = context_->storage->InternString(fld.as_string());
+        break;
+      case protos::ChromeTraceEvent::kCategoryGroupNameFieldNumber:
+        cat_id = context_->storage->InternString(fld.as_string());
+        break;
+      case protos::ChromeTraceEvent::kNameIndexFieldNumber:
+        name_intern_id = fld.as_uint32();
+        break;
+      case protos::ChromeTraceEvent::kCategoryGroupNameIndexFieldNumber:
+        cat_intern_id = fld.as_uint32();
+        break;
+      case protos::ChromeTraceEvent::kTimestampFieldNumber:
+        ts = fld.as_int64() * 1000;
+        break;
+      case protos::ChromeTraceEvent::kThreadTimestampFieldNumber:
+        tts = fld.as_int64() * 1000;
+        break;
+      case protos::ChromeTraceEvent::kPhaseFieldNumber:
+        phase = fld.as_int32();
+        break;
+      case protos::ChromeTraceEvent::kThreadIdFieldNumber:
+        tid = fld.as_uint32();
+        break;
+      case protos::ChromeTraceEvent::kProcessIdFieldNumber:
+        pid = fld.as_uint32();
+        break;
+      case protos::ChromeTraceEvent::kDurationFieldNumber:
+        dur = fld.as_int64() * 1000;
+        break;
+      case protos::ChromeTraceEvent::kThreadDurationFieldNumber:
+        tdur = fld.as_int64() * 1000;
+        break;
+      case protos::ChromeTraceEvent::kArgsFieldNumber: {
+        const size_t fld_off = event.offset_of(fld.data());
+        TraceBlobView args = event.slice(fld_off, fld.size());
+        ProtoDecoder d(args.data(), args.length());
+        for (auto arg = d.ReadField(); arg.id != 0; arg = d.ReadField()) {
+          switch (arg.id) {
+            case protos::ChromeTraceEvent::Arg::kStringValueFieldNumber: {
+              arg_value = arg.as_string().ToStdString();
+              break;
+            }
+          }
+        }
+        break;
+      }
+    }
+  }
+
+  // base::Optional<int64_t> opt_trace_time =
+  //   context_->clock_tracker->ToTraceTime(ClockDomain::kRealTime, ts);
+  // PERFETTO_DCHECK(opt_trace_time.has_value());
+  // ts = *opt_trace_time;
+
+  if (name_id == 0) {
+    PERFETTO_DCHECK(name_intern_id < string_table.size());
+    name_id = string_table[name_intern_id];
+  }
+  if (cat_id == 0) {
+    PERFETTO_DCHECK(cat_intern_id < string_table.size());
+    cat_id = string_table[cat_intern_id];
+  }
+  PERFETTO_DCHECK(name_id && cat_id);
+  SliceTracker* slice_tracker = context_->slice_tracker.get();
+  UniqueTid utid = context_->process_tracker->UpdateThread(tid, pid);
+  if (phase == 'B') {
+    slice_tracker->Begin(ts, utid, cat_id, name_id);
+  } else if (phase == 'E') {
+    slice_tracker->End(ts, utid, cat_id, name_id);
+  } else if (phase == 'X' && dur) {
+    // PERFETTO_DLOG("X %u ts: %.3f c:'%s' n:'%s'", utid, ts/1e6,
+                  // context_->storage->GetString(cat_id).c_str(),
+                  // context_->storage->GetString(name_id).c_str());
+    slice_tracker->Scoped(ts, utid, cat_id, name_id, dur);
+  } else if (phase == 'M') {
+    if (name_id == thread_name_id_) {
+      context_->process_tracker->UpdateThreadName(tid, pid,
+                                                  base::StringView(arg_value));
+    } else if (name_id == process_name_id_) {
+      context_->process_tracker->UpdateProcess(pid,
+                                               base::StringView(arg_value));
+    }
+  }
 }
 
 }  // namespace trace_processor
