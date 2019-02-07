@@ -1821,10 +1821,10 @@ void ProtoTraceParser::ParseChromeTraceEvent(
     }
   }
 
-  // base::Optional<int64_t> opt_trace_time =
-  //   context_->clock_tracker->ToTraceTime(ClockDomain::kRealTime, ts);
-  // PERFETTO_DCHECK(opt_trace_time.has_value());
-  // ts = *opt_trace_time;
+  base::Optional<int64_t> opt_trace_time =
+    context_->clock_tracker->ToTraceTime(ClockDomain::kMonotonic, ts);
+  PERFETTO_DCHECK(opt_trace_time.has_value());
+  ts = *opt_trace_time;
 
   if (name_id == 0) {
     PERFETTO_DCHECK(name_intern_id < string_table.size());
