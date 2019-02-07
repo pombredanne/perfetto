@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -64,6 +64,16 @@ TEST(StringWriterTest, BasicCases) {
     base::StringWriter writer(buffer, sizeof(buffer));
     writer.AppendDouble(123.25);
     ASSERT_STREQ(writer.GetCString(), "123.250000");
+  }
+  {
+    base::StringWriter writer(buffer, sizeof(buffer));
+    writer.AppendInt(std::numeric_limits<int64_t>::min());
+    ASSERT_STREQ(writer.GetCString(), "-9223372036854775808");
+  }
+  {
+    base::StringWriter writer(buffer, sizeof(buffer));
+    writer.AppendInt(std::numeric_limits<int64_t>::max());
+    ASSERT_STREQ(writer.GetCString(), "9223372036854775807");
   }
 
   constexpr char kTestStr[] = "test";
