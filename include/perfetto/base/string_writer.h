@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@
 #ifndef INCLUDE_PERFETTO_BASE_STRING_WRITER_H_
 #define INCLUDE_PERFETTO_BASE_STRING_WRITER_H_
 
+#include <math.h>
+
 #include "perfetto/base/logging.h"
 #include "perfetto/base/string_view.h"
 
@@ -24,90 +26,90 @@ namespace perfetto {
 namespace base {
 
 // A helper class which writes formatted data to a string buffer.
+// This is used in the trace processor where we write O(GBs) of strings and
+// sprintf is too slow.
 class StringWriter {
  public:
   // Creates a string buffer from a char buffer and length.
-  StringWriter(char* buffer, size_t n) : buffer_(buffer), n_(n) {}
+  StringWriter(char* buffer, size_t size) : buffer_(buffer), size_(size) {}
 
-  // Writes a char to the buffer.
-  void WriteChar(const char in) {
-    PERFETTO_DCHECK(pos_ + 1 <= n_);
+  // Appends a char to the buffer.
+  void AppendChar(char in) {
+    PERFETTO_DCHECK(pos_ + 1 <= size_);
     buffer_[pos_++] = in;
   }
 
-  // Writes a length delimited string to the buffer.
-  void WriteString(const char* in, size_t n) {
-    PERFETTO_DCHECK(pos_ + n <= n_);
+  // Appends a length delimited string to the buffer.
+  void AppendString(const char* in, size_t n) {
+    PERFETTO_DCHECK(pos_ + n <= size_);
     memcpy(&buffer_[pos_], in, n);
     pos_ += n;
   }
 
-  // Writes a StringView to the buffer.
-  void WriteString(StringView data) {
-    PERFETTO_DCHECK(pos_ + data.size() <= n_);
-    memcpy(&buffer_[pos_], data.data(), data.size());
-    pos_ += data.size();
-  }
+  // Appends a StringView to the buffer.
+  void AppendString(StringView data) { AppendString(data.data(), data.size()); }
 
-  // Writes an integer to the buffer.
-  void WriteInt(int64_t value) { WritePaddedInt<'0', 0>(value); }
+  // Appends an integer to the buffer.
+  void AppendInt(int64_t value) { AppendPaddedInt<'0', 0>(value); }
 
-  // Writes an integer to the buffer, padding with |PadChar| if the number of
+  // Appends an integer to the buffer, padding with |PadChar| if the number of
   // digits of the integer is less than Padding.
-  template <char PadChar, size_t Padding>
-  void WritePaddedInt(int64_t value) {
+  template <char padchar, uint64_t padding>
+  void AppendPaddedInt(int64_t sign_value) {
     // Need to add 2 to the number of digits to account for minus sign and
     // rounding down of digits10.
-    constexpr auto kBufferSize =
-        std::numeric_limits<uint64_t>::digits10 + 2 + Padding;
-    PERFETTO_DCHECK(pos_ + kBufferSize <= n_);
+    constexpr auto kMaxDigits = std::numeric_limits<uint64_t>::digits10 + 2;
+    constexpr auto kSizeNeeded = kMaxDigits > padding ? kMaxDigits : padding;
+    PERFETTO_DCHECK(pos_ + kSizeNeeded <= size_);
 
-    char data[kBufferSize];
-    bool negate = value < 0;
-    if (negate)
-      value = 0 - value;
+    char data[kSizeNeeded];
+    const bool negate = signbit(sign_value);
+    uint64_t value = static_cast<uint64_t>(std::abs(sign_value));
 
-    uint64_t val = static_cast<uint64_t>(value);
     size_t idx;
-    for (idx = kBufferSize - 1; val >= 10;) {
-      char digit = val % 10;
-      val /= 10;
+    for (idx = kSizeNeeded - 1; value >= 10;) {
+      char digit = value % 10;
+      value /= 10;
       data[idx--] = digit + '0';
     }
-    data[idx--] = static_cast<char>(val) + '0';
+    data[idx--] = static_cast<char>(value) + '0';
 
-    if (Padding > 0) {
-      size_t num_digits = kBufferSize - 1 - idx;
-      for (size_t i = num_digits; i < Padding; i++) {
-        data[idx--] = PadChar;
+    if (padding > 0) {
+      size_t num_digits = kSizeNeeded - 1 - idx;
+      for (size_t i = num_digits; i < padding; i++) {
+        data[idx--] = padchar;
       }
     }
 
     if (negate)
       buffer_[pos_++] = '-';
-    for (size_t i = idx + 1; i < kBufferSize; i++)
-      buffer_[pos_++] = data[i];
+
+    size_t num_chars = kSizeNeeded - idx - 1;
+    memmove(&buffer_[pos_], &data[idx + 1], num_chars);
+    pos_ += num_chars;
   }
 
-  // Writes a double to the buffer.
-  void WriteDouble(double value) {
+  // Appends a double to the buffer.
+  void AppendDouble(double value) {
     // TODO(lalitm): trying to optimize this is premature given we almost never
     // print doubles. Reevaluate this in the future if we do print them more.
-    size_t res =
-        static_cast<size_t>(snprintf(buffer_ + pos_, n_ - pos_, "%lf", value));
-    PERFETTO_DCHECK(pos_ + res < n_);
+    size_t res = static_cast<size_t>(
+        snprintf(buffer_ + pos_, size_ - pos_, "%lf", value));
+    PERFETTO_DCHECK(pos_ + res < size_);
     pos_ += res;
   }
 
   char* GetCString() {
-    PERFETTO_DCHECK(pos_ < n_);
+    // TODO(lalitm): this may need to be changed in the future to return a
+    // StringView if we find that we will want embedded nulls in our strings.
+    PERFETTO_DCHECK(pos_ < size_);
     buffer_[pos_] = '\0';
     return buffer_;
   }
 
  private:
   char* buffer_ = nullptr;
-  size_t n_ = 0;
+  size_t size_ = 0;
   size_t pos_ = 0;
 };
 
