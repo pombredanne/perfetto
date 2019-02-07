@@ -32,7 +32,7 @@ struct MetadataHeader {
 };
 
 int FuzzRingBuffer(const uint8_t* data, size_t size) {
-  if (size < sizeof(MetadataHeader))
+  if (size <= sizeof(MetadataHeader))
     return 0;
 
   auto fd = base::TempFile::CreateUnlinked().ReleaseFD();
@@ -42,8 +42,6 @@ int FuzzRingBuffer(const uint8_t* data, size_t size) {
 
   size_t payload_size = size - sizeof(MetadataHeader);
   const uint8_t* payload = data + sizeof(MetadataHeader);
-  if (payload_size == 0)
-    return 0;
 
   PERFETTO_CHECK(base::WriteAll(*fd, payload, payload_size) != -1);
   if (payload_size % base::kPageSize != 0) {
