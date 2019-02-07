@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,14 @@ class ScopedSpinlock {
  public:
   enum class Mode { Try, Blocking };
 
-  ScopedSpinlock(std::atomic<bool>* lock, Mode mode);
+  ScopedSpinlock(std::atomic<bool>* lock, Mode mode) : lock_(lock) {
+    if (PERFETTO_LIKELY(!lock_->exchange(true, std::memory_order_acquire))) {
+      locked_ = true;
+      return;
+    }
+    LockSlow(mode);
+  }
+
   ScopedSpinlock(const ScopedSpinlock&) = delete;
   ScopedSpinlock& operator=(const ScopedSpinlock&) = delete;
 
@@ -54,6 +61,7 @@ class ScopedSpinlock {
   bool locked() const { return locked_; }
 
  private:
+  void LockSlow(Mode mode);
   std::atomic<bool>* lock_;
   bool locked_ = false;
 };
@@ -81,6 +89,12 @@ class SharedRingBuffer {
     Buffer() {}
     Buffer(uint8_t* d, size_t s) : data(d), size(s) {}
 
+    Buffer(const Buffer&) = delete;
+    Buffer& operator=(const Buffer&) = delete;
+
+    Buffer(Buffer&&) = default;
+    Buffer& operator=(Buffer&&) = default;
+
     operator bool() const { return data != nullptr; }
 
     uint8_t* data = nullptr;
@@ -99,10 +113,14 @@ class SharedRingBuffer {
   int fd() const { return *mem_fd_; }
 
   Buffer BeginWrite(const ScopedSpinlock& spinlock, size_t size);
-  void EndWrite(const Buffer& buf);
+  void EndWrite(Buffer buf);
 
   Buffer BeginRead();
-  void EndRead(const Buffer&);
+  void EndRead(Buffer);
+
+  // This is used by the caller to be able to hold the SpinLock after
+  // BeginWrite has returned. This is so that additional bookkeeping can be
+  // done under the lock. This will be used to increment the sequence_number.
   ScopedSpinlock AcquireLock(ScopedSpinlock::Mode mode) {
     return ScopedSpinlock(&meta_->spinlock, mode);
   }
@@ -119,8 +137,6 @@ class SharedRingBuffer {
     std::atomic<uint64_t> num_writes_succeeded;
     std::atomic<uint64_t> num_writes_failed;
     std::atomic<uint64_t> num_reads_failed;
-
-    // TODO static assert offsets.
   };
 
   struct CreateFlag {};
@@ -135,7 +151,8 @@ class SharedRingBuffer {
   void Initialize(base::ScopedFile mem_fd);
   bool IsCorrupt();
 
-  inline size_t read_avail(const ScopedSpinlock&) {
+  inline size_t read_avail(const ScopedSpinlock& lock) {
+    PERFETTO_DCHECK(lock.locked());
     PERFETTO_DCHECK(meta_->write_pos >= meta_->read_pos);
     auto res = static_cast<size_t>(meta_->write_pos - meta_->read_pos);
     PERFETTO_DCHECK(res <= size_);

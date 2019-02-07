@@ -45,7 +45,7 @@ bool TryWrite(SharedRingBuffer* wr, const char* src, size_t size) {
   if (!buf)
     return false;
   memcpy(buf.data, src, size);
-  wr->EndWrite(buf);
+  wr->EndWrite(std::move(buf));
   return true;
 }
 
@@ -63,13 +63,13 @@ void StructuredTest(SharedRingBuffer* wr, SharedRingBuffer* rd) {
     auto buf_and_size = rd->BeginRead();
     ASSERT_EQ(buf_and_size.size, 4);
     ASSERT_STREQ(reinterpret_cast<const char*>(&buf_and_size.data[0]), "foo");
-    rd->EndRead(buf_and_size);
+    rd->EndRead(std::move(buf_and_size));
   }
   {
     auto buf_and_size = rd->BeginRead();
     ASSERT_EQ(buf_and_size.size, 4);
     ASSERT_STREQ(reinterpret_cast<const char*>(&buf_and_size.data[0]), "bar");
-    rd->EndRead(buf_and_size);
+    rd->EndRead(std::move(buf_and_size));
   }
 
   for (int i = 0; i < 3; i++) {
@@ -89,7 +89,7 @@ void StructuredTest(SharedRingBuffer* wr, SharedRingBuffer* rd) {
     // And read it back
     auto buf_and_size = rd->BeginRead();
     ASSERT_EQ(ToString(buf_and_size), data);
-    rd->EndRead(buf_and_size);
+    rd->EndRead(std::move(buf_and_size));
   }
 
   // Test large writes that wrap.
@@ -99,7 +99,7 @@ void StructuredTest(SharedRingBuffer* wr, SharedRingBuffer* rd) {
   {
     auto buf_and_size = rd->BeginRead();
     ASSERT_EQ(ToString(buf_and_size), data);
-    rd->EndRead(buf_and_size);
+    rd->EndRead(std::move(buf_and_size));
   }
   data = std::string(base::kPageSize - sizeof(uint64_t), '#');
   for (int i = 0; i < 4; i++)
@@ -109,7 +109,7 @@ void StructuredTest(SharedRingBuffer* wr, SharedRingBuffer* rd) {
     auto buf_and_size = rd->BeginRead();
     ASSERT_EQ(buf_and_size.size, data.size());
     ASSERT_EQ(ToString(buf_and_size), data);
-    rd->EndRead(buf_and_size);
+    rd->EndRead(std::move(buf_and_size));
   }
 
   // Test misaligned writes.
@@ -121,27 +121,27 @@ void StructuredTest(SharedRingBuffer* wr, SharedRingBuffer* rd) {
   {
     auto buf_and_size = rd->BeginRead();
     ASSERT_EQ(ToString(buf_and_size), "1");
-    rd->EndRead(buf_and_size);
+    rd->EndRead(std::move(buf_and_size));
   }
   {
     auto buf_and_size = rd->BeginRead();
     ASSERT_EQ(ToString(buf_and_size), "22");
-    rd->EndRead(buf_and_size);
+    rd->EndRead(std::move(buf_and_size));
   }
   {
     auto buf_and_size = rd->BeginRead();
     ASSERT_EQ(ToString(buf_and_size), "333");
-    rd->EndRead(buf_and_size);
+    rd->EndRead(std::move(buf_and_size));
   }
   {
     auto buf_and_size = rd->BeginRead();
     ASSERT_EQ(ToString(buf_and_size), "55555");
-    rd->EndRead(buf_and_size);
+    rd->EndRead(std::move(buf_and_size));
   }
   {
     auto buf_and_size = rd->BeginRead();
     ASSERT_EQ(ToString(buf_and_size), "7777777");
-    rd->EndRead(buf_and_size);
+    rd->EndRead(std::move(buf_and_size));
   }
 }
 
@@ -207,7 +207,7 @@ TEST(SharedRingBufferTest, MultiThreadingTest) {
       std::string data = ToString(buf_and_size);
       std::lock_guard<std::mutex> lock(mutex);
       expected_contents[std::move(data)]--;
-      rd.EndRead(buf_and_size);
+      rd.EndRead(std::move(buf_and_size));
     }
   };
 
