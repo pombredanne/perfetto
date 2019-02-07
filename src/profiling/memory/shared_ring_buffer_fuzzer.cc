@@ -24,33 +24,45 @@
 namespace perfetto {
 namespace profiling {
 
+struct MetadataHeader {
+  std::atomic<bool> spinlock;
+  uint64_t read_pos;
+  uint64_t write_pos;
+};
+
 // This cannot be in the anonymous namespace as it is a friend of
 // SharedRingBuffer so that it can access MetadataPage.
 int FuzzRingBuffer(const uint8_t* data, size_t size) {
-  using MetadataPage = SharedRingBuffer::MetadataPage;
-  if (size < sizeof(MetadataPage))
+  if (size < sizeof(MetadataHeader))
     return 0;
 
   auto fd = base::TempFile::CreateUnlinked().ReleaseFD();
   PERFETTO_CHECK(fd);
-  PERFETTO_CHECK(base::WriteAll(*fd, data, sizeof(MetadataPage)) != -1);
+  PERFETTO_CHECK(base::WriteAll(*fd, data, sizeof(MetadataHeader)) != -1);
   PERFETTO_CHECK(lseek(*fd, base::kPageSize, SEEK_SET) != -1);
 
-  size_t payload_size = size - sizeof(MetadataPage);
-  const uint8_t* payload = data + sizeof(MetadataPage);
+  size_t payload_size = size - sizeof(MetadataHeader);
+  const uint8_t* payload = data + sizeof(MetadataHeader);
   if (payload_size == 0)
     return 0;
 
   PERFETTO_CHECK(base::WriteAll(*fd, payload, payload_size) != -1);
-  PERFETTO_CHECK(
-      lseek(*fd, base::kPageSize + base::AlignUp<base::kPageSize>(payload_size),
-            SEEK_SET) != -1);
+  if (payload_size % base::kPageSize != 0) {
+    PERFETTO_CHECK(lseek(*fd,
+                         base::kPageSize +
+                             base::AlignUp<base::kPageSize>(payload_size) - 1,
+                         SEEK_SET) != -1);
+    char null[1] = {'\0'};
+    PERFETTO_CHECK(base::WriteAll(*fd, null, sizeof(null) != -1));
+  }
+  PERFETTO_CHECK(lseek(*fd, 0, SEEK_SET) != -1);
+
   auto buf = SharedRingBuffer::Attach(std::move(fd));
   PERFETTO_CHECK(!!buf);
   SharedRingBuffer::Buffer read_buf = {};
   do {
     read_buf = buf->BeginRead();
-    buf->EndRead(read_buf);
+    buf->EndRead(std::move(read_buf));
     if (read_buf) {
       volatile uint8_t* v_data = read_buf.data;
       // Assert we get a reference to valid memory.

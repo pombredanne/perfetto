@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,13 +45,7 @@ constexpr auto kGuardSize = base::kPageSize * 1024 * 16;  // 64 MB.
 
 }  // namespace
 
-ScopedSpinlock::ScopedSpinlock(std::atomic<bool>* lock, Mode mode)
-    : lock_(lock) {
-  if (PERFETTO_LIKELY(!lock_->exchange(true, std::memory_order_acquire))) {
-    locked_ = true;
-    return;
-  }
-
+void ScopedSpinlock::LockSlow(Mode mode) {
   // Slowpath.
   for (size_t attempt = 0; mode == Mode::Blocking || attempt < 1024 * 10;
        attempt++) {
@@ -197,15 +191,16 @@ SharedRingBuffer::Buffer SharedRingBuffer::BeginWrite(
   meta_->write_pos += size_with_header;
   meta_->bytes_written += size;
   meta_->num_writes_succeeded++;
-  // By making this an release store, we can save grabbing the spinlock in
+  // By making this a release store, we can save grabbing the spinlock in
   // EndWrite.
   reinterpret_cast<std::atomic<uint32_t>*>(wr_ptr)->store(
       0, std::memory_order_release);
   return result;
 }
 
-void SharedRingBuffer::EndWrite(const Buffer& buf) {
+void SharedRingBuffer::EndWrite(Buffer buf) {
   uint8_t* wr_ptr = buf.data - kHeaderSize;
+  PERFETTO_DCHECK(reinterpret_cast<uintptr_t>(wr_ptr) % kAlignment == 0);
   reinterpret_cast<std::atomic<uint32_t>*>(wr_ptr)->store(
       static_cast<uint32_t>(buf.size), std::memory_order_release);
 }
@@ -245,7 +240,7 @@ SharedRingBuffer::Buffer SharedRingBuffer::BeginRead() {
   return Buffer(rd_ptr, size);
 }
 
-void SharedRingBuffer::EndRead(const Buffer& buf) {
+void SharedRingBuffer::EndRead(Buffer buf) {
   if (!buf)
     return;
   ScopedSpinlock spinlock(&meta_->spinlock, ScopedSpinlock::Mode::Blocking);
