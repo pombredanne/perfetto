@@ -83,8 +83,6 @@ class EventTracker {
     StringId next_comm_id = 0;
   };
 
-  void AddSchedRawArg(RowId, int field_num, TraceStorage::Args::Variadic);
-
   // Store pending sched slices for each CPU.
   std::array<PendingSchedSlice, base::kMaxCpus> pending_sched_per_cpu_{};
 
@@ -97,7 +95,6 @@ class EventTracker {
   int64_t prev_timestamp_ = 0;
 
   static constexpr uint8_t kSchedSwitchMaxFieldId = 7;
-
   std::array<StringId, kSchedSwitchMaxFieldId + 1> sched_switch_field_ids_;
   StringId sched_switch_id_;
 

@@ -65,43 +65,38 @@ void EventTracker::PushSchedSwitch(uint32_t cpu,
   PERFETTO_DCHECK(cpu < base::kMaxCpus);
 
   auto* slices = context_->storage->mutable_slices();
-  auto* prev_slice = &pending_sched_per_cpu_[cpu];
 
   StringId next_comm_id = context_->storage->InternString(next_comm);
   auto next_utid =
       context_->process_tracker->UpdateThread(ts, next_pid, next_comm_id);
 
-  // First add the slice for the "next" data.
-  auto next_idx = slices->AddSlice(cpu, ts, 0 /* duration */, next_utid,
-                                   ftrace_utils::TaskState(), next_prio);
-
-  // Now use this event to update any data on the existing slice.
-  bool reuse_slice_data = false;
+  // First use this data to close the previous slice.
+  bool prev_pid_match_prev_next_pid = false;
+  auto* prev_slice = &pending_sched_per_cpu_[cpu];
   size_t slice_idx = prev_slice->storage_index;
   if (slice_idx < std::numeric_limits<size_t>::max()) {
     int64_t duration = ts - slices->start_ns()[slice_idx];
     slices->set_duration(slice_idx, duration);
 
-    if (prev_pid == prev_slice->next_pid) {
+    prev_pid_match_prev_next_pid = prev_pid == prev_slice->next_pid;
+    if (prev_pid_match_prev_next_pid) {
       // We store the state as a uint16 as we only consider values up to 2048
       // when unpacking the information inside; this allows savings of 48 bits
       // per slice.
       slices->set_end_state(slice_idx, ftrace_utils::TaskState(
                                            static_cast<uint16_t>(prev_state)));
-
-      // We can reuse the slice's data because the pids match.
-      reuse_slice_data = true;
     } else {
-      // If the this events previous pid does not match the previous event's
-      // next pid, make a note of this.
+      // If the pids ae not consistent, make a note of this.
       context_->storage->IncrementStats(stats::mismatched_sched_switch_tids);
     }
   }
 
-  // Compute the prev_utid and prev_comm_id in an optimized manner if possible.
+  // If the prev_pid matches the previous slice's next pid, we can just lookup
+  // the comm id and utid from the previous slice. This saves relatively
+  // expensive string interning/thread lookup.
   UniqueTid prev_utid;
   StringId prev_comm_id;
-  if (reuse_slice_data) {
+  if (prev_pid_match_prev_next_pid) {
     PERFETTO_DCHECK(slice_idx < std::numeric_limits<size_t>::max());
     prev_comm_id = prev_slice->next_comm_id;
     prev_utid = slices->utids()[slice_idx];
@@ -117,28 +112,31 @@ void EventTracker::PushSchedSwitch(uint32_t cpu,
       ts, sched_switch_id_, cpu, prev_utid);
 
   // Note: this ordering is important. The events should be pushed in the same
-  // order as the order of fields in the proto.
+  // order as the order of fields in the proto; this is used by the raw table to
+  // index these events using the field ids.
   using Variadic = TraceStorage::Args::Variadic;
   using SS = protos::SchedSwitchFtraceEvent;
-  AddSchedRawArg(rid, SS::kPrevCommFieldNumber, Variadic::String(prev_comm_id));
-  AddSchedRawArg(rid, SS::kPrevPidFieldNumber, Variadic::Integer(prev_pid));
-  AddSchedRawArg(rid, SS::kPrevPrioFieldNumber, Variadic::Integer(prev_prio));
-  AddSchedRawArg(rid, SS::kPrevStateFieldNumber, Variadic::Integer(prev_state));
-  AddSchedRawArg(rid, SS::kNextCommFieldNumber, Variadic::String(next_comm_id));
-  AddSchedRawArg(rid, SS::kNextPidFieldNumber, Variadic::Integer(next_pid));
-  AddSchedRawArg(rid, SS::kNextPrioFieldNumber, Variadic::Integer(next_prio));
+  auto add_raw_arg = [this](RowId row_id, int field_num,
+                            TraceStorage::Args::Variadic var) {
+    StringId key = sched_switch_field_ids_[static_cast<size_t>(field_num)];
+    context_->args_tracker->AddArg(row_id, key, key, var);
+  };
+  add_raw_arg(rid, SS::kPrevCommFieldNumber, Variadic::String(prev_comm_id));
+  add_raw_arg(rid, SS::kPrevPidFieldNumber, Variadic::Integer(prev_pid));
+  add_raw_arg(rid, SS::kPrevPrioFieldNumber, Variadic::Integer(prev_prio));
+  add_raw_arg(rid, SS::kPrevStateFieldNumber, Variadic::Integer(prev_state));
+  add_raw_arg(rid, SS::kNextCommFieldNumber, Variadic::String(next_comm_id));
+  add_raw_arg(rid, SS::kNextPidFieldNumber, Variadic::Integer(next_pid));
+  add_raw_arg(rid, SS::kNextPrioFieldNumber, Variadic::Integer(next_prio));
+
+  // Add the slice for the "next" slice.
+  auto next_idx = slices->AddSlice(cpu, ts, 0 /* duration */, next_utid,
+                                   ftrace_utils::TaskState(), next_prio);
 
   // Finally, update the info for the next sched switch on this CPU.
   prev_slice->storage_index = next_idx;
   prev_slice->next_pid = next_pid;
   prev_slice->next_comm_id = next_comm_id;
-}
-
-void EventTracker::AddSchedRawArg(RowId row_id,
-                                  int field_num,
-                                  TraceStorage::Args::Variadic var) {
-  StringId key = sched_switch_field_ids_[static_cast<size_t>(field_num)];
-  context_->args_tracker->AddArg(row_id, key, key, var);
 }
 
 RowId EventTracker::PushCounter(int64_t timestamp,
