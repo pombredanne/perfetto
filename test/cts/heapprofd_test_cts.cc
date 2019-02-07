@@ -59,7 +59,7 @@ void PollRunState(bool desired_run_state,
     callback();
     return;
   }
-  task_runner->PostTask([desired_run_state, task_runner, &name, &callback] {
+  task_runner->PostTask([desired_run_state, task_runner, name, callback] {
     PollRunState(desired_run_state, task_runner, name, std::move(callback));
   });
 }
@@ -75,7 +75,7 @@ void StartAppActivity(const std::string& app_name,
   bool desired_run_state = true;
   const auto checkpoint = task_runner->CreateCheckpoint(checkpoint_name);
   task_runner->PostDelayedTask(
-      [desired_run_state, task_runner, &app_name, checkpoint] {
+      [desired_run_state, task_runner, app_name, checkpoint] {
         PollRunState(desired_run_state, task_runner, app_name,
                      std::move(checkpoint));
       },
@@ -91,11 +91,10 @@ void StopApp(const std::string& app_name,
 
   bool desired_run_state = false;
   auto checkpoint = task_runner->CreateCheckpoint(checkpoint_name);
-  task_runner->PostTask(
-      [desired_run_state, task_runner, &app_name, checkpoint] {
-        PollRunState(desired_run_state, task_runner, app_name,
-                     std::move(checkpoint));
-      });
+  task_runner->PostTask([desired_run_state, task_runner, app_name, checkpoint] {
+    PollRunState(desired_run_state, task_runner, app_name,
+                 std::move(checkpoint));
+  });
 }
 
 void TestAppRuntime(std::string app_name) {
