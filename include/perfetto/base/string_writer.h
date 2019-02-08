@@ -47,6 +47,12 @@ class StringWriter {
     pos_ += n;
   }
 
+  // Appends a null-terminated string literal to the buffer.
+  template <size_t N>
+  inline void AppendLiteral(const char (&in)[N]) {
+    AppendString(in, N - 1);
+  }
+
   // Appends a StringView to the buffer.
   void AppendString(StringView data) { AppendString(data.data(), data.size()); }
 

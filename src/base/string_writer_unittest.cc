@@ -79,6 +79,11 @@ TEST(StringWriterTest, BasicCases) {
   constexpr char kTestStr[] = "test";
   {
     base::StringWriter writer(buffer, sizeof(buffer));
+    writer.AppendLiteral(kTestStr);
+    ASSERT_STREQ(writer.GetCString(), kTestStr);
+  }
+  {
+    base::StringWriter writer(buffer, sizeof(buffer));
     writer.AppendString(kTestStr, sizeof(kTestStr) - 1);
     ASSERT_STREQ(writer.GetCString(), kTestStr);
   }
@@ -103,10 +108,12 @@ TEST(StringWriterTest, WriteAllTypes) {
   writer.AppendDouble(123.25);
 
   constexpr char kTestStr[] = "test";
+  writer.AppendLiteral(kTestStr);
   writer.AppendString(kTestStr, sizeof(kTestStr) - 1);
   writer.AppendString(kTestStr);
 
-  ASSERT_STREQ(writer.GetCString(), "01325451000101001  123123.250000testtest");
+  ASSERT_STREQ(writer.GetCString(),
+               "01325451000101001  123123.250000testtesttest");
 }
 
 }  // namespace
