@@ -50,7 +50,8 @@ int FuzzRingBuffer(const uint8_t* data, size_t size) {
 
   size_t payload_size = size - sizeof(MetadataHeader);
   const uint8_t* payload = data + sizeof(MetadataHeader);
-  size_t payload_size_pages = (payload_size + kPageSize - 1) / kPageSize;
+  size_t payload_size_pages =
+      (payload_size + base::kPageSize - 1) / base::kPageSize;
   if (!IsPow2(payload_size_pages))
     payload_size_pages = RoundToPow2(payload_size_pages);
 
