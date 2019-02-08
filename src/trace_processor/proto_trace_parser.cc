@@ -189,48 +189,48 @@ ProtoTraceParser::ProtoTraceParser(TraceProcessorContext* context)
       oom_score_adj_id_;
 
   mm_event_counter_names_ = {
-      MmEventCounterNames(
-          context->storage->InternString("mem.mm.min_flt.count"),
-          context->storage->InternString("mem.mm.min_flt.max_lat"),
-          context->storage->InternString("mem.mm.min_flt.avg_lat")),
-      MmEventCounterNames(
-          context->storage->InternString("mem.mm.maj_flt.count"),
-          context->storage->InternString("mem.mm.maj_flt.max_lat"),
-          context->storage->InternString("mem.mm.maj_flt.avg_lat")),
-      MmEventCounterNames(
-          context->storage->InternString("mem.mm.read_io.count"),
-          context->storage->InternString("mem.mm.read_io.max_lat"),
-          context->storage->InternString("mem.mm.read_io.avg_lat")),
-      MmEventCounterNames(
-          context->storage->InternString("mem.mm.compaction.count"),
-          context->storage->InternString("mem.mm.compaction.max_lat"),
-          context->storage->InternString("mem.mm.compaction.avg_lat")),
-      MmEventCounterNames(
-          context->storage->InternString("mem.mm.reclaim.count"),
-          context->storage->InternString("mem.mm.reclaim.max_lat"),
-          context->storage->InternString("mem.mm.reclaim.avg_lat")),
-      MmEventCounterNames(
-          context->storage->InternString("mem.mm.swp_flt.count"),
-          context->storage->InternString("mem.mm.swp_flt.max_lat"),
-          context->storage->InternString("mem.mm.swp_flt.avg_lat")),
-      MmEventCounterNames(
-          context->storage->InternString("mem.mm.kern_alloc.count"),
-          context->storage->InternString("mem.mm.kern_alloc.max_lat"),
-          context->storage->InternString("mem.mm.kern_alloc.avg_lat"))};
+      {MmEventCounterNames(
+           context->storage->InternString("mem.mm.min_flt.count"),
+           context->storage->InternString("mem.mm.min_flt.max_lat"),
+           context->storage->InternString("mem.mm.min_flt.avg_lat")),
+       MmEventCounterNames(
+           context->storage->InternString("mem.mm.maj_flt.count"),
+           context->storage->InternString("mem.mm.maj_flt.max_lat"),
+           context->storage->InternString("mem.mm.maj_flt.avg_lat")),
+       MmEventCounterNames(
+           context->storage->InternString("mem.mm.read_io.count"),
+           context->storage->InternString("mem.mm.read_io.max_lat"),
+           context->storage->InternString("mem.mm.read_io.avg_lat")),
+       MmEventCounterNames(
+           context->storage->InternString("mem.mm.compaction.count"),
+           context->storage->InternString("mem.mm.compaction.max_lat"),
+           context->storage->InternString("mem.mm.compaction.avg_lat")),
+       MmEventCounterNames(
+           context->storage->InternString("mem.mm.reclaim.count"),
+           context->storage->InternString("mem.mm.reclaim.max_lat"),
+           context->storage->InternString("mem.mm.reclaim.avg_lat")),
+       MmEventCounterNames(
+           context->storage->InternString("mem.mm.swp_flt.count"),
+           context->storage->InternString("mem.mm.swp_flt.max_lat"),
+           context->storage->InternString("mem.mm.swp_flt.avg_lat")),
+       MmEventCounterNames(
+           context->storage->InternString("mem.mm.kern_alloc.count"),
+           context->storage->InternString("mem.mm.kern_alloc.max_lat"),
+           context->storage->InternString("mem.mm.kern_alloc.avg_lat"))}};
 
-  sys_name_ids_ = {context->storage->InternString("sys_read"),
-                   context->storage->InternString("sys_write"),
-                   context->storage->InternString("sys_open"),
-                   context->storage->InternString("sys_close"),
-                   context->storage->InternString("sys_newstat"),
-                   context->storage->InternString("sys_newfstat"),
-                   context->storage->InternString("sys_newlstat"),
-                   context->storage->InternString("sys_poll"),
-                   context->storage->InternString("sys_lseek"),
-                   context->storage->InternString("sys_mmap"),
-                   context->storage->InternString("sys_mprotect"),
-                   context->storage->InternString("sys_munmap"),
-                   context->storage->InternString("sys_brk")};
+  sys_name_ids_ = {{context->storage->InternString("sys_read"),
+                    context->storage->InternString("sys_write"),
+                    context->storage->InternString("sys_open"),
+                    context->storage->InternString("sys_close"),
+                    context->storage->InternString("sys_newstat"),
+                    context->storage->InternString("sys_newfstat"),
+                    context->storage->InternString("sys_newlstat"),
+                    context->storage->InternString("sys_poll"),
+                    context->storage->InternString("sys_lseek"),
+                    context->storage->InternString("sys_mmap"),
+                    context->storage->InternString("sys_mprotect"),
+                    context->storage->InternString("sys_munmap"),
+                    context->storage->InternString("sys_brk")}};
 
   // Build the lookup table for the strings inside ftrace events (e.g. the
   // name of ftrace event fields and the names of their args).
