@@ -32,8 +32,9 @@ RawTable::RawTable(sqlite3* db, const TraceStorage* storage)
     auto* thiz = static_cast<RawTable*>(sqlite3_user_data(ctx));
     thiz->ToSystrace(ctx, argc, argv);
   };
-  sqlite3_create_function(db, "systrace", 1, SQLITE_UTF8 | SQLITE_DETERMINISTIC,
-                          this, fn, nullptr, nullptr);
+  sqlite3_create_function(db, "to_ftrace", 1,
+                          SQLITE_UTF8 | SQLITE_DETERMINISTIC, this, fn, nullptr,
+                          nullptr);
 }
 
 void RawTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
@@ -83,14 +84,14 @@ void RawTable::FormatSystraceArgs(const std::string& event_name,
   auto write_value = [this, writer](const Variadic& value) {
     switch (value.type) {
       case TraceStorage::Args::Variadic::kInt:
-        writer->WriteInt(value.int_value);
+        writer->AppendInt(value.int_value);
         break;
       case TraceStorage::Args::Variadic::kReal:
-        writer->WriteDouble(value.real_value);
+        writer->AppendDouble(value.real_value);
         break;
       case TraceStorage::Args::Variadic::kString: {
         const auto& str = storage_->GetString(value.string_value);
-        writer->WriteString(str.c_str(), str.size());
+        writer->AppendString(str.c_str(), str.size());
       }
     }
   };
@@ -98,14 +99,14 @@ void RawTable::FormatSystraceArgs(const std::string& event_name,
                                              ValueWriter value_fn) {
     uint32_t arg_row = start_row + arg_idx;
     if (arg_row != 0)
-      writer->WriteChar(' ');
+      writer->AppendChar(' ');
 
     const auto& args = storage_->args();
     const auto& key = storage_->GetString(args.keys()[arg_row]);
     const auto& value = args.arg_values()[arg_row];
 
-    writer->WriteString(key.c_str(), key.length());
-    writer->WriteChar('=');
+    writer->AppendString(key.c_str(), key.length());
+    writer->AppendChar('=');
     value_fn(value);
   };
 
@@ -116,11 +117,10 @@ void RawTable::FormatSystraceArgs(const std::string& event_name,
     write_arg(SS::kPrevPrioFieldNumber - 1, write_value);
     write_arg(SS::kPrevStateFieldNumber - 1, [writer](const Variadic& value) {
       auto state = static_cast<uint16_t>(value.int_value);
-      writer->WriteString(ftrace_utils::TaskState(state).ToString().data());
+      writer->AppendString(ftrace_utils::TaskState(state).ToString().data());
     });
 
-    constexpr char kDelimiter[] = " ==>";
-    writer->WriteString(kDelimiter, sizeof(kDelimiter) - 1);
+    writer->AppendLiteral(" ==>");
     write_arg(SS::kNextCommFieldNumber - 1, write_value);
     write_arg(SS::kNextPidFieldNumber - 1, write_value);
     write_arg(SS::kNextPrioFieldNumber - 1, write_value);
@@ -139,13 +139,14 @@ void RawTable::ToSystrace(sqlite3_context* ctx,
     sqlite3_result_error(ctx, "Usage: systrace(id)", -1);
     return;
   }
-  RowId id = sqlite3_value_int64(argv[0]);
-  auto pair = TraceStorage::ParseRowId(id);
+  RowId row_id = sqlite3_value_int64(argv[0]);
+  auto pair = TraceStorage::ParseRowId(row_id);
+  PERFETTO_DCHECK(pair.first == TableId::kRawEvents);
   auto row = pair.second;
 
-  const auto& raw = storage_->raw_events();
+  const auto& raw_evts = storage_->raw_events();
 
-  UniqueTid utid = raw.utids()[row];
+  UniqueTid utid = raw_evts.utids()[row];
   const auto& thread = storage_->GetThread(utid);
   uint32_t tgid = 0;
   if (thread.upid.has_value()) {
@@ -153,23 +154,20 @@ void RawTable::ToSystrace(sqlite3_context* ctx,
   }
   const auto& name = storage_->GetString(thread.name_id);
 
-  char line[2048];
+  char line[4096];
   base::StringWriter writer(line, sizeof(line));
 
-  ftrace_utils::FormatSystracePrefix(raw.timestamps()[row], raw.cpus()[row],
-                                     thread.tid, tgid, base::StringView(name),
-                                     &writer);
+  ftrace_utils::FormatSystracePrefix(raw_evts.timestamps()[row],
+                                     raw_evts.cpus()[row], thread.tid, tgid,
+                                     base::StringView(name), &writer);
 
-  const auto& event_name = storage_->GetString(raw.name_ids()[row]);
-  writer.WriteChar(' ');
-  writer.WriteString(event_name.c_str(), event_name.size());
+  const auto& event_name = storage_->GetString(raw_evts.name_ids()[row]);
+  writer.AppendChar(' ');
+  writer.AppendString(event_name.c_str(), event_name.size());
+  writer.AppendLiteral(": ");
 
-  constexpr char kNameSuffix[] = ": ";
-  writer.WriteString(kNameSuffix, sizeof(kNameSuffix) - 1);
-
-  FormatSystraceArgs(event_name, raw.arg_set_ids()[row], &writer);
-  sqlite3_result_text(ctx, writer.GetCString(), -1,
-                      sqlite_utils::kSqliteTransient);
+  FormatSystraceArgs(event_name, raw_evts.arg_set_ids()[row], &writer);
+  sqlite3_result_text(ctx, writer.CreateStringCopy().release(), -1, free);
 }
 
 }  // namespace trace_processor

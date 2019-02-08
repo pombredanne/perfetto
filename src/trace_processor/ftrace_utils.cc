@@ -16,23 +16,24 @@
 
 #include "src/trace_processor/ftrace_utils.h"
 
-#include <inttypes.h>
+#include <stdint.h>
 #include <algorithm>
 
 #include "perfetto/base/logging.h"
+#include "perfetto/base/string_writer.h"
 
 namespace perfetto {
 namespace trace_processor {
 namespace ftrace_utils {
 
 namespace {
-int64_t TimestampToSeconds(int64_t timestamp) {
-  return timestamp / 1000000000l;
-}
+struct FtraceTime {
+  FtraceTime(int64_t ns)
+      : secs(ns / 1000000000LL), micros((ns - secs * 1000000000LL) / 1000) {}
 
-int64_t TimestampToMicroseconds(int64_t timestamp) {
-  return (timestamp / 1000) % 1000000l;
-}
+  const int64_t secs;
+  const int64_t micros;
+};
 }  // namespace
 
 TaskState::TaskState(const char* state_str) {
@@ -155,36 +156,29 @@ void FormatSystracePrefix(int64_t timestamp,
                           uint32_t tgid,
                           base::StringView name,
                           base::StringWriter* writer) {
-  int64_t seconds = TimestampToSeconds(timestamp);
-  int64_t useconds = TimestampToMicroseconds(timestamp);
+  FtraceTime ftrace_time(timestamp);
   if (pid == 0) {
     name = "<idle>";
   }
 
-  writer->WriteString(name);
-  writer->WriteChar('-');
-  writer->WriteInt(pid);
+  writer->AppendString(name);
+  writer->AppendChar('-');
+  writer->AppendInt(pid);
 
-  constexpr char kTgidPrefix[] = "     (";
-  writer->WriteString(kTgidPrefix, sizeof(kTgidPrefix) - 1);
+  writer->AppendLiteral("     (");
   if (tgid == 0) {
-    constexpr char kNoTgid[] = "-----";
-    writer->WriteString(kNoTgid, sizeof(kNoTgid) - 1);
+    writer->AppendLiteral("-----");
   } else {
-    writer->WritePaddedInt<' ', 5>(tgid);
+    writer->AppendPaddedInt<' ', 5>(tgid);
   }
-  constexpr char kTgidSuffix[] = ") [";
-  writer->WriteString(kTgidSuffix, sizeof(kTgidSuffix) - 1);
+  writer->AppendLiteral(") [");
+  writer->AppendPaddedInt<'0', 3>(cpu);
+  writer->AppendLiteral("] .... ");
 
-  writer->WritePaddedInt<'0', 3>(cpu);
-
-  constexpr char kCpuSuffix[] = "] d..3 ";
-  writer->WriteString(kCpuSuffix, sizeof(kCpuSuffix) - 1);
-
-  writer->WriteInt(seconds);
-  writer->WriteChar('.');
-  writer->WritePaddedInt<'0', 6>(useconds);
-  writer->WriteChar(':');
+  writer->AppendInt(ftrace_time.secs);
+  writer->AppendChar('.');
+  writer->AppendPaddedInt<'0', 6>(ftrace_time.micros);
+  writer->AppendChar(':');
 }
 
 }  // namespace ftrace_utils
