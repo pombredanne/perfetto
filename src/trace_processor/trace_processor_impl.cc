@@ -184,7 +184,11 @@ bool TraceProcessorImpl::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
     switch (trace_type) {
       case kJsonTraceType:
         PERFETTO_DLOG("Legacy JSON trace detected");
+#if PERFETTO_BUILDFLAG(PERFETTO_STANDALONE_BUILD)
         context_.chunk_reader.reset(new JsonTraceParser(&context_));
+#else
+        PERFETTO_FATAL("JSON traces only supported in standalone mode.");
+#endif
         break;
       case kProtoTraceType:
         context_.chunk_reader.reset(new ProtoTraceTokenizer(&context_));
