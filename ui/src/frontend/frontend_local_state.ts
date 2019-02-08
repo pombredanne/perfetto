@@ -31,6 +31,7 @@ export class FrontendLocalState {
   perfDebug = false;
   hoveredUtid = -1;
   hoveredPid = -1;
+  hoveredNotePreview = -1;
 
   // TODO: there is some redundancy in the fact that both |visibleWindowTime|
   // and a |timeScale| have a notion of time range. That should live in one
@@ -75,6 +76,14 @@ export class FrontendLocalState {
   setHoveredUtidAndPid(utid: number, pid: number) {
     this.hoveredUtid = utid;
     this.hoveredPid = pid;
+    globals.rafScheduler.scheduleRedraw();
+  }
+
+  // Sets the position at which the note preview should be shown
+  // (not the current hovered note). Used to draw the vertical
+  // line over the tracks.
+  setHoveredNotePreview(xPos: number) {
+    this.hoveredNotePreview = xPos;
     globals.rafScheduler.scheduleRedraw();
   }
 }
