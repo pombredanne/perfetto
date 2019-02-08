@@ -214,18 +214,23 @@ export class TrackPanel extends Panel<TrackPanelAttrs> {
 
     const localState = globals.frontendLocalState;
     // Draw vertical line when hovering on the the notes panel.
-    if (localState.hoveredNotePreview !== -1) {
-      const xPos = TRACK_SHELL_WIDTH + localState.hoveredNotePreview;
-      drawVerticalLine(ctx, xPos, size.height, `#aaa`);
+    if (localState.hoveredTimestamp !== -1) {
+      drawVerticalLine(ctx,
+                       localState.timeScale,
+                       localState.hoveredTimestamp,
+                       size.height,
+                       `#aaa`);
     }
 
     // Draw vertical line when a note is selected.
     if (globals.state.currentSelection !== null &&
         globals.state.currentSelection.kind === 'NOTE') {
       const note = globals.state.notes[globals.state.currentSelection.id];
-      let xPos = TRACK_SHELL_WIDTH;
-      xPos += Math.floor(localState.timeScale.timeToPx(note.timestamp));
-      drawVerticalLine(ctx, xPos, size.height, note.color);
+      drawVerticalLine(ctx,
+                       localState.timeScale,
+                       note.timestamp,
+                       size.height,
+                       note.color);
     }
   }
 }

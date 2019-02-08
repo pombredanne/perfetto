@@ -43,7 +43,7 @@ export class NotesPanel extends Panel {
     });
     dom.addEventListener('mouseout', () => {
       this.hoveredX = null;
-      globals.frontendLocalState.setHoveredNotePreview(-1);
+      globals.frontendLocalState.setHoveredTimestamp(-1);
       globals.rafScheduler.scheduleRedraw();
     }, {passive: true});
   }
@@ -99,15 +99,15 @@ export class NotesPanel extends Panel {
       ctx.fillText(toSummary(note.text), left + 2, size.height - 1);
     }
 
-    // A real note is hovered so we don't need to see the preview.
-    if (aNoteIsHovered) globals.frontendLocalState.setHoveredNotePreview(-1);
+    // A real note is hovered so we don't need to see the preview line.
+    if (aNoteIsHovered) globals.frontendLocalState.setHoveredTimestamp(-1);
 
     // View preview note flag when hovering on notes panel.
     if (!aNoteIsHovered && this.hoveredX !== null) {
       const timestamp = timeScale.pxToTime(this.hoveredX);
       if (timeScale.timeInBounds(timestamp)) {
+        globals.frontendLocalState.setHoveredTimestamp(timestamp);
         const x = timeScale.timeToPx(timestamp);
-        globals.frontendLocalState.setHoveredNotePreview(x);
         const left = Math.floor(x + TRACK_SHELL_WIDTH);
         this.drawFlag(ctx, left, size.height, '#aaa');
       }
