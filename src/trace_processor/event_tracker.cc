@@ -79,7 +79,7 @@ void EventTracker::PushSchedSwitch(uint32_t cpu,
     slices->set_duration(slice_idx, duration);
 
     prev_pid_match_prev_next_pid = prev_pid == prev_slice->next_pid;
-    if (prev_pid_match_prev_next_pid) {
+    if (PERFETTO_LIKELY(prev_pid_match_prev_next_pid)) {
       // We store the state as a uint16 as we only consider values up to 2048
       // when unpacking the information inside; this allows savings of 48 bits
       // per slice.
