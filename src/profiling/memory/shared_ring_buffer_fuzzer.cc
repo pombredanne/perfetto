@@ -36,6 +36,8 @@ bool IsPow2(size_t x) {
 }
 
 size_t RoundToPow2(size_t x) {
+  if (x == 1)
+    return 2;
   return 2 * (x & (x - 1));
 }
 
