@@ -1,0 +1,106 @@
+/*
+ * Copyright (C) 2019 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+option optimize_for = LITE_RUNTIME;
+
+import "perfetto/trace/event/debug_annotations.proto";
+import "perfetto/trace/event/tasks.proto";
+
+package perfetto.protos;
+
+// Trace events emitted by client instrumentation library (TRACE_EVENT macros).
+//
+// This message is optimized for writing and makes heavy use of data interning
+// and delta encoding (e.g. of timestamps) to reduce data repetition and encoded
+// data size.
+//
+// A TraceEvent exists in the context of its packet sequence (TracePackets
+// emitted by the same producer + writer) and refers to data in preceding
+// TracePackets emitted on the same sequence, both directly and indirectly. For
+// example, interned data entries are emitted as part of a TracePacket and
+// directly referred to from TraceEvents by their interning IDs. Attributes
+// shared by all events on the same sequence (e.g. their thread and process
+// association) are emitted as part of ProcessDescriptor and ThreadDescriptor
+// messages in separate TracePackets instead.
+//
+// Next reserved id: 7 (up to 15).
+// Next id: 20.
+message TraceEvent {
+  oneof timestamp {
+    // Delta timestamp value since the last TraceEvent or ThreadDescriptor.
+    // To calculate the absolute timestamp value, sum up all cumulative_delta
+    // values of the preceding TraceEvents since the last ThreadDescriptor and
+    // add the sum to the |reference_timestamp| in ThreadDescriptor.
+    int64 timestamp_cumulative_delta = 1;
+    // Absolute value (e.g. a manually specified timestamp in the macro).
+    // This is a one-off value that does not affect delta timestamp computation
+    // in subsequent TraceEvents.
+    uint64 timestamp_absolute = 16;
+  }
+  oneof thread_time {
+    uint64 thread_time_cumulative_delta = 2;
+    uint64 thread_time_absolute = 17;
+  }
+
+  // Override the pid/tid if the writer needs to emit events on behalf of
+  // another process/thread. This should be the exception. Normally, the pid+tid
+  // from ThreadDescriptor is used.
+  optional uint32 pid_override = 18;
+  optional uint32 tid_override = 19;
+
+  // We intend to add a binary symbol version of this in the future.
+  repeated uint32 category_iid = 3;  // interned EventCategoryName.
+
+  // TODO(eseckler): May also want a debug_name for untyped debug-only events.
+
+  oneof args {
+    DebugAnnotations debug_annotations = 4;
+    TaskExecution task_execution = 5;
+  }
+
+  // Apart from {category, time, thread time, tid, pid}, other legacy trace
+  // event attributes are initially simply proxied for conversion to a JSON
+  // trace. We intend to gradually transition these attributes to similar native
+  // features in TraceEvent (e.g. async + flow events), or deprecate them
+  // without replacement where transition is unsuitable.
+  message LegacyEvent {
+    optional uint32 name_iid = 1;  // interned LegacyEventName.
+    optional uint32 phase = 2;
+    optional int64 duration = 3;
+    optional int64 thread_duration = 4;
+    optional uint32 flags = 5;  // e.g. global/process/thread scope, flow, ...
+    optional uint64 id = 6;
+    optional string scope = 7;
+    optional uint64 bind_id = 8;
+  }
+
+  optional LegacyEvent legacy_event = 6;
+}
+
+// --------------------
+// Interned data types:
+// --------------------
+
+message EventCategory {
+  optional uint32 interning_id = 1;
+  optional string name = 2;
+}
+
+message LegacyEventName {
+  optional uint32 interning_id = 1;
+  optional string name = 2;
+}

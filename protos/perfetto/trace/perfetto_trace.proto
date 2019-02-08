@@ -2505,8 +2505,9 @@ message Trace {
 // The root object emitted by Perfetto. A perfetto trace is just a stream of
 // TracePacket(s).
 //
-// Next reserved id: 11.
-// Next id: 41.
+// Next reserved id: 12 (up to 32).
+// Next id: 45 (up to 999).
+// Next interning field id: 1004.
 message TracePacket {
   // TODO(primiano): in future we should add a timestamp_clock_domain field to
   // allow mixing timestamps from different clock domains.
@@ -2520,9 +2521,10 @@ message TracePacket {
     // removed field with id 5
     ClockSnapshot clock_snapshot = 6;
     SysStats sys_stats = 7;
+    // removed field with id 11
 
-    // IDs up to 32 are reserved for events that are quite frequent because they
-    // take only one byte to encode their preamble.
+    // IDs up to 32 are reserved. IDs up to 15 take only one byte to encode
+    // their preamble so should be used for freqeuent events.
 
     // removed field with id 33
     FtraceStats ftrace_stats = 34;
@@ -2531,6 +2533,8 @@ message TracePacket {
     BatteryCounters battery = 38;
     PowerRails power_rails = 40;
     AndroidLogPacket android_log = 39;
+    // removed field with id 43
+    // removed field with id 44
 
     // This field is emitted at periodic intervals (~10s) and
     // contains always the binary representation of the UUID
@@ -2556,6 +2560,56 @@ message TracePacket {
   oneof optional_trusted_packet_sequence_id {
     uint32 trusted_packet_sequence_id = 10;
   }
+
+  // ----------------------------- DATA INTERNING: -----------------------------
+  // Interning indexes are built up gradually by adding the entries contained in
+  // each TracePacket of the same packet sequence (packets emitted by the same
+  // producer and TraceWriter, see |trusted_packet_sequence_id|).
+  //
+  // The writer will emit new entries when it encounters new internable values
+  // that aren't yet in the index. Data in this and subsequent TracePackets can
+  // then refer to the entry by its position (interning ID, abbreviated "iid")
+  // in its index.
+  //
+  // Because of the incremental build-up, the interning index will be corrupted
+  // when TracePackets are lost, e.g. because a chunk was overridden in the
+  // central ring buffer. To avoid invalidation of the whole trace in such a
+  // case, the index is periodically reset (see |reset_interning_state|). The
+  // reader will only lose interning data for packets after a "hole" in the
+  // sequence (see |missing_packets_on_sequence|) up to the next reset.
+  // ---------------------------------------------------------------------------
+
+  // Set to true when the writer invalidates previously emitted interning state.
+  // This TracePacket and subsequent TracePackets will not refer to any
+  // interning entry emitted before this TracePacket without re-emitting the
+  // entry.
+  //
+  // When the reader detects packet loss (|missing_packets_on_sequence|), it
+  // needs to skip packets in the sequence until the next one with this flag
+  // set.
+  optional bool reset_interning_state = 41;
+
+  // Flag set by the service if this packet does not immediately follow the last
+  // packet from the writer sequence that the consumer read. This can happen if
+  // chunks in the trace buffer are overridden before the consumer can read
+  // them.
+  optional bool missing_packets_on_sequence = 42;
+
+  // Interned data entries:
+  //
+  // The writer will emit new entries in the same TracePacket that first refers
+  // to them (since the last reset of interning state). The messages in each of
+  // these fields need to specify an |interning_id| field, which is the ID of
+  // the entry in the field's interning index. Each field constructs its own
+  // index, thus interning IDs are scoped to the tracing session and field
+  // (usually as a counter for efficient var-int encoding).
+  //
+  // We use field IDs from 1000 to identify these fields for generic
+  // reconstruction of the interning indexes in the trace processor.
+  // removed field with id 1000
+  // removed field with id 1001
+  // removed field with id 1002
+  // removed field with id 1003
 }
 
 // End of protos/perfetto/trace/trace_packet.proto
