@@ -439,8 +439,8 @@ class TracingServiceImpl : public TracingService {
   size_t sync_marker_packet_size_ = 0;
 
   // Stats.
-  uint32_t chunks_discarded_ = 0;
-  uint32_t patches_discarded_ = 0;
+  uint64_t chunks_discarded_ = 0;
+  uint64_t patches_discarded_ = 0;
 
   PERFETTO_THREAD_CHECKER(thread_checker_)
 

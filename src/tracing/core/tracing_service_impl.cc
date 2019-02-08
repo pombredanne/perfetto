@@ -1453,7 +1453,7 @@ void TracingServiceImpl::ApplyChunkPatches(
           "Received invalid chunks_to_patch request from Producer: %" PRIu16
           ", BufferID: %" PRIu32 " ChunkdID: %" PRIu32 " WriterID: %" PRIu16,
           producer_id_trusted, chunk.target_buffer(), chunk_id, writer_id);
-      patches_discarded_ += static_cast<uint32_t>(chunk.patches_size());
+      patches_discarded_ += static_cast<uint64_t>(chunk.patches_size());
       continue;
     }
 
@@ -1472,7 +1472,7 @@ void TracingServiceImpl::ApplyChunkPatches(
       PERFETTO_ELOG("Too many patches (%zu) batched in the same request",
                     patches.size());
       PERFETTO_DFATAL("Too many patches");
-      patches_discarded_ += static_cast<uint32_t>(chunk.patches_size());
+      patches_discarded_ += static_cast<uint64_t>(chunk.patches_size());
       continue;
     }
 
