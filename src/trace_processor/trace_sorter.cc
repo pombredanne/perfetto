@@ -85,6 +85,8 @@ void TraceSorter::SortAndFlushEventsBeyondWindow(int64_t window_size_ns) {
     earliest_timestamp_ = std::numeric_limits<int64_t>::max();
     latest_timestamp_ = 0;
   }
+
+  next_stage->Flush();
 }
 
 }  // namespace trace_processor

@@ -58,6 +58,7 @@ TEST(SliceTrackerTest, OneSliceDetailed) {
 
   tracker.Begin(2 /*ts*/, 42 /*tid*/, 0 /*cat*/, 1 /*name*/);
   tracker.End(10 /*ts*/, 42 /*tid*/, 0 /*cat*/, 1 /*name*/);
+  tracker.Flush();
 
   auto slices = context.storage->nestable_slices();
   EXPECT_EQ(slices.slice_count(), 1);
@@ -78,6 +79,7 @@ TEST(SliceTrackerTest, TwoSliceDetailed) {
   tracker.Begin(3 /*ts*/, 42 /*tid*/, 0 /*cat*/, 2 /*name*/);
   tracker.End(5 /*ts*/, 42 /*tid*/);
   tracker.End(10 /*ts*/, 42 /*tid*/);
+  tracker.Flush();
 
   auto slices = context.storage->nestable_slices();
 
@@ -113,10 +115,28 @@ TEST(SliceTrackerTest, Scoped) {
   tracker.Scoped(2 /*ts*/, 42 /*tid*/, 0, 0, 6);
   tracker.End(9 /*ts*/, 42 /*tid*/);
   tracker.End(10 /*ts*/, 42 /*tid*/);
+  tracker.Flush();
 
   auto slices = ToSliceInfo(context.storage->nestable_slices());
   EXPECT_THAT(slices,
               ElementsAre(SliceInfo{0, 10}, SliceInfo{1, 8}, SliceInfo{2, 6}));
+}
+
+TEST(SliceTrackerTest, TwoFlushes) {
+  TraceProcessorContext context;
+  context.storage.reset(new TraceStorage());
+  SliceTracker tracker(&context);
+
+  tracker.Begin(0 /*ts*/, 42 /*tid*/, 0, 0);
+  tracker.Begin(1 /*ts*/, 42 /*tid*/, 0, 0);
+  tracker.Flush();
+  tracker.End(2 /*ts*/, 42 /*tid*/);
+  tracker.End(3 /*ts*/, 42 /*tid*/);
+  tracker.Flush();
+
+  auto slices = ToSliceInfo(context.storage->nestable_slices());
+  EXPECT_THAT(slices,
+              ElementsAre(SliceInfo{0, 3}, SliceInfo{1, 1}));
 }
 
 }  // namespace

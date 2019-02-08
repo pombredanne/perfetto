@@ -37,6 +37,8 @@ class SliceTracker {
                     StringId cat,
                     StringId name);
 
+  void EndAndroid(int64_t timestamp, uint32_t ftrace_tid, uint32_t atrace_tgid);
+
   void Begin(int64_t timestamp, UniqueTid utid, StringId cat, StringId name);
 
   void Scoped(int64_t timestamp,
@@ -45,15 +47,27 @@ class SliceTracker {
               StringId name,
               int64_t duration);
 
-  void EndAndroid(int64_t timestamp, uint32_t ftrace_tid, uint32_t atrace_tgid);
-
   void End(int64_t timestamp,
            UniqueTid utid,
            StringId opt_cat = {},
            StringId opt_name = {});
 
+  void Flush();
+
  private:
   using SlicesStack = std::vector<size_t>;
+
+  struct Event {
+    enum Kind {
+      kStart = 0,
+      kEnd,
+    };
+    int64_t timestamp;
+    UniqueTid utid;
+    StringId cat;
+    StringId name;
+    Kind kind;
+  };
 
   void StartSlice(int64_t timestamp,
                   int64_t duration,
@@ -65,6 +79,10 @@ class SliceTracker {
   void MaybeCloseStack(int64_t end_ts, SlicesStack*);
   int64_t GetStackHash(const SlicesStack&);
 
+  SlicesStack* GetStack(UniqueTid utid);
+
+  std::vector<Event> events_;
+  std::vector<SlicesStack> utid_to_stack_;
   TraceProcessorContext* const context_;
   std::unordered_map<UniqueTid, SlicesStack> threads_;
   std::unordered_map<uint32_t, uint32_t> ftrace_to_atrace_tgid_;
