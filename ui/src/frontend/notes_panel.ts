@@ -53,6 +53,7 @@ export class NotesPanel extends Panel {
         {
           onclick: (e: MouseEvent) => {
             this.onClick(e.layerX - TRACK_SHELL_WIDTH, e.layerY);
+            e.stopPropagation();
           },
         },
         m('.title', 'Notes'));
@@ -78,7 +79,9 @@ export class NotesPanel extends Panel {
 
       const isHovered =
           this.hoveredX && x <= this.hoveredX && this.hoveredX < x + FLAG_WIDTH;
-      const isSelected = globals.state.selectedNote === note.id;
+      const selection = globals.state.currentSelection;
+      const isSelected = selection !== null && selection.kind === 'NOTE' &&
+                         selection.id === note.id;
       const left = Math.floor(x + TRACK_SHELL_WIDTH);
 
       // Draw flag.
@@ -164,7 +167,7 @@ export class NotesEditorPanel extends Panel<NotesEditorPanelAttrs> {
             },
             'Remove'), ),
         m('textarea', {
-          rows: 20,
+          rows: 12,
           onkeydown: (e: Event) => {
             e.stopImmediatePropagation();
           },

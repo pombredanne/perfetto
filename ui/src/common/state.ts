@@ -85,10 +85,18 @@ export interface Note {
   text: string;
 }
 
+export interface NoteSelection {
+  kind: 'NOTE';
+  id: string;
+}
+
 export interface SliceSelection {
+  kind: 'SLICE';
   utid: number;
   id: number;
 }
+
+type Selection = NoteSelection|SliceSelection;
 
 export interface State {
   route: string|null;
@@ -113,8 +121,7 @@ export interface State {
   permalink: PermalinkConfig;
   notes: ObjectById<Note>;
   status: Status;
-  selectedNote: string|null;
-  selectedSlice: SliceSelection|null;
+  currentSelection: Selection|null;
 
   /**
    * This state is updated on the frontend at 60Hz and eventually syncronised to
@@ -137,6 +144,7 @@ export interface RecordConfig {
   [key: string]: null|number|boolean|string|string[];
 
   // Global settings
+  targetOS: string;  // 'Q','P','O' for Android, 'L' for Linux
   mode: RecordMode;
   durationMs: number;
   bufferSizeMb: number;
@@ -180,6 +188,7 @@ export interface RecordConfig {
 
 export function createEmptyRecordConfig(): RecordConfig {
   return {
+    targetOS: 'Q',
     mode: 'STOP_WHEN_FULL',
     durationMs: 10000.0,
     maxFileSizeMb: 100,
@@ -247,7 +256,6 @@ export function createEmptyState(): State {
     },
 
     status: {msg: '', timestamp: 0},
-    selectedNote: null,
-    selectedSlice: null,
+    currentSelection: null,
   };
 }
