@@ -36,6 +36,9 @@ bool IsPow2(size_t x) {
 }
 
 size_t RoundToPow2(size_t x) {
+  if (IsPow2(x))
+    return x;
+
   if (x == 1)
     return 2;
   return 2 * (x & (x - 1));
@@ -54,8 +57,7 @@ int FuzzRingBuffer(const uint8_t* data, size_t size) {
   const uint8_t* payload = data + sizeof(MetadataHeader);
   size_t payload_size_pages =
       (payload_size + base::kPageSize - 1) / base::kPageSize;
-  if (!IsPow2(payload_size_pages))
-    payload_size_pages = RoundToPow2(payload_size_pages);
+  payload_size_pages = RoundToPow2(payload_size_pages);
 
   PERFETTO_CHECK(base::WriteAll(*fd, payload, payload_size) != -1);
   if (payload_size != payload_size_pages * base::kPageSize) {
