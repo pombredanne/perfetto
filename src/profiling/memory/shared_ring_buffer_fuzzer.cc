@@ -31,6 +31,14 @@ struct MetadataHeader {
   uint64_t write_pos;
 };
 
+bool IsPow2(size_t x) {
+  return (x & (x - 1)) == x;
+}
+
+size_t RoundToPow2(size_t x) {
+  return 2 * (x & (x - 1));
+}
+
 int FuzzRingBuffer(const uint8_t* data, size_t size) {
   if (size <= sizeof(MetadataHeader))
     return 0;
@@ -42,13 +50,14 @@ int FuzzRingBuffer(const uint8_t* data, size_t size) {
 
   size_t payload_size = size - sizeof(MetadataHeader);
   const uint8_t* payload = data + sizeof(MetadataHeader);
+  size_t payload_size_pages = (payload_size + kPageSize - 1) / kPageSize;
+  if (!IsPow2(payload_size_pages))
+    payload_size_pages = RoundToPow2(payload_size_pages);
 
   PERFETTO_CHECK(base::WriteAll(*fd, payload, payload_size) != -1);
-  if (payload_size % base::kPageSize != 0) {
-    PERFETTO_CHECK(lseek(*fd,
-                         base::kPageSize +
-                             base::AlignUp<base::kPageSize>(payload_size) - 1,
-                         SEEK_SET) != -1);
+  if (payload_size != payload_size_pages * base::kPageSize) {
+    PERFETTO_CHECK(
+        lseek(*fd, payload_size_pages * base::kPageSize - 1, SEEK_SET) != -1);
     char null[1] = {'\0'};
     PERFETTO_CHECK(base::WriteAll(*fd, null, sizeof(null) != -1));
   }
