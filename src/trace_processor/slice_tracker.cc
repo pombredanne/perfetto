@@ -42,44 +42,6 @@ void SliceTracker::BeginAndroid(int64_t timestamp,
   Begin(timestamp, utid, cat, name);
 }
 
-void SliceTracker::Begin(int64_t timestamp,
-                         UniqueTid utid,
-                         StringId cat,
-                         StringId name) {
-  MaybeCloseStack(timestamp, &threads_[utid]);
-  StartSlice(timestamp, 0, utid, cat, name);
-}
-
-void SliceTracker::Scoped(int64_t timestamp,
-                          UniqueTid utid,
-                          StringId cat,
-                          StringId name,
-                          int64_t duration) {
-  MaybeCloseStack(timestamp, &threads_[utid]);
-  StartSlice(timestamp, duration, utid, cat, name);
-}
-
-void SliceTracker::StartSlice(int64_t timestamp,
-                              int64_t duration,
-                              UniqueTid utid,
-                              StringId cat,
-                              StringId name) {
-  auto* stack = &threads_[utid];
-  auto* slices = context_->storage->mutable_nestable_slices();
-
-  const uint8_t depth = static_cast<uint8_t>(stack->size());
-  if (depth >= std::numeric_limits<uint8_t>::max()) {
-    PERFETTO_DFATAL("Slices with too large depth found.");
-    return;
-  }
-  int64_t parent_stack_id = depth == 0 ? 0 : slices->stack_ids()[stack->back()];
-  size_t slice_idx = slices->AddSlice(timestamp, duration, utid, cat, name,
-                                      depth, 0, parent_stack_id);
-  stack->emplace_back(slice_idx);
-
-  slices->set_stack_id(slice_idx, GetStackHash(*stack));
-}
-
 void SliceTracker::EndAndroid(int64_t timestamp,
                               uint32_t ftrace_tid,
                               uint32_t atrace_tgid) {
@@ -102,62 +64,78 @@ void SliceTracker::EndAndroid(int64_t timestamp,
   End(timestamp, utid);
 }
 
+void SliceTracker::Begin(int64_t timestamp,
+                         UniqueTid utid,
+                         StringId cat,
+                         StringId name) {
+  events_.push_back(Event{timestamp, utid, cat, name, Event::kStart});
+}
+
+void SliceTracker::Scoped(int64_t timestamp,
+                          UniqueTid utid,
+                          StringId cat,
+                          StringId name,
+                          int64_t duration) {
+  Begin(timestamp, utid, cat, name);
+  End(timestamp+duration, utid, cat, name);
+}
+
 void SliceTracker::End(int64_t timestamp,
                        UniqueTid utid,
                        StringId cat,
                        StringId name) {
-  MaybeCloseStack(timestamp, &threads_[utid]);
+  events_.push_back(Event{timestamp, utid, cat, name, Event::kEnd});
+}
 
-  const auto& stack = threads_[utid];
-  if (stack.empty())
-    return;
+void SliceTracker::Flush() {
+  std::sort(events_.begin(), events_.end(), [](const Event& a, const Event& b){
+      return a.timestamp < b.timestamp;
+  });
 
   auto* slices = context_->storage->mutable_nestable_slices();
-  size_t slice_idx = stack.back();
 
-  PERFETTO_CHECK(cat == 0 || slices->cats()[slice_idx] == cat);
-  PERFETTO_CHECK(name == 0 || slices->names()[slice_idx] == name);
+  for (const SliceTracker::Event& e : events_) {
+    SlicesStack* stack = GetStack(e.utid);
+    switch (e.kind) {
+      case Event::kStart: {
+        const uint8_t depth = static_cast<uint8_t>(stack->size());
+        // TODO(hjd): fix
+        PERFETTO_CHECK(depth < std::numeric_limits<uint8_t>::max());
+        int64_t parent_stack_id = depth == 0 ? 0 : slices->stack_ids()[stack->back()];
+        size_t slice_idx = slices->AddSlice(e.timestamp, 0/*duration*/, e.utid, e.cat, e.name, depth, 0, parent_stack_id);
+        stack->emplace_back(slice_idx);
+        slices->set_stack_id(slice_idx, GetStackHash(*stack));
+        break;
+      }
 
-  slices->set_duration(slice_idx, timestamp - slices->start_ns()[slice_idx]);
-
-  CompleteSlice(utid);
-  // TODO(primiano): auto-close B slices left open at the end.
-}
-
-void SliceTracker::CompleteSlice(UniqueTid utid) {
-  threads_[utid].pop_back();
-}
-
-void SliceTracker::MaybeCloseStack(int64_t ts, SlicesStack* stack) {
-  const auto& slices = context_->storage->nestable_slices();
-  bool check_only = false;
-  for (int i = static_cast<int>(stack->size()) - 1; i >= 0; i--) {
-    size_t slice_idx = (*stack)[static_cast<size_t>(i)];
-
-    int64_t start_ts = slices.start_ns()[slice_idx];
-    int64_t dur = slices.durations()[slice_idx];
-    int64_t end_ts = start_ts + dur;
-    if (dur == 0) {
-      check_only = true;
-    }
-
-    if (check_only) {
-      PERFETTO_DCHECK(ts >= start_ts);
-      PERFETTO_DCHECK(dur == 0 || ts <= end_ts);
-      continue;
-    }
-
-    if (end_ts <= ts) {
-      stack->pop_back();
+      case Event::kEnd: {
+        // TODO(hjd): Fix
+        //PERFETTO_CHECK(stack->size() > 0);
+        if (stack->size() == 0)
+          break;
+        size_t slice_idx = stack->back();
+        int64_t start_ts = slices->start_ns()[slice_idx];
+        int64_t duration = e.timestamp - start_ts;
+        slices->set_duration(slice_idx, duration);
+        stack->pop_back();
+        break;
+      }
     }
   }
+  events_.clear();
+}
+
+SliceTracker::SlicesStack* SliceTracker::GetStack(UniqueTid utid) {
+  if (utid >= utid_to_stack_.size())
+    utid_to_stack_.resize(utid+1);
+  return &utid_to_stack_[utid];
 }
 
 int64_t SliceTracker::GetStackHash(const SlicesStack& stack) {
   PERFETTO_DCHECK(!stack.empty());
 
   const auto& slices = context_->storage->nestable_slices();
-
+;
   std::string s;
   s.reserve(stack.size() * sizeof(uint64_t) * 2);
   for (size_t i = 0; i < stack.size(); i++) {
