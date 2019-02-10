@@ -77,8 +77,8 @@ TEST(SliceTrackerTest, TwoSliceDetailed) {
 
   tracker.Begin(2 /*ts*/, 42 /*tid*/, 0 /*cat*/, 1 /*name*/);
   tracker.Begin(3 /*ts*/, 42 /*tid*/, 0 /*cat*/, 2 /*name*/);
-  tracker.End(5 /*ts*/, 42 /*tid*/);
-  tracker.End(10 /*ts*/, 42 /*tid*/);
+  tracker.End(5 /*ts*/, 42 /*tid*/, 0, 0);
+  tracker.End(10 /*ts*/, 42 /*tid*/, 0, 0);
   tracker.Flush();
 
   auto slices = context.storage->nestable_slices();
@@ -113,8 +113,8 @@ TEST(SliceTrackerTest, Scoped) {
   tracker.Begin(0 /*ts*/, 42 /*tid*/, 0, 0);
   tracker.Begin(1 /*ts*/, 42 /*tid*/, 0, 0);
   tracker.Scoped(2 /*ts*/, 42 /*tid*/, 0, 0, 6);
-  tracker.End(9 /*ts*/, 42 /*tid*/);
-  tracker.End(10 /*ts*/, 42 /*tid*/);
+  tracker.End(9 /*ts*/, 42 /*tid*/, 0, 0);
+  tracker.End(10 /*ts*/, 42 /*tid*/, 0, 0);
   tracker.Flush();
 
   auto slices = ToSliceInfo(context.storage->nestable_slices());
@@ -130,8 +130,8 @@ TEST(SliceTrackerTest, TwoFlushes) {
   tracker.Begin(0 /*ts*/, 42 /*tid*/, 0, 0);
   tracker.Begin(1 /*ts*/, 42 /*tid*/, 0, 0);
   tracker.Flush();
-  tracker.End(2 /*ts*/, 42 /*tid*/);
-  tracker.End(3 /*ts*/, 42 /*tid*/);
+  tracker.End(2 /*ts*/, 42 /*tid*/, 0, 0);
+  tracker.End(3 /*ts*/, 42 /*tid*/, 0, 0);
   tracker.Flush();
 
   auto slices = ToSliceInfo(context.storage->nestable_slices());

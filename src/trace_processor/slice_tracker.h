@@ -39,6 +39,9 @@ class SliceTracker {
 
   void EndAndroid(int64_t timestamp, uint32_t ftrace_tid, uint32_t atrace_tgid);
 
+  void BeginSyscall(int64_t timestamp, UniqueTid utid, StringId name);
+  void EndSyscall(int64_t timestamp, UniqueTid utid, StringId name);
+
   void Begin(int64_t timestamp, UniqueTid utid, StringId cat, StringId name);
 
   void Scoped(int64_t timestamp,
@@ -47,10 +50,7 @@ class SliceTracker {
               StringId name,
               int64_t duration);
 
-  void End(int64_t timestamp,
-           UniqueTid utid,
-           StringId opt_cat = {},
-           StringId opt_name = {});
+  void End(int64_t timestamp, UniqueTid utid, StringId cat, StringId name);
 
   void Flush();
 
@@ -67,24 +67,53 @@ class SliceTracker {
     StringId cat;
     StringId name;
     Kind kind;
+    bool is_syscall;
   };
 
-  void StartSlice(int64_t timestamp,
-                  int64_t duration,
-                  UniqueTid utid,
-                  StringId cat,
-                  StringId name);
-  void CompleteSlice(UniqueTid tid);
+  void BeginInternal(int64_t timestamp,
+	UniqueTid utid, StringId cat, StringId name, 
+	bool is_syscall
+	);
 
-  void MaybeCloseStack(int64_t end_ts, SlicesStack*);
+  void EndInternal(int64_t timestamp,
+           UniqueTid utid,
+           StringId cat,
+           StringId name,
+	   bool is_syscall);
+
   int64_t GetStackHash(const SlicesStack&);
 
   SlicesStack* GetStack(UniqueTid utid);
 
+  void SetLastWasSyscall(UniqueTid utid, bool value) {
+    if (utid >= last_event_was_syscall_.size())
+      last_event_was_syscall_.resize(utid+1);
+    last_event_was_syscall_[utid] = value;
+  }
+
+  bool GetLastWasSyscall(UniqueTid utid) {
+    if (utid >= last_event_was_syscall_.size())
+        return false;
+    return last_event_was_syscall_[utid];
+  }
+
+  void SetIgnoreNext(UniqueTid utid, bool value) {
+    if (utid >= ignore_next_.size())
+      ignore_next_.resize(utid+1);
+    ignore_next_[utid] = value;
+  }
+
+  bool GetIgnoreNext(UniqueTid utid) {
+    if (utid >= ignore_next_.size())
+        return false;
+    return ignore_next_[utid];
+  }
+
+  std::vector<bool> last_event_was_syscall_;
+  std::vector<bool> ignore_next_;
   std::vector<Event> events_;
   std::vector<SlicesStack> utid_to_stack_;
   TraceProcessorContext* const context_;
-  std::unordered_map<UniqueTid, SlicesStack> threads_;
   std::unordered_map<uint32_t, uint32_t> ftrace_to_atrace_tgid_;
 };
 

@@ -39,7 +39,7 @@ void SliceTracker::BeginAndroid(int64_t timestamp,
   UniqueTid utid =
       context_->process_tracker->UpdateThread(ftrace_tid, atrace_tgid);
   ftrace_to_atrace_tgid_[ftrace_tid] = atrace_tgid;
-  Begin(timestamp, utid, cat, name);
+  BeginInternal(timestamp, utid, cat, name, false /*is_syscall*/);
 }
 
 void SliceTracker::EndAndroid(int64_t timestamp,
@@ -61,14 +61,7 @@ void SliceTracker::EndAndroid(int64_t timestamp,
   }
   UniqueTid utid =
       context_->process_tracker->UpdateThread(ftrace_tid, actual_tgid);
-  End(timestamp, utid);
-}
-
-void SliceTracker::Begin(int64_t timestamp,
-                         UniqueTid utid,
-                         StringId cat,
-                         StringId name) {
-  events_.push_back(Event{timestamp, utid, cat, name, Event::kStart});
+  EndInternal(timestamp, utid, 0/*cat*/, 0/*name*/, false/* is_syscall */);
 }
 
 void SliceTracker::Scoped(int64_t timestamp,
@@ -76,15 +69,52 @@ void SliceTracker::Scoped(int64_t timestamp,
                           StringId cat,
                           StringId name,
                           int64_t duration) {
-  Begin(timestamp, utid, cat, name);
-  End(timestamp+duration, utid, cat, name);
+  BeginInternal(timestamp, utid, cat, name, false/* is_syscall */);
+  EndInternal(timestamp+duration, utid, cat, name, false/* is_syscall */);
+}
+
+void SliceTracker::Begin(int64_t timestamp,
+                         UniqueTid utid,
+                         StringId cat,
+                         StringId name) {
+  BeginInternal(timestamp, utid, cat, name, false/* is_syscall */);
 }
 
 void SliceTracker::End(int64_t timestamp,
                        UniqueTid utid,
                        StringId cat,
                        StringId name) {
-  events_.push_back(Event{timestamp, utid, cat, name, Event::kEnd});
+  EndInternal(timestamp, utid, cat, name, false/* is_syscall */);
+}
+
+void SliceTracker::BeginSyscall(int64_t timestamp,
+                         UniqueTid utid,
+                         StringId name) {
+  BeginInternal(timestamp, utid, 0/*cat*/, name, true/* is_syscall */);
+}
+
+void SliceTracker::EndSyscall(int64_t timestamp,
+                       UniqueTid utid,
+                       StringId name) {
+  EndInternal(timestamp, utid, 0/*cat*/, name, true/* is_syscall */);
+}
+
+
+void SliceTracker::BeginInternal(int64_t timestamp,
+                         UniqueTid utid,
+                         StringId cat,
+                       StringId name,
+		       bool is_syscall) {
+  events_.push_back(Event{timestamp, utid, cat, name, Event::kStart, is_syscall});
+}
+
+
+void SliceTracker::EndInternal(int64_t timestamp,
+                       UniqueTid utid,
+                       StringId cat,
+                       StringId name,
+		       bool is_syscall) {
+  events_.push_back(Event{timestamp, utid, cat, name, Event::kEnd, is_syscall});
 }
 
 void SliceTracker::Flush() {
@@ -94,10 +124,29 @@ void SliceTracker::Flush() {
 
   auto* slices = context_->storage->mutable_nestable_slices();
 
-  for (const SliceTracker::Event& e : events_) {
+  for (size_t i=0; i<events_.size(); i++) {
+    const SliceTracker::Event& e = events_[i];
     SlicesStack* stack = GetStack(e.utid);
     switch (e.kind) {
       case Event::kStart: {
+        PERFETTO_ELOG("B %d %s", e.utid, 
+            context_->storage->string_pool()[e.name].c_str());
+
+        if (e.is_syscall) {
+            bool next_is_syscall = true;
+            for (size_t j=i+1; j<events_.size(); j++) {
+                if (events_[j].utid == e.utid) {
+                    next_is_syscall = events_[j].is_syscall;
+                    break;
+                }
+            }
+            if (!next_is_syscall) {
+                SetIgnoreNext(e.utid, true);
+                PERFETTO_ELOG("  Ignored");
+                break;
+            }
+        }
+
         const uint8_t depth = static_cast<uint8_t>(stack->size());
         // TODO(hjd): fix
         PERFETTO_CHECK(depth < std::numeric_limits<uint8_t>::max());
@@ -109,8 +158,15 @@ void SliceTracker::Flush() {
       }
 
       case Event::kEnd: {
+        PERFETTO_ELOG("E %d %s", e.utid,
+            context_->storage->string_pool()[e.name].c_str()); 
         // TODO(hjd): Fix
         //PERFETTO_CHECK(stack->size() > 0);
+        if (e.is_syscall && GetIgnoreNext(e.utid)) {
+            PERFETTO_ELOG("  Ignored");
+            SetIgnoreNext(e.utid, false);
+            break;
+        }
         if (stack->size() == 0)
           break;
         size_t slice_idx = stack->back();
@@ -124,6 +180,8 @@ void SliceTracker::Flush() {
   }
   events_.clear();
 }
+
+
 
 SliceTracker::SlicesStack* SliceTracker::GetStack(UniqueTid utid) {
   if (utid >= utid_to_stack_.size())

@@ -313,6 +313,12 @@ class TraceStorage {
       stack_ids_[index] = stack_id;
     }
 
+    void update(size_t index, UniqueTid utid, StringId cat, StringId name) {
+      utids_[index] = utid;
+      cats_[index] = cat;
+      names_[index] = name;
+    }
+
     size_t slice_count() const { return start_ns_.size(); }
     const std::deque<int64_t>& start_ns() const { return start_ns_; }
     const std::deque<int64_t>& durations() const { return durations_; }

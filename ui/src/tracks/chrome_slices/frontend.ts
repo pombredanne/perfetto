@@ -94,7 +94,11 @@ class ChromeSliceTrack extends Track<Config, Data> {
       const rectYStart = TRACK_PADDING + depth * SLICE_HEIGHT;
 
       const hovered = titleId === this.hoveredTitleId;
-      const hue = hash(cat);
+      let hue = hash(cat)+10;
+      if (title.indexOf('sys_') === 0) {
+      hue += 180;
+      hue %= 360;
+      }
       const saturation = Math.min(20 + depth * 10, 70);
       ctx.fillStyle = `hsl(${hue}, ${saturation}%, ${hovered ? 30 : 65}%)`;
 

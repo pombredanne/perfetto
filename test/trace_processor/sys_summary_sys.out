@@ -1,0 +1,14 @@
+"name","count(*)"
+"sys_brk",23
+"sys_close",579
+"sys_lseek",1
+"sys_mmap",232
+"sys_mprotect",262
+"sys_munmap",53
+"sys_newfstat",518
+"sys_newlstat",88
+"sys_newstat",47
+"sys_open",616
+"sys_poll",429
+"sys_read",4440
+"sys_write",3424
