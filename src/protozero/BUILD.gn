@@ -37,7 +37,7 @@ source_set("protozero") {
   ]
 }
 
-if (build_with_chromium) {
+if (!build_with_chromium) {
   static_library("libprotozero") {
     deps = [
       ":protozero",
