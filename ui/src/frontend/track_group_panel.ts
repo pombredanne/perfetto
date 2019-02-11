@@ -24,7 +24,7 @@ import {Panel, PanelSize} from './panel';
 import {Track} from './track';
 import {TrackContent} from './track_panel';
 import {trackRegistry} from './track_registry';
-import {drawVerticalLine} from './vertical_line_helper';
+import {drawVerticalLine, drawVerticalSelection} from './vertical_line_helper';
 
 
 interface Attrs {
@@ -68,6 +68,7 @@ export class TrackGroupPanel extends Panel<Attrs> {
           m('.fold-button',
             {
               onclick: (e:MouseEvent) => {
+                console.log("click");
                 globals.dispatch(Actions.toggleTrackGroupCollapsed({
                   trackGroupId: attrs.trackGroupId,
                 })),
@@ -120,15 +121,23 @@ export class TrackGroupPanel extends Panel<Attrs> {
                        `#aaa`);
     }
 
-    // Draw vertical line when a note is selected.
-    if (globals.state.currentSelection !== null &&
-        globals.state.currentSelection.kind === 'NOTE') {
-      const note = globals.state.notes[globals.state.currentSelection.id];
-      drawVerticalLine(ctx,
-                       localState.timeScale,
-                       note.timestamp,
-                       size.height,
-                       note.color);
+    if (globals.state.currentSelection !== null) {
+      if (globals.state.currentSelection.kind === 'NOTE') {
+        const note = globals.state.notes[globals.state.currentSelection.id];
+        drawVerticalLine(ctx,
+                        localState.timeScale,
+                        note.timestamp,
+                        size.height,
+                        note.color);
+      }
+      if (globals.state.currentSelection.kind === 'TIMESPAN') {
+        drawVerticalSelection(ctx,
+                              localState.timeScale,
+                              globals.state.currentSelection.startTs,
+                              globals.state.currentSelection.endTs,
+                              size.height,
+                              `rgba(52,69,150,0.3)`);
+      }
     }
   }
 }
