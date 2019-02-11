@@ -337,7 +337,7 @@ export const StateActions = {
       startTs: args.startTs,
       endTs: args.endTs,
     };
-  }, 
+  },
 
   deselect(state: StateDraft, _: {}): void {
     state.currentSelection = null;
