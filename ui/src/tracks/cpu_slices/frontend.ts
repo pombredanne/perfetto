@@ -279,7 +279,6 @@ class CpuSliceTrack extends Track<Config, Data> {
   }
 
   onMouseClick({x}: {x: number}) {
-    console.log("clicksdfhsdfjs");
     const data = this.data();
     if (data === undefined || data.kind === 'summary') return false;
     const {timeScale} = globals.frontendLocalState;

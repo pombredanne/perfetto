@@ -82,7 +82,7 @@ function drawHBar(
 
 export class TimeSelectionPanel extends Panel {
   view() {
-    return m('.ruler-panel');
+    return m('.time-selection-panel');
   }
 
   renderCanvas(ctx: CanvasRenderingContext2D, size: PanelSize) {

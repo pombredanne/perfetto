@@ -99,13 +99,16 @@ export class PanAndZoomHandler {
 
     let lastX = -1;
     new DragGestureHandler(this.element, x => {
-      if (this.shiftDown) {
+      if (this.shiftDown && this.panStartPx !== -1) {
         this.onDragSelect(this.panStartPx, x);
       } else {
         this.onPanned(lastX - x);
       }
       lastX = x;
-    }, x => { lastX = x; this.panStartPx = x;});
+    }, x => {
+      lastX = x;
+      this.panStartPx = x;
+    });
   }
 
   shutdown() {

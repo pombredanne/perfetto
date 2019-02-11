@@ -135,7 +135,7 @@ export class TrackContent implements m.ClassComponent<TrackContentAttrs> {
         // If we are selecting a timespan - do not pass the click to the track.
         const selection = globals.state.currentSelection;
         if (selection && selection.kind === 'TIMESPAN') return;
-        
+
         if (attrs.track.onMouseClick({x: e.layerX, y: e.layerY})) {
           e.stopPropagation();
         }

@@ -24,7 +24,6 @@ export class DragGestureHandler {
       private onDragStarted: (x: number, y: number) => void = () => {},
       private onDragFinished = () => {}) {
     element.addEventListener('mousedown', this.boundOnMouseDown);
-    
   }
 
   private onMouseDown(e: MouseEvent) {
@@ -48,11 +47,9 @@ export class DragGestureHandler {
   }
 
   private onMouseUp(e: MouseEvent) {
-    console.log('mouseUp');
     document.body.removeEventListener('mousemove', this.boundOnMouseMove);
     document.body.removeEventListener('mouseup', this.boundOnMouseUp);
     this.onDragFinished();
-    e.stopImmediatePropagation();
-    console.log('propigation stopped');
+    e.stopPropagation();
   }
 }

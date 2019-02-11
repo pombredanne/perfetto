@@ -68,7 +68,6 @@ export class TrackGroupPanel extends Panel<Attrs> {
           m('.fold-button',
             {
               onclick: (e:MouseEvent) => {
-                console.log("click");
                 globals.dispatch(Actions.toggleTrackGroupCollapsed({
                   trackGroupId: attrs.trackGroupId,
                 })),

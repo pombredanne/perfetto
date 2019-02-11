@@ -214,13 +214,12 @@ class TraceViewer implements m.ClassComponent {
         this.keepCurrentSelection = true;
         const traceTime = globals.state.traceTime;
         const scale = frontendLocalState.timeScale;
-        const startTs = scale.pxToTime(selectStartPx - TRACK_SHELL_WIDTH);
-        let endTs = scale.pxToTime(selectEndPx - TRACK_SHELL_WIDTH);
-        if (endTs < startTs) {
-          endTs = Math.max(traceTime.startSec,endTs);
-        } else {
-          endTs = Math.min(traceTime.endSec,endTs);
-        }
+        const startPx = Math.min(selectStartPx, selectEndPx);
+        const endPx = Math.max(selectStartPx, selectEndPx);
+        const startTs = Math.max(traceTime.startSec,
+                               scale.pxToTime(startPx - TRACK_SHELL_WIDTH));
+        const endTs = Math.min(traceTime.endSec,
+                               scale.pxToTime(endPx - TRACK_SHELL_WIDTH));
         globals.dispatch(Actions.selectTimeSpan({startTs, endTs}));
         globals.rafScheduler.scheduleRedraw();
       }
