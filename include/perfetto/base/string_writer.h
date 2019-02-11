@@ -17,7 +17,7 @@
 #ifndef INCLUDE_PERFETTO_BASE_STRING_WRITER_H_
 #define INCLUDE_PERFETTO_BASE_STRING_WRITER_H_
 
-#include <math.h>
+#include <cmath>
 #include <limits>
 
 #include "perfetto/base/logging.h"
@@ -70,8 +70,8 @@ class StringWriter {
     PERFETTO_DCHECK(pos_ + kSizeNeeded <= size_);
 
     char data[kSizeNeeded];
-    const bool negate = signbit(sign_value);
-    uint64_t value = static_cast<uint64_t>(abs(sign_value));
+    const bool negate = std::signbit(sign_value);
+    uint64_t value = static_cast<uint64_t>(std::abs(sign_value));
 
     size_t idx;
     for (idx = kSizeNeeded - 1; value >= 10;) {
