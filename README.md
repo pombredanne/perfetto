@@ -1,7 +1,7 @@
 # Perfetto - Performance instrumentation and tracing
 
 Perfetto is an open-source project for performance instrumentation and tracing
-of Linux/Android/Chrome platforms and user-space apps.  
+of Linux/Android/Chrome platforms and user-space apps.
 
 See [www.perfetto.dev](https://www.perfetto.dev) for docs.
 
