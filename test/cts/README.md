@@ -30,6 +30,6 @@ can then be decoded by the GTest consumer.
 
 ## HeapprofdCtsTest
 The tests cover the intersection of profiling from-startup/at-runtime, and
-whether the target app is debuggable/profileable/neither-of-the-two. The GTest
-binary handles the targets' lifetimes, acts as a profiling consumer, and asserts
-the contents of the resultant traces.
+whether the target app is debuggable. The GTest binary handles the targets'
+lifetimes, acts as a profiling consumer, and asserts the contents of the
+resultant traces.
