@@ -98,7 +98,7 @@ void RawTable::FormatSystraceArgs(const std::string& event_name,
   auto write_arg = [this, writer, start_row](uint32_t arg_idx,
                                              ValueWriter value_fn) {
     uint32_t arg_row = start_row + arg_idx;
-    if (arg_row != 0)
+    if (arg_idx != 0)
       writer->AppendChar(' ');
 
     const auto& args = storage_->args();
@@ -124,6 +124,7 @@ void RawTable::FormatSystraceArgs(const std::string& event_name,
     write_arg(SS::kNextCommFieldNumber - 1, write_value);
     write_arg(SS::kNextPidFieldNumber - 1, write_value);
     write_arg(SS::kNextPrioFieldNumber - 1, write_value);
+    return;
   }
 
   uint32_t arg = 0;
