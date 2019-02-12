@@ -57,6 +57,15 @@ class EventTracker {
                             RefType ref_type);
 
  private:
+  // Represents a slice which is currently pending.
+  struct PendingSchedSlice {
+    size_t storage_index = std::numeric_limits<size_t>::max();
+    uint32_t pid = 0;
+  };
+
+  // Store pending sched slices for each CPU.
+  std::array<PendingSchedSlice, base::kMaxCpus> pending_sched_per_cpu_{};
+
   // Timestamp of the previous event. Used to discard events arriving out
   // of order.
   int64_t prev_timestamp_ = 0;
