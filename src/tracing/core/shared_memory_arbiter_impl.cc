@@ -119,10 +119,12 @@ Chunk SharedMemoryArbiterImpl::GetNewChunk(
 
       // TODO(primiano): sending the IPC synchronously is a temporary workaround
       // until the backpressure logic in probes_producer is sorted out. Until
-      // then the risk is that we stall the message loop waiting for the
-      // tracing service to consume the shared memory buffer (SMB) and, for
-      // this reason, never run the task that tells the service to purge the
-      // SMB.
+      // then the risk is that we stall the message loop waiting for the tracing
+      // service to consume the shared memory buffer (SMB) and, for this reason,
+      // never run the task that tells the service to purge the SMB. This must
+      // happen iff we are on the IPC thread, not doing this will cause
+      // deadlocks, doing this on the wrong thread causes out-of-order data
+      // commits (crbug.com/919187#c28).
       if (task_runner_->RunsTasksOnCurrentThread())
         FlushPendingCommitDataRequests();
     }
@@ -185,9 +187,11 @@ void SharedMemoryArbiterImpl::UpdateCommitDataRequest(Chunk chunk,
       // in |commit_data_req_|), force a synchronous CommitDataRequest(), to
       // reduce the likeliness of stalling the writer.
       //
-      // This only makes sense if we're writing on the same thread that we
-      // access the producer endpoint on, since we cannot notify the producer
-      // endpoint to commit synchronously on a different thread.
+      // We can only do this if we're writing on the same thread that we access
+      // the producer endpoint on, since we cannot notify the producer endpoint
+      // to commit synchronously on a different thread. Attempting to flush
+      // synchronously on another thread will lead to subtle bugs caused by
+      // out-of-order commit requests (crbug.com/919187#c28).
       if (task_runner_->RunsTasksOnCurrentThread() &&
           bytes_pending_commit_ >= shmem_abi_.size() / 2) {
         should_commit_synchronously = true;
