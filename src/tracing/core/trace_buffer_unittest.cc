@@ -455,6 +455,23 @@ TEST_F(TraceBufferTest, ReadWrite_PaddingAtEndUpdatesIndexMisaligned) {
   ASSERT_THAT(ReadPacket(), IsEmpty());
 }
 
+// Verify that empty packets are skipped.
+TEST_F(TraceBufferTest, ReadWrite_EmptyPacket) {
+  ResetBuffer(4096);
+  CreateChunk(ProducerID(1), WriterID(1), 0)
+      .AddPacket(42, 1)
+      .AddPacket(1, 2)
+      .AddPacket(42, 3)
+      .CopyIntoTraceBuffer();
+
+  trace_buffer()->BeginRead();
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(42, 1)));
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(42, 3)));
+  ASSERT_THAT(ReadPacket(), IsEmpty());
+
+  EXPECT_EQ(0u, trace_buffer()->stats().abi_violations());
+}
+
 // --------------------------------------
 // Fragments stitching and skipping logic
 // --------------------------------------

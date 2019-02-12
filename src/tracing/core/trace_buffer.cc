@@ -645,14 +645,21 @@ bool TraceBuffer::ReadNextTracePacket(
 
       if (action == kReadOnePacket) {
         // The easy peasy case B.
-        if (PERFETTO_LIKELY(ReadNextPacketInChunk(chunk_meta, packet))) {
+        ReadPacketResult result = ReadNextPacketInChunk(chunk_meta, packet);
+
+        if (PERFETTO_LIKELY(result == ReadPacketResult::kSucceeded)) {
           *sequence_properties = {trusted_producer_id, trusted_uid, writer_id};
           return true;
+        } else if (result == ReadPacketResult::kFailedEmptyPacket) {
+          // We can ignore and skip empty packets.
+          PERFETTO_DCHECK(packet->slices().empty());
+          continue;
         }
 
         // In extremely rare cases (producer bugged / malicious) the chunk might
         // contain an invalid fragment. In such case we don't want to stall the
         // sequence but just skip the chunk and move on.
+        PERFETTO_DCHECK(result == ReadPacketResult::kFailedInvalidPacket);
         stats_.set_abi_violations(stats_.abi_violations() + 1);
         PERFETTO_DCHECK(suppress_sanity_dchecks_for_testing_);
         break;
@@ -747,10 +754,11 @@ TraceBuffer::ReadAheadResult TraceBuffer::ReadAhead(TracePacket* packet) {
       PERFETTO_DCHECK(read_iter_.is_valid());
       TRACE_BUFFER_DLOG("    commit chunk %u", read_iter_.chunk_id());
       if (PERFETTO_LIKELY((*read_iter_).num_fragments > 0)) {
-        // In the unlikely case of a corrupted packet, invalidate the all
-        // stitching and move on to the next chunk in the same sequence,
-        // if any.
-        packet_corruption |= !ReadNextPacketInChunk(&*read_iter_, packet);
+        // In the unlikely case of a corrupted packet (corrupted or empty
+        // fragment), invalidate the all stitching and move on to the next chunk
+        // in the same sequence, if any.
+        packet_corruption |= ReadNextPacketInChunk(&*read_iter_, packet) !=
+                             ReadPacketResult::kSucceeded;
       }
       if (read_iter_.cur == it.cur)
         break;
@@ -770,8 +778,9 @@ TraceBuffer::ReadAheadResult TraceBuffer::ReadAhead(TracePacket* packet) {
   return ReadAheadResult::kFailedMoveToNextSequence;
 }
 
-bool TraceBuffer::ReadNextPacketInChunk(ChunkMeta* chunk_meta,
-                                        TracePacket* packet) {
+TraceBuffer::ReadPacketResult TraceBuffer::ReadNextPacketInChunk(
+    ChunkMeta* chunk_meta,
+    TracePacket* packet) {
   PERFETTO_DCHECK(chunk_meta->num_fragments_read < chunk_meta->num_fragments);
   PERFETTO_DCHECK(!(chunk_meta->flags & kChunkNeedsPatching));
 
@@ -787,7 +796,7 @@ bool TraceBuffer::ReadNextPacketInChunk(ChunkMeta* chunk_meta,
     // contains more packets beyond its boundaries.
     stats_.set_abi_violations(stats_.abi_violations() + 1);
     PERFETTO_DCHECK(suppress_sanity_dchecks_for_testing_);
-    return false;
+    return ReadPacketResult::kFailedInvalidPacket;
   }
 
   // A packet (or a fragment) starts with a varint stating its size, followed
@@ -812,7 +821,7 @@ bool TraceBuffer::ReadNextPacketInChunk(ChunkMeta* chunk_meta,
       stats_.set_bytes_read(stats_.bytes_read() +
                             chunk_meta->chunk_record->size);
     }
-    return false;
+    return ReadPacketResult::kFailedInvalidPacket;
   }
   chunk_meta->cur_fragment_offset =
       static_cast<uint16_t>(next_packet - packets_begin);
@@ -825,16 +834,13 @@ bool TraceBuffer::ReadNextPacketInChunk(ChunkMeta* chunk_meta,
     stats_.set_bytes_read(stats_.bytes_read() + chunk_meta->chunk_record->size);
   }
 
-  if (PERFETTO_UNLIKELY(packet_size == 0)) {
-    stats_.set_abi_violations(stats_.abi_violations() + 1);
-    PERFETTO_DCHECK(suppress_sanity_dchecks_for_testing_);
-    return false;
-  }
+  if (PERFETTO_UNLIKELY(packet_size == 0))
+    return ReadPacketResult::kFailedEmptyPacket;
 
   if (PERFETTO_LIKELY(packet))
     packet->AddSlice(packet_data, static_cast<size_t>(packet_size));
 
-  return true;
+  return ReadPacketResult::kSucceeded;
 }
 
 void TraceBuffer::DiscardWrite() {
