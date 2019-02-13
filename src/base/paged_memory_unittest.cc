@@ -171,7 +171,7 @@ TEST(PagedMemoryTest, Unchecked) {
         ASSERT_EQ(0, setrlimit(RLIMIT_AS, &limit));
         auto mem = PagedMemory::Allocate(kMemLimit * 2, PagedMemory::kMayFail);
         ASSERT_FALSE(mem.IsValid());
-        exit(0);
+        quick_exit(0);
       },
       ::testing::ExitedWithCode(0), "");
 }
