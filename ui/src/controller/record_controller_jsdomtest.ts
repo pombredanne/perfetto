@@ -15,7 +15,7 @@
 import {dingus} from 'dingusjs';
 
 import {TraceConfig} from '../common/protos';
-import {createEmptyRecordConfig} from '../common/state';
+import {createEmptyRecordConfig, RecordConfig} from '../common/state';
 
 import {App} from './globals';
 import {
@@ -86,7 +86,7 @@ producers: {
 
 test('RecordController', () => {
   const app = dingus<App>('globals');
-  // app.state.recordConfig.durationSeconds = 1000;
+  (app.state.recordConfig as RecordConfig) = createEmptyRecordConfig();
   const controller = new RecordController({app});
   controller.run();
   controller.run();
