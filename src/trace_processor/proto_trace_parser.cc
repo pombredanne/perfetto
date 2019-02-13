@@ -218,6 +218,7 @@ ProtoTraceParser::ProtoTraceParser(TraceProcessorContext* context)
            context->storage->InternString("mem.mm.kern_alloc.max_lat"),
            context->storage->InternString("mem.mm.kern_alloc.avg_lat"))}};
 
+  // TODO(hjd): Add the missing syscalls + fix on over arch.
   sys_name_ids_ = {{context->storage->InternString("sys_restart_syscall"),
                     context->storage->InternString("sys_exit"),
                     context->storage->InternString("sys_fork"),
