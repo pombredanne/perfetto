@@ -41,7 +41,7 @@ proto_library("minimal_complete_lite") {
     ":lite",
     "../:minimal_lite",
     "../../config:lite",
-    "../event:zero",
+    "../event:lite",
   ]
   sources = minimal_chrome_proto_names
   proto_in_dir = "$perfetto_root_path/protos"
