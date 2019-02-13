@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <functional>
 
+#include "perfetto/base/logging.h"
 #include "perfetto/base/time.h"
 #include "src/trace_processor/android_logs_table.h"
 #include "src/trace_processor/args_table.h"
@@ -318,11 +319,85 @@ void TraceProcessorImpl::ExecuteQuery(
   callback(proto);
 }
 
+std::unique_ptr<TraceProcessor::Iterator> TraceProcessorImpl::ExecuteQuery(
+    base::StringView sql) {
+  sqlite3_stmt* raw_stmt;
+  int err = sqlite3_prepare_v2(*db_, sql.data(), static_cast<int>(sql.size()),
+                               &raw_stmt, nullptr);
+  if (err)
+    return nullptr;
+  int ret = sqlite3_step(raw_stmt);
+  if (ret != SQLITE_ROW && ret != SQLITE_DONE)
+    return nullptr;
+
+  bool has_next = ret == SQLITE_ROW;
+  auto col_count = static_cast<uint8_t>(sqlite3_column_count(raw_stmt));
+  return std::unique_ptr<TraceProcessor::Iterator>(
+      new IteratorImpl(*db_, ScopedStmt(raw_stmt), has_next, col_count));
+}
+
 void TraceProcessorImpl::InterruptQuery() {
   if (!db_)
     return;
   query_interrupted_.store(true);
   sqlite3_interrupt(db_.get());
+}
+
+TraceProcessorImpl::IteratorImpl::IteratorImpl(sqlite3* db,
+                                               ScopedStmt stmt,
+                                               bool has_next,
+                                               uint8_t column_count)
+    : db_(db),
+      stmt_(std::move(stmt)),
+      has_next_(has_next),
+      column_count_(column_count) {}
+
+TraceProcessorImpl::IteratorImpl::~IteratorImpl() = default;
+
+TraceProcessorImpl::IteratorImpl::NextResult
+TraceProcessorImpl::IteratorImpl::Next() {
+  PERFETTO_DCHECK(has_next_);
+
+  int ret = sqlite3_step(*stmt_);
+  NextResult result;
+  result.is_error = ret != SQLITE_ROW && ret != SQLITE_DONE;
+  if (result.is_error)
+    result.error = sqlite3_errmsg(db_);
+  has_next_ = ret == SQLITE_ROW;
+  return result;
+}
+
+SqlValue TraceProcessorImpl::IteratorImpl::ColumnValue(uint8_t column) {
+  PERFETTO_DCHECK(has_next_);
+  auto col_type = sqlite3_column_type(*stmt_, column);
+  SqlValue value;
+  switch (col_type) {
+    case SQLITE_INTEGER:
+      value.type = SqlValue::kLong;
+      value.long_value = sqlite3_column_int64(*stmt_, column);
+      break;
+    case SQLITE_TEXT:
+      value.type = SqlValue::kLong;
+      value.string_value =
+          reinterpret_cast<const char*>(sqlite3_column_text(*stmt_, column));
+      break;
+    case SQLITE_FLOAT:
+      value.type = SqlValue::kDouble;
+      value.double_value = sqlite3_column_double(*stmt_, column);
+      break;
+    case SQLITE_NULL:
+      value.type = SqlValue::kNull;
+      break;
+  }
+  return value;
+}
+
+bool TraceProcessorImpl::IteratorImpl::HasNext() {
+  return has_next_;
+}
+
+uint8_t TraceProcessorImpl::IteratorImpl::ColumnCount() {
+  return column_count_;
 }
 
 }  // namespace trace_processor

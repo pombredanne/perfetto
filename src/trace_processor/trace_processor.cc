@@ -28,6 +28,7 @@ std::unique_ptr<TraceProcessor> TraceProcessor::CreateInstance(
 }
 
 TraceProcessor::~TraceProcessor() = default;
+TraceProcessor::Iterator::~Iterator() = default;
 
 // static
 void EnableSQLiteVtableDebugging() {

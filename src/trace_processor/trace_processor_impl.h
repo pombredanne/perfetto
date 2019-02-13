@@ -21,6 +21,7 @@
 #include <functional>
 #include <memory>
 
+#include "perfetto/base/string_view.h"
 #include "perfetto/trace_processor/basic_types.h"
 #include "perfetto/trace_processor/trace_processor.h"
 #include "src/trace_processor/scoped_db.h"
@@ -47,6 +48,23 @@ TraceType GuessTraceType(const uint8_t* data, size_t size);
 // execution of SQL queries on the events in these traces.
 class TraceProcessorImpl : public TraceProcessor {
  public:
+  class IteratorImpl : public TraceProcessor::Iterator {
+   public:
+    IteratorImpl(sqlite3* db, ScopedStmt, bool has_next, uint8_t column_count);
+    ~IteratorImpl() override;
+
+    NextResult Next() override;
+    bool HasNext() override;
+    SqlValue ColumnValue(uint8_t col) override;
+    uint8_t ColumnCount() override;
+
+   private:
+    sqlite3* db_;
+    ScopedStmt stmt_;
+    bool has_next_ = true;
+    uint8_t column_count_ = 0;
+  };
+
   explicit TraceProcessorImpl(const Config&);
 
   ~TraceProcessorImpl() override;
@@ -58,6 +76,8 @@ class TraceProcessorImpl : public TraceProcessor {
   void ExecuteQuery(
       const protos::RawQueryArgs&,
       std::function<void(const protos::RawQueryResult&)>) override;
+
+  std::unique_ptr<Iterator> ExecuteQuery(base::StringView sql) override;
 
   void InterruptQuery() override;
 

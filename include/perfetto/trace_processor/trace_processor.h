@@ -20,6 +20,7 @@
 #include <functional>
 #include <memory>
 
+#include "perfetto/base/string_view.h"
 #include "perfetto/trace_processor/basic_types.h"
 
 namespace perfetto {
@@ -35,6 +36,20 @@ namespace trace_processor {
 // execution of SQL queries on the events in these traces.
 class TraceProcessor {
  public:
+  class Iterator {
+   public:
+    struct NextResult {
+      bool is_error = false;
+      std::string error;
+    };
+    virtual ~Iterator();
+
+    virtual NextResult Next() = 0;
+    virtual bool HasNext() = 0;
+    virtual SqlValue ColumnValue(uint8_t col) = 0;
+    virtual uint8_t ColumnCount() = 0;
+  };
+
   // Creates a new instance of TraceProcessor.
   static std::unique_ptr<TraceProcessor> CreateInstance(const Config&);
 
@@ -59,6 +74,8 @@ class TraceProcessor {
   virtual void ExecuteQuery(
       const protos::RawQueryArgs&,
       std::function<void(const protos::RawQueryResult&)>) = 0;
+
+  virtual std::unique_ptr<Iterator> ExecuteQuery(base::StringView sql) = 0;
 
   // Interrupts the current query. Typically used by Ctrl-C handler.
   virtual void InterruptQuery() = 0;

@@ -29,6 +29,22 @@ struct Config {
   uint64_t window_size_ns = 60 * 1000 * 1000 * 1000ULL;  // 60 seconds.
 };
 
+struct SqlValue {
+  enum Type {
+    kString,
+    kLong,
+    kDouble,
+    kNull,
+  };
+
+  union {
+    const char* string_value;
+    long long_value;
+    double double_value;
+  };
+  Type type = kNull;
+};
+
 }  // namespace trace_processor
 }  // namespace perfetto
 
