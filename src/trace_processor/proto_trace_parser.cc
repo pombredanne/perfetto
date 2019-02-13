@@ -218,19 +218,19 @@ ProtoTraceParser::ProtoTraceParser(TraceProcessorContext* context)
            context->storage->InternString("mem.mm.kern_alloc.max_lat"),
            context->storage->InternString("mem.mm.kern_alloc.avg_lat"))}};
 
-  sys_name_ids_ = {{context->storage->InternString("sys_read"),
+  sys_name_ids_ = {{context->storage->InternString("sys_restart_syscall"),
+                    context->storage->InternString("sys_exit"),
+                    context->storage->InternString("sys_fork"),
+                    context->storage->InternString("sys_read"),
                     context->storage->InternString("sys_write"),
                     context->storage->InternString("sys_open"),
                     context->storage->InternString("sys_close"),
-                    context->storage->InternString("sys_newstat"),
-                    context->storage->InternString("sys_newfstat"),
-                    context->storage->InternString("sys_newlstat"),
-                    context->storage->InternString("sys_poll"),
-                    context->storage->InternString("sys_lseek"),
-                    context->storage->InternString("sys_mmap"),
-                    context->storage->InternString("sys_mprotect"),
-                    context->storage->InternString("sys_munmap"),
-                    context->storage->InternString("sys_brk")}};
+                    context->storage->InternString("sys_creat"),
+                    context->storage->InternString("sys_link"),
+                    context->storage->InternString("sys_unlink"),
+                    context->storage->InternString("sys_execve"),
+                    context->storage->InternString("sys_chdir"),
+                    context->storage->InternString("sys_time")}};
 
   // Build the lookup table for the strings inside ftrace events (e.g. the
   // name of ftrace event fields and the names of their args).
@@ -1160,6 +1160,13 @@ void ProtoTraceParser::ParseSysEvent(int64_t ts,
     context_->storage->IncrementStats(stats::sys_unknown_sys_id);
     return;
   }
+
+  // We see two write sys calls around each userspace slice that is going via
+  // trace_marker, this violates the assumption that userspace slices are
+  // perfectly nested. For the moment ignore all write sys calls.
+  // TODO(hjd): Remove this limitation.
+  if (id == 4 /*sys_write*/)
+    return;
 
   StringId sys_name_id = sys_name_ids_[id];
   UniqueTid utid = context_->process_tracker->UpdateThread(ts, pid, 0);
