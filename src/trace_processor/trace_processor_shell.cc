@@ -17,7 +17,6 @@
 #include <aio.h>
 #include <fcntl.h>
 #include <inttypes.h>
-#include <stdio.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -423,8 +422,6 @@ void PrintUsage(char** argv) {
       argv[0]);
 }
 
-#include <gperftools/profiler.h>
-
 int TraceProcessorMain(int argc, char** argv) {
   if (argc < 2) {
     PrintUsage(argv);
@@ -495,7 +492,6 @@ int TraceProcessorMain(int argc, char** argv) {
   PERFETTO_CHECK(aio_read(&cb) == 0);
   struct aiocb* aio_list[1] = {&cb};
 
-  ProfilerStart("/tmp/ingestion.perf");
   uint64_t file_size = 0;
   auto t_load_start = base::GetWallTimeMs();
   for (int i = 0;; i++) {
@@ -525,7 +521,6 @@ int TraceProcessorMain(int argc, char** argv) {
   double size_mb = file_size / 1E6;
   PERFETTO_ILOG("Trace loaded: %.2f MB (%.1f MB/s)", size_mb, size_mb / t_load);
   g_tp = tp.get();
-  ProfilerStop();
 
 #if PERFETTO_HAS_SIGNAL_H()
   signal(SIGINT, [](int) { g_tp->InterruptQuery(); });

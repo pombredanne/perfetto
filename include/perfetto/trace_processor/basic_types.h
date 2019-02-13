@@ -29,7 +29,9 @@ struct Config {
   uint64_t window_size_ns = 60 * 1000 * 1000 * 1000ULL;  // 60 seconds.
 };
 
+// Represents a dynamically typed value returned by SQL.
 struct SqlValue {
+  // Represents the type of the value.
   enum Type {
     kString,
     kLong,
@@ -37,6 +39,7 @@ struct SqlValue {
     kNull,
   };
 
+  // Up to 1 of these fields can be accessed depending on |type|.
   union {
     const char* string_value;
     long long_value;
