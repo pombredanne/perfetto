@@ -20,6 +20,7 @@
 #include <functional>
 #include <memory>
 
+#include "perfetto/base/optional.h"
 #include "perfetto/base/string_view.h"
 #include "perfetto/trace_processor/basic_types.h"
 
@@ -36,17 +37,26 @@ namespace trace_processor {
 // execution of SQL queries on the events in these traces.
 class TraceProcessor {
  public:
+  // Iterator returning SQL rows satisfied by a query.
   class Iterator {
    public:
-    struct NextResult {
-      bool is_error = false;
-      std::string error;
-    };
+    using OptionalError = base::Optional<std::string>;
+    using NextResult = std::pair<bool, OptionalError>;
+
     virtual ~Iterator();
 
+    // Forwards the iterator to the next result row and returns a pair
+    // (bool, OptionalError) with the first param indicating whether the
+    // iterator is completed and second indicating if there is an error. All
+    // errors indicated are fatal - that is if the second param has a param, the
+    // first param will always be true.
     virtual NextResult Next() = 0;
-    virtual bool HasNext() = 0;
+
+    // Returns the value associated with the column |col|. |Next()| *must* be
+    // called before calling this function.
     virtual SqlValue ColumnValue(uint8_t col) = 0;
+
+    // Returns the number of columns in this iterator's query.
     virtual uint8_t ColumnCount() = 0;
   };
 
@@ -75,6 +85,8 @@ class TraceProcessor {
       const protos::RawQueryArgs&,
       std::function<void(const protos::RawQueryResult&)>) = 0;
 
+  // Executes a SQLite query on the loaded portion of the trace. The returned
+  // iterator can be used to load rows from the result.
   virtual std::unique_ptr<Iterator> ExecuteQuery(base::StringView sql) = 0;
 
   // Interrupts the current query. Typically used by Ctrl-C handler.

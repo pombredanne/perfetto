@@ -326,14 +326,9 @@ std::unique_ptr<TraceProcessor::Iterator> TraceProcessorImpl::ExecuteQuery(
                                &raw_stmt, nullptr);
   if (err)
     return nullptr;
-  int ret = sqlite3_step(raw_stmt);
-  if (ret != SQLITE_ROW && ret != SQLITE_DONE)
-    return nullptr;
-
-  bool has_next = ret == SQLITE_ROW;
   auto col_count = static_cast<uint8_t>(sqlite3_column_count(raw_stmt));
   return std::unique_ptr<TraceProcessor::Iterator>(
-      new IteratorImpl(*db_, ScopedStmt(raw_stmt), has_next, col_count));
+      new IteratorImpl(*db_, ScopedStmt(raw_stmt), col_count));
 }
 
 void TraceProcessorImpl::InterruptQuery() {
@@ -345,30 +340,23 @@ void TraceProcessorImpl::InterruptQuery() {
 
 TraceProcessorImpl::IteratorImpl::IteratorImpl(sqlite3* db,
                                                ScopedStmt stmt,
-                                               bool has_next,
                                                uint8_t column_count)
-    : db_(db),
-      stmt_(std::move(stmt)),
-      has_next_(has_next),
-      column_count_(column_count) {}
+    : db_(db), stmt_(std::move(stmt)), column_count_(column_count) {}
 
 TraceProcessorImpl::IteratorImpl::~IteratorImpl() = default;
 
 TraceProcessorImpl::IteratorImpl::NextResult
 TraceProcessorImpl::IteratorImpl::Next() {
-  PERFETTO_DCHECK(has_next_);
-
   int ret = sqlite3_step(*stmt_);
-  NextResult result;
-  result.is_error = ret != SQLITE_ROW && ret != SQLITE_DONE;
-  if (result.is_error)
-    result.error = sqlite3_errmsg(db_);
-  has_next_ = ret == SQLITE_ROW;
-  return result;
+  bool is_done = ret != SQLITE_ROW;
+  if (is_done && ret != SQLITE_DONE) {
+    base::Optional<std::string> err(sqlite3_errmsg(db_));
+    return std::make_pair(true, std::move(err));
+  }
+  return std::make_pair(is_done, base::nullopt);
 }
 
 SqlValue TraceProcessorImpl::IteratorImpl::ColumnValue(uint8_t column) {
-  PERFETTO_DCHECK(has_next_);
   auto col_type = sqlite3_column_type(*stmt_, column);
   SqlValue value;
   switch (col_type) {
@@ -390,10 +378,6 @@ SqlValue TraceProcessorImpl::IteratorImpl::ColumnValue(uint8_t column) {
       break;
   }
   return value;
-}
-
-bool TraceProcessorImpl::IteratorImpl::HasNext() {
-  return has_next_;
 }
 
 uint8_t TraceProcessorImpl::IteratorImpl::ColumnCount() {

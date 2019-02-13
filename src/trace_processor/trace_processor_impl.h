@@ -50,18 +50,16 @@ class TraceProcessorImpl : public TraceProcessor {
  public:
   class IteratorImpl : public TraceProcessor::Iterator {
    public:
-    IteratorImpl(sqlite3* db, ScopedStmt, bool has_next, uint8_t column_count);
+    IteratorImpl(sqlite3* db, ScopedStmt, uint8_t column_count);
     ~IteratorImpl() override;
 
     NextResult Next() override;
-    bool HasNext() override;
     SqlValue ColumnValue(uint8_t col) override;
     uint8_t ColumnCount() override;
 
    private:
     sqlite3* db_;
     ScopedStmt stmt_;
-    bool has_next_ = true;
     uint8_t column_count_ = 0;
   };
 

@@ -151,8 +151,18 @@ int TraceToExperimentalSystrace(std::istream* input, std::ostream* output) {
   base::ScopedString buffer(static_cast<char*>(malloc(kBufferSize)));
   base::StringWriter writer(*buffer, kBufferSize);
 
-  uint32_t rows = 0;
-  while (iterator->HasNext()) {
+  ;
+  for (uint32_t rows = 0;; rows++) {
+    auto result = iterator->Next();
+    bool is_done = result.first;
+    const auto& opt_err = result.second;
+    if (PERFETTO_UNLIKELY(opt_err.has_value())) {
+      PERFETTO_ELOG("Error while writing systrace %s", opt_err->c_str());
+      return 1;
+    } else if (is_done) {
+      break;
+    }
+
     const char* line = iterator->ColumnValue(0).string_value;
     size_t length = strlen(line);
     if (writer.pos() + length >= kBufferSize) {
@@ -163,13 +173,6 @@ int TraceToExperimentalSystrace(std::istream* input, std::ostream* output) {
     }
     writer.AppendString(line, length);
     writer.AppendChar('\n');
-
-    auto result = iterator->Next();
-    if (PERFETTO_UNLIKELY(result.is_error)) {
-      PERFETTO_ELOG("Error while writing systrace %s", result.error.c_str());
-      return 1;
-    }
-    rows++;
   }
 
   return 0;
