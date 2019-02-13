@@ -16,6 +16,7 @@
 
 #include "perfetto/base/temp_file.h"
 
+#include <stdlib.h>
 #include <unistd.h>
 
 namespace perfetto {
