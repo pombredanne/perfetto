@@ -65,7 +65,7 @@ export class PanAndZoomHandler {
   private boundOnKeyDown = this.onKeyDown.bind(this);
   private boundOnKeyUp = this.onKeyUp.bind(this);
   private shiftDown = false;
-  private panStartPx = -1;
+  private dragStartPx = -1;
   private panning: Pan = Pan.None;
   private zooming: Zoom = Zoom.None;
   private cancelPanTimeout?: Timer;
@@ -99,15 +99,19 @@ export class PanAndZoomHandler {
 
     let lastX = -1;
     new DragGestureHandler(this.element, x => {
-      if (this.shiftDown && this.panStartPx !== -1) {
-        this.onDragSelect(this.panStartPx, x);
+      if (this.shiftDown && this.dragStartPx !== -1) {
+        this.onDragSelect(this.dragStartPx, x);
       } else {
         this.onPanned(lastX - x);
       }
       lastX = x;
     }, x => {
       lastX = x;
-      this.panStartPx = x;
+      if (this.shiftDown) {
+        this.dragStartPx = x;
+      }
+    }, () => {
+      this.dragStartPx = -1;
     });
   }
 
