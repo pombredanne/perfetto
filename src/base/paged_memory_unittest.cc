@@ -171,6 +171,9 @@ TEST(PagedMemoryTest, Unchecked) {
         ASSERT_EQ(0, setrlimit(RLIMIT_AS, &limit));
         auto mem = PagedMemory::Allocate(kMemLimit * 2, PagedMemory::kMayFail);
         ASSERT_FALSE(mem.IsValid());
+        // Use _exit() instead of exit() to avoid calling destructors on child
+        // process death, which may interfere with the parent process's test
+        // launcher expectations.
         _exit(0);
       },
       ::testing::ExitedWithCode(0), "");
