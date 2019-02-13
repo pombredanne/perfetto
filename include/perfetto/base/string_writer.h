@@ -117,7 +117,7 @@ class StringWriter {
 
   // Creates a copy of the internal buffer.
   base::ScopedString CreateStringCopy() {
-    char* dup = reintepret_cast<char*>(malloc(pos_ + 1));
+    char* dup = reinterpret_cast<char*>(malloc(pos_ + 1));
     if (dup) {
       strncpy(dup, buffer_, pos_);
       dup[pos_] = '\0';
