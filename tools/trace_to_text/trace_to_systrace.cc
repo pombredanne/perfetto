@@ -151,7 +151,6 @@ int TraceToExperimentalSystrace(std::istream* input, std::ostream* output) {
   base::ScopedString buffer(static_cast<char*>(malloc(kBufferSize)));
   base::StringWriter writer(*buffer, kBufferSize);
 
-  ;
   for (uint32_t rows = 0;; rows++) {
     auto result = iterator->Next();
     bool is_done = result.first;
