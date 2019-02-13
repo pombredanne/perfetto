@@ -249,6 +249,7 @@ void SharedMemoryArbiterImpl::FlushPendingCommitDataRequests(
       if (weak_this)
         weak_this->FlushPendingCommitDataRequests(std::move(callback));
     });
+    return;
   }
 
   std::shared_ptr<CommitDataRequest> req;
