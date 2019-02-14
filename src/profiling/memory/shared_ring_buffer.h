@@ -76,6 +76,14 @@ class ScopedSpinlock {
 // - Reads are atomic, no fragmentation.
 // - The reader sees writes in write order (% discarding).
 //
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// *IMPORTANT*: The ring buffer must be written under the assumption that the
+// other end modifies arbitrary shared memory without holding the spin-lock.
+// This means we must make local copies of read and write pointers for doing
+// bounds checks followed by reads / writes, as they might change in the
+// meantime.
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+//
 // TODO:
 // - Write a benchmark.
 // - Make the stats ifdef-able.
@@ -153,20 +161,25 @@ class SharedRingBuffer {
   void Initialize(base::ScopedFile mem_fd);
   bool IsCorrupt(const PointerPositions& pos);
 
-  inline PointerPositions GetPointerPositions(const ScopedSpinlock& lock) {
+  inline base::Optional<PointerPositions> GetPointerPositions(
+      const ScopedSpinlock& lock) {
     PERFETTO_DCHECK(lock.locked());
 
     PointerPositions pos;
     pos.read_pos = meta_->read_pos;
     pos.write_pos = meta_->write_pos;
-    return pos;
+
+    base::Optional<PointerPositions> result;
+    if (IsCorrupt(pos)) {
+      meta_->num_reads_failed++;
+      return result;
+    }
+    result = pos;
+    return result;
   }
 
   inline size_t read_avail(const PointerPositions& pos) {
     PERFETTO_DCHECK(pos.write_pos >= pos.read_pos);
-    if (pos.read_pos > pos.write_pos)
-      return 0;
-
     auto res = static_cast<size_t>(pos.write_pos - pos.read_pos);
     PERFETTO_DCHECK(res <= size_);
     return res;

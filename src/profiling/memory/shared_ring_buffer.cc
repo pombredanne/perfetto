@@ -174,9 +174,10 @@ SharedRingBuffer::Buffer SharedRingBuffer::BeginWrite(
   PERFETTO_DCHECK(spinlock.locked());
   Buffer result;
 
-  PointerPositions pos = GetPointerPositions(spinlock);
-  if (IsCorrupt(pos))
+  base::Optional<PointerPositions> opt_pos = GetPointerPositions(spinlock);
+  if (!opt_pos)
     return result;
+  auto pos = opt_pos.value();
 
   const uint64_t size_with_header =
       base::AlignUp<kAlignment>(size + kHeaderSize);
@@ -209,12 +210,10 @@ void SharedRingBuffer::EndWrite(Buffer buf) {
 SharedRingBuffer::Buffer SharedRingBuffer::BeginRead() {
   ScopedSpinlock spinlock(&meta_->spinlock, ScopedSpinlock::Mode::Blocking);
 
-  PointerPositions pos = GetPointerPositions(spinlock);
-
-  if (IsCorrupt(pos)) {
-    meta_->num_reads_failed++;
+  base::Optional<PointerPositions> opt_pos = GetPointerPositions(spinlock);
+  if (!opt_pos)
     return Buffer();
-  }
+  auto pos = opt_pos.value();
 
   uint64_t avail_read = read_avail(pos);
 
