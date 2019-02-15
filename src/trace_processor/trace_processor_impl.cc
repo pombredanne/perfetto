@@ -346,7 +346,7 @@ void TraceProcessorImpl::InterruptQuery() {
 }
 
 TraceProcessor::IteratorImpl::IteratorImpl(TraceProcessorImpl* trace_processor,
-sqlite3* db,
+                                           sqlite3* db,
                                            ScopedStmt stmt,
                                            uint32_t column_count,
                                            base::Optional<std::string> error)
@@ -355,7 +355,7 @@ sqlite3* db,
       stmt_(std::move(stmt)),
       column_count_(column_count),
       error_(error) {}
-    
+
 TraceProcessor::IteratorImpl::~IteratorImpl() {
   if (trace_processor_) {
     auto* its = &trace_processor_->iterators_;
