@@ -51,7 +51,7 @@ message DebugAnnotation {
     // Pointers are stored in a separate type as the JSON output treats them
     // differently from other uint64 values.
     uint64 pointer_value = 7;
-    NestedValue nestable_value = 8;
+    NestedValue nested_value = 8;
 
     // Legacy instrumentation may not support conversion of nested data to
     // NestedValue yet.
