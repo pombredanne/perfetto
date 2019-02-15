@@ -64,11 +64,7 @@ int FuzzRingBuffer(const uint8_t* data, size_t size) {
   // for the metadata.
   size_t total_size_pages = 1 + RoundToPow2(payload_size_pages);
 
-  PERFETTO_CHECK(lseek(*fd, total_size_pages * base::kPageSize - 1, SEEK_SET) !=
-                 -1);
-  char null[1] = {'\0'};
-  PERFETTO_CHECK(base::WriteAll(*fd, null, sizeof(null) != -1));
-  PERFETTO_CHECK(lseek(*fd, 0, SEEK_SET) != -1);
+  PERFETTO_CHECK(ftruncate(*fd, total_size_pages * base::kPageSize) == 0);
 
   PERFETTO_CHECK(base::WriteAll(*fd, data, sizeof(MetadataHeader)) != -1);
   PERFETTO_CHECK(lseek(*fd, base::kPageSize, SEEK_SET) != -1);
