@@ -42,6 +42,7 @@ constexpr auto kMetaPageSize = base::kPageSize;
 constexpr auto kAlignment = 8;  // 64 bits to use aligned memcpy().
 constexpr auto kHeaderSize = kAlignment;
 constexpr auto kGuardSize = base::kPageSize * 1024 * 16;  // 64 MB.
+constexpr auto kFDSeals = F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_SEAL;
 
 }  // namespace
 
@@ -88,7 +89,14 @@ SharedRingBuffer::SharedRingBuffer(CreateFlag, size_t size) {
 
   if (!fd) {
     // TODO: if this fails on Android we should fall back on ashmem.
+#if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
+    // In-tree builds should only allow mem_fd, so we can inspect the seals
+    // to verify the fd is appropriately sealed.
+    PERFETTO_ELOG("memfd_create() failed");
+    return;
+#else
     PERFETTO_DPLOG("memfd_create() failed");
+#endif
   }
 #endif
 
@@ -100,7 +108,7 @@ SharedRingBuffer::SharedRingBuffer(CreateFlag, size_t size) {
   PERFETTO_CHECK(res == 0);
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
   if (is_memfd) {
-    res = fcntl(*fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_SEAL);
+    res = fcntl(*fd, F_ADD_SEALS, kFDSeals);
     PERFETTO_DCHECK(res == 0);
   }
 #endif
@@ -120,6 +128,15 @@ SharedRingBuffer::~SharedRingBuffer() {
 }
 
 void SharedRingBuffer::Initialize(base::ScopedFile mem_fd) {
+#if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
+  unsigned int seals = fnctl(*mem_fd, F_GET_SEALS);
+  if (seals & kFDSeals != kFDSeals) {
+    PERFETTO_ELOG("FD not properly sealed. Expected %hu, got %hu", kFDSeals,
+                  seals);
+    return;
+  }
+#endif
+
   struct stat stat_buf = {};
   int res = fstat(*mem_fd, &stat_buf);
   if (res != 0 || stat_buf.st_size == 0) {
