@@ -117,6 +117,17 @@ bool SetBlocking(int fd, bool is_blocking) {
   return fcntl(fd, F_SETFL, flags) == 0;
 }
 
+bool IsPrefix(const char* prefix, const uint8_t* start, const uint8_t* end) {
+  size_t len = strlen(prefix);
+  for (size_t i = 0; i < static_cast<size_t>(end - start); ++i) {
+    if (i == len)
+      return true;
+    if (*(reinterpret_cast<const char*>(start) + i) != prefix[i])
+      return false;
+  }
+  return false;
+}
+
 base::Optional<PageHeader> ParsePageHeader(const uint8_t** ptr,
                                            uint16_t page_header_size_len) {
   const uint8_t* end_of_page = *ptr + base::kPageSize;
@@ -560,6 +571,17 @@ bool CpuReader::ParseEvent(uint16_t ftrace_event_id,
   }
 
   bool success = true;
+
+  const int kPrintEventProtoFieldId = 3;
+  const int kBufFieldId = 1;
+  if (info.proto_field_id == kPrintEventProtoFieldId) {
+    const Field& field = info.fields[kBufFieldId];
+    const uint8_t* field_start = start + field.ftrace_offset;
+    if (!IsPrefix("B|", field_start, end)) {
+      return success;
+    }
+  }
+
   for (const Field& field : table->common_fields())
     success &= ParseField(field, start, end, message, metadata);
 
