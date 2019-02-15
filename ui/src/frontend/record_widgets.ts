@@ -20,7 +20,7 @@ import {RecordConfig} from '../common/state';
 
 import {copyToClipboard} from './clipboard';
 import {globals} from './globals';
-import { assertExists } from '../base/logging';
+import {assertExists} from '../base/logging';
 
 
 declare type Setter<T> = (draft: Draft<RecordConfig>, val: T) => void;

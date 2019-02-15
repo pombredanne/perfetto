@@ -43,7 +43,7 @@ export class Remote {
    */
   // tslint:disable-next-line no-any
   send<T extends any>(
-      method: string, 
+      method: string,
       args: Array<{}>, transferList?: Transferable[]): Promise<T> {
     const d = defer<T>();
     this.deferredRequests.set(this.nextRequestId, d);
