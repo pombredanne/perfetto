@@ -113,6 +113,7 @@ SharedRingBuffer::SharedRingBuffer(CreateFlag, size_t size) {
   }
 #endif
   Initialize(std::move(fd));
+  new (meta_) MetadataPage();
 }
 
 SharedRingBuffer::~SharedRingBuffer() {
@@ -180,7 +181,7 @@ void SharedRingBuffer::Initialize(base::ScopedFile mem_fd) {
     return;
   }
   size_ = size;
-  meta_ = new (region) MetadataPage();
+  meta_ = reinterpret_cast<MetadataPage*>(region);
   mem_ = region + kMetaPageSize;
   mem_fd_ = std::move(mem_fd);
 }
