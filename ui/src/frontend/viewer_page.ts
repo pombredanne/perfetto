@@ -304,10 +304,10 @@ class TraceViewer implements m.ClassComponent {
               panels: [
                 m(OverviewTimelinePanel, {key: 'overview'}),
                 m(TimeAxisPanel, {key: 'timeaxis'}),
+                m(TimeSelectionPanel, {key: 'timeselection'}),
                 m(NotesPanel, {key: 'notes'}),
                 ...globals.state.pinnedTracks.map(
                     id => m(TrackPanel, {key: id, id})),
-                m(TimeSelectionPanel, {key: 'timeselection'})
               ],
             })),
           m('.scrolling-panel-container', m(PanelContainer, {

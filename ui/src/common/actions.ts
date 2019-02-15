@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import {Draft} from 'immer';
+import {hsl} from 'color-convert';
 
 import {assertExists} from '../base/logging';
 import {ConvertTrace} from '../controller/trace_converter';
@@ -253,10 +254,13 @@ export const StateActions = {
 
   addNote(state: StateDraft, args: {timestamp: number}): void {
     const id = `${state.nextId++}`;
+    // 40 different random hues 9 degrees apart.
+    const hue = Math.floor(Math.random() * 40) * 9;
+    const color = hsl.hex([hue, 90, 55]);
     state.notes[id] = {
       id,
       timestamp: args.timestamp,
-      color: '#000000',
+      color: '#' + color,
       text: '',
     };
     this.selectNote(state, {id});
