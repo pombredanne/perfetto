@@ -45,7 +45,7 @@ message TraceEvent {
     // To calculate the absolute timestamp value, sum up all cumulative_delta
     // values of the preceding TraceEvents since the last ThreadDescriptor and
     // add the sum to the |reference_timestamp| in ThreadDescriptor.
-    int64 timestamp_cumulative_delta = 1;
+    uint64 timestamp_cumulative_delta = 1;
     // Absolute value (e.g. a manually specified timestamp in the macro).
     // This is a one-off value that does not affect delta timestamp computation
     // in subsequent TraceEvents.
