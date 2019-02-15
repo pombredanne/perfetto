@@ -34,7 +34,7 @@ export interface App {
   publish(
       what: 'OverviewData'|'TrackData'|'Threads'|'QueryResult'|'LegacyTrace'|
             'SliceDetails',
-      data: {}, transferList?: Transferable[]): void;
+      data: {}, transferList?: Array<{}>): void;
 }
 
 /**
