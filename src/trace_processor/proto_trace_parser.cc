@@ -636,7 +636,7 @@ void ProtoTraceParser::ParseProcess(TraceBlobView process) {
         pid = fld.as_uint32();
         break;
       case protos::ProcessTree::Process::kPpidFieldNumber:
-        pid = fld.as_uint32();
+        ppid = fld.as_uint32();
         break;
       case protos::ProcessTree::Process::kCmdlineFieldNumber:
         if (process_name.empty())
