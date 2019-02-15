@@ -20,6 +20,7 @@
 #include <atomic>
 #include <functional>
 #include <memory>
+#include <vector>
 
 #include "perfetto/base/string_view.h"
 #include "perfetto/trace_processor/basic_types.h"
@@ -48,21 +49,6 @@ TraceType GuessTraceType(const uint8_t* data, size_t size);
 // execution of SQL queries on the events in these traces.
 class TraceProcessorImpl : public TraceProcessor {
  public:
-  class IteratorImpl : public TraceProcessor::Iterator {
-   public:
-    IteratorImpl(sqlite3* db, ScopedStmt, uint8_t column_count);
-    ~IteratorImpl() override;
-
-    NextResult Next() override;
-    SqlValue ColumnValue(uint8_t col) override;
-    uint8_t ColumnCount() override;
-
-   private:
-    sqlite3* db_;
-    ScopedStmt stmt_;
-    uint8_t column_count_ = 0;
-  };
-
   explicit TraceProcessorImpl(const Config&);
 
   ~TraceProcessorImpl() override;
@@ -75,19 +61,59 @@ class TraceProcessorImpl : public TraceProcessor {
       const protos::RawQueryArgs&,
       std::function<void(const protos::RawQueryResult&)>) override;
 
-  std::unique_ptr<Iterator> ExecuteQuery(base::StringView sql) override;
+  Iterator ExecuteQuery(base::StringView sql) override;
 
   void InterruptQuery() override;
 
  private:
+  // Needed for iterators to be able to delete themselves from the vector.
+  friend class IteratorImpl;
+
   ScopedDb db_;  // Keep first.
   TraceProcessorContext context_;
   bool unrecoverable_parse_error_ = false;
+
+  std::vector<IteratorImpl*> iterators_;
 
   // This is atomic because it is set by the CTRL-C signal handler and we need
   // to prevent single-flow compiler optimizations in ExecuteQuery().
   std::atomic<bool> query_interrupted_{false};
 };
+
+// The pointer implementation of TraceProcessor::Iterator.
+class TraceProcessor::IteratorImpl {
+ public:
+  IteratorImpl(TraceProcessorImpl* impl,
+               sqlite3* db,
+               ScopedStmt,
+               uint32_t column_count,
+               base::Optional<std::string> error);
+  ~IteratorImpl();
+
+  IteratorImpl(IteratorImpl&) noexcept = delete;
+  IteratorImpl& operator=(IteratorImpl&) = delete;
+
+  IteratorImpl(IteratorImpl&&) noexcept = default;
+  IteratorImpl& operator=(IteratorImpl&&) = default;
+
+  // Methods called by TraceProcessor::Iterator.
+  Iterator::NextResult Next();
+  SqlValue Get(uint32_t col);
+  uint32_t ColumnCount();
+  base::Optional<std::string> GetLastError();
+  bool IsValid();
+
+  // Methods called by TraceProcessorImpl.
+  void Reset();
+
+ private:
+  TraceProcessorImpl* trace_processor_;
+  sqlite3* db_ = nullptr;
+  ScopedStmt stmt_;
+  uint32_t column_count_ = 0;
+  base::Optional<std::string> error_;
+};
+
 }  // namespace trace_processor
 }  // namespace perfetto
 

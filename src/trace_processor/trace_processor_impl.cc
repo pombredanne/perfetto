@@ -170,7 +170,10 @@ TraceProcessorImpl::TraceProcessorImpl(const Config& cfg) {
   RawTable::RegisterTable(*db_, context_.storage.get());
 }
 
-TraceProcessorImpl::~TraceProcessorImpl() = default;
+TraceProcessorImpl::~TraceProcessorImpl() {
+  for (auto* it : iterators_)
+    it->Reset();
+}
 
 bool TraceProcessorImpl::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
   if (size == 0)
@@ -319,16 +322,20 @@ void TraceProcessorImpl::ExecuteQuery(
   callback(proto);
 }
 
-std::unique_ptr<TraceProcessor::Iterator> TraceProcessorImpl::ExecuteQuery(
+TraceProcessor::Iterator TraceProcessorImpl::ExecuteQuery(
     base::StringView sql) {
   sqlite3_stmt* raw_stmt;
   int err = sqlite3_prepare_v2(*db_, sql.data(), static_cast<int>(sql.size()),
                                &raw_stmt, nullptr);
-  if (err)
-    return nullptr;
-  auto col_count = static_cast<uint8_t>(sqlite3_column_count(raw_stmt));
-  return std::unique_ptr<TraceProcessor::Iterator>(
-      new IteratorImpl(*db_, ScopedStmt(raw_stmt), col_count));
+  auto col_count =
+      err ? 0 : static_cast<uint32_t>(sqlite3_column_count(raw_stmt));
+  auto error =
+      err ? base::Optional<std::string>(sqlite3_errmsg(*db_)) : base::nullopt;
+
+  std::unique_ptr<IteratorImpl> impl(
+      new IteratorImpl(this, *db_, ScopedStmt(raw_stmt), col_count, error));
+  iterators_.emplace_back(impl.get());
+  return TraceProcessor::Iterator(std::move(impl));
 }
 
 void TraceProcessorImpl::InterruptQuery() {
@@ -338,25 +345,41 @@ void TraceProcessorImpl::InterruptQuery() {
   sqlite3_interrupt(db_.get());
 }
 
-TraceProcessorImpl::IteratorImpl::IteratorImpl(sqlite3* db,
-                                               ScopedStmt stmt,
-                                               uint8_t column_count)
-    : db_(db), stmt_(std::move(stmt)), column_count_(column_count) {}
-
-TraceProcessorImpl::IteratorImpl::~IteratorImpl() = default;
-
-TraceProcessorImpl::IteratorImpl::NextResult
-TraceProcessorImpl::IteratorImpl::Next() {
-  int ret = sqlite3_step(*stmt_);
-  bool is_done = ret != SQLITE_ROW;
-  if (is_done && ret != SQLITE_DONE) {
-    base::Optional<std::string> err(sqlite3_errmsg(db_));
-    return std::make_pair(true, std::move(err));
+TraceProcessor::IteratorImpl::IteratorImpl(TraceProcessorImpl* trace_processor,
+sqlite3* db,
+                                           ScopedStmt stmt,
+                                           uint32_t column_count,
+                                           base::Optional<std::string> error)
+    : trace_processor_(trace_processor),
+      db_(db),
+      stmt_(std::move(stmt)),
+      column_count_(column_count),
+      error_(error) {}
+    
+TraceProcessor::IteratorImpl::~IteratorImpl() {
+  if (trace_processor_) {
+    auto* its = &trace_processor_->iterators_;
+    auto it = std::find(its->begin(), its->end(), this);
+    PERFETTO_CHECK(it != its->end());
+    its->erase(it);
   }
-  return std::make_pair(is_done, base::nullopt);
 }
 
-SqlValue TraceProcessorImpl::IteratorImpl::ColumnValue(uint8_t column) {
+TraceProcessor::Iterator::NextResult TraceProcessor::IteratorImpl::Next() {
+  using Result = TraceProcessor::Iterator::NextResult;
+  if (error_.has_value())
+    return Result::kError;
+
+  int ret = sqlite3_step(*stmt_);
+  if (ret != SQLITE_ROW && ret != SQLITE_DONE) {
+    error_ = base::Optional<std::string>(sqlite3_errmsg(db_));
+    return Result::kError;
+  }
+  return ret == SQLITE_ROW ? Result::kHasNext : Result::kEOF;
+}
+
+SqlValue TraceProcessor::IteratorImpl::Get(uint32_t col) {
+  auto column = static_cast<int>(col);
   auto col_type = sqlite3_column_type(*stmt_, column);
   SqlValue value;
   switch (col_type) {
@@ -380,8 +403,20 @@ SqlValue TraceProcessorImpl::IteratorImpl::ColumnValue(uint8_t column) {
   return value;
 }
 
-uint8_t TraceProcessorImpl::IteratorImpl::ColumnCount() {
+uint32_t TraceProcessor::IteratorImpl::ColumnCount() {
   return column_count_;
+}
+
+base::Optional<std::string> TraceProcessor::IteratorImpl::GetLastError() {
+  return error_;
+}
+
+bool TraceProcessor::IteratorImpl::IsValid() {
+  return trace_processor_ != nullptr;
+}
+
+void TraceProcessor::IteratorImpl::Reset() {
+  *this = IteratorImpl(nullptr, nullptr, ScopedStmt(), 0, base::nullopt);
 }
 
 }  // namespace trace_processor

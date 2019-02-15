@@ -33,14 +33,16 @@ struct Config {
 struct SqlValue {
   // Represents the type of the value.
   enum Type {
+    kNull = 0,
     kString,
     kLong,
     kDouble,
-    kNull,
   };
 
   // Up to 1 of these fields can be accessed depending on |type|.
   union {
+    // This string will be owned by the iterator that returned it and is valid
+    // as long until the subsequent call to Next().
     const char* string_value;
     long long_value;
     double double_value;

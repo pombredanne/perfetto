@@ -142,7 +142,7 @@ int TraceToExperimentalSystrace(std::istream* input, std::ostream* output) {
   *output << kFtraceHeader;
 
   auto iterator = tp->ExecuteQuery("select to_ftrace(id) from raw");
-  if (!iterator) {
+  if (!iterator.IsValid()) {
     PERFETTO_ELOG("Error creating SQL iterator");
     return 1;
   }
@@ -152,17 +152,18 @@ int TraceToExperimentalSystrace(std::istream* input, std::ostream* output) {
   base::StringWriter writer(*buffer, kBufferSize);
 
   for (uint32_t rows = 0;; rows++) {
-    auto result = iterator->Next();
-    bool is_done = result.first;
-    const auto& opt_err = result.second;
-    if (PERFETTO_UNLIKELY(opt_err.has_value())) {
-      PERFETTO_ELOG("Error while writing systrace %s", opt_err->c_str());
+    using Result = trace_processor::TraceProcessor::Iterator::NextResult;
+
+    auto result = iterator.Next();
+    if (PERFETTO_UNLIKELY(result == Result::kError)) {
+      PERFETTO_ELOG("Error while writing systrace %s",
+                    iterator.GetLastError().value().c_str());
       return 1;
-    } else if (is_done) {
+    } else if (result == Result::kEOF) {
       break;
     }
 
-    const char* line = iterator->ColumnValue(0).string_value;
+    const char* line = iterator.Get(0 /* col */).string_value;
     size_t length = strlen(line);
     if (writer.pos() + length >= kBufferSize) {
       fprintf(stderr, "\x1b[2K\rWritten %" PRIu32 " rows\r", rows);

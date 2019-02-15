@@ -37,27 +37,43 @@ namespace trace_processor {
 // execution of SQL queries on the events in these traces.
 class TraceProcessor {
  public:
+  class IteratorImpl;
+
   // Iterator returning SQL rows satisfied by a query.
   class Iterator {
    public:
-    using OptionalError = base::Optional<std::string>;
-    using NextResult = std::pair<bool, OptionalError>;
+    enum NextResult { kEOF = 0, kError = -1, kHasNext = 1 };
 
-    virtual ~Iterator();
+    Iterator(std::unique_ptr<IteratorImpl> iterator);
 
-    // Forwards the iterator to the next result row and returns a pair
-    // (bool, OptionalError) with the first param indicating whether the
-    // iterator is completed and second indicating if there is an error. All
-    // errors indicated are fatal - that is if the second param has a param, the
-    // first param will always be true.
-    virtual NextResult Next() = 0;
+    Iterator(Iterator&) noexcept = delete;
+    Iterator& operator=(Iterator&) = delete;
 
-    // Returns the value associated with the column |col|. |Next()| *must* be
-    // called before calling this function.
-    virtual SqlValue ColumnValue(uint8_t col) = 0;
+    Iterator(Iterator&&) noexcept = default;
+    Iterator& operator=(Iterator&&) = default;
 
-    // Returns the number of columns in this iterator's query.
-    virtual uint8_t ColumnCount() = 0;
+    // Forwards the iterator to the next result row and returns an enum
+    // indicating if there we have reached EOF and whether there was an error.
+    NextResult Next();
+
+    // Returns the value associated with the column |col|. Any call to
+    // |Get()| must be preceeded by a call to |Next()| returning
+    // kHasNext. |col| must be less than the number returned by |ColumnCount()|.
+    SqlValue Get(uint32_t col);
+
+    // Returns the number of columns in this iterator's query. Can be called
+    // even before calling |Next()|.
+    uint32_t ColumnCount();
+
+    // Returns the error indicated by the last |Next()| call. If no error
+    // occurred, the returned value will be base::nullopt.
+    base::Optional<std::string> GetLastError();
+
+    // Returns if this iterator is valid to call methods on.
+    bool IsValid();
+
+   private:
+    std::unique_ptr<IteratorImpl> iterator_;
   };
 
   // Creates a new instance of TraceProcessor.
@@ -87,7 +103,7 @@ class TraceProcessor {
 
   // Executes a SQLite query on the loaded portion of the trace. The returned
   // iterator can be used to load rows from the result.
-  virtual std::unique_ptr<Iterator> ExecuteQuery(base::StringView sql) = 0;
+  virtual Iterator ExecuteQuery(base::StringView sql);
 
   // Interrupts the current query. Typically used by Ctrl-C handler.
   virtual void InterruptQuery() = 0;

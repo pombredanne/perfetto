@@ -28,7 +28,30 @@ std::unique_ptr<TraceProcessor> TraceProcessor::CreateInstance(
 }
 
 TraceProcessor::~TraceProcessor() = default;
-TraceProcessor::Iterator::~Iterator() = default;
+
+TraceProcessor::Iterator::NextResult TraceProcessor::Iterator::Next() {
+  PERFETTO_DCHECK(IsValid());
+  return iterator_->Next();
+}
+
+SqlValue TraceProcessor::Iterator::Get(uint32_t col) {
+  PERFETTO_DCHECK(IsValid());
+  return iterator_->Get(col);
+}
+
+uint32_t TraceProcessor::Iterator::ColumnCount() {
+  PERFETTO_DCHECK(IsValid());
+  return iterator_->ColumnCount();
+}
+
+base::Optional<std::string> TraceProcessor::Iterator::GetLastError() {
+  PERFETTO_DCHECK(IsValid());
+  return iterator_->GetLastError();
+}
+
+bool TraceProcessor::Iterator::IsValid() {
+  return iterator_->IsValid();
+}
 
 // static
 void EnableSQLiteVtableDebugging() {
