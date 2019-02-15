@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Draft} from 'immer';
+import {DraftObject} from 'immer';
 
 import {assertExists} from '../base/logging';
 import {ConvertTrace} from '../controller/trace_converter';
@@ -26,7 +26,7 @@ import {
   TraceTime,
 } from './state';
 
-type StateDraft = Draft<State>;
+type StateDraft = DraftObject<State>;
 
 
 function clearTraceState(state: StateDraft) {

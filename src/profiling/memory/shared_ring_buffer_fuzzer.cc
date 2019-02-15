@@ -52,7 +52,6 @@ int FuzzRingBuffer(const uint8_t* data, size_t size) {
     return 0;
 
   auto fd = base::TempFile::CreateUnlinked().ReleaseFD();
-
   PERFETTO_CHECK(fd);
 
   // Put the remaining fuzzer input into the data portion of the ring buffer.
