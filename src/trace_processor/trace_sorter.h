@@ -19,6 +19,7 @@
 
 #include <vector>
 
+#include "perfetto/base/circular_queue.h"
 #include "perfetto/trace_processor/basic_types.h"
 #include "src/trace_processor/trace_blob_view.h"
 #include "src/trace_processor/trace_processor_context.h"
@@ -162,10 +163,7 @@ class TraceSorter {
     SortAndFlushEventsBeyondWindow(window_size_ns_);
   }
 
-  // std::deque makes erase-front potentially faster but std::sort slower.
-  // Overall seems slower than a vector (350 MB/s vs 400 MB/s) without counting
-  // next pipeline stages.
-  std::vector<TimestampedTracePiece> events_;
+  base::CircularQueue<TimestampedTracePiece> events_;
   TraceProcessorContext* const context_;
   OptimizationMode optimization_;
 
