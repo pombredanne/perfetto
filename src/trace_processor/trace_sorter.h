@@ -151,8 +151,7 @@ class TraceSorter {
     // things happening here: (1) Sorting the tail of |events_|; (2) Erasing the
     // head of |events_| and shifting them left. Both operations become way
     // faster if done in large batches (~1M events), where we end up erasing
-    // 90% or more of |events_| and the erase-front becomes mainly a memmove of
-    // the remaining tail elements. Capping at 1M objectis to avoid holding
+    // 90% or more of |events_|. Capping at 1M object to avoid holding onto
     // too many events in the staging area.
     if (optimization_ == OptimizationMode::kMaxBandwidth &&
         latest_timestamp_ - earliest_timestamp_ < window_size_ns_ * 10 &&
