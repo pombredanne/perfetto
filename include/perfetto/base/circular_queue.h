@@ -57,8 +57,8 @@ class CircularQueue {
     using reference = const T&;
     using iterator_category = std::random_access_iterator_tag;
 
-    Iterator(CircularQueue* cdq, uint64_t pos, uint32_t generation)
-        : cdq_(cdq),
+    Iterator(CircularQueue* queue, uint64_t pos, uint32_t generation)
+        : queue_(queue),
           pos_(pos)
 #if PERFETTO_DCHECK_IS_ON()
           ,
@@ -70,9 +70,9 @@ class CircularQueue {
 
     T* operator->() {
 #if PERFETTO_DCHECK_IS_ON()
-      PERFETTO_DCHECK(generation_ == cdq_->generation());
+      PERFETTO_DCHECK(generation_ == queue_->generation());
 #endif
-      return cdq_->Get(pos_);
+      return queue_->Get(pos_);
     }
     T& operator*() { return *(operator->()); }
 
@@ -156,10 +156,10 @@ class CircularQueue {
    private:
     inline void Add(difference_type offset) {
       pos_ = static_cast<uint64_t>(static_cast<difference_type>(pos_) + offset);
-      PERFETTO_DCHECK(pos_ <= cdq_->end_);
+      PERFETTO_DCHECK(pos_ <= queue_->end_);
     }
 
-    CircularQueue* cdq_;
+    CircularQueue* queue_;
     uint64_t pos_;
 
 #if PERFETTO_DCHECK_IS_ON()
