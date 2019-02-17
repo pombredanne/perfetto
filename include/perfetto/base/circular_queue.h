@@ -229,7 +229,8 @@ class CircularQueue {
   void Grow() {
     // Capacity must be always a power of two. This allows Get() to use a simple
     // bitwise-AND for handling the wrapping instead of a full division.
-    size_t new_capacity = capacity_ * 2;
+    size_t new_capacity = static_cast<size_t>(capacity_ * 2);
+    PERFETTO_CHECK(new_capacity > capacity_);  // Hit the 4GB wall on 32-bit.
     auto new_vec = static_cast<T*>(malloc(new_capacity * sizeof(T)));
 
     // Move all elements in the expanded array.
