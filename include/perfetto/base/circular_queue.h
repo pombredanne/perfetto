@@ -27,12 +27,12 @@
 namespace perfetto {
 namespace base {
 
-// CircularQueue is a push-back, pop-front queue with the following
+// CircularQueue is a push-back-only / pop-front-only queue with the following
 // characteristics:
 // - The storage is based on a flat circular buffer. Beginning and end wrap
 //   as necessary, to keep pushes and pops O(1) as long as capacity expansion is
 //   not required.
-// - Capacity is automatically expanded as in a std::vector. Expansion has a
+// - Capacity is automatically expanded like in a std::vector. Expansion has a
 //   O(N) cost.
 // - It allows random access, allowing in-place std::sort.
 // - Iterators are not stable. Mutating the container invalidates all iterators.
@@ -40,9 +40,9 @@ namespace base {
 //
 // Implementation details:
 // Internally, |begin|, |end| and iterators use 64-bit monotonic indexes, which
-// are incremented as if the queue was backed on unlimited storage.
-// Even assuming that elements are inserted and removed every ns, 64 bit is
-// enough for 584 years.
+// are incremented as if the queue was backed by unlimited storage.
+// Even assuming that elements are inserted and removed every nanosecond, 64 bit
+// is enough for 584 years.
 // Wrapping happens only when addressing elements in the underlying circular
 // storage. This limits the complexity and avoiding dealing with modular
 // arithmetic all over the places.
@@ -74,6 +74,7 @@ class CircularQueue {
 #endif
       return queue_->Get(pos_);
     }
+
     T& operator*() { return *(operator->()); }
 
     const value_type& operator[](difference_type i) const {
@@ -167,22 +168,18 @@ class CircularQueue {
 #endif
   };
 
-  CircularQueue(size_t initial_capacity = 1024) {
-    PERFETTO_CHECK((initial_capacity & (initial_capacity - 1)) == 0);
-    capacity_ = initial_capacity;
-    vec_ = static_cast<T*>(malloc(capacity_ * sizeof(T)));
-  }
+  CircularQueue(size_t initial_capacity = 1024) { Grow(initial_capacity); }
 
   ~CircularQueue() {
-    erase_front(size());
+    erase_front(size());  // Invoke destructors on all alive entries.
     PERFETTO_DCHECK(empty());
-    free(vec_);
+    free(entries_);
   }
 
   template <typename... Args>
   void emplace_back(Args&&... args) {
     increment_generation();
-    if (PERFETTO_UNLIKELY(size() == capacity_))
+    if (PERFETTO_UNLIKELY(size() >= capacity_))
       Grow();
     T* slot = Get(end_++);
     new (slot) T(std::forward<Args>(args)...);
@@ -211,7 +208,7 @@ class CircularQueue {
   bool empty() const { return size() == 0; }
 
   size_t size() const {
-    PERFETTO_DCHECK(end_ - begin_ <= static_cast<uint64_t>(capacity_));
+    PERFETTO_DCHECK(end_ - begin_ <= capacity_);
     return static_cast<size_t>(end_ - begin_);
   }
 
@@ -226,12 +223,18 @@ class CircularQueue {
 #endif
 
  private:
-  void Grow() {
+  void Grow(size_t new_capacity = 0) {
     // Capacity must be always a power of two. This allows Get() to use a simple
     // bitwise-AND for handling the wrapping instead of a full division.
-    size_t new_capacity = static_cast<size_t>(capacity_ * 2);
-    PERFETTO_CHECK(new_capacity > capacity_);  // Hit the 4GB wall on 32-bit.
-    auto new_vec = static_cast<T*>(malloc(new_capacity * sizeof(T)));
+    new_capacity = new_capacity ? new_capacity : capacity_ * 2;
+    PERFETTO_CHECK((new_capacity & (new_capacity - 1)) == 0);  // Must be pow2.
+
+    // On 32-bit systems this might hit the 4GB wall and onverflow. We can't do
+    // anything other than crash in this case.
+    PERFETTO_CHECK(new_capacity > capacity_);
+    size_t malloc_size = new_capacity * sizeof(T);
+    PERFETTO_CHECK(malloc_size > new_capacity);
+    auto* new_vec = static_cast<T*>(malloc(malloc_size));
 
     // Move all elements in the expanded array.
     size_t new_size = 0;
@@ -242,25 +245,32 @@ class CircularQueue {
     // required to call the dtor for them.
     for (uint64_t i = begin_; i < end_; i++)
       Get(i)->~T();
-    free(vec_);
+    free(entries_);  // It's fine to free(nullptr) (for the ctor call case).
 
     begin_ = 0;
     end_ = new_size;
     capacity_ = new_capacity;
-    vec_ = new_vec;
+    entries_ = new_vec;
   }
 
   inline T* Get(uint64_t pos) {
     PERFETTO_DCHECK(pos >= begin_ && pos < end_);
-    PERFETTO_DCHECK((capacity_ & (capacity_ - 1)) == 0);
-    auto mod = static_cast<size_t>(pos & (capacity_ - 1));
-    return &vec_[mod];
+    PERFETTO_DCHECK((capacity_ & (capacity_ - 1)) == 0);  // Must be a pow2.
+    auto index = static_cast<size_t>(pos & (capacity_ - 1));
+    return &entries_[index];
   }
 
-  T* vec_;
+  // Underlying storage. It's raw malloc-ed rather than being a unique_ptr<T[]>
+  // to allow having uninitialized entries inside it.
+  T* entries_ = nullptr;
+  size_t capacity_ = 0;  // Number of allocated slots (NOT bytes) in |entries_|.
+
+  // The |begin_| and |end_| indexes are monotonic and never wrap. Modular arith
+  // is used only when dereferencing entries in the vector.
   uint64_t begin_ = 0;
   uint64_t end_ = 0;
-  uint64_t capacity_;
+
+// Generation is used in debug builds only for checking iterator validity.
 #if PERFETTO_DCHECK_IS_ON()
   uint32_t generation_ = 0;
 #endif
