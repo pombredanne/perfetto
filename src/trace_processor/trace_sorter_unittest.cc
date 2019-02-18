@@ -61,14 +61,13 @@ class MockTraceStorage : public TraceStorage {
   MOCK_METHOD1(InternString, StringId(base::StringView view));
 };
 
-class TraceSorterTest : public ::testing::TestWithParam<OptimizationMode> {
+class TraceSorterTest : public ::testing::Test {
  public:
   TraceSorterTest()
       : test_buffer_(std::unique_ptr<uint8_t[]>(new uint8_t[8]), 0, 8) {
     storage_ = new NiceMock<MockTraceStorage>();
     context_.storage.reset(storage_);
-    context_.sorter.reset(
-        new TraceSorter(&context_, GetParam(), 0 /*window_size*/));
+    context_.sorter.reset(new TraceSorter(&context_, 0 /*window_size*/));
     parser_ = new MockTraceParser(&context_);
     context_.proto_parser.reset(parser_);
   }
@@ -80,12 +79,7 @@ class TraceSorterTest : public ::testing::TestWithParam<OptimizationMode> {
   TraceBlobView test_buffer_;
 };
 
-INSTANTIATE_TEST_CASE_P(OptMode,
-                        TraceSorterTest,
-                        ::testing::Values(OptimizationMode::kMaxBandwidth,
-                                          OptimizationMode::kMinLatency));
-
-TEST_P(TraceSorterTest, TestFtrace) {
+TEST_F(TraceSorterTest, TestFtrace) {
   TraceBlobView view = test_buffer_.slice(0, 1);
   EXPECT_CALL(*parser_, MOCK_ParseFtracePacket(0, 1000, view.data(), 1));
   context_.sorter->PushFtracePacket(0 /*cpu*/, 1000 /*timestamp*/,
@@ -93,14 +87,14 @@ TEST_P(TraceSorterTest, TestFtrace) {
   context_.sorter->FlushEventsForced();
 }
 
-TEST_P(TraceSorterTest, TestTracePacket) {
+TEST_F(TraceSorterTest, TestTracePacket) {
   TraceBlobView view = test_buffer_.slice(0, 1);
   EXPECT_CALL(*parser_, MOCK_ParseTracePacket(1000, view.data(), 1));
   context_.sorter->PushTracePacket(1000, std::move(view));
   context_.sorter->FlushEventsForced();
 }
 
-TEST_P(TraceSorterTest, Ordering) {
+TEST_F(TraceSorterTest, Ordering) {
   TraceBlobView view_1 = test_buffer_.slice(0, 1);
   TraceBlobView view_2 = test_buffer_.slice(0, 2);
   TraceBlobView view_3 = test_buffer_.slice(0, 3);
