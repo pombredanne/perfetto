@@ -85,4 +85,9 @@ export class FrontendLocalState {
     this.hoveredTimestamp = ts;
     globals.rafScheduler.scheduleRedraw();
   }
+
+  //setLogsPagination(offset: number, count: number): void {
+  //  this.logsOffset = offset;
+  //  this.logsCount = count;
+  //}
 }

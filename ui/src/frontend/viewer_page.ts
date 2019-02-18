@@ -16,6 +16,7 @@ import * as m from 'mithril';
 
 import {QueryResponse} from '../common/queries';
 import {TimeSpan} from '../common/time';
+import {LogPanel} from './logs_panel';
 
 import {copyToClipboard} from './clipboard';
 import {DragGestureHandler} from './drag_gesture_handler';
@@ -286,6 +287,7 @@ class TraceViewer implements m.ClassComponent {
         this.detailsHeight = DRAG_HANDLE_HEIGHT_PX;
       }
     }
+    detailsPanels.push(m(LogPanel, {}));
 
     return m(
         '.page',

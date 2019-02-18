@@ -24,6 +24,7 @@ import {
   State,
   Status,
   TraceTime,
+  LogsPagination,
 } from './state';
 
 type StateDraft = DraftObject<State>;
@@ -303,7 +304,11 @@ export const StateActions = {
 
   deselect(state: StateDraft, _: {}): void {
     state.currentSelection = null;
-  }
+  },
+
+  updateLogsPagination(state: StateDraft, args: LogsPagination): void {
+    state.logsPagination = args;
+  },
 
 };
 

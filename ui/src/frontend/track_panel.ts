@@ -214,6 +214,16 @@ export class TrackPanel extends Panel<TrackPanelAttrs> {
     ctx.translate(TRACK_SHELL_WIDTH, 0);
 
     this.track.renderCanvas(ctx);
+
+    //const hoveredTs = globals.frontendLocalState.hoveredTs;
+    //const vizTime = globals.frontendLocalState.visibleWindowTime;
+    //if (hoveredTs > 0 && vizTime.start <= hoveredTs &&
+    //    hoveredTs <= vizTime.end) {
+    //  ctx.fillStyle = '#333333';
+    //  const x = Math.floor(globals.frontendLocalState.timeScale.timeToPx(hoveredTs));
+    //  ctx.fillRect(x, 0, 1, size.height);
+    //}
+
     ctx.restore();
 
     const localState = globals.frontendLocalState;

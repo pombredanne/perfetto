@@ -62,7 +62,11 @@ class FrontendApi {
 
   publishTrackData(args: {id: string, data: {}}) {
     globals.setTrackData(args.id, args.data);
-    globals.rafScheduler.scheduleRedraw();
+    if (args.id === 'log-bounds' || args.id === 'log-entries') {
+      globals.rafScheduler.scheduleFullRedraw();
+    } else {
+      globals.rafScheduler.scheduleRedraw();
+    }
   }
 
   publishQueryResult(args: {id: string, data: {}}) {
