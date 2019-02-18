@@ -63,7 +63,7 @@ message TraceEvent {
   optional int32 tid_override = 19;
 
   // We intend to add a binary symbol version of this in the future.
-  repeated uint32 category_iid = 3;  // interned EventCategoryName.
+  repeated uint32 category_iids = 3;  // interned EventCategoryName.
 
   // TODO(eseckler): May also want a debug_name for untyped debug-only events.
 

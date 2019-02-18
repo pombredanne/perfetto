@@ -25,9 +25,9 @@ message ChromeTracedValue {
   }
   optional NestedType nested_type = 1;
 
-  repeated string dict_key = 2;
-  repeated ChromeTracedValue dict_value = 3;
-  repeated ChromeTracedValue array_value = 4;
+  repeated string dict_keys = 2;
+  repeated ChromeTracedValue dict_values = 3;
+  repeated ChromeTracedValue array_values = 4;
   optional int32 int_value = 5;
   optional double double_value = 6;
   optional bool bool_value = 7;

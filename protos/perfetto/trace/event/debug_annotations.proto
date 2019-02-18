@@ -31,9 +31,9 @@ message DebugAnnotation {
     }
     optional NestedType nested_type = 1;
 
-    repeated string dict_key = 2;
-    repeated NestedValue dict_value = 3;
-    repeated NestedValue array_value = 4;
+    repeated string dict_keys = 2;
+    repeated NestedValue dict_values = 3;
+    repeated NestedValue array_values = 4;
     optional int32 int_value = 5;
     optional double double_value = 6;
     optional bool bool_value = 7;
@@ -60,7 +60,7 @@ message DebugAnnotation {
 }
 
 message DebugAnnotations {
-  repeated DebugAnnotation debug_annotation = 1;
+  repeated DebugAnnotation debug_annotations = 1;
 }
 
 // --------------------

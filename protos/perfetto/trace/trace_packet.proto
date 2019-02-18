@@ -144,8 +144,8 @@ message TracePacket {
   //
   // We use field IDs from 1000 to identify these fields for generic
   // reconstruction of the interning indexes in the trace processor.
-  repeated EventCategory event_category = 1000;
-  repeated LegacyEventName legacy_event_name = 1001;
-  repeated DebugAnnotationName debug_annotation_name = 1002;
-  repeated SourceLocation source_location = 1003;
+  repeated EventCategory event_categories = 1000;
+  repeated LegacyEventName legacy_event_names = 1001;
+  repeated DebugAnnotationName debug_annotation_names = 1002;
+  repeated SourceLocation source_locations = 1003;
 }
