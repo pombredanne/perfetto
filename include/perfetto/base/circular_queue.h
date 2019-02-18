@@ -168,13 +168,16 @@ class CircularQueue {
   };
 
   CircularQueue(size_t initial_capacity = 1024) { Grow(initial_capacity); }
+
   CircularQueue(CircularQueue&& other) noexcept {
-    *this = other;  // Use (private) default copy assignment operator.
+    // Copy all fields using the (private) default copy assignment operator.
+    *this = other;
     increment_generation();
     new (&other) CircularQueue();  // Reset the old queue so it's still usable.
   }
 
   CircularQueue& operator=(CircularQueue&& other) {
+    this->~CircularQueue();                      // Destroy the current state.
     new (this) CircularQueue(std::move(other));  // Use the move ctor above.
     return *this;
   }
