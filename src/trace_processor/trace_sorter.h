@@ -103,7 +103,7 @@ class TraceSorter {
   }
 
  private:
-  struct EventQueue {
+  struct Queue {
     inline void Append(TimestampedTracePiece ttp) {
       const int64_t timestamp = ttp.timestamp;
       events_.emplace_back(std::move(ttp));
@@ -144,13 +144,13 @@ class TraceSorter {
   // parser to be parsed and then stored.
   void SortAndFlushEventsBeyondWindow(int64_t windows_size_ns);
 
-  inline EventQueue* GetQueue(size_t index) {
+  inline Queue* GetQueue(size_t index) {
     if (PERFETTO_UNLIKELY(index >= queues_.size()))
       queues_.resize(index + 1);
     return &queues_[index];
   }
 
-  inline void AppendAndMaybeFlushEvents(EventQueue* queue,
+  inline void AppendAndMaybeFlushEvents(Queue* queue,
                                         int64_t timestamp,
                                         TraceBlobView packet) {
     queue->Append(
@@ -170,7 +170,7 @@ class TraceSorter {
   // queues_[0] is the general (non-ftrace) queue.
   // queues_[1] is the ftrace queue for CPU(0).
   // queues_[x] is the ftrace queue for CPU(x - 1).
-  std::vector<EventQueue> queues_;
+  std::vector<Queue> queues_;
 
   // Events are propagated to the next stage only after (max - min) timestamp
   // is larger than this value.

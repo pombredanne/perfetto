@@ -29,7 +29,7 @@ TraceSorter::TraceSorter(TraceProcessorContext* context, int64_t window_size_ns)
   bypass_next_stage_for_testing_ = env && !strcmp(env, "1");
 }
 
-void TraceSorter::EventQueue::Sort() {
+void TraceSorter::Queue::Sort() {
   // First check if any sorting is needed.
   PERFETTO_DCHECK(needs_sorting());
   PERFETTO_DCHECK(sort_start_idx_ < events_.size());
@@ -104,7 +104,7 @@ void TraceSorter::SortAndFlushEventsBeyondWindow(int64_t window_size_ns) {
       break;
     }
 
-    EventQueue& queue = queues_[min_queue_idx];
+    Queue& queue = queues_[min_queue_idx];
     base::CircularQueue<TimestampedTracePiece>& events = queue.events_;
     if (queue.needs_sorting())
       queue.Sort();
