@@ -18,7 +18,6 @@
 #define INCLUDE_PERFETTO_BASE_CIRCULAR_QUEUE_H_
 
 #include <stdint.h>
-#include <string.h>
 #include <iterator>
 
 #include "perfetto/base/logging.h"
@@ -169,8 +168,22 @@ class CircularQueue {
   };
 
   CircularQueue(size_t initial_capacity = 1024) { Grow(initial_capacity); }
+  CircularQueue(CircularQueue&& other) noexcept {
+    *this = other;  // Use (private) default copy assignment operator.
+    increment_generation();
+    new (&other) CircularQueue();  // Reset the old queue so it's still usable.
+  }
+
+  CircularQueue& operator=(CircularQueue&& other) {
+    new (this) CircularQueue(std::move(other));  // Use the move ctor above.
+    return *this;
+  }
 
   ~CircularQueue() {
+    if (!entries_) {
+      PERFETTO_DCHECK(empty());
+      return;
+    }
     erase_front(size());  // Invoke destructors on all alive entries.
     PERFETTO_DCHECK(empty());
     free(entries_);
@@ -223,13 +236,16 @@ class CircularQueue {
 #endif
 
  private:
+  CircularQueue(const CircularQueue&) = delete;
+  CircularQueue& operator=(const CircularQueue&) = default;
+
   void Grow(size_t new_capacity = 0) {
     // Capacity must be always a power of two. This allows Get() to use a simple
     // bitwise-AND for handling the wrapping instead of a full division.
     new_capacity = new_capacity ? new_capacity : capacity_ * 2;
     PERFETTO_CHECK((new_capacity & (new_capacity - 1)) == 0);  // Must be pow2.
 
-    // On 32-bit systems this might hit the 4GB wall and onverflow. We can't do
+    // On 32-bit systems this might hit the 4GB wall and overflow. We can't do
     // anything other than crash in this case.
     PERFETTO_CHECK(new_capacity > capacity_);
     size_t malloc_size = new_capacity * sizeof(T);

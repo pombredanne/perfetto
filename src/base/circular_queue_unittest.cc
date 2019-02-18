@@ -101,6 +101,39 @@ TEST(CircularQueueTest, Sorting) {
   ASSERT_TRUE(std::is_sorted(queue.begin(), queue.end()));
 }
 
+TEST(CircularQueueTest, MoveOperators) {
+  CircularQueue<int> queue;
+  queue.emplace_back(1);
+  queue.emplace_back(2);
+
+  {
+    CircularQueue<int> moved(std::move(queue));
+    ASSERT_TRUE(queue.empty());
+    ASSERT_EQ(moved.size(), 2u);
+
+    moved.emplace_back(3);
+    moved.emplace_back(4);
+    ASSERT_EQ(moved.size(), 4u);
+  }
+  queue.emplace_back(10);
+  queue.emplace_back(11);
+  queue.emplace_back(12);
+  ASSERT_EQ(queue.size(), 3u);
+  ASSERT_EQ(queue.front(), 10);
+  ASSERT_EQ(queue.back(), 12);
+
+  {
+    CircularQueue<int> moved;
+    moved.emplace_back(42);
+    moved = std::move(queue);
+    ASSERT_TRUE(queue.empty());
+    ASSERT_EQ(moved.size(), 3u);
+    ASSERT_EQ(moved.size(), 3u);
+    ASSERT_EQ(moved.front(), 10);
+    ASSERT_EQ(moved.back(), 12);
+  }
+}
+
 TEST(CircularQueueTest, Iterators) {
   for (size_t repeat = 1; repeat < 8; repeat++) {
     size_t capacity = 8 * (1 << repeat);
