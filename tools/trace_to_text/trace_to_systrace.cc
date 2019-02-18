@@ -110,7 +110,6 @@ const char kFtraceJsonHeader[] =
 
 int TraceToExperimentalSystrace(std::istream* input, std::ostream* output) {
   trace_processor::Config config;
-  config.optimization_mode = trace_processor::OptimizationMode::kMaxBandwidth;
   std::unique_ptr<trace_processor::TraceProcessor> tp =
       trace_processor::TraceProcessor::CreateInstance(config);
 
