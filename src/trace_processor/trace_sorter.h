@@ -58,8 +58,8 @@ namespace trace_processor {
 class TraceSorter {
  public:
   struct TimestampedTracePiece {
-    TimestampedTracePiece(int64_t ts, uint64_t idx, TraceBlobView tbv)
-        : timestamp(ts), packet_idx_(idx), blob_view(std::move(tbv)) {}
+    TimestampedTracePiece(int64_t ts, TraceBlobView tbv)
+        : timestamp(ts), blob_view(std::move(tbv)) {}
 
     TimestampedTracePiece(TimestampedTracePiece&&) noexcept = default;
     TimestampedTracePiece& operator=(TimestampedTracePiece&&) = default;
@@ -71,25 +71,27 @@ class TraceSorter {
 
     // For std::sort().
     inline bool operator<(const TimestampedTracePiece& o) const {
-      return timestamp < o.timestamp ||
-             (timestamp == o.timestamp && packet_idx_ < o.packet_idx_);
+      return timestamp < o.timestamp;
     }
 
     int64_t timestamp;
-    uint64_t packet_idx_;
     TraceBlobView blob_view;
   };
 
   TraceSorter(TraceProcessorContext*, int64_t window_size_ns);
 
+  inline void PushTracePacket(TraceBlobView packet) {
+    AppendAndMaybeFlushEvents(GetQueue(0), 0ul, std::move(packet));
+  }
+
   inline void PushTracePacket(int64_t timestamp, TraceBlobView packet) {
-    AppendAndMaybeFlushEvents(GetQueue(0), timestamp, std::move(packet));
+    AppendAndMaybeFlushEvents(GetQueue(1), timestamp, std::move(packet));
   }
 
   inline void PushFtracePacket(uint32_t cpu,
                                int64_t timestamp,
                                TraceBlobView packet) {
-    AppendAndMaybeFlushEvents(GetQueue(cpu + 1), timestamp, std::move(packet));
+    AppendAndMaybeFlushEvents(GetQueue(cpu + 2), timestamp, std::move(packet));
   }
 
   // Flush all events ignorinig the window.
@@ -153,8 +155,7 @@ class TraceSorter {
   inline void AppendAndMaybeFlushEvents(Queue* queue,
                                         int64_t timestamp,
                                         TraceBlobView packet) {
-    queue->Append(
-        TimestampedTracePiece(timestamp, packet_idx_++, std::move(packet)));
+    queue->Append(TimestampedTracePiece(timestamp, std::move(packet)));
 
     global_max_ts_ = std::max(global_max_ts_, queue->max_ts_);
     global_min_ts_ = std::min(global_min_ts_, queue->min_ts_);
@@ -181,9 +182,6 @@ class TraceSorter {
 
   // min(e.timestamp for e in queues_).
   int64_t global_min_ts_ = std::numeric_limits<int64_t>::max();
-
-  // Monotonic increasing value used to index timestamped trace pieces.
-  uint64_t packet_idx_ = 0;
 
   // Used for performance tests. True when setting TRACE_PROCESSOR_SORT_ONLY=1.
   bool bypass_next_stage_for_testing_ = false;

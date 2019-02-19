@@ -156,10 +156,6 @@ void ProtoTraceTokenizer::ParsePacket(TraceBlobView packet) {
         decoder.FindIntField<kTimestampFieldNumber>(&raw_timestamp);
   }
 
-  int64_t timestamp =
-      timestamp_found ? static_cast<int64_t>(raw_timestamp) : latest_timestamp_;
-  latest_timestamp_ = std::max(timestamp, latest_timestamp_);
-
   // TODO(primiano): this can be optimized for the ftrace case.
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     if (fld.id == protos::TracePacket::kTrustedUidFieldNumber)
@@ -174,7 +170,12 @@ void ProtoTraceTokenizer::ParsePacket(TraceBlobView packet) {
 
   // Use parent data and length because we want to parse this again
   // later to get the exact type of the packet.
-  trace_sorter_->PushTracePacket(timestamp, std::move(packet));
+  if (PERFETTO_LIKELY(timestamp_found)) {
+    int64_t timestamp = static_cast<int64_t>(raw_timestamp);
+    trace_sorter_->PushTracePacket(timestamp, std::move(packet));
+  } else {
+    trace_sorter_->PushTracePacket(std::move(packet));
+  }
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 
@@ -248,11 +249,9 @@ void ProtoTraceTokenizer::ParseFtraceEvent(uint32_t cpu, TraceBlobView event) {
     return;
   }
 
-  int64_t timestamp = static_cast<int64_t>(raw_timestamp);
-  latest_timestamp_ = std::max(timestamp, latest_timestamp_);
-
   // We don't need to parse this packet, just push it to be sorted with
   // the timestamp.
+  int64_t timestamp = static_cast<int64_t>(raw_timestamp);
   trace_sorter_->PushFtracePacket(cpu, timestamp, std::move(event));
 }
 

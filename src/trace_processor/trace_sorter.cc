@@ -126,10 +126,10 @@ void TraceSorter::SortAndFlushEventsBeyondWindow(int64_t window_size_ns) {
       if (bypass_next_stage_for_testing_)
         continue;
 
-      if (min_queue_idx == 0) {
+      if (min_queue_idx == 0 || min_queue_idx == 1) {
         next_stage->ParseTracePacket(timestamp, std::move(blob_view));
       } else {
-        uint32_t cpu = static_cast<uint32_t>(min_queue_idx - 1);
+        uint32_t cpu = static_cast<uint32_t>(min_queue_idx - 2);
         next_stage->ParseFtracePacket(cpu, timestamp, std::move(blob_view));
       }
     }  // for (event: events)
