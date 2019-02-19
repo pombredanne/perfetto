@@ -1628,8 +1628,6 @@ void TracingServiceImpl::SnapshotClocks(std::vector<TracePacket>* packets) {
     };
     protos::ClockSnapshot::Clock* c = clock_snapshot->add_clocks();
     c->set_type(clock.type);
-    c->set_timestamp(
-        static_cast<uint64_t>(base::FromPosixTimespec(clock.ts).count()));
   }
 #else   // !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
   protos::ClockSnapshot::Clock* c = clock_snapshot->add_clocks();
