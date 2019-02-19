@@ -195,6 +195,9 @@ void DumpProfilePacket(std::vector<ProfilePacket>& packet_fragments,
     }
     decltype(string_table)::iterator it;
     std::string function_name = str_it->second;
+    // This assumes both the device that captured the trace and the host
+    // machine use the same mangling scheme. This is a reasonable
+    // assumption as the Itanium ABI is the de-facto standard for mangling.
     MaybeDemangle(&function_name);
     std::tie(it, std::ignore) =
         string_table.emplace(std::move(function_name), string_table.size());
