@@ -56,11 +56,12 @@ message ChromeTracePacket {
   TraceStats trace_stats = 35;
 
   uint32 trusted_packet_sequence_id = 10;
-  bool reset_interning_state = 41;
-  bool missing_packets_on_sequence = 42;
 
   repeated EventCategory event_categories = 1000;
   repeated LegacyEventName legacy_event_names = 1001;
   repeated DebugAnnotationName debug_annotation_names = 1002;
   repeated SourceLocation source_locations = 1003;
+
+  bool reset_interning_state = 41;
+  bool missing_packets_on_sequence = 42;
 }

@@ -70,7 +70,7 @@ message TraceEvent {
   repeated DebugAnnotation debug_annotations = 4;
 
   // Typed event arguments:
-  TaskExecution task_execution = 5;
+  optional TaskExecution task_execution = 5;
   // TODO(eseckler): New argument types go here :)
 
   // Apart from {category, time, thread time, tid, pid}, other legacy trace

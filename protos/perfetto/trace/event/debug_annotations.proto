@@ -60,10 +60,6 @@ message DebugAnnotation {
   }
 }
 
-message DebugAnnotations {
-  repeated DebugAnnotation debug_annotations = 1;
-}
-
 // --------------------
 // Interned data types:
 // --------------------
