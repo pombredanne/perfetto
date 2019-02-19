@@ -30,7 +30,7 @@ import "perfetto/common/trace_stats.proto";
 import "perfetto/config/trace_config.proto";
 import "perfetto/trace/chrome/chrome_trace_event.proto";
 import "perfetto/trace/clock_snapshot.proto";
-import "perfetto/trace/event/debug_annotations.proto";
+import "perfetto/trace/event/debug_annotation.proto";
 import "perfetto/trace/event/process_descriptor.proto";
 import "perfetto/trace/event/task_execution.proto";
 import "perfetto/trace/event/thread_descriptor.proto";
