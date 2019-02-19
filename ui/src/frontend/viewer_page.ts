@@ -37,7 +37,7 @@ import {TrackPanel} from './track_panel';
 import {Actions} from '../common/actions';
 
 const DRAG_HANDLE_HEIGHT_PX = 12;
-const DEFAULT_DETAILS_HEIGHT_PX = 250 + DRAG_HANDLE_HEIGHT_PX;
+const DEFAULT_DETAILS_HEIGHT_PX = 230 + DRAG_HANDLE_HEIGHT_PX;
 
 class QueryTable extends Panel {
   view() {
