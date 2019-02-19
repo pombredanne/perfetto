@@ -104,7 +104,7 @@ class TraceProcessor {
 
   // Executes a SQLite query on the loaded portion of the trace. The returned
   // iterator can be used to load rows from the result.
-  virtual Iterator ExecuteQuery(base::StringView sql);
+  virtual Iterator ExecuteQuery(base::StringView sql) = 0;
 
   // Interrupts the current query. Typically used by Ctrl-C handler.
   virtual void InterruptQuery() = 0;
