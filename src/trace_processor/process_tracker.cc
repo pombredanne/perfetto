@@ -109,7 +109,7 @@ UniqueTid ProcessTracker::UpdateThread(uint32_t tid, uint32_t pid) {
 }
 
 UniquePid ProcessTracker::UpdateProcess(uint32_t pid,
-                                        uint32_t ppid,
+                                        base::Optional<uint32_t> ppid,
                                         base::StringView name) {
   auto proc_name_id = context_->storage->InternString(name);
 
@@ -117,7 +117,9 @@ UniquePid ProcessTracker::UpdateProcess(uint32_t pid,
   TraceStorage::Process* process;
   std::tie(upid, process) = GetOrCreateProcess(pid, 0 /* start_ns */);
   process->name_id = proc_name_id;
-  process->pupid = GetOrCreateProcess(ppid, 0 /* start_ns */).first;
+  if (ppid.has_value()) {
+    process->pupid = GetOrCreateProcess(ppid.value(), 0 /* start_ns */).first;
+  }
 
   // Create an entry for the main thread.
   UpdateThread(/*tid=*/pid, pid);

@@ -66,7 +66,7 @@ class ProcessTracker {
   // for that pid or assigns a new one.
   // Virtual for testing.
   virtual UniquePid UpdateProcess(uint32_t pid,
-                                  uint32_t ppid,
+                                  base::Optional<uint32_t> ppid,
                                   base::StringView name);
 
   // Called when a process is seen in a process tree. Retrieves the UniquePid
