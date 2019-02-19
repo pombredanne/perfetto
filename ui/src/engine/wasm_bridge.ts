@@ -67,9 +67,9 @@ export class WasmBridge {
         data: undefined,
       };
     }
-
+    const name = req.methodName.charAt(0).toLowerCase() + req.methodName.slice(1);
     this.connection.ccall(
-        `${req.serviceName}_${req.methodName}`,  // C method name.
+        `${req.serviceName}_${name}`,            // C method name.
         'void',                                  // Return type.
         ['number', 'array', 'number'],           // Input args.
         [req.id, req.data, req.data.length]      // Args.

@@ -16,6 +16,7 @@ import * as m from 'mithril';
 
 import {QueryResponse} from '../common/queries';
 import {TimeSpan} from '../common/time';
+import {LogPanel} from './logs_panel';
 
 import {copyToClipboard} from './clipboard';
 import {DragGestureHandler} from './drag_gesture_handler';
@@ -150,7 +151,7 @@ class DragHandle implements m.ClassComponent<DragHandleAttrs> {
 class TraceViewer implements m.ClassComponent {
   private onResize: () => void = () => {};
   private zoomContent?: PanAndZoomHandler;
-  private detailsHeight = DRAG_HANDLE_HEIGHT_PX;
+  private detailsHeight = 0;
   // Used to set details panel to default height on selection.
   private showDetailsPanel = false;
   // Used to prevent global deselection if a pan/drag select occurred.
@@ -257,34 +258,40 @@ class TraceViewer implements m.ClassComponent {
     scrollingPanels.unshift(m(QueryTable));
 
     const detailsPanels: AnyAttrsVnode[] = [];
-    if (globals.state.currentSelection) {
-      if (!this.showDetailsPanel &&
-          globals.state.currentSelection.kind !== 'TIMESPAN') {
-        this.detailsHeight = DEFAULT_DETAILS_HEIGHT_PX;
+    const hasLogs = true;
+    const currentSelection = globals.state.currentSelection;
+    if (currentSelection || hasLogs) {
+      const isTimeSpanSelection = currentSelection && currentSelection.kind === 'TIMESPAN';
+      if (!this.showDetailsPanel && !isTimeSpanSelection) {
+        if (this.detailsHeight === 0) {
+          this.detailsHeight = DEFAULT_DETAILS_HEIGHT_PX;
+        }
+        this.detailsHeight = Math.max(this.detailsHeight, DRAG_HANDLE_HEIGHT_PX);
         this.showDetailsPanel = true;
       }
-      switch (globals.state.currentSelection.kind) {
-        case 'NOTE':
-          detailsPanels.push(m(NotesEditorPanel, {
-            key: 'notes',
-            id: globals.state.currentSelection.id,
-          }));
-          break;
-        case 'SLICE':
-          detailsPanels.push(m(SliceDetailsPanel, {
-            key: 'slice',
-            utid: globals.state.currentSelection.utid,
-          }));
-          break;
-        default:
-          break;
+      if (currentSelection) {
+        switch (currentSelection.kind) {
+          case 'NOTE':
+            detailsPanels.push(m(NotesEditorPanel, {
+              key: 'notes',
+              id: currentSelection.id,
+            }));
+            break;
+          case 'SLICE':
+            detailsPanels.push(m(SliceDetailsPanel, {
+              key: 'slice',
+              utid: currentSelection.utid,
+            }));
+            break;
+          default:
+            break;
+        }
+      } else {
+        detailsPanels.push(m(LogPanel, {}));
       }
     } else {
       // No current selection so hide the details panel.
-      if (this.showDetailsPanel) {
-        this.showDetailsPanel = false;
-        this.detailsHeight = DRAG_HANDLE_HEIGHT_PX;
-      }
+      this.showDetailsPanel = false;
     }
 
     return m(
@@ -314,7 +321,7 @@ class TraceViewer implements m.ClassComponent {
               doesScroll: true,
               panels: scrollingPanels,
             }))),
-        m('.details-content',
+      this.showDetailsPanel &&  m('.details-content',
           {style: {height: `${this.detailsHeight}px`}},
           m(DragHandle, {
             resize: (height: number) => {

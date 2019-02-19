@@ -305,8 +305,8 @@ class PERFETTO_EXPORT TraceConfig {
     file_write_period_ms_ = value;
   }
 
-  uint64_t max_file_size_bytes() const { return max_file_size_bytes_; }
-  void set_max_file_size_bytes(uint64_t value) { max_file_size_bytes_ = value; }
+  uint32_t max_file_size_bytes() const { return max_file_size_bytes_; }
+  void set_max_file_size_bytes(uint32_t value) { max_file_size_bytes_ = value; }
 
   const GuardrailOverrides& guardrail_overrides() const {
     return guardrail_overrides_;
@@ -344,7 +344,7 @@ class PERFETTO_EXPORT TraceConfig {
   StatsdMetadata statsd_metadata_ = {};
   bool write_into_file_ = {};
   uint32_t file_write_period_ms_ = {};
-  uint64_t max_file_size_bytes_ = {};
+  uint32_t max_file_size_bytes_ = {};
   GuardrailOverrides guardrail_overrides_ = {};
   bool deferred_start_ = {};
   uint32_t flush_period_ms_ = {};

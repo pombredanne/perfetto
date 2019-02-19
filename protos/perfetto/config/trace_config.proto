@@ -134,7 +134,7 @@ message TraceConfig {
   // Optional. When non zero the periodic write stops once at most X bytes
   // have been written into the file. Tracing is disabled when this limit is
   // reached, even if |duration_ms| has not been reached yet.
-  optional uint64 max_file_size_bytes = 10;
+  optional uint32 max_file_size_bytes = 10;
 
   // Contains flags which override the default values of the guardrails inside
   // Perfetto. These values are only affect userdebug builds.
