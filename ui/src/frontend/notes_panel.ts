@@ -21,6 +21,7 @@ import {globals} from './globals';
 import {gridlines} from './gridline_helper';
 import {Panel, PanelSize} from './panel';
 import {TRACK_SHELL_WIDTH} from './track_constants';
+import {hsl} from 'color-convert';
 
 const FLAG_WIDTH = 10;
 const MOUSE_OFFSET = 4;
@@ -150,7 +151,10 @@ export class NotesPanel extends Panel {
         return;
       }
     }
-    globals.dispatch(Actions.addNote({timestamp}));
+    // 40 different random hues 9 degrees apart.
+    const hue = Math.floor(Math.random() * 40) * 9;
+    const color = '#' + hsl.hex([hue, 90, 55]);
+    globals.dispatch(Actions.addNote({timestamp, color}));
   }
 }
 
