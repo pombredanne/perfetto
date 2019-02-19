@@ -29,6 +29,15 @@ std::unique_ptr<TraceProcessor> TraceProcessor::CreateInstance(
 
 TraceProcessor::~TraceProcessor() = default;
 
+TraceProcessor::Iterator::Iterator(std::unique_ptr<IteratorImpl> iterator)
+    : iterator_(std::move(iterator)) {}
+TraceProcessor::Iterator::~Iterator() = default;
+
+TraceProcessor::Iterator::Iterator(TraceProcessor::Iterator&&) noexcept =
+    default;
+TraceProcessor::Iterator& TraceProcessor::Iterator::operator=(
+    TraceProcessor::Iterator&&) = default;
+
 TraceProcessor::Iterator::NextResult TraceProcessor::Iterator::Next() {
   PERFETTO_DCHECK(IsValid());
   return iterator_->Next();

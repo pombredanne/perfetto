@@ -17,7 +17,6 @@
 #include "src/trace_processor/trace_processor_impl.h"
 
 #include <inttypes.h>
-#include <sqlite3.h>
 #include <algorithm>
 #include <functional>
 
@@ -327,10 +326,14 @@ TraceProcessor::Iterator TraceProcessorImpl::ExecuteQuery(
   sqlite3_stmt* raw_stmt;
   int err = sqlite3_prepare_v2(*db_, sql.data(), static_cast<int>(sql.size()),
                                &raw_stmt, nullptr);
-  auto col_count =
-      err ? 0 : static_cast<uint32_t>(sqlite3_column_count(raw_stmt));
-  auto error =
-      err ? base::Optional<std::string>(sqlite3_errmsg(*db_)) : base::nullopt;
+
+  uint32_t col_count = 0;
+  base::Optional<std::string> error;
+  if (err) {
+    error = base::Optional<std::string>(sqlite3_errmsg(*db_));
+  } else {
+    col_count = static_cast<uint32_t>(sqlite3_column_count(raw_stmt));
+  }
 
   std::unique_ptr<IteratorImpl> impl(
       new IteratorImpl(this, *db_, ScopedStmt(raw_stmt), col_count, error));
@@ -363,56 +366,6 @@ TraceProcessor::IteratorImpl::~IteratorImpl() {
     PERFETTO_CHECK(it != its->end());
     its->erase(it);
   }
-}
-
-TraceProcessor::Iterator::NextResult TraceProcessor::IteratorImpl::Next() {
-  using Result = TraceProcessor::Iterator::NextResult;
-  if (error_.has_value())
-    return Result::kError;
-
-  int ret = sqlite3_step(*stmt_);
-  if (ret != SQLITE_ROW && ret != SQLITE_DONE) {
-    error_ = base::Optional<std::string>(sqlite3_errmsg(db_));
-    return Result::kError;
-  }
-  return ret == SQLITE_ROW ? Result::kHasNext : Result::kEOF;
-}
-
-SqlValue TraceProcessor::IteratorImpl::Get(uint32_t col) {
-  auto column = static_cast<int>(col);
-  auto col_type = sqlite3_column_type(*stmt_, column);
-  SqlValue value;
-  switch (col_type) {
-    case SQLITE_INTEGER:
-      value.type = SqlValue::kLong;
-      value.long_value = sqlite3_column_int64(*stmt_, column);
-      break;
-    case SQLITE_TEXT:
-      value.type = SqlValue::kLong;
-      value.string_value =
-          reinterpret_cast<const char*>(sqlite3_column_text(*stmt_, column));
-      break;
-    case SQLITE_FLOAT:
-      value.type = SqlValue::kDouble;
-      value.double_value = sqlite3_column_double(*stmt_, column);
-      break;
-    case SQLITE_NULL:
-      value.type = SqlValue::kNull;
-      break;
-  }
-  return value;
-}
-
-uint32_t TraceProcessor::IteratorImpl::ColumnCount() {
-  return column_count_;
-}
-
-base::Optional<std::string> TraceProcessor::IteratorImpl::GetLastError() {
-  return error_;
-}
-
-bool TraceProcessor::IteratorImpl::IsValid() {
-  return trace_processor_ != nullptr;
 }
 
 void TraceProcessor::IteratorImpl::Reset() {

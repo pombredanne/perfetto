@@ -45,12 +45,13 @@ class TraceProcessor {
     enum NextResult { kEOF = 0, kError = -1, kHasNext = 1 };
 
     Iterator(std::unique_ptr<IteratorImpl> iterator);
+    ~Iterator();
 
     Iterator(Iterator&) noexcept = delete;
     Iterator& operator=(Iterator&) = delete;
 
-    Iterator(Iterator&&) noexcept = default;
-    Iterator& operator=(Iterator&&) = default;
+    Iterator(Iterator&&) noexcept;
+    Iterator& operator=(Iterator&&);
 
     // Forwards the iterator to the next result row and returns an enum
     // indicating if there we have reached EOF and whether there was an error.
