@@ -44,7 +44,7 @@ struct SqlValue {
     // This string will be owned by the iterator that returned it and is valid
     // as long until the subsequent call to Next().
     const char* string_value;
-    long long_value;
+    int64_t long_value;
     double double_value;
   };
   Type type = kNull;
