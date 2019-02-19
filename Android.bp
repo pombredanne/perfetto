@@ -1144,7 +1144,7 @@ genrule {
   srcs: [
     "protos/perfetto/trace/event/debug_annotations.proto",
     "protos/perfetto/trace/event/process_descriptor.proto",
-    "protos/perfetto/trace/event/tasks.proto",
+    "protos/perfetto/trace/event/task_execution.proto",
     "protos/perfetto/trace/event/thread_descriptor.proto",
     "protos/perfetto/trace/event/trace_event.proto",
   ],
@@ -1155,7 +1155,7 @@ genrule {
   out: [
     "external/perfetto/protos/perfetto/trace/event/debug_annotations.pb.cc",
     "external/perfetto/protos/perfetto/trace/event/process_descriptor.pb.cc",
-    "external/perfetto/protos/perfetto/trace/event/tasks.pb.cc",
+    "external/perfetto/protos/perfetto/trace/event/task_execution.pb.cc",
     "external/perfetto/protos/perfetto/trace/event/thread_descriptor.pb.cc",
     "external/perfetto/protos/perfetto/trace/event/trace_event.pb.cc",
   ],
@@ -1167,7 +1167,7 @@ genrule {
   srcs: [
     "protos/perfetto/trace/event/debug_annotations.proto",
     "protos/perfetto/trace/event/process_descriptor.proto",
-    "protos/perfetto/trace/event/tasks.proto",
+    "protos/perfetto/trace/event/task_execution.proto",
     "protos/perfetto/trace/event/thread_descriptor.proto",
     "protos/perfetto/trace/event/trace_event.proto",
   ],
@@ -1178,7 +1178,7 @@ genrule {
   out: [
     "external/perfetto/protos/perfetto/trace/event/debug_annotations.pb.h",
     "external/perfetto/protos/perfetto/trace/event/process_descriptor.pb.h",
-    "external/perfetto/protos/perfetto/trace/event/tasks.pb.h",
+    "external/perfetto/protos/perfetto/trace/event/task_execution.pb.h",
     "external/perfetto/protos/perfetto/trace/event/thread_descriptor.pb.h",
     "external/perfetto/protos/perfetto/trace/event/trace_event.pb.h",
   ],
@@ -1193,7 +1193,7 @@ genrule {
   srcs: [
     "protos/perfetto/trace/event/debug_annotations.proto",
     "protos/perfetto/trace/event/process_descriptor.proto",
-    "protos/perfetto/trace/event/tasks.proto",
+    "protos/perfetto/trace/event/task_execution.proto",
     "protos/perfetto/trace/event/thread_descriptor.proto",
     "protos/perfetto/trace/event/trace_event.proto",
   ],
@@ -1205,7 +1205,7 @@ genrule {
   out: [
     "external/perfetto/protos/perfetto/trace/event/debug_annotations.pbzero.cc",
     "external/perfetto/protos/perfetto/trace/event/process_descriptor.pbzero.cc",
-    "external/perfetto/protos/perfetto/trace/event/tasks.pbzero.cc",
+    "external/perfetto/protos/perfetto/trace/event/task_execution.pbzero.cc",
     "external/perfetto/protos/perfetto/trace/event/thread_descriptor.pbzero.cc",
     "external/perfetto/protos/perfetto/trace/event/trace_event.pbzero.cc",
   ],
@@ -1217,7 +1217,7 @@ genrule {
   srcs: [
     "protos/perfetto/trace/event/debug_annotations.proto",
     "protos/perfetto/trace/event/process_descriptor.proto",
-    "protos/perfetto/trace/event/tasks.proto",
+    "protos/perfetto/trace/event/task_execution.proto",
     "protos/perfetto/trace/event/thread_descriptor.proto",
     "protos/perfetto/trace/event/trace_event.proto",
   ],
@@ -1229,7 +1229,7 @@ genrule {
   out: [
     "external/perfetto/protos/perfetto/trace/event/debug_annotations.pbzero.h",
     "external/perfetto/protos/perfetto/trace/event/process_descriptor.pbzero.h",
-    "external/perfetto/protos/perfetto/trace/event/tasks.pbzero.h",
+    "external/perfetto/protos/perfetto/trace/event/task_execution.pbzero.h",
     "external/perfetto/protos/perfetto/trace/event/thread_descriptor.pbzero.h",
     "external/perfetto/protos/perfetto/trace/event/trace_event.pbzero.h",
   ],

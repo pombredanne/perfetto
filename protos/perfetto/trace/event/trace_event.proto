@@ -18,7 +18,7 @@ syntax = "proto2";
 option optimize_for = LITE_RUNTIME;
 
 import "perfetto/trace/event/debug_annotations.proto";
-import "perfetto/trace/event/tasks.proto";
+import "perfetto/trace/event/task_execution.proto";
 
 package perfetto.protos;
 
@@ -40,6 +40,7 @@ package perfetto.protos;
 // Next reserved id: 7 (up to 15).
 // Next id: 20.
 message TraceEvent {
+  // Timestamp in microseconds (usually CLOCK_MONOTONIC).
   oneof timestamp {
     // Delta timestamp value since the last TraceEvent or ThreadDescriptor.
     // To calculate the absolute timestamp value, sum up all cumulative_delta
@@ -51,26 +52,26 @@ message TraceEvent {
     // in subsequent TraceEvents.
     uint64 timestamp_absolute = 16;
   }
+
+  // CPU time for the current thread (e.g., CLOCK_THREAD_CPUTIME_ID) in
+  // microseconds.
   oneof thread_time {
     uint64 thread_time_cumulative_delta = 2;
     uint64 thread_time_absolute = 17;
   }
-
-  // Override the pid/tid if the writer needs to emit events on behalf of
-  // another process/thread. This should be the exception. Normally, the pid+tid
-  // from ThreadDescriptor is used.
-  optional int32 pid_override = 18;
-  optional int32 tid_override = 19;
 
   // We intend to add a binary symbol version of this in the future.
   repeated uint32 category_iids = 3;  // interned EventCategoryName.
 
   // TODO(eseckler): May also want a debug_name for untyped debug-only events.
 
-  oneof args {
-    DebugAnnotations debug_annotations = 4;
-    TaskExecution task_execution = 5;
-  }
+  // Unstable key/value annotations shown in the trace viewer but not intended
+  // for upload from the field or metrics use.
+  repeated DebugAnnotation debug_annotations = 4;
+
+  // Typed event arguments:
+  TaskExecution task_execution = 5;
+  // TODO(eseckler): New argument types go here :)
 
   // Apart from {category, time, thread time, tid, pid}, other legacy trace
   // event attributes are initially simply proxied for conversion to a JSON
@@ -86,6 +87,12 @@ message TraceEvent {
     optional uint64 id = 6;
     optional string scope = 7;
     optional uint64 bind_id = 8;
+
+    // Override the pid/tid if the writer needs to emit events on behalf of
+    // another process/thread. This should be the exception. Normally, the
+    // pid+tid from ThreadDescriptor is used.
+    optional int32 pid_override = 18;
+    optional int32 tid_override = 19;
   }
 
   optional LegacyEvent legacy_event = 6;

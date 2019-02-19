@@ -25,7 +25,7 @@ package perfetto.protos;
 // Next id: 5.
 message ProcessDescriptor {
   optional int32 pid = 1;
-  optional string command_line = 2;
+  repeated string argv = 2;
 
   // To support old UI. New UI should determine default sorting by process_type.
   optional int32 legacy_sort_index = 3;

@@ -2505,7 +2505,7 @@ message Trace {
 // The root object emitted by Perfetto. A perfetto trace is just a stream of
 // TracePacket(s).
 //
-// Next reserved id: 12 (up to 32).
+// Next reserved id: 12 (up to 15).
 // Next id: 45 (up to 999).
 // Next interning field id: 1004.
 message TracePacket {
@@ -2523,8 +2523,8 @@ message TracePacket {
     SysStats sys_stats = 7;
     // removed field with id 11
 
-    // IDs up to 32 are reserved. IDs up to 15 take only one byte to encode
-    // their preamble so should be used for freqeuent events.
+    // IDs up to 15 are reserved. They take only one byte to encode their
+    // preamble so should be used for freqeuent events.
 
     // removed field with id 33
     FtraceStats ftrace_stats = 34;
@@ -2579,30 +2579,15 @@ message TracePacket {
   // sequence (see |missing_packets_on_sequence|) up to the next reset.
   // ---------------------------------------------------------------------------
 
-  // Set to true when the writer invalidates previously emitted interning state.
-  // This TracePacket and subsequent TracePackets will not refer to any
-  // interning entry emitted before this TracePacket without re-emitting the
-  // entry.
-  //
-  // When the reader detects packet loss (|missing_packets_on_sequence|), it
-  // needs to skip packets in the sequence until the next one with this flag
-  // set.
-  optional bool reset_interning_state = 41;
-
-  // Flag set by the service if this packet does not immediately follow the last
-  // packet from the writer sequence that the consumer read. This can happen if
-  // chunks in the trace buffer are overridden before the consumer can read
-  // them.
-  optional bool missing_packets_on_sequence = 42;
-
   // Interned data entries:
   //
-  // The writer will emit new entries in the same TracePacket that first refers
-  // to them (since the last reset of interning state). The messages in each of
-  // these fields need to specify an |interning_id| field, which is the ID of
-  // the entry in the field's interning index. Each field constructs its own
-  // index, thus interning IDs are scoped to the tracing session and field
-  // (usually as a counter for efficient var-int encoding).
+  // The writer will usually emit new entries in the same TracePacket that first
+  // refers to them (since the last reset of interning state). They may also be
+  // emitted proactively in advance of referring to them in later packets. The
+  // messages in each of these fields need to specify an |interning_id| field,
+  // which is the ID of the entry in the field's interning index. Each field
+  // constructs its own index, thus interning IDs are scoped to the tracing
+  // session and field (usually as a counter for efficient var-int encoding).
   //
   // We use field IDs from 1000 to identify these fields for generic
   // reconstruction of the interning indexes in the trace processor.
@@ -2610,6 +2595,26 @@ message TracePacket {
   // removed field with id 1001
   // removed field with id 1002
   // removed field with id 1003
+
+  // Set to true by the writer to indicate that it will re-emit any incremental
+  // data for the packet's sequence before referring to it again. This includes
+  // interned data in the interning indexes as well as periodically emitted data
+  // like Process/ThreadDescriptors.
+  //
+  // When set to true, this TracePacket and subsequent TracePackets will not
+  // refer to any interning entry emitted before this TracePacket without
+  // re-emitting the entry.
+  //
+  // When the reader detects packet loss (|missing_packets_on_sequence|), it
+  // needs to skip packets in the sequence until the next one with this flag
+  // set, to ensure a complete interning state.
+  optional bool reset_incremental_state = 41;
+
+  // Flag set by the service if this packet does not immediately follow the last
+  // packet from the writer sequence that the consumer read. This can happen if
+  // chunks in the trace buffer are overridden before the consumer can read
+  // them when the trace is configured in ring buffer mode.
+  optional bool missing_packets_on_sequence = 42;
 }
 
 // End of protos/perfetto/trace/trace_packet.proto

@@ -39,7 +39,7 @@ message ThreadDescriptor {
   };
   optional ChromeThreadType thread_type = 4;
 
-  // TODO(eseckler): Replace this with ChromeThreadType.
+  // TODO(eseckler): Replace this with ChromeThreadType where possible.
   optional string thread_name = 5;
 
   // Absolute reference values. Clock values in subsequent TraceEvents can be
