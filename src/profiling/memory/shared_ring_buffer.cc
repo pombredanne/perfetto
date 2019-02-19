@@ -42,7 +42,9 @@ constexpr auto kMetaPageSize = base::kPageSize;
 constexpr auto kAlignment = 8;  // 64 bits to use aligned memcpy().
 constexpr auto kHeaderSize = kAlignment;
 constexpr auto kGuardSize = base::kPageSize * 1024 * 16;  // 64 MB.
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
 constexpr auto kFDSeals = F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_SEAL;
+#endif
 
 }  // namespace
 
@@ -130,9 +132,9 @@ SharedRingBuffer::~SharedRingBuffer() {
 
 void SharedRingBuffer::Initialize(base::ScopedFile mem_fd) {
 #if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
-  unsigned int seals = fnctl(*mem_fd, F_GET_SEALS);
-  if (seals & kFDSeals != kFDSeals) {
-    PERFETTO_ELOG("FD not properly sealed. Expected %hu, got %hu", kFDSeals,
+  int seals = fcntl(*mem_fd, F_GET_SEALS);
+  if ((seals & kFDSeals) != kFDSeals) {
+    PERFETTO_ELOG("FD not properly sealed. Expected %x, got %x", kFDSeals,
                   seals);
     return;
   }
