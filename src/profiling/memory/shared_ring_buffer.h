@@ -132,7 +132,7 @@ class SharedRingBuffer {
 
  private:
   struct alignas(base::kPageSize) MetadataPage {
-    std::atomic<bool> spinlock;
+    alignas(uint64_t) std::atomic<bool> spinlock;
     uint64_t read_pos;
     uint64_t write_pos;
 

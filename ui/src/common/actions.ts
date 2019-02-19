@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {DraftObject} from 'immer';
+import {Draft} from 'immer';
 
 import {assertExists} from '../base/logging';
 import {ConvertTrace} from '../controller/trace_converter';
@@ -26,7 +26,7 @@ import {
   TraceTime,
 } from './state';
 
-type StateDraft = DraftObject<State>;
+type StateDraft = Draft<State>;
 
 
 function clearTraceState(state: StateDraft) {
@@ -251,12 +251,12 @@ export const StateActions = {
     }
   },
 
-  addNote(state: StateDraft, args: {timestamp: number}): void {
+  addNote(state: StateDraft, args: {timestamp: number, color: string}): void {
     const id = `${state.nextId++}`;
     state.notes[id] = {
       id,
       timestamp: args.timestamp,
-      color: '#000000',
+      color: args.color,
       text: '',
     };
     this.selectNote(state, {id});
