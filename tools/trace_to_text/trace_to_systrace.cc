@@ -185,8 +185,8 @@ int TraceToExperimentalSystrace(std::istream* input,
   using Iterator = trace_processor::TraceProcessor::Iterator;
 
   constexpr uint32_t kBufferSize = 1024u * 1024u * 16u;
-  base::ScopedString buffer(static_cast<char*>(malloc(kBufferSize)));
-  base::StringWriter buf_writer(*buffer, kBufferSize);
+  std::unique_ptr<char[]> buffer(new char[kBufferSize]);
+  base::StringWriter buf_writer(buffer.get(), kBufferSize);
 
   if (wrap_in_json) {
     *output << kTraceHeader;

@@ -116,13 +116,13 @@ class StringWriter {
   }
 
   // Creates a copy of the internal buffer.
-  base::ScopedString CreateStringCopy() {
+  std::unique_ptr<char[]> CreateStringCopy() {
     char* dup = reinterpret_cast<char*>(malloc(pos_ + 1));
     if (dup) {
       strncpy(dup, buffer_, pos_);
       dup[pos_] = '\0';
     }
-    return base::ScopedString(dup);
+    return std::unique_ptr<char[]>(dup);
   }
 
   // Resets the position to 0 with the same buffer and capacity.
