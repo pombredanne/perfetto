@@ -107,9 +107,49 @@ const char kFtraceJsonHeader[] =
     "#           TASK-PID    TGID   CPU#  ||||    TIMESTAMP  FUNCTION\\n"
     "#              | |        |      |   ||||       |         |\\n";
 
+template <typename Callback>
+int RunTraceProcessorQuery(trace_processor::TraceProcessor* tp,
+                           base::StringWriter* global_writer,
+                           base::StringView sql,
+                           std::ostream* output,
+                           Callback callback) {
+  auto iterator = tp->ExecuteQuery(sql);
+  if (!iterator.IsValid()) {
+    PERFETTO_ELOG("Error creating SQL iterator");
+    return 1;
+  }
+
+  char buffer[2048];
+  for (uint32_t rows = 0;; rows++) {
+    using Result = trace_processor::TraceProcessor::Iterator::NextResult;
+
+    auto result = iterator.Next();
+    if (PERFETTO_UNLIKELY(result == Result::kError)) {
+      PERFETTO_ELOG("Error while writing systrace %s",
+                    iterator.GetLastError().value().c_str());
+      return 1;
+    } else if (result == Result::kEOF) {
+      break;
+    }
+
+    base::StringWriter writer(buffer, sizeof(buffer));
+    callback(&iterator, &writer);
+
+    if (global_writer->pos() + writer.pos() >= global_writer->size()) {
+      fprintf(stderr, "\x1b[2K\rWritten %" PRIu32 " rows\r", rows);
+      *output << global_writer->GetCString();
+      global_writer->Reset();
+    }
+    global_writer->AppendString(writer.GetCString(), writer.pos());
+  }
+  return 0;
+}
+
 }  // namespace
 
-int TraceToExperimentalSystrace(std::istream* input, std::ostream* output) {
+int TraceToExperimentalSystrace(std::istream* input,
+                                std::ostream* output,
+                                bool wrap_in_json) {
   trace_processor::Config config;
   config.optimization_mode = trace_processor::OptimizationMode::kMaxBandwidth;
   std::unique_ptr<trace_processor::TraceProcessor> tp =
@@ -138,42 +178,71 @@ int TraceToExperimentalSystrace(std::istream* input, std::ostream* output) {
   }
   tp->NotifyEndOfFile();
 
-  *output << "TRACE:\n";
-  *output << kFtraceHeader;
-
-  auto iterator = tp->ExecuteQuery("select to_ftrace(id) from raw");
-  if (!iterator.IsValid()) {
-    PERFETTO_ELOG("Error creating SQL iterator");
-    return 1;
-  }
+  using Iterator = trace_processor::TraceProcessor::Iterator;
 
   constexpr uint32_t kBufferSize = 1024u * 1024u * 16u;
   base::ScopedString buffer(static_cast<char*>(malloc(kBufferSize)));
-  base::StringWriter writer(*buffer, kBufferSize);
+  base::StringWriter buf_writer(*buffer, kBufferSize);
 
-  for (uint32_t rows = 0;; rows++) {
-    using Result = trace_processor::TraceProcessor::Iterator::NextResult;
+  if (wrap_in_json) {
+    *output << kTraceHeader;
 
-    auto result = iterator.Next();
-    if (PERFETTO_UNLIKELY(result == Result::kError)) {
-      PERFETTO_ELOG("Error while writing systrace %s",
-                    iterator.GetLastError().value().c_str());
-      return 1;
-    } else if (result == Result::kEOF) {
-      break;
-    }
+    *output << kProcessDumpHeader;
+    auto p_callback = [](Iterator* it, base::StringWriter* writer) {
+      uint32_t pid = static_cast<uint32_t>(it->Get(0 /* col */).long_value);
+      uint32_t ppid = static_cast<uint32_t>(it->Get(1 /* col */).long_value);
+      const char* name = it->Get(2 /* col */).string_value;
+      FormatProcess(pid, ppid, name, writer);
+    };
+    const char* p_sql = "select pid, 0 as ppid, name from process";
+    RunTraceProcessorQuery(tp.get(), &buf_writer, p_sql, output, p_callback);
 
-    const char* line = iterator.Get(0 /* col */).string_value;
-    size_t length = strlen(line);
-    if (writer.pos() + length >= kBufferSize) {
-      fprintf(stderr, "\x1b[2K\rWritten %" PRIu32 " rows\r", rows);
+    *output << kThreadHeader;
+    auto t_callback = [](Iterator* it, base::StringWriter* writer) {
+      uint32_t tid = static_cast<uint32_t>(it->Get(0 /* col */).long_value);
+      uint32_t tgid = static_cast<uint32_t>(it->Get(1 /* col */).long_value);
+      const char* name = it->Get(2 /* col */).string_value;
+      FormatThread(tid, tgid, name, writer);
+    };
+    const char* t_sql =
+        "select tid, COALESCE(upid, 0), thread.name "
+        "from thread inner join process using (upid)";
+    RunTraceProcessorQuery(tp.get(), &buf_writer, t_sql, output, t_callback);
 
-      *output << writer.GetCString();
-      writer = base::StringWriter(*buffer, kBufferSize);
-    }
-    writer.AppendString(line, length);
-    writer.AppendChar('\n');
+    *output << "\",";
+    *output << kSystemTraceEvents;
+    *output << kFtraceJsonHeader;
+  } else {
+    *output << "TRACE:\n";
+    *output << kFtraceHeader;
   }
+
+  auto callback = [wrap_in_json](Iterator* it, base::StringWriter* writer) {
+    const char* line = it->Get(0 /* col */).string_value;
+    if (wrap_in_json) {
+      for (uint32_t i = 0; line[i] != '\0'; i++) {
+        char c = line[i];
+        if (c == '\n') {
+          writer->AppendLiteral("\\n");
+          continue;
+        }
+
+        if (c == '\\' || c == '"')
+          writer->AppendChar('\\');
+        writer->AppendChar(c);
+      }
+      writer->AppendChar('\\');
+      writer->AppendChar('n');
+    } else {
+      writer->AppendString(line);
+      writer->AppendChar('\n');
+    }
+  };
+  const char* raw_sql = "select to_ftrace(id) from raw";
+  RunTraceProcessorQuery(tp.get(), &buf_writer, raw_sql, output, callback);
+
+  if (wrap_in_json)
+    *output << kTraceFooter;
 
   return 0;
 }
