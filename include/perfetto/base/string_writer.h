@@ -125,7 +125,12 @@ class StringWriter {
     return base::ScopedString(dup);
   }
 
+  // Resets the position to 0 with the same buffer and capacity.
+  void Reset() { pos_ = 0; }
+
   size_t pos() { return pos_; }
+
+  size_t size() { return size_; }
 
  private:
   char* buffer_ = nullptr;
