@@ -141,7 +141,7 @@ export class PanAndZoomHandler {
     // TODO(taylori): Content offset is 6px off, why?
     this.mousePositionX = e.clientX - this.contentOffsetX - 6;
     if (this.shiftDown) {
-      globals.frontendLocalState.setDragSelectPreviewPos(this.mousePositionX);
+      globals.frontendLocalState.setTimeSelectPreviewPos(this.mousePositionX);
     }
   }
 
@@ -159,10 +159,10 @@ export class PanAndZoomHandler {
 
   private onKeyDown(e: KeyboardEvent) {
     this.shiftDown = e.shiftKey;
-    globals.frontendLocalState.setShowDragSelectPreview(this.shiftDown);
+    globals.frontendLocalState.setShowTimeSelectPreview(this.shiftDown);
     if (this.shiftDown && this.mousePositionX) {
       this.element.style.cursor = 'text';
-      globals.frontendLocalState.setDragSelectPreviewPos(this.mousePositionX);
+      globals.frontendLocalState.setTimeSelectPreviewPos(this.mousePositionX);
     }
     if (keyToPan(e) !== Pan.None) {
       this.panning = keyToPan(e);
@@ -188,7 +188,7 @@ export class PanAndZoomHandler {
 
   private onKeyUp(e: KeyboardEvent) {
     this.shiftDown = e.shiftKey;
-    globals.frontendLocalState.setShowDragSelectPreview(this.shiftDown);
+    globals.frontendLocalState.setShowTimeSelectPreview(this.shiftDown);
     if (!this.shiftDown) {this.element.style.cursor = 'default';}
     if (keyToPan(e) === this.panning) {
       const minEndTime = this.panAnimation.startTimeMs + TAP_ANIMATION_TIME;

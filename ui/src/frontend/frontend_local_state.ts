@@ -32,8 +32,8 @@ export class FrontendLocalState {
   hoveredUtid = -1;
   hoveredPid = -1;
   hoveredTimestamp = -1;
-  dragSelectPreviewPos = -1;
-  showDragSelectPreview = false;
+  timeSelectPreviewPos = -1;
+  showTimeSelectPreview = false;
 
   // TODO: there is some redundancy in the fact that both |visibleWindowTime|
   // and a |timeScale| have a notion of time range. That should live in one
@@ -88,13 +88,13 @@ export class FrontendLocalState {
     globals.rafScheduler.scheduleRedraw();
   }
 
-  setDragSelectPreviewPos(mousePos: number) {
-    this.dragSelectPreviewPos = mousePos;
+  setTimeSelectPreviewPos(mousePos: number) {
+    this.timeSelectPreviewPos = mousePos;
     globals.rafScheduler.scheduleRedraw();
   }
 
-  setShowDragSelectPreview(show: boolean) {
-    this.showDragSelectPreview = show;
+  setShowTimeSelectPreview(show: boolean) {
+    this.showTimeSelectPreview = show;
     globals.rafScheduler.scheduleRedraw();
   }
 

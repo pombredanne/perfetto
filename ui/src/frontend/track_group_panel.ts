@@ -122,9 +122,9 @@ export class TrackGroupPanel extends Panel<Attrs> {
                              `#aaa`);
     }
 
-    if (localState.showDragSelectPreview) {
+    if (localState.showTimeSelectPreview) {
       drawVerticalLine(ctx,
-                       localState.dragSelectPreviewPos,
+                       localState.timeSelectPreviewPos,
                        size.height,
                        `rgb(52,69,150)`);
     }
