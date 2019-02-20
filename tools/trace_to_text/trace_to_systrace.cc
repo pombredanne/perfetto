@@ -107,47 +107,60 @@ const char kFtraceJsonHeader[] =
     "#           TASK-PID    TGID   CPU#  ||||    TIMESTAMP  FUNCTION\\n"
     "#              | |        |      |   ||||       |         |\\n";
 
-template <typename Callback>
-int RunTraceProcessorQuery(trace_processor::TraceProcessor* tp,
-                           base::StringWriter* global_writer,
-                           base::StringView sql,
-                           std::ostream* output,
-                           Callback callback) {
-  auto iterator = tp->ExecuteQuery(sql);
-  if (!iterator.IsValid()) {
-    PERFETTO_ELOG("Error creating SQL iterator");
-    return 1;
-  }
+class QueryWriter {
+ public:
+  QueryWriter(trace_processor::TraceProcessor* tp, std::ostream* output)
+      : tp_(tp),
+        buffer_(new char[kBufferSize]),
+        global_writer_(buffer_.get(), kBufferSize),
+        output_(output) {}
 
-  char buffer[2048];
-  for (uint32_t rows = 0;; rows++) {
-    using Result = trace_processor::TraceProcessor::Iterator::NextResult;
-
-    auto result = iterator.Next();
-    if (PERFETTO_UNLIKELY(result == Result::kError)) {
-      PERFETTO_ELOG("Error while writing systrace %s",
-                    iterator.GetLastError().value().c_str());
+  template <typename Callback>
+  bool RunQuery(base::StringView sql, Callback callback) {
+    auto iterator = tp_->ExecuteQuery(sql);
+    if (!iterator.IsValid()) {
+      PERFETTO_ELOG("Error creating SQL iterator");
       return 1;
-    } else if (result == Result::kEOF) {
-      break;
     }
 
-    base::StringWriter writer(buffer, sizeof(buffer));
-    callback(&iterator, &writer);
+    char buffer[2048];
+    for (uint32_t rows = 0;; rows++) {
+      using Result = trace_processor::TraceProcessor::Iterator::NextResult;
 
-    if (global_writer->pos() + writer.pos() >= global_writer->size()) {
-      fprintf(stderr, "\x1b[2K\rWritten %" PRIu32 " rows\r", rows);
-      *output << global_writer->GetCString();
-      global_writer->Reset();
+      auto result = iterator.Next();
+      if (PERFETTO_UNLIKELY(result == Result::kError)) {
+        PERFETTO_ELOG("Error while writing systrace %s",
+                      iterator.GetLastError().value().c_str());
+        return 1;
+      } else if (result == Result::kEOF) {
+        break;
+      }
+
+      base::StringWriter writer(buffer, base::ArraySize(buffer));
+      callback(&iterator, &writer);
+
+      if (global_writer_.pos() + writer.pos() >= global_writer_.size()) {
+        fprintf(stderr, "\x1b[2K\rWritten %" PRIu32 " rows\r", rows);
+        *output_ << global_writer_.GetCString();
+        global_writer_.Reset();
+      }
+      global_writer_.AppendString(writer.GetCString(), writer.pos());
     }
-    global_writer->AppendString(writer.GetCString(), writer.pos());
+
+    // Flush any dangling pieces in the global writer.
+    *output_ << global_writer_.GetCString();
+    global_writer_.Reset();
+    return 0;
   }
 
-  // Flush any dangling pieces in the global writer.
-  *output << global_writer->GetCString();
-  global_writer->Reset();
-  return 0;
-}
+ private:
+  static constexpr uint32_t kBufferSize = 1024u * 1024u * 16u;
+
+  trace_processor::TraceProcessor* tp_ = nullptr;
+  std::unique_ptr<char[]> buffer_;
+  base::StringWriter global_writer_;
+  std::ostream* output_ = nullptr;
+};
 
 }  // namespace
 
@@ -184,34 +197,29 @@ int TraceToExperimentalSystrace(std::istream* input,
 
   using Iterator = trace_processor::TraceProcessor::Iterator;
 
-  constexpr uint32_t kBufferSize = 1024u * 1024u * 16u;
-  std::unique_ptr<char[]> buffer(new char[kBufferSize]);
-  base::StringWriter buf_writer(buffer.get(), kBufferSize);
-
+  QueryWriter q_writer(tp.get(), output);
   if (wrap_in_json) {
     *output << kTraceHeader;
 
     *output << kProcessDumpHeader;
-    auto p_callback = [](Iterator* it, base::StringWriter* writer) {
+    static const char kPSql[] = "select pid, 0 as ppid, name from process";
+    q_writer.RunQuery(kPSql, [](Iterator* it, base::StringWriter* writer) {
       uint32_t pid = static_cast<uint32_t>(it->Get(0 /* col */).long_value);
       uint32_t ppid = static_cast<uint32_t>(it->Get(1 /* col */).long_value);
       const char* name = it->Get(2 /* col */).string_value;
       FormatProcess(pid, ppid, name, writer);
-    };
-    const char* p_sql = "select pid, 0 as ppid, name from process";
-    RunTraceProcessorQuery(tp.get(), &buf_writer, p_sql, output, p_callback);
+    });
 
     *output << kThreadHeader;
-    auto t_callback = [](Iterator* it, base::StringWriter* writer) {
+    static const char kTSql[] =
+        "select tid, COALESCE(upid, 0), thread.name "
+        "from thread inner join process using (upid)";
+    q_writer.RunQuery(kTSql, [](Iterator* it, base::StringWriter* writer) {
       uint32_t tid = static_cast<uint32_t>(it->Get(0 /* col */).long_value);
       uint32_t tgid = static_cast<uint32_t>(it->Get(1 /* col */).long_value);
       const char* name = it->Get(2 /* col */).string_value;
       FormatThread(tid, tgid, name, writer);
-    };
-    const char* t_sql =
-        "select tid, COALESCE(upid, 0), thread.name "
-        "from thread inner join process using (upid)";
-    RunTraceProcessorQuery(tp.get(), &buf_writer, t_sql, output, t_callback);
+    });
 
     *output << "\",";
     *output << kSystemTraceEvents;
@@ -221,7 +229,7 @@ int TraceToExperimentalSystrace(std::istream* input,
     *output << kFtraceHeader;
   }
 
-  auto callback = [wrap_in_json](Iterator* it, base::StringWriter* writer) {
+  auto raw_callback = [wrap_in_json](Iterator* it, base::StringWriter* writer) {
     const char* line = it->Get(0 /* col */).string_value;
     if (wrap_in_json) {
       for (uint32_t i = 0; line[i] != '\0'; i++) {
@@ -242,8 +250,8 @@ int TraceToExperimentalSystrace(std::istream* input,
       writer->AppendChar('\n');
     }
   };
-  const char* raw_sql = "select to_ftrace(id) from raw";
-  RunTraceProcessorQuery(tp.get(), &buf_writer, raw_sql, output, callback);
+  static const char kRawSql[] = "select to_ftrace(id) from raw";
+  q_writer.RunQuery(kRawSql, raw_callback);
 
   if (wrap_in_json)
     *output << kTraceFooter;
