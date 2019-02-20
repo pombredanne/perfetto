@@ -292,6 +292,8 @@ class UnixSocket {
   }
 #endif
 
+  UnixSocketRaw ReleaseSocket();
+
  private:
   UnixSocket(EventListener*, TaskRunner*, SockType);
   UnixSocket(EventListener*, TaskRunner*, ScopedFile, State, SockType);
