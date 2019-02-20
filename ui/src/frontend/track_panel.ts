@@ -19,7 +19,9 @@ import {TrackState} from '../common/state';
 
 import {globals} from './globals';
 import {drawGridLines} from './gridline_helper';
-import {drawVerticalLine, drawVerticalSelection} from './vertical_line_helper';
+import {drawVerticalLine,
+        drawVerticalSelection,
+        drawVerticalLineAtTime} from './vertical_line_helper';
 import {Panel, PanelSize} from './panel';
 import {Track} from './track';
 import {TRACK_SHELL_WIDTH} from './track_constants';
@@ -225,21 +227,28 @@ export class TrackPanel extends Panel<TrackPanelAttrs> {
     const localState = globals.frontendLocalState;
     // Draw vertical line when hovering on the the notes panel.
     if (localState.hoveredTimestamp !== -1) {
+      drawVerticalLineAtTime(ctx,
+                             localState.timeScale,
+                             localState.hoveredTimestamp,
+                             size.height,
+                             `#aaa`);
+    }
+
+    if (localState.showDragSelectPreview) {
       drawVerticalLine(ctx,
-                       localState.timeScale,
-                       localState.hoveredTimestamp,
+                       localState.dragSelectPreviewPos,
                        size.height,
-                       `#aaa`);
+                       `rgb(52,69,150)`);
     }
 
     if (globals.state.currentSelection !== null) {
       if (globals.state.currentSelection.kind === 'NOTE') {
         const note = globals.state.notes[globals.state.currentSelection.id];
-        drawVerticalLine(ctx,
-                        localState.timeScale,
-                        note.timestamp,
-                        size.height,
-                        note.color);
+        drawVerticalLineAtTime(ctx,
+                               localState.timeScale,
+                               note.timestamp,
+                               size.height,
+                               note.color);
       }
       if (globals.state.currentSelection.kind === 'TIMESPAN') {
         drawVerticalSelection(ctx,
