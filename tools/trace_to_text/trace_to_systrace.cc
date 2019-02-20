@@ -142,6 +142,10 @@ int RunTraceProcessorQuery(trace_processor::TraceProcessor* tp,
     }
     global_writer->AppendString(writer.GetCString(), writer.pos());
   }
+
+  // Flush any dangling pieces in the global writer.
+  *output << global_writer->GetCString();
+  global_writer->Reset();
   return 0;
 }
 
