@@ -120,7 +120,7 @@ class QueryWriter {
     auto iterator = tp_->ExecuteQuery(sql);
     if (!iterator.IsValid()) {
       PERFETTO_ELOG("Error creating SQL iterator");
-      return 1;
+      return false;
     }
 
     char buffer[2048];
@@ -131,7 +131,7 @@ class QueryWriter {
       if (PERFETTO_UNLIKELY(result == Result::kError)) {
         PERFETTO_ELOG("Error while writing systrace %s",
                       iterator.GetLastError().value().c_str());
-        return 1;
+        return false;
       } else if (result == Result::kEOF) {
         break;
       }
@@ -150,7 +150,7 @@ class QueryWriter {
     // Flush any dangling pieces in the global writer.
     *output_ << global_writer_.GetCString();
     global_writer_.Reset();
-    return 0;
+    return true;
   }
 
  private:
@@ -202,24 +202,30 @@ int TraceToExperimentalSystrace(std::istream* input,
     *output << kTraceHeader;
 
     *output << kProcessDumpHeader;
+
     static const char kPSql[] = "select pid, 0 as ppid, name from process";
-    q_writer.RunQuery(kPSql, [](Iterator* it, base::StringWriter* writer) {
+    auto p_callback = [](Iterator* it, base::StringWriter* writer) {
       uint32_t pid = static_cast<uint32_t>(it->Get(0 /* col */).long_value);
       uint32_t ppid = static_cast<uint32_t>(it->Get(1 /* col */).long_value);
       const char* name = it->Get(2 /* col */).string_value;
       FormatProcess(pid, ppid, name, writer);
-    });
+    };
+    if (!q_writer.RunQuery(kPSql, p_callback))
+      return 1;
 
     *output << kThreadHeader;
+
     static const char kTSql[] =
         "select tid, COALESCE(upid, 0), thread.name "
         "from thread inner join process using (upid)";
-    q_writer.RunQuery(kTSql, [](Iterator* it, base::StringWriter* writer) {
+    auto t_callback = [](Iterator* it, base::StringWriter* writer) {
       uint32_t tid = static_cast<uint32_t>(it->Get(0 /* col */).long_value);
       uint32_t tgid = static_cast<uint32_t>(it->Get(1 /* col */).long_value);
       const char* name = it->Get(2 /* col */).string_value;
       FormatThread(tid, tgid, name, writer);
-    });
+    };
+    if (!q_writer.RunQuery(kTSql, t_callback))
+      return 1;
 
     *output << "\",";
     *output << kSystemTraceEvents;
@@ -229,6 +235,7 @@ int TraceToExperimentalSystrace(std::istream* input,
     *output << kFtraceHeader;
   }
 
+  static const char kRawSql[] = "select to_ftrace(id) from raw";
   auto raw_callback = [wrap_in_json](Iterator* it, base::StringWriter* writer) {
     const char* line = it->Get(0 /* col */).string_value;
     if (wrap_in_json) {
@@ -250,8 +257,8 @@ int TraceToExperimentalSystrace(std::istream* input,
       writer->AppendChar('\n');
     }
   };
-  static const char kRawSql[] = "select to_ftrace(id) from raw";
-  q_writer.RunQuery(kRawSql, raw_callback);
+  if (!q_writer.RunQuery(kRawSql, raw_callback))
+    return 1;
 
   if (wrap_in_json)
     *output << kTraceFooter;

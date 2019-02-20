@@ -47,7 +47,7 @@ inline std::string FormatThread(const protos::ProcessTree::Thread& t) {
 
 inline void FormatProcess(uint32_t pid,
                           uint32_t ppid,
-                          base::StringView name,
+                          const base::StringView& name,
                           base::StringWriter* writer) {
   writer->AppendLiteral("root             ");
   writer->AppendInt(pid);
@@ -60,7 +60,7 @@ inline void FormatProcess(uint32_t pid,
 
 inline void FormatThread(uint32_t tid,
                          uint32_t tgid,
-                         base::StringView name,
+                         const base::StringView& name,
                          base::StringWriter* writer) {
   writer->AppendLiteral("root         ");
   writer->AppendInt(tgid);
