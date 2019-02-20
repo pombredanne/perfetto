@@ -468,6 +468,7 @@ UnixSocket::~UnixSocket() {
 }
 
 UnixSocketRaw UnixSocket::ReleaseSocket() {
+  // This will invalidate any pending calls to OnEvent.
   state_ = State::kDisconnected;
   if (sock_raw_)
     task_runner_->RemoveFileDescriptorWatch(sock_raw_.fd());
