@@ -330,7 +330,7 @@ class TraceViewer implements m.ClassComponent {
             height: this.detailsHeight,
           }),
           m('.details-panel-container', m(PanelContainer,
-            {doesScroll: true, panels: detailsPanels}))));
+            {doesScroll: false, panels: detailsPanels}))));
   }
 }
 

@@ -122,8 +122,6 @@ export class LogsController extends Controller<'main'> {
     const needSpanUpdate = !oldSpan.equals(newSpan);
     const needPaginationUpdate = !oldPagination.contains(requestedPagination);
 
-    console.log('!!!!!', needSpanUpdate, needPaginationUpdate);
-
     if (needSpanUpdate) {
       this.span = newSpan;
       console.log('spanUpdate');

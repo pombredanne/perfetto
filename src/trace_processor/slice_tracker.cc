@@ -115,6 +115,8 @@ void SliceTracker::End(int64_t timestamp,
   auto* slices = context_->storage->mutable_nestable_slices();
   size_t slice_idx = stack.back();
 
+  if (name != 0 && slices->names()[slice_idx] != name)
+    PERFETTO_ELOG("sys_event %s", context_->storage->GetString(name).c_str());
   PERFETTO_CHECK(cat == 0 || slices->cats()[slice_idx] == cat);
   PERFETTO_CHECK(name == 0 || slices->names()[slice_idx] == name);
 

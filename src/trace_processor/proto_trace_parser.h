@@ -168,7 +168,8 @@ class ProtoTraceParser {
   std::array<MmEventCounterNames, kMmEventCounterSize> mm_event_counter_names_;
 
   // Keep this in sync with the Linux syscall count.
-  static constexpr size_t kSysNameIdSize = 13;
+  static constexpr size_t kSysNameIdSize = 281;
+  StringId syscall_cat_id_;
   std::array<StringId, kSysNameIdSize> sys_name_ids_;
 };
 

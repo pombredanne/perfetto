@@ -66,7 +66,10 @@ export class LogPanel extends Panel<{}> {
   onupdate(_: m.CVnodeDOM) {
     this.bounds = globals.trackDataStore.get('log-bounds') as LogBounds;
     this.entries = globals.trackDataStore.get('log-entries') as LogEntries;
+
     this.recomputeVisibleRowsAndUpdate();
+    if (this.scrollContainer === undefined) return;
+    this.scrollContainer.style.maxHeight = `${this.scrollContainer.parentElement!.parentElement!.parentElement!.parentElement!.getBoundingClientRect().height - 29}px`;
   }
 
   onScroll() {
