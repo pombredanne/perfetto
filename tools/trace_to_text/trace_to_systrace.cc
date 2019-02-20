@@ -136,7 +136,9 @@ int RunTraceProcessorQuery(trace_processor::TraceProcessor* tp,
     callback(&iterator, &writer);
 
     if (global_writer->pos() + writer.pos() >= global_writer->size()) {
-      fprintf(stderr, "\x1b[2K\rWritten %" PRIu32 " rows\r", rows);
+      fprintf(stderr, "Writing row %d" PROGRESS_CHAR, rows);
+      fflush(stderr);
+
       *output << global_writer->GetCString();
       global_writer->Reset();
     }
@@ -164,8 +166,10 @@ int TraceToExperimentalSystrace(std::istream* input,
 
   uint64_t file_size = 0;
   for (int i = 0;; i++) {
-    if (i % 128 == 0)
-      fprintf(stderr, "\x1b[2K\rLoading trace: %.2f MB\r", file_size / 1E6);
+    if (i % 128 == 0) {
+      fprintf(stderr, "Loading trace %.2f" PROGRESS_CHAR, file_size / 1.0e6);
+      fflush(stderr);
+    }
 
     std::unique_ptr<uint8_t[]> buf(new uint8_t[kChunkSize]);
     input->read(reinterpret_cast<char*>(buf.get()), kChunkSize);
@@ -181,6 +185,9 @@ int TraceToExperimentalSystrace(std::istream* input,
     tp->Parse(std::move(buf), static_cast<size_t>(rsize));
   }
   tp->NotifyEndOfFile();
+
+  fprintf(stderr, "Loaded trace" PROGRESS_CHAR);
+  fflush(stderr);
 
   using Iterator = trace_processor::TraceProcessor::Iterator;
 
@@ -220,6 +227,9 @@ int TraceToExperimentalSystrace(std::istream* input,
     *output << "TRACE:\n";
     *output << kFtraceHeader;
   }
+
+  fprintf(stderr, "Converting trace events" PROGRESS_CHAR);
+  fflush(stderr);
 
   auto callback = [wrap_in_json](Iterator* it, base::StringWriter* writer) {
     const char* line = it->Get(0 /* col */).string_value;
