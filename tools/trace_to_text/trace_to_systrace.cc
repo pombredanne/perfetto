@@ -140,7 +140,7 @@ class QueryWriter {
       callback(&iterator, &writer);
 
       if (global_writer_.pos() + writer.pos() >= global_writer_.size()) {
-        fprintf(stderr, "Writing row %d" PROGRESS_CHAR, rows);
+        fprintf(stderr, "Writing row %" PRIu32 PROGRESS_CHAR, rows);
         *output_ << global_writer_.GetCString();
         global_writer_.Reset();
       }
@@ -178,7 +178,7 @@ int TraceToExperimentalSystrace(std::istream* input,
   uint64_t file_size = 0;
   for (int i = 0;; i++) {
     if (i % 128 == 0) {
-      fprintf(stderr, "Loading trace %.2f" PROGRESS_CHAR, file_size / 1.0e6);
+      fprintf(stderr, "Loading trace %.2f MB" PROGRESS_CHAR, file_size / 1.0e6);
       fflush(stderr);
     }
 
