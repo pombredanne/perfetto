@@ -126,6 +126,11 @@ class Client {
   static std::atomic<uint64_t> max_generation_;
   const uint64_t generation_;
 
+  // TODO(rsavitski): used to check if the client is completely initialized
+  // after construction. The reads in RecordFree & SampledAllocSizeLocked are no
+  // longer necessary (was an optimization to not do redundant work after
+  // shutdown). Turn into a normal bool, or indicate construction failures
+  // differently.
   std::atomic<bool> inited_{false};
   ClientConfiguration client_config_;
   // NB: sampler_ operations require external synchronization.

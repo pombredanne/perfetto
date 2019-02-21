@@ -345,8 +345,8 @@ bool Client::RecordFree(uint64_t alloc_address) {
 
 size_t Client::SampledAllocSizeLocked(size_t alloc_size) {
   if (!inited_.load(std::memory_order_acquire))
-    return -1;
-  return static_cast<ssize_t>(sampler_.SampleSize(alloc_size));
+    return 0;
+  return sampler_.SampleSize(alloc_size);
 }
 
 void Client::Shutdown() {
