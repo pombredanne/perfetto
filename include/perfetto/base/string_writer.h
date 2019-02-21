@@ -117,7 +117,7 @@ class StringWriter {
 
   // Creates a copy of the internal buffer.
   std::unique_ptr<char[]> CreateStringCopy() {
-    char* dup = reinterpret_cast<char*>(malloc(pos_ + 1));
+    char* dup = new char[pos_ + 1];
     if (dup) {
       strncpy(dup, buffer_, pos_);
       dup[pos_] = '\0';
