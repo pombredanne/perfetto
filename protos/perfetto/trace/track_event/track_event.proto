@@ -17,47 +17,48 @@
 syntax = "proto2";
 option optimize_for = LITE_RUNTIME;
 
-import "perfetto/trace/event/debug_annotation.proto";
-import "perfetto/trace/event/task_execution.proto";
+import "perfetto/trace/track_event/debug_annotation.proto";
+import "perfetto/trace/track_event/task_execution.proto";
 
 package perfetto.protos;
 
-// Trace events emitted by client instrumentation library (TRACE_EVENT macros).
+// Trace events emitted by client instrumentation library (TRACE_EVENT macros),
+// which describe activity on a track, such as a thread, task sequence, or
+// asynchronous track.
 //
 // This message is optimized for writing and makes heavy use of data interning
 // and delta encoding (e.g. of timestamps) to reduce data repetition and encoded
 // data size.
 //
-// A TraceEvent exists in the context of its packet sequence (TracePackets
+// A TrackEvent exists in the context of its packet sequence (TracePackets
 // emitted by the same producer + writer) and refers to data in preceding
 // TracePackets emitted on the same sequence, both directly and indirectly. For
 // example, interned data entries are emitted as part of a TracePacket and
-// directly referred to from TraceEvents by their interning IDs. Attributes
+// directly referred to from TrackEvents by their interning IDs. Attributes
 // shared by all events on the same sequence (e.g. their thread and process
 // association) are emitted as part of ProcessDescriptor and ThreadDescriptor
 // messages in separate TracePackets instead.
 //
-// Next reserved id: 7 (up to 15).
-// Next id: 20.
-message TraceEvent {
+// Next reserved id: 7 (up to 15). Next id: 20.
+message TrackEvent {
   // Timestamp in microseconds (usually CLOCK_MONOTONIC).
   oneof timestamp {
-    // Delta timestamp value since the last TraceEvent or ThreadDescriptor.
+    // Delta timestamp value since the last TrackEvent or ThreadDescriptor.
     // To calculate the absolute timestamp value, sum up all cumulative_delta
-    // values of the preceding TraceEvents since the last ThreadDescriptor and
+    // values of the preceding TrackEvents since the last ThreadDescriptor and
     // add the sum to the |reference_timestamp| in ThreadDescriptor.
-    uint64 timestamp_cumulative_delta = 1;
+    uint64 timestamp_cumulative_delta_us = 1;
     // Absolute value (e.g. a manually specified timestamp in the macro).
     // This is a one-off value that does not affect delta timestamp computation
-    // in subsequent TraceEvents.
-    uint64 timestamp_absolute = 16;
+    // in subsequent TrackEvents.
+    uint64 timestamp_absolute_us = 16;
   }
 
   // CPU time for the current thread (e.g., CLOCK_THREAD_CPUTIME_ID) in
   // microseconds.
   oneof thread_time {
-    uint64 thread_time_cumulative_delta = 2;
-    uint64 thread_time_absolute = 17;
+    uint64 thread_time_cumulative_delta_us = 2;
+    uint64 thread_time_absolute_us = 17;
   }
 
   // We intend to add a binary symbol version of this in the future.
@@ -76,7 +77,7 @@ message TraceEvent {
   // Apart from {category, time, thread time, tid, pid}, other legacy trace
   // event attributes are initially simply proxied for conversion to a JSON
   // trace. We intend to gradually transition these attributes to similar native
-  // features in TraceEvent (e.g. async + flow events), or deprecate them
+  // features in TrackEvent (e.g. async + flow events), or deprecate them
   // without replacement where transition is unsuitable.
   message LegacyEvent {
     optional uint32 name_iid = 1;  // interned LegacyEventName.

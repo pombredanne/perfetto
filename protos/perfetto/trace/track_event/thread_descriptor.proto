@@ -42,9 +42,9 @@ message ThreadDescriptor {
   // TODO(eseckler): Replace this with ChromeThreadType where possible.
   optional string thread_name = 5;
 
-  // Absolute reference values. Clock values in subsequent TraceEvents can be
+  // Absolute reference values. Clock values in subsequent TrackEvents can be
   // encoded accumulatively and relative to these. This reduces their var-int
   // encoding size.
-  optional uint64 reference_timestamp = 6;
-  optional uint64 reference_thread_time = 7;
+  optional uint64 reference_timestamp_us = 6;
+  optional uint64 reference_thread_time_us = 7;
 }

@@ -21,7 +21,7 @@ event_proto_names = [
   "process_descriptor.proto",
   "task_execution.proto",
   "thread_descriptor.proto",
-  "trace_event.proto",
+  "track_event.proto",
 ]
 
 proto_library("lite") {

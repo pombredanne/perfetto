@@ -2505,9 +2505,8 @@ message Trace {
 // The root object emitted by Perfetto. A perfetto trace is just a stream of
 // TracePacket(s).
 //
-// Next reserved id: 12 (up to 15).
-// Next id: 45 (up to 999).
-// Next interning field id: 1004.
+// Next reserved id: 13 (up to 15).
+// Next id: 45.
 message TracePacket {
   // TODO(primiano): in future we should add a timestamp_clock_domain field to
   // allow mixing timestamps from different clock domains.
@@ -2561,66 +2560,39 @@ message TracePacket {
     uint32 trusted_packet_sequence_id = 10;
   }
 
-  // ----------------------------- DATA INTERNING: -----------------------------
-  // Interning indexes are built up gradually by adding the entries contained in
-  // each TracePacket of the same packet sequence (packets emitted by the same
-  // producer and TraceWriter, see |trusted_packet_sequence_id|). Thus, packets
-  // can only refer to interned data from other packets in the same sequence.
-  //
-  // The writer will emit new entries when it encounters new internable values
-  // that aren't yet in the index. Data in this and subsequent TracePackets can
-  // then refer to the entry by its position (interning ID, abbreviated "iid")
-  // in its index.
-  //
-  // Because of the incremental build-up, the interning index will be corrupted
-  // when TracePackets are lost, e.g. because a chunk was overridden in the
-  // central ring buffer. To avoid invalidation of the whole trace in such a
-  // case, the index is periodically reset (see |reset_interning_state|). When
-  // packet loss occurs, the reader will only lose interning data up to the next
-  // reset.
-  // ---------------------------------------------------------------------------
-
-  // Interned data entries:
-  //
-  // The writer will usually emit new entries in the same TracePacket that first
-  // refers to them (since the last reset of interning state). They may also be
-  // emitted proactively in advance of referring to them in later packets. The
-  // messages in each of these fields need to specify an |iid| field, which is
-  // the ID of the entry in the field's interning index. Each field constructs
-  // its own index, thus interning IDs are scoped to the tracing session and
-  // field (usually as a counter for efficient var-int encoding).
-  //
-  // We use field IDs from 1000 to identify these fields for generic
-  // reconstruction of the interning indexes in the trace processor.
-  // removed field with id 1000
-  // removed field with id 1001
-  // removed field with id 1002
-  // removed field with id 1003
+  // Incrementally emitted interned data, valid only on the packet's sequence.
+  // The writer will usually emit new interned data in the same TracePacket that
+  // first refers to it (since the last reset of interning state). It may also
+  // be emitted proactively in advance of referring to them in later packets.
+  optional InternedData interned_data = 12;
 
   // Set to true by the writer to indicate that it will re-emit any incremental
   // data for the packet's sequence before referring to it again. This includes
-  // interned data in the interning indexes as well as periodically emitted data
-  // like Process/ThreadDescriptors.
+  // interned data as well as periodically emitted data like
+  // Process/ThreadDescriptors. This flag only affects the current packet
+  // sequence.
   //
-  // When set to true, this TracePacket and subsequent TracePackets will not
-  // refer to any interning entry emitted before this TracePacket without
-  // re-emitting the entry.
+  // When set to true, this TracePacket and subsequent TracePackets on the same
+  // sequence will not refer to any incremental data emitted before this
+  // TracePacket. For example, previously emitted interned data will be
+  // re-emitted if it is referred to again.
   //
   // When the reader detects packet loss (|missing_packets_on_sequence|), it
   // needs to skip packets in the sequence until the next one with this flag
   // set, to ensure intact incremental data.
   optional bool reset_incremental_state = 41;
 
-  // Flag set by the service if this packet does not immediately follow the last
-  // packet from the writer sequence that the consumer read. This can happen if
-  // chunks in the trace buffer are overridden before the consumer can read them
-  // when the trace is configured in ring buffer mode.
+  // Flag set by the service if one or multiple packets on the packet's sequence
+  // were dropped since the last packet that the consumer read from the
+  // sequence. This can happen if chunks in the trace buffer are overridden
+  // before the consumer could read them when the trace is configured in ring
+  // buffer mode. This flag only affects the current packet sequence.
   //
   // When packet loss occurs, incrementally emitted data (including interned
   // data) on the sequence should be considered invalid up until the next packet
   // with |reset_incremental_state| set. In such a situation, the reader should
   // skip to the next packet with this flag set.
-  optional bool missing_packets_on_sequence = 42;
+  optional bool previous_packet_dropped = 42;
 }
 
 // End of protos/perfetto/trace/trace_packet.proto

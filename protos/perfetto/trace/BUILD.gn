@@ -34,13 +34,14 @@ protozero_library("zero") {
     "../config:zero",
     "android:zero",
     "chrome:zero",
-    "event:zero",
     "filesystem:zero",
     "ftrace:zero",
+    "interned_data:zero",
     "power:zero",
     "profiling:zero",
     "ps:zero",
     "sys_stats:zero",
+    "track_event:zero",
   ]
   sources = proto_sources_minimal + proto_sources
   proto_in_dir = "$perfetto_root_path/protos"
@@ -56,13 +57,14 @@ proto_library("lite") {
     "../config:lite",
     "android:lite",
     "chrome:lite",
-    "event:lite",
     "filesystem:lite",
     "ftrace:lite",
+    "interned_data:lite",
     "power:lite",
     "profiling:lite",
     "ps:lite",
     "sys_stats:lite",
+    "track_event:lite",
   ]
   if (perfetto_build_standalone) {
     generate_descriptor = "$perfetto_root_path/protos/trace/trace.descriptor"
