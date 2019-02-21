@@ -20,63 +20,32 @@
 
 namespace perfetto {
 namespace profiling {
-namespace {
-ThreadLocalSamplingData* GetSpecific(pthread_key_t key,
-                                     uint64_t interval,
-                                     void* (*unhooked_malloc)(size_t),
-                                     void (*unhooked_free)(void*)) {
-  // This should not be used with glibc as it might re-enter into malloc, see
-  // http://crbug.com/776475.
-  void* specific = pthread_getspecific(key);
-  if (specific == nullptr) {
-    specific = unhooked_malloc(sizeof(ThreadLocalSamplingData));
-    new (specific) ThreadLocalSamplingData(unhooked_free, interval);
-    pthread_setspecific(key, specific);
-  }
-  return reinterpret_cast<ThreadLocalSamplingData*>(specific);
-}
-}  // namespace
 
 // The algorithm below is inspired by the Chromium sampling algorithm at
 // https://cs.chromium.org/search/?q=f:cc+symbol:AllocatorShimLogAlloc+package:%5Echromium$&type=cs
 
-int64_t ThreadLocalSamplingData::NextSampleInterval() {
-  std::exponential_distribution<double> dist(rate_);
+int64_t Sampler::NextSampleInterval() {
+  std::exponential_distribution<double> dist(sampling_rate_);
   int64_t next = static_cast<int64_t>(dist(random_engine_));
   // The +1 corrects the distribution of the first value in the interval.
   // TODO(fmayer): Figure out why.
   return next + 1;
 }
 
-size_t ThreadLocalSamplingData::NumberOfSamples(size_t sz) {
-  interval_to_next_sample_ -= sz;
-  size_t sz_multiplier = 0;
+size_t Sampler::NumberOfSamples(size_t alloc_sz) {
+  interval_to_next_sample_ -= alloc_sz;
+  size_t num_samples = 0;
   while (PERFETTO_UNLIKELY(interval_to_next_sample_ <= 0)) {
     interval_to_next_sample_ += NextSampleInterval();
-    ++sz_multiplier;
+    ++num_samples;
   }
-  return sz_multiplier;
+  return num_samples;
 }
 
-std::atomic<uint64_t> ThreadLocalSamplingData::seed(1);
-
-size_t SampleSize(pthread_key_t key,
-                  size_t sz,
-                  uint64_t interval,
-                  void* (*unhooked_malloc)(size_t),
-                  void (*unhooked_free)(void*)) {
-  if (PERFETTO_UNLIKELY(sz >= interval))
-    return sz;
-  return interval * GetSpecific(key, interval, unhooked_malloc, unhooked_free)
-                        ->NumberOfSamples(sz);
-}
-
-void ThreadLocalSamplingData::KeyDestructor(void* ptr) {
-  ThreadLocalSamplingData* thread_local_data =
-      reinterpret_cast<ThreadLocalSamplingData*>(ptr);
-  void (*unhooked_free)(void*) = thread_local_data->unhooked_free_;
-  thread_local_data->~ThreadLocalSamplingData();
-  unhooked_free(ptr);
+size_t Sampler::SampleSize(size_t alloc_sz) {
+  if (PERFETTO_UNLIKELY(alloc_sz >= sampling_interval_))
+    return alloc_sz;
+  return sampling_interval_ * NumberOfSamples(alloc_sz);
 }
 
 }  // namespace profiling

@@ -17,7 +17,6 @@
 #ifndef SRC_PROFILING_MEMORY_CLIENT_H_
 #define SRC_PROFILING_MEMORY_CLIENT_H_
 
-#include <pthread.h>
 #include <stddef.h>
 
 #include <condition_variable>
@@ -25,6 +24,7 @@
 #include <vector>
 
 #include "perfetto/base/unix_socket.h"
+#include "src/profiling/memory/sampler.h"
 #include "src/profiling/memory/wire_protocol.h"
 
 namespace perfetto {
@@ -89,7 +89,7 @@ class FreePage {
 
   // Add address to buffer. Flush if necessary using a socket borrowed from
   // pool.
-  // Can be called from any thread. Must not hold mutex_.`
+  // Can be called from any thread. Must not hold mutex_.
   bool Add(const uint64_t addr, uint64_t sequence_number, SocketPool* pool);
 
  private:
@@ -103,30 +103,6 @@ class FreePage {
 
 const char* GetThreadStackBase();
 
-// RAII wrapper around pthread_key_t. This is different from a ScopedResource
-// because it needs a separate boolean indicating validity.
-class PThreadKey {
- public:
-  PThreadKey(const PThreadKey&) = delete;
-  PThreadKey& operator=(const PThreadKey&) = delete;
-
-  PThreadKey(void (*destructor)(void*)) noexcept
-      : valid_(pthread_key_create(&key_, destructor) == 0) {}
-  ~PThreadKey() noexcept {
-    if (valid_)
-      pthread_key_delete(key_);
-  }
-  bool valid() const { return valid_; }
-  pthread_key_t get() const {
-    PERFETTO_DCHECK(valid_);
-    return key_;
-  }
-
- private:
-  pthread_key_t key_;
-  bool valid_;
-};
-
 constexpr uint32_t kClientSockTxTimeoutMs = 1000;
 
 // This is created and owned by the malloc hooks.
@@ -138,19 +114,13 @@ class Client {
                     uint64_t total_size,
                     uint64_t alloc_address);
   bool RecordFree(uint64_t alloc_address);
-  bool MaybeSampleAlloc(uint64_t alloc_size,
-                        uint64_t alloc_address,
-                        void* (*unhooked_malloc)(size_t),
-                        void (*unhooked_free)(void*));
+  size_t SampledAllocSizeLocked(size_t alloc_size);
   void Shutdown();
 
   ClientConfiguration client_config_for_testing() { return client_config_; }
   bool inited() { return inited_; }
 
  private:
-  ssize_t ShouldSampleAlloc(uint64_t alloc_size,
-                            void* (*unhooked_malloc)(size_t),
-                            void (*unhooked_free)(void*));
   const char* GetStackBase();
 
   static std::atomic<uint64_t> max_generation_;
@@ -158,7 +128,8 @@ class Client {
 
   std::atomic<bool> inited_{false};
   ClientConfiguration client_config_;
-  PThreadKey pthread_key_;
+  // NB: sampler_ operations require external synchronization.
+  Sampler sampler_;
   SocketPool socket_pool_;
   FreePage free_page_;
   const char* main_thread_stack_base_ = nullptr;
