@@ -103,11 +103,11 @@ message TraceEvent {
 // --------------------
 
 message EventCategory {
-  optional uint32 interning_id = 1;
+  optional uint32 iid = 1;
   optional string name = 2;
 }
 
 message LegacyEventName {
-  optional uint32 interning_id = 1;
+  optional uint32 iid = 1;
   optional string name = 2;
 }

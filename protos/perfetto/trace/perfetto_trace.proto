@@ -2564,7 +2564,8 @@ message TracePacket {
   // ----------------------------- DATA INTERNING: -----------------------------
   // Interning indexes are built up gradually by adding the entries contained in
   // each TracePacket of the same packet sequence (packets emitted by the same
-  // producer and TraceWriter, see |trusted_packet_sequence_id|).
+  // producer and TraceWriter, see |trusted_packet_sequence_id|). Thus, packets
+  // can only refer to interned data from other packets in the same sequence.
   //
   // The writer will emit new entries when it encounters new internable values
   // that aren't yet in the index. Data in this and subsequent TracePackets can
@@ -2574,9 +2575,9 @@ message TracePacket {
   // Because of the incremental build-up, the interning index will be corrupted
   // when TracePackets are lost, e.g. because a chunk was overridden in the
   // central ring buffer. To avoid invalidation of the whole trace in such a
-  // case, the index is periodically reset (see |reset_interning_state|). The
-  // reader will only lose interning data for packets after a "hole" in the
-  // sequence (see |missing_packets_on_sequence|) up to the next reset.
+  // case, the index is periodically reset (see |reset_interning_state|). When
+  // packet loss occurs, the reader will only lose interning data up to the next
+  // reset.
   // ---------------------------------------------------------------------------
 
   // Interned data entries:
@@ -2584,10 +2585,10 @@ message TracePacket {
   // The writer will usually emit new entries in the same TracePacket that first
   // refers to them (since the last reset of interning state). They may also be
   // emitted proactively in advance of referring to them in later packets. The
-  // messages in each of these fields need to specify an |interning_id| field,
-  // which is the ID of the entry in the field's interning index. Each field
-  // constructs its own index, thus interning IDs are scoped to the tracing
-  // session and field (usually as a counter for efficient var-int encoding).
+  // messages in each of these fields need to specify an |iid| field, which is
+  // the ID of the entry in the field's interning index. Each field constructs
+  // its own index, thus interning IDs are scoped to the tracing session and
+  // field (usually as a counter for efficient var-int encoding).
   //
   // We use field IDs from 1000 to identify these fields for generic
   // reconstruction of the interning indexes in the trace processor.
@@ -2607,13 +2608,18 @@ message TracePacket {
   //
   // When the reader detects packet loss (|missing_packets_on_sequence|), it
   // needs to skip packets in the sequence until the next one with this flag
-  // set, to ensure a complete interning state.
+  // set, to ensure intact incremental data.
   optional bool reset_incremental_state = 41;
 
   // Flag set by the service if this packet does not immediately follow the last
   // packet from the writer sequence that the consumer read. This can happen if
-  // chunks in the trace buffer are overridden before the consumer can read
-  // them when the trace is configured in ring buffer mode.
+  // chunks in the trace buffer are overridden before the consumer can read them
+  // when the trace is configured in ring buffer mode.
+  //
+  // When packet loss occurs, incrementally emitted data (including interned
+  // data) on the sequence should be considered invalid up until the next packet
+  // with |reset_incremental_state| set. In such a situation, the reader should
+  // skip to the next packet with this flag set.
   optional bool missing_packets_on_sequence = 42;
 }
 

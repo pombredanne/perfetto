@@ -30,7 +30,7 @@ message TaskExecution {
 // --------------------
 
 message SourceLocation {
-  optional uint32 interning_id = 1;
+  optional uint32 iid = 1;
 
   // We intend to add a binary symbol version of this in the future.
   optional string file_name = 2;
