@@ -203,6 +203,9 @@ int TraceToExperimentalSystrace(std::istream* input,
 
     *output << kProcessDumpHeader;
 
+    // Write out all the processes in the trace.
+    // TODO(lalitm): change this query to actually use ppid when it is exposed
+    // by the process table.
     static const char kPSql[] = "select pid, 0 as ppid, name from process";
     auto p_callback = [](Iterator* it, base::StringWriter* writer) {
       uint32_t pid = static_cast<uint32_t>(it->Get(0 /* col */).long_value);
@@ -215,6 +218,7 @@ int TraceToExperimentalSystrace(std::istream* input,
 
     *output << kThreadHeader;
 
+    // Write out all the threads in the trace.
     static const char kTSql[] =
         "select tid, COALESCE(upid, 0), thread.name "
         "from thread inner join process using (upid)";
