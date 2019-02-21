@@ -17,6 +17,7 @@ import Timer = NodeJS.Timer;
 import {DragGestureHandler} from './drag_gesture_handler';
 import {globals} from './globals';
 import {handleKey} from './keyboard_event_handler';
+import { TRACK_SHELL_WIDTH } from './track_constants';
 
 const ZOOM_RATIO_PER_FRAME = 0.008;
 const KEYBOARD_PAN_PX_PER_FRAME = 8;
@@ -141,7 +142,10 @@ export class PanAndZoomHandler {
     // TODO(taylori): Content offset is 6px off, why?
     this.mousePositionX = e.clientX - this.contentOffsetX - 6;
     if (this.shiftDown) {
-      globals.frontendLocalState.setTimeSelectPreviewPos(this.mousePositionX);
+      const pos = this.mousePositionX - TRACK_SHELL_WIDTH;
+      const ts =
+        globals.frontendLocalState.timeScale.pxToTime(pos);
+      globals.frontendLocalState.setHoveredTimestamp(ts);
     }
   }
 
@@ -162,7 +166,9 @@ export class PanAndZoomHandler {
     globals.frontendLocalState.setShowTimeSelectPreview(this.shiftDown);
     if (this.shiftDown && this.mousePositionX) {
       this.element.style.cursor = 'text';
-      globals.frontendLocalState.setTimeSelectPreviewPos(this.mousePositionX);
+      const pos = this.mousePositionX - TRACK_SHELL_WIDTH;
+      const ts = globals.frontendLocalState.timeScale.pxToTime(pos);
+      globals.frontendLocalState.setHoveredTimestamp(ts);
     }
     if (keyToPan(e) !== Pan.None) {
       this.panning = keyToPan(e);

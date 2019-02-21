@@ -25,7 +25,7 @@ export function drawVerticalLineAtTime(ctx: CanvasRenderingContext2D,
     drawVerticalLine(ctx, xPos, height, color, lineWidth);
   }
 
-export function drawVerticalLine(ctx: CanvasRenderingContext2D,
+function drawVerticalLine(ctx: CanvasRenderingContext2D,
                                  xPos: number,
                                  height: number,
                                  color: string,

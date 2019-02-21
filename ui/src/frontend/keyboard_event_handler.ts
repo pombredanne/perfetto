@@ -18,10 +18,8 @@ import {Actions} from '../common/actions';
 // Handles all key events than are not handled by the
 // pan and zoom handler.
 export function handleKey(key: string, down: boolean) {
-  if (down) {
-    if (['m'].includes(key)) {
-        selectSliceSpan();
-    }
+  if (down && 'm' === key) {
+    selectSliceSpan();
   }
 }
 
@@ -33,7 +31,6 @@ function selectSliceSpan() {
     const startTs = slice.ts + globals.state.traceTime.startSec;
     const endTs = startTs + slice.dur;
     globals.dispatch(Actions.selectTimeSpan({startTs, endTs}));
-    globals.rafScheduler.scheduleRedraw();
   }
 }
 
