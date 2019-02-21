@@ -112,7 +112,7 @@ export class TrackGroupPanel extends Panel<Attrs> {
 
     const localState = globals.frontendLocalState;
     // Draw vertical line when hovering on the the notes panel.
-    if (localState.hoveredTimestamp !== -1) {
+    if (localState.hasHoveredTimestamp) {
       drawVerticalLine(ctx,
                        localState.timeScale,
                        localState.hoveredTimestamp,

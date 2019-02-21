@@ -73,7 +73,20 @@ export class FrontendLocalState {
     globals.rafScheduler.scheduleFullRedraw();
   }
 
+  hasHoveredPid(): boolean {
+    return this.hoveredPid !== -1;
+  }
+
+  hasHoveredUtid(): boolean {
+    return this.hoveredUtid !== -1;
+  }
+
+  hasHoveredTimestamp(): boolean {
+    return this.hoveredTimestamp !== -1;
+  }
+
   setHoveredUtidAndPid(utid: number, pid: number) {
+    if (utid === this.hoveredUtid && pid === this.hoveredPid) return;
     this.hoveredUtid = utid;
     this.hoveredPid = pid;
     globals.rafScheduler.scheduleRedraw();

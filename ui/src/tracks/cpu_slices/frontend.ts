@@ -162,7 +162,7 @@ class CpuSliceTrack extends Track<Config, Data> {
         }
       }
 
-      const isHovering = globals.frontendLocalState.hoveredUtid !== -1;
+      const isHovering = globals.frontendLocalState.hasHoveredUtid;
       const isThreadHovered = globals.frontendLocalState.hoveredUtid === utid;
       const isProcessHovered = globals.frontendLocalState.hoveredPid === pid;
       const color = colorForThread(threadInfo);
