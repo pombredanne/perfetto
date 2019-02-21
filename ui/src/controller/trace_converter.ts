@@ -26,7 +26,7 @@ export function ConvertTrace(trace: Blob) {
     onRuntimeInitialized: () => {
       updateStatus('Converting trace');
       const outPath = '/trace.json';
-      mod.callMain(['experimental_json', '/fs/trace.proto', outPath]);
+      mod.callMain(['json', '/fs/trace.proto', outPath]);
       updateStatus('Trace conversion completed');
       const fsNode = mod.FS.lookupPath(outPath).node;
       const data = fsNode.contents.buffer;
