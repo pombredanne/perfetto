@@ -17,7 +17,7 @@ import Timer = NodeJS.Timer;
 import {DragGestureHandler} from './drag_gesture_handler';
 import {globals} from './globals';
 import {handleKey} from './keyboard_event_handler';
-import { TRACK_SHELL_WIDTH } from './track_constants';
+import {TRACK_SHELL_WIDTH} from './track_constants';
 
 const ZOOM_RATIO_PER_FRAME = 0.008;
 const KEYBOARD_PAN_PX_PER_FRAME = 8;

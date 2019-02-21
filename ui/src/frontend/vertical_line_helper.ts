@@ -26,10 +26,10 @@ export function drawVerticalLineAtTime(ctx: CanvasRenderingContext2D,
   }
 
 function drawVerticalLine(ctx: CanvasRenderingContext2D,
-                                 xPos: number,
-                                 height: number,
-                                 color: string,
-                                 lineWidth = 2) {
+                          xPos: number,
+                          height: number,
+                          color: string,
+                          lineWidth = 2) {
     ctx.beginPath();
     ctx.strokeStyle = color;
     const prevLineWidth = ctx.lineWidth;
