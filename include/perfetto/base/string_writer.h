@@ -51,6 +51,8 @@ class StringWriter {
     pos_ += n;
   }
 
+  void AppendStringView(StringView sv) { AppendString(sv.data(), sv.size()); }
+
   // Appends a null-terminated string literal to the buffer.
   template <size_t N>
   inline void AppendLiteral(const char (&in)[N]) {
@@ -121,7 +123,9 @@ class StringWriter {
     return dup;
   }
 
-  size_t pos() { return pos_; }
+  size_t pos() const { return pos_; }
+  size_t size() const { return size_; }
+  void reset() { pos_ = 0; }
 
  private:
   char* buffer_ = nullptr;

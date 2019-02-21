@@ -108,9 +108,68 @@ const char kFtraceJsonHeader[] =
     "#           TASK-PID    TGID   CPU#  ||||    TIMESTAMP  FUNCTION\\n"
     "#              | |        |      |   ||||       |         |\\n";
 
+class QueryWriter {
+ public:
+  QueryWriter(trace_processor::TraceProcessor* tp, std::ostream* output)
+      : tp_(tp),
+        buffer_(base::PagedMemory::Allocate(kBufferSize)),
+        global_writer_(static_cast<char*>(buffer_.Get()), kBufferSize),
+        output_(output) {}
+
+  template <typename Callback>
+  bool RunQuery(base::StringView sql, Callback callback) {
+    auto iterator = tp_->ExecuteQuery(sql);
+    if (!iterator.IsValid()) {
+      PERFETTO_ELOG("Error creating SQL iterator");
+      return false;
+    }
+
+    char buffer[2048];
+    for (uint32_t rows = 0;; rows++) {
+      using Result = trace_processor::TraceProcessor::Iterator::NextResult;
+
+      auto result = iterator.Next();
+      if (PERFETTO_UNLIKELY(result == Result::kError)) {
+        PERFETTO_ELOG("Error while writing systrace %s",
+                      iterator.GetLastError().value().c_str());
+        return false;
+      } else if (result == Result::kEOF) {
+        break;
+      }
+
+      base::StringWriter line_writer(buffer, base::ArraySize(buffer));
+      callback(&iterator, &line_writer);
+
+      if (global_writer_.pos() + line_writer.pos() >= global_writer_.size()) {
+        fprintf(stderr, "\x1b[2K\rWritten %" PRIu32 " rows\r", rows);
+        auto str = global_writer_.GetStringView();
+        output_->write(str.data(), static_cast<std::streamsize>(str.size()));
+        global_writer_.reset();
+      }
+      global_writer_.AppendStringView(line_writer.GetStringView());
+    }
+
+    // Flush any dangling pieces in the global writer.
+    auto str = global_writer_.GetStringView();
+    output_->write(str.data(), static_cast<std::streamsize>(str.size()));
+    global_writer_.reset();
+    return true;
+  }
+
+ private:
+  static constexpr uint32_t kBufferSize = 1024u * 1024u * 16u;
+
+  trace_processor::TraceProcessor* tp_ = nullptr;
+  base::PagedMemory buffer_;
+  base::StringWriter global_writer_;
+  std::ostream* output_ = nullptr;
+};
+
 }  // namespace
 
-int TraceToExperimentalSystrace(std::istream* input, std::ostream* output) {
+int TraceToExperimentalSystrace(std::istream* input,
+                                std::ostream* output,
+                                bool wrap_in_json) {
   trace_processor::Config config;
   config.optimization_mode = trace_processor::OptimizationMode::kMaxBandwidth;
   std::unique_ptr<trace_processor::TraceProcessor> tp =
@@ -139,44 +198,77 @@ int TraceToExperimentalSystrace(std::istream* input, std::ostream* output) {
   }
   tp->NotifyEndOfFile();
 
-  *output << "TRACE:\n";
-  *output << kFtraceHeader;
+  using Iterator = trace_processor::TraceProcessor::Iterator;
 
-  auto iterator = tp->ExecuteQuery("select to_ftrace(id) from raw");
-  if (!iterator.IsValid()) {
-    PERFETTO_ELOG("Error creating SQL iterator");
-    return 1;
-  }
+  QueryWriter q_writer(tp.get(), output);
+  if (wrap_in_json) {
+    *output << kTraceHeader;
 
-  constexpr uint32_t kBufferSize = 1024u * 1024u * 16u;
+    *output << kProcessDumpHeader;
 
-  // PagedMemory has guards against overflows.
-  base::PagedMemory paged_mem = base::PagedMemory::Allocate(kBufferSize);
-  char* buffer = static_cast<char*>(paged_mem.Get());
-  base::StringWriter writer(buffer, kBufferSize);
-  for (uint32_t rows = 0;; rows++) {
-    using Result = trace_processor::TraceProcessor::Iterator::NextResult;
-
-    auto result = iterator.Next();
-    if (PERFETTO_UNLIKELY(result == Result::kError)) {
-      PERFETTO_ELOG("Error while writing systrace %s",
-                    iterator.GetLastError().value().c_str());
+    // Write out all the processes in the trace.
+    // TODO(lalitm): change this query to actually use ppid when it is exposed
+    // by the process table.
+    static const char kPSql[] = "select pid, 0 as ppid, name from process";
+    auto p_callback = [](Iterator* it, base::StringWriter* writer) {
+      uint32_t pid = static_cast<uint32_t>(it->Get(0 /* col */).long_value);
+      uint32_t ppid = static_cast<uint32_t>(it->Get(1 /* col */).long_value);
+      const char* name = it->Get(2 /* col */).string_value;
+      FormatProcess(pid, ppid, name, writer);
+    };
+    if (!q_writer.RunQuery(kPSql, p_callback))
       return 1;
-    } else if (result == Result::kEOF) {
-      break;
-    }
 
-    const char* line = iterator.Get(0 /* col */).string_value;
-    size_t length = strlen(line);
-    if (writer.pos() + length >= kBufferSize) {
-      fprintf(stderr, "\x1b[2K\rWritten %" PRIu32 " rows\r", rows);
-      auto sview = writer.GetStringView();
-      output->write(sview.data(), static_cast<std::streamsize>(sview.size()));
-      writer = base::StringWriter(buffer, kBufferSize);
-    }
-    writer.AppendString(line, length);
-    writer.AppendChar('\n');
+    *output << kThreadHeader;
+
+    // Write out all the threads in the trace.
+    static const char kTSql[] =
+        "select tid, COALESCE(upid, 0), thread.name "
+        "from thread inner join process using (upid)";
+    auto t_callback = [](Iterator* it, base::StringWriter* writer) {
+      uint32_t tid = static_cast<uint32_t>(it->Get(0 /* col */).long_value);
+      uint32_t tgid = static_cast<uint32_t>(it->Get(1 /* col */).long_value);
+      const char* name = it->Get(2 /* col */).string_value;
+      FormatThread(tid, tgid, name, writer);
+    };
+    if (!q_writer.RunQuery(kTSql, t_callback))
+      return 1;
+
+    *output << "\",";
+    *output << kSystemTraceEvents;
+    *output << kFtraceJsonHeader;
+  } else {
+    *output << "TRACE:\n";
+    *output << kFtraceHeader;
   }
+
+  static const char kRawSql[] = "select to_ftrace(id) from raw";
+  auto raw_callback = [wrap_in_json](Iterator* it, base::StringWriter* writer) {
+    const char* line = it->Get(0 /* col */).string_value;
+    if (wrap_in_json) {
+      for (uint32_t i = 0; line[i] != '\0'; i++) {
+        char c = line[i];
+        if (c == '\n') {
+          writer->AppendLiteral("\\n");
+          continue;
+        }
+
+        if (c == '\\' || c == '"')
+          writer->AppendChar('\\');
+        writer->AppendChar(c);
+      }
+      writer->AppendChar('\\');
+      writer->AppendChar('n');
+    } else {
+      writer->AppendString(line);
+      writer->AppendChar('\n');
+    }
+  };
+  if (!q_writer.RunQuery(kRawSql, raw_callback))
+    return 1;
+
+  if (wrap_in_json)
+    *output << kTraceFooter;
 
   return 0;
 }
