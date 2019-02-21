@@ -212,6 +212,7 @@ class UnixSocket {
 
   UnixSocket(const UnixSocket&) = delete;
   UnixSocket& operator=(const UnixSocket&) = delete;
+  // Cannot be easily moved because of tasks from the FileDescriptorWatch.
   UnixSocket(UnixSocket&&) = delete;
   UnixSocket& operator=(UnixSocket&&) = delete;
 
