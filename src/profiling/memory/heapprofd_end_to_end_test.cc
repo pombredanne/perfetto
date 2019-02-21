@@ -409,6 +409,11 @@ TEST_F(HeapprofdEndToEnd, ReInit) {
   ASSERT_EQ(read(*ack_pipe.rd, buf, sizeof(buf)), 0);
   ack_pipe.rd.reset();
 
+  // TODO(rsavitski): this sleep is to compensate for the heapprofd delaying in
+  // closing the sockets (and therefore the client noticing that the session is
+  // over). Clarify where the delays are coming from.
+  usleep(100 * kMsToUs);
+
   PERFETTO_LOG("HeapprofdEndToEnd::Reinit: Starting second");
   TraceAndValidate(trace_config, pid, kSecondIterationBytes);
 
