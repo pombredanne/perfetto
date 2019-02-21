@@ -152,7 +152,7 @@ int TraceToExperimentalSystrace(std::istream* input, std::ostream* output) {
 
   // PagedMemory has guards against overflows.
   base::PagedMemory paged_mem = base::PagedMemory::Allocate(kBufferSize);
-  char* buffer = static_cast<char*>(buffer.Get());
+  char* buffer = static_cast<char*>(paged_mem.Get());
   base::StringWriter writer(buffer, kBufferSize);
   for (uint32_t rows = 0;; rows++) {
     using Result = trace_processor::TraceProcessor::Iterator::NextResult;
