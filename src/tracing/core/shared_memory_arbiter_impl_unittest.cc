@@ -72,7 +72,7 @@ class SharedMemoryArbiterImplTest : public AlignedBufferTest {
 };
 
 size_t const kPageSizes[] = {4096, 65536};
-INSTANTIATE_TEST_CASE_P(PageSize,
+INSTANTIATE_TEST_SUITE_P(PageSize,
                         SharedMemoryArbiterImplTest,
                         ::testing::ValuesIn(kPageSizes));
 

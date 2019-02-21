@@ -80,7 +80,7 @@ class TraceSorterTest : public ::testing::TestWithParam<OptimizationMode> {
   TraceBlobView test_buffer_;
 };
 
-INSTANTIATE_TEST_CASE_P(OptMode,
+INSTANTIATE_TEST_SUITE_P(OptMode,
                         TraceSorterTest,
                         ::testing::Values(OptimizationMode::kMaxBandwidth,
                                           OptimizationMode::kMinLatency));

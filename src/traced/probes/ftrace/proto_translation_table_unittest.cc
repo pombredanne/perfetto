@@ -102,7 +102,7 @@ TEST_P(AllTranslationTableTest, Create) {
   }
 }
 
-INSTANTIATE_TEST_CASE_P(ByDevice, AllTranslationTableTest, ValuesIn(kDevices));
+INSTANTIATE_TEST_SUITE_P(ByDevice, AllTranslationTableTest, ValuesIn(kDevices));
 
 TEST(TranslationTableTest, Seed) {
   std::string path =
@@ -256,7 +256,7 @@ print fmt: "some format")"));
   EXPECT_EQ(field_e.strategy, kUint32ToUint64);
 }
 
-INSTANTIATE_TEST_CASE_P(BySize, TranslationTableCreationTest, Values(4, 8));
+INSTANTIATE_TEST_SUITE_P(BySize, TranslationTableCreationTest, Values(4, 8));
 
 TEST(TranslationTableTest, InferFtraceType) {
   FtraceFieldType type;
