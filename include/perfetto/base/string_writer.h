@@ -103,26 +103,22 @@ class StringWriter {
     // print doubles. Reevaluate this in the future if we do print them more.
     size_t res = static_cast<size_t>(
         snprintf(buffer_ + pos_, size_ - pos_, "%lf", value));
-    PERFETTO_DCHECK(pos_ + res < size_);
+    PERFETTO_DCHECK(pos_ + res <= size_);
     pos_ += res;
   }
 
-  char* GetCString() {
-    // TODO(lalitm): this may need to be changed in the future to return a
-    // StringView if we find that we will want embedded nulls in our strings.
-    PERFETTO_DCHECK(pos_ < size_);
-    buffer_[pos_] = '\0';
-    return buffer_;
+  StringView GetStringView() {
+    PERFETTO_DCHECK(pos_ <= size_);
+    return StringView(buffer_, pos_);
   }
 
-  // Creates a copy of the internal buffer.
-  base::ScopedString CreateStringCopy() {
+  char* CreateStringCopy() {
     char* dup = reinterpret_cast<char*>(malloc(pos_ + 1));
     if (dup) {
       strncpy(dup, buffer_, pos_);
       dup[pos_] = '\0';
     }
-    return base::ScopedString(dup);
+    return dup;
   }
 
   size_t pos() { return pos_; }

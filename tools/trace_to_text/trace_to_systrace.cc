@@ -29,6 +29,7 @@
 
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
+#include "perfetto/base/paged_memory.h"
 #include "perfetto/base/string_writer.h"
 #include "perfetto/trace_processor/trace_processor.h"
 #include "perfetto/traced/sys_stats_counters.h"
@@ -148,9 +149,11 @@ int TraceToExperimentalSystrace(std::istream* input, std::ostream* output) {
   }
 
   constexpr uint32_t kBufferSize = 1024u * 1024u * 16u;
-  base::ScopedString buffer(static_cast<char*>(malloc(kBufferSize)));
-  base::StringWriter writer(*buffer, kBufferSize);
 
+  // PagedMemory has guards against overflows.
+  base::PagedMemory paged_mem = base::PagedMemory::Allocate(kBufferSize);
+  char* buffer = static_cast<char*>(buffer.Get());
+  base::StringWriter writer(buffer, kBufferSize);
   for (uint32_t rows = 0;; rows++) {
     using Result = trace_processor::TraceProcessor::Iterator::NextResult;
 
@@ -167,9 +170,9 @@ int TraceToExperimentalSystrace(std::istream* input, std::ostream* output) {
     size_t length = strlen(line);
     if (writer.pos() + length >= kBufferSize) {
       fprintf(stderr, "\x1b[2K\rWritten %" PRIu32 " rows\r", rows);
-
-      *output << writer.GetCString();
-      writer = base::StringWriter(*buffer, kBufferSize);
+      auto sview = writer.GetStringView();
+      output->write(sview.data(), static_cast<std::streamsize>(sview.size()));
+      writer = base::StringWriter(buffer, kBufferSize);
     }
     writer.AppendString(line, length);
     writer.AppendChar('\n');

@@ -43,7 +43,7 @@ void TraceSorter::SortAndFlushEventsBeyondWindow(int64_t window_size_ns) {
     // this range, perform a bound search and find the iterator for the min
     // timestamp that broke the monotonicity. Re-sort from there to the end.
     auto sorted_end = events_.begin() + static_cast<ssize_t>(sort_start_idx_);
-    PERFETTO_DCHECK(std::is_sorted(events_.begin(), sorted_end));
+    // PERFETTO_DCHECK(std::is_sorted(events_.begin(), sorted_end));
     auto sort_from = std::lower_bound(events_.begin(), sorted_end, sort_min_ts_,
                                       &TimestampedTracePiece::Compare);
     std::sort(sort_from, events_.end());
@@ -52,7 +52,7 @@ void TraceSorter::SortAndFlushEventsBeyondWindow(int64_t window_size_ns) {
   }
 
   // At this point |events_| must be fully sorted.
-  PERFETTO_DCHECK(std::is_sorted(events_.begin(), events_.end()));
+  // PERFETTO_DCHECK(std::is_sorted(events_.begin(), events_.end()));
 
   if (PERFETTO_UNLIKELY(latest_timestamp_ < window_size_ns))
     return;
