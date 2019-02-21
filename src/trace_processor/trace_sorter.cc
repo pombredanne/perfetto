@@ -30,7 +30,6 @@ TraceSorter::TraceSorter(TraceProcessorContext* context, int64_t window_size_ns)
 }
 
 void TraceSorter::Queue::Sort() {
-  // First check if any sorting is needed.
   PERFETTO_DCHECK(needs_sorting());
   PERFETTO_DCHECK(sort_start_idx_ < events_.size());
   PERFETTO_DCHECK(sort_min_ts_ > 0 && sort_min_ts_ < max_ts_);
@@ -51,27 +50,30 @@ void TraceSorter::Queue::Sort() {
 }
 
 // Removes all the events in |queues_| that are earlier than the given window
-// size and move them to the next parser stages, respecting global timestamp
+// size and moves them to the next parser stages, respecting global timestamp
 // order. This function is a "extract min from N sorted queues", with some
 // little cleverness: we know that events tend to be bursty, so events are
-// not going to be randomsly distributed on the N |queues_|.
-// On every iteration this function finds the first two queues (if any) that
+// not going to be randomly distributed on the N |queues_|.
+// Upon each iteration this function finds the first two queues (if any) that
 // have the oldest events, and extracts events from the 1st until hitting the
-// min_ts of the 2nd. Imagine the queries are as follows:
+// min_ts of the 2nd. Imagine the queues are as follows:
+//
 //  q0           {min_ts: 10  max_ts: 30}
 //  q1    {min_ts:5              max_ts: 35}
 //  q2              {min_ts: 12    max_ts: 40}
 //
-// We know that we can extract all events from q1 until we hit T=10 without
-// looking at any other queue. After hitting T=10, we need to re-look to all of
+// We know that we can extract all events from q1 until we hit ts=10 without
+// looking at any other queue. After hitting ts=10, we need to re-look to all of
 // them to figure out the next min-event.
 // There are more suitable data structures to do this (e.g. keeping a min-heap
-// to avoid re-scanning queues all the times) but not sure it's worth it. With
-// Android traces (that have 8 CPUs) this function accounts for 0.2% self cpu
+// to avoid re-scanning all the queues all the times) but doesn't seem worth it.
+// With Android traces (that have 8 CPUs) this function accounts for ~1-3% cpu
 // time in a profiler.
-void TraceSorter::SortAndFlushEventsBeyondWindow(int64_t window_size_ns) {
+void TraceSorter::SortAndExtractEventsBeyondWindow(int64_t window_size_ns) {
+  DCHECK_ftrace_batch_cpu(kNoBatch);
   constexpr int64_t kTsMax = std::numeric_limits<int64_t>::max();
-  int64_t flush_end_ts = global_max_ts_ - window_size_ns;
+  const bool was_empty = global_min_ts_ == kTsMax && global_max_ts_ == 0;
+  int64_t extract_end_ts = global_max_ts_ - window_size_ns;
   auto* next_stage = context_->proto_parser.get();
   size_t iterations = 0;
   for (;; iterations++) {
@@ -83,7 +85,7 @@ void TraceSorter::SortAndFlushEventsBeyondWindow(int64_t window_size_ns) {
 
     // This loop identifies the queue which starts with the earliest event and
     // also remembers the earliest event of the 2nd queue (in min_queue_ts[1]).
-    bool has_queues_with_events_earlier_than_window = false;
+    bool has_queues_with_expired_events = false;
     for (size_t i = 0; i < queues_.size(); i++) {
       auto& queue = queues_[i];
       if (queue.events_.empty())
@@ -94,18 +96,19 @@ void TraceSorter::SortAndFlushEventsBeyondWindow(int64_t window_size_ns) {
         min_queue_ts[1] = min_queue_ts[0];
         min_queue_ts[0] = queue.min_ts_;
         min_queue_idx = i;
-        has_queues_with_events_earlier_than_window = true;
+        has_queues_with_expired_events = true;
       } else if (queue.min_ts_ < min_queue_ts[1]) {
         min_queue_ts[1] = queue.min_ts_;
       }
     }
-    if (!has_queues_with_events_earlier_than_window) {
-      // All the queues have events that start after the window, nothing to do.
+    if (!has_queues_with_expired_events) {
+      // All the queues have events that start after the window (i.e. they are
+      // too recent and not eligible to be extracted given the current window).
       break;
     }
 
     Queue& queue = queues_[min_queue_idx];
-    base::CircularQueue<TimestampedTracePiece>& events = queue.events_;
+    auto& events = queue.events_;
     if (queue.needs_sorting())
       queue.Sort();
     PERFETTO_DCHECK(queue.min_ts_ == events.front().timestamp);
@@ -114,11 +117,11 @@ void TraceSorter::SortAndFlushEventsBeyondWindow(int64_t window_size_ns) {
     // Now that we identified the min-queue, extract all events from it until
     // we hit either: (1) the min-ts of the 2nd queue or (2) the window limit,
     // whichever comes first.
-    int64_t flush_until_ts = std::min(flush_end_ts, min_queue_ts[1]);
+    int64_t extract_until_ts = std::min(extract_end_ts, min_queue_ts[1]);
     size_t num_extracted = 0;
     for (auto& event : events) {
       int64_t timestamp = event.timestamp;
-      if (timestamp > flush_until_ts)
+      if (timestamp > extract_until_ts)
         break;
 
       auto blob_view = std::move(event.blob_view);
@@ -127,8 +130,10 @@ void TraceSorter::SortAndFlushEventsBeyondWindow(int64_t window_size_ns) {
         continue;
 
       if (min_queue_idx == 0) {
+        // queues_[0] is for non-ftrace packets.
         next_stage->ParseTracePacket(timestamp, std::move(blob_view));
       } else {
+        // Ftrace queues start at offset 1. So queues_[1] = cpu[0] and so on.
         uint32_t cpu = static_cast<uint32_t>(min_queue_idx - 1);
         next_stage->ParseFtracePacket(cpu, timestamp, std::move(blob_view));
       }
@@ -142,9 +147,10 @@ void TraceSorter::SortAndFlushEventsBeyondWindow(int64_t window_size_ns) {
 
     // Now remove the entries from the event buffer and update the queue-local
     // and global time bounds.
-    queue.events_.erase_front(num_extracted);
+    events.erase_front(num_extracted);
 
-    if (queue.events_.empty()) {
+    // Update the global_{min,max}_ts to reflect the bounds after extraction.
+    if (events.empty()) {
       queue.min_ts_ = kTsMax;
       queue.max_ts_ = 0;
       global_min_ts_ = min_queue_ts[1];
@@ -161,9 +167,14 @@ void TraceSorter::SortAndFlushEventsBeyondWindow(int64_t window_size_ns) {
     }
   }  // for(;;)
 
+  // We decide to extract events only when we know (using the global_{min,max}
+  // bounds) that there are eligible events. We should never end up in a
+  // situation where we call this function but then realize that there was
+  // nothing to extract.
+  PERFETTO_DCHECK(iterations > 0 || was_empty);
+
 #if PERFETTO_DCHECK_IS_ON()
-  // In debug builds check that the global min/max are consistent.
-  PERFETTO_DCHECK(iterations > 0);
+  // Check that the global min/max are consistent.
   int64_t dbg_min_ts = kTsMax;
   int64_t dbg_max_ts = 0;
   for (auto& q : queues_) {

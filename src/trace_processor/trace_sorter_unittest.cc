@@ -15,6 +15,10 @@
  */
 #include "src/trace_processor/proto_trace_parser.h"
 
+#include <map>
+#include <random>
+#include <vector>
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -28,6 +32,7 @@ namespace {
 
 using ::testing::_;
 using ::testing::InSequence;
+using ::testing::Invoke;
 using ::testing::NiceMock;
 
 class MockTraceParser : public ProtoTraceParser {
@@ -82,16 +87,18 @@ class TraceSorterTest : public ::testing::Test {
 TEST_F(TraceSorterTest, TestFtrace) {
   TraceBlobView view = test_buffer_.slice(0, 1);
   EXPECT_CALL(*parser_, MOCK_ParseFtracePacket(0, 1000, view.data(), 1));
-  context_.sorter->PushFtracePacket(0 /*cpu*/, 1000 /*timestamp*/,
-                                    std::move(view));
-  context_.sorter->FlushEventsForced();
+  context_.sorter->PushFtraceEvent(0 /*cpu*/, 1000 /*timestamp*/,
+                                   std::move(view));
+  context_.sorter->FinalizeFtraceEventBatch(0);
+  context_.sorter->ExtractEventsForced();
 }
 
 TEST_F(TraceSorterTest, TestTracePacket) {
   TraceBlobView view = test_buffer_.slice(0, 1);
   EXPECT_CALL(*parser_, MOCK_ParseTracePacket(1000, view.data(), 1));
   context_.sorter->PushTracePacket(1000, std::move(view));
-  context_.sorter->FlushEventsForced();
+  context_.sorter->FinalizeFtraceEventBatch(1000);
+  context_.sorter->ExtractEventsForced();
 }
 
 TEST_F(TraceSorterTest, Ordering) {
@@ -108,14 +115,56 @@ TEST_F(TraceSorterTest, Ordering) {
   EXPECT_CALL(*parser_, MOCK_ParseFtracePacket(2, 1200, view_4.data(), 4));
 
   context_.sorter->set_window_ns_for_testing(200);
-  context_.sorter->PushFtracePacket(2 /*cpu*/, 1200 /*timestamp*/,
-                                    std::move(view_4));
+  context_.sorter->PushFtraceEvent(2 /*cpu*/, 1200 /*timestamp*/,
+                                   std::move(view_4));
+  context_.sorter->FinalizeFtraceEventBatch(2);
   context_.sorter->PushTracePacket(1001, std::move(view_2));
   context_.sorter->PushTracePacket(1100, std::move(view_3));
-  context_.sorter->PushFtracePacket(0 /*cpu*/, 1000 /*timestamp*/,
-                                    std::move(view_1));
+  context_.sorter->PushFtraceEvent(0 /*cpu*/, 1000 /*timestamp*/,
+                                   std::move(view_1));
 
-  context_.sorter->FlushEventsForced();
+  context_.sorter->FinalizeFtraceEventBatch(0);
+  context_.sorter->ExtractEventsForced();
+}
+
+// Simulates a random stream of ftrace events happening on random CPUs.
+// Tests that the output of the TraceSorter matches the timestamp order
+// (% events happening at the same time on different CPUs).
+TEST_F(TraceSorterTest, MultiQueueSorting) {
+  std::minstd_rand0 rnd_engine(0);
+  std::map<int64_t /*ts*/, std::vector<uint32_t /*cpu*/>> expectations;
+
+  EXPECT_CALL(*parser_, MOCK_ParseFtracePacket(_, _, _, _))
+      .WillRepeatedly(Invoke([&expectations](uint32_t cpu, int64_t timestamp,
+                                             const uint8_t*, size_t) {
+        EXPECT_EQ(expectations.begin()->first, timestamp);
+        auto& cpus = expectations.begin()->second;
+        bool cpu_found = false;
+        for (auto it = cpus.begin(); it < cpus.end(); it++) {
+          if (*it != cpu)
+            continue;
+          cpu_found = true;
+          cpus.erase(it);
+          break;
+        }
+        if (cpus.empty())
+          expectations.erase(expectations.begin());
+        EXPECT_TRUE(cpu_found);
+      }));
+
+  for (int i = 0; i < 1000; i++) {
+    int64_t ts = abs(static_cast<int64_t>(rnd_engine()));
+    int num_cpus = rnd_engine() % 3;
+    for (int j = 0; j < num_cpus; j++) {
+      uint32_t cpu = static_cast<uint32_t>(rnd_engine() % 32);
+      expectations[ts].push_back(cpu);
+      context_.sorter->PushFtraceEvent(cpu, ts, TraceBlobView(nullptr, 0, 0));
+      context_.sorter->FinalizeFtraceEventBatch(cpu);
+    }
+  }
+
+  context_.sorter->ExtractEventsForced();
+  EXPECT_TRUE(expectations.empty());
 }
 
 }  // namespace
