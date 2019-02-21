@@ -1,5 +1,3 @@
-
-
 /*
  * Copyright (C) 2019 The Android Open Source Project
  *
@@ -16,29 +14,8 @@
  * limitations under the License.
  */
 
-// #include <stddef.h>
-// #include <stdint.h>
-//
-// #include <algorithm>
-//
-// #include "perfetto/base/logging.h"
-// #include "perfetto/base/utils.h"
-// #include "perfetto/protozero/scattered_stream_null_delegate.h"
-// #include "perfetto/protozero/scattered_stream_writer.h"
-// #include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
-// #include "src/traced/probes/ftrace/cpu_reader.h"
-// #include "test/cpu_reader_support.h"
-
-#include <map>
-#include <random>
-#include <string>
-
-#include "gtest/gtest.h"
 #include "perfetto/base/logging.h"
-#include "perfetto/base/scoped_file.h"
 #include "perfetto/trace_processor/trace_processor.h"
-#include "src/base/test/utils.h"
-#include "src/trace_processor/json_trace_parser.h"
 
 #include "perfetto/trace_processor/raw_query.pb.h"
 
