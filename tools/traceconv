@@ -21,7 +21,7 @@
 # cat ./traceconv | python -
 
 BASH_FALLBACK=""" "
-exec python - <<'#'EOF
+exec python - "$@" <<'#'EOF
 #"""
 
 import hashlib
