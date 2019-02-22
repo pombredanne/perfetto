@@ -450,6 +450,64 @@ bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   return true;
 }
 
+void TracingServiceImpl::EnableAdditionalFilteredProducers(
+    ConsumerEndpointImpl* consumer,
+    const TraceConfig& cfg) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  TracingSession* tracing_session =
+      GetTracingSession(consumer->tracing_session_id_);
+  PERFETTO_DCHECK(tracing_session);
+
+  for (const TraceConfig::DataSource& cfg_data_source : cfg.data_sources()) {
+    // Scan all the registered data sources with a matching name.
+    auto range = data_sources_.equal_range(cfg_data_source.config().name());
+    for (auto it = range.first; it != range.second; it++) {
+      ProducerEndpointImpl* producer = GetProducer(it->second.producer_id);
+      PERFETTO_DCHECK(producer);
+
+      // Check if the producer name of this data source is present
+      // in the name filter.
+      if (!cfg_data_source.producer_name_filter().empty() &&
+          std::find(cfg_data_source.producer_name_filter().begin(),
+                    cfg_data_source.producer_name_filter().end(),
+                    producer->name_) ==
+              cfg_data_source.producer_name_filter().end()) {
+        continue;
+      }
+
+      bool already_setup = false;
+      auto& ds_instances = tracing_session->data_source_instances;
+      for (auto instance_it = ds_instances.begin();
+           instance_it != ds_instances.end(); ++instance_it) {
+        if (instance_it->first == it->second.producer_id &&
+            instance_it->second.data_source_name ==
+                cfg_data_source.config().name()) {
+          already_setup = true;
+          break;
+        }
+      }
+
+      if (already_setup)
+        continue;
+
+      // If it wasn't previously setup, set it up now.
+      TraceConfig::ProducerConfig producer_config;
+      for (auto& config : cfg.producers()) {
+        if (producer->name_ == config.producer_name()) {
+          producer_config = config;
+          break;
+        }
+      }
+
+      DataSourceInstance* ds_inst = SetupDataSource(
+          cfg_data_source, producer_config, it->second, tracing_session);
+
+      if (ds_inst && tracing_session->state == TracingSession::STARTED)
+        producer->StartDataSource(ds_inst->instance_id, ds_inst->config);
+    }
+  }
+}
+
 bool TracingServiceImpl::StartTracing(TracingSessionID tsid) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   TracingSession* tracing_session = GetTracingSession(tsid);
@@ -1728,6 +1786,17 @@ void TracingServiceImpl::ConsumerEndpointImpl::EnableTracing(
   PERFETTO_DCHECK_THREAD(thread_checker_);
   if (!service_->EnableTracing(this, cfg, std::move(fd)))
     NotifyOnTracingDisabled();
+}
+
+void TracingServiceImpl::ConsumerEndpointImpl::
+    EnableAdditionalFilteredProducers(const TraceConfig& cfg) {
+  if (!tracing_session_id_) {
+    PERFETTO_LOG(
+        "Consumer called EnableAdditionalFilteredProducers() but tracing was "
+        "not active");
+    return;
+  }
+  service_->EnableAdditionalFilteredProducers(this, cfg);
 }
 
 void TracingServiceImpl::ConsumerEndpointImpl::StartTracing() {
