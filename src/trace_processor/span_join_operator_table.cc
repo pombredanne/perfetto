@@ -42,26 +42,6 @@ bool IsRequiredColumn(const std::string& name) {
   return name == kTsColumnName || name == kDurColumnName;
 }
 
-bool CheckRequiredColumns(const std::vector<Table::Column>& cols) {
-  int required_columns_found = 0;
-  for (const auto& col : cols) {
-    if (IsRequiredColumn(col.name())) {
-      ++required_columns_found;
-      if (col.type() != Table::ColumnType::kLong &&
-          col.type() != Table::ColumnType::kUnknown) {
-        PERFETTO_ELOG("Invalid column type for %s", col.name().c_str());
-        return false;
-      }
-    }
-  }
-  if (required_columns_found != 2) {
-    PERFETTO_ELOG("Required columns not found (found %d)",
-                  required_columns_found);
-    return false;
-  }
-  return true;
-}
-
 }  // namespace
 
 SpanJoinOperatorTable::SpanJoinOperatorTable(sqlite3* db, const TraceStorage*)
@@ -203,14 +183,22 @@ SpanJoinOperatorTable::ComputeSqlConstraintsForDefinition(
 base::Optional<SpanJoinOperatorTable::TableDefinition>
 SpanJoinOperatorTable::CreateTableDefinition(const TableDescriptor& desc) {
   auto cols = sqlite_utils::GetColumnsForTable(db_, desc.name);
-  if (!CheckRequiredColumns(cols))
-    return base::nullopt;
 
+  uint32_t required_columns_found = 0;
   uint32_t ts_idx = std::numeric_limits<uint32_t>::max();
   uint32_t dur_idx = std::numeric_limits<uint32_t>::max();
   uint32_t partition_idx = std::numeric_limits<uint32_t>::max();
   for (uint32_t i = 0; i < cols.size(); i++) {
     auto col = cols[i];
+    if (IsRequiredColumn(col.name())) {
+      ++required_columns_found;
+      if (col.type() != Table::ColumnType::kLong &&
+          col.type() != Table::ColumnType::kUnknown) {
+        PERFETTO_ELOG("Invalid column type for %s", col.name().c_str());
+        return base::nullopt;
+      }
+    }
+
     if (col.name() == kTsColumnName) {
       ts_idx = i;
     } else if (col.name() == kDurColumnName) {
@@ -219,6 +207,12 @@ SpanJoinOperatorTable::CreateTableDefinition(const TableDescriptor& desc) {
       partition_idx = i;
     }
   }
+  if (required_columns_found != 2) {
+    PERFETTO_ELOG("Required columns not found (found %d)",
+                  required_columns_found);
+    return base::nullopt;
+  }
+
   PERFETTO_DCHECK(ts_idx < cols.size());
   PERFETTO_DCHECK(dur_idx < cols.size());
   PERFETTO_DCHECK(desc.partition_col.empty() || partition_idx < cols.size());
@@ -426,7 +420,8 @@ int SpanJoinOperatorTable::Cursor::TableQueryState::StepAndCacheValues() {
   auto dur_idx = static_cast<int>(definition()->dur_idx());
   auto partition_idx = static_cast<int>(definition()->partition_idx());
   PERFETTO_DCHECK(!definition()->IsPartitioned() ||
-                  partition_idx < definition()->columns().size());
+                  static_cast<size_t>(partition_idx) <
+                      definition()->columns().size());
 
   int res;
   if (definition()->IsPartitioned()) {
@@ -458,7 +453,6 @@ int SpanJoinOperatorTable::Cursor::TableQueryState::StepAndCacheValues() {
 
 std::string SpanJoinOperatorTable::Cursor::TableQueryState::CreateSqlQuery(
     const std::vector<std::string>& cs) const {
-  // We expect the columns to be ordered in the query as per enum Column
   std::vector<std::string> col_names;
   for (const Table::Column& c : defn_->columns()) {
     col_names.push_back("`" + c.name() + "`");
