@@ -26,7 +26,7 @@ package perfetto.protos;
 message DebugAnnotation {
   message NestedValue {
     enum NestedType {
-      NONE = 0;  // leaf value.
+      UNSPECIFIED = 0;  // leaf value.
       DICT = 1;
       ARRAY = 2;
     }

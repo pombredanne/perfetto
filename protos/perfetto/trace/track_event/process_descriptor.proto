@@ -31,7 +31,7 @@ message ProcessDescriptor {
   optional int32 legacy_sort_index = 3;
 
   enum ChromeProcessType {
-    OTHER = 0;
+    UNSPECIFIED = 0;
     BROWSER = 1;
     RENDERER = 2;
     UTILITY = 3;

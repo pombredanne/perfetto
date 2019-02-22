@@ -58,6 +58,6 @@ message ChromeTracePacket {
 
   optional InternedData interned_data = 12;
 
-  bool reset_incremental_state = 41;
+  bool incremental_state_cleared = 41;
   bool previous_packet_dropped = 42;
 }
