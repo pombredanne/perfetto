@@ -114,7 +114,8 @@ def merge_protos(proto_paths, output_path):
   definitions = re.finditer(definitions_re, merged_content, re.MULTILINE)
   types = set((match.group(1) for match in definitions))
 
-  uses_re = r'^( +)(?:repeated)?\s?([A-Z]\w+.*)\s+[a-z]\w+\s*=\s*(\d+);'
+  uses_re = r'^( +)(?:repeated)?(?:optional)?\s'\
+            r'?([A-Z]\w+.*)\s+[a-z]\w+\s*=\s*(\d+);'
   uses = re.finditer(uses_re, merged_content, re.MULTILINE)
   substitutions = []
   for use in uses:
