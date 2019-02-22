@@ -22,42 +22,42 @@ BASE = 'https://android.googlesource.com/platform/external/perfetto.git/' \
        '+/master/%s?format=TEXT'
 
 RESOURCES = {
-    'trace_to_text': 'tools/run_trace_to_text',
-    'trace_processor': 'tools/run_trace_processor',
+    'traceconv': 'tools/traceconv',
+    'trace_processor': 'tools/trace_processor',
 }
 
 
 class RedirectHandler(webapp2.RequestHandler):
-    def get(self):
-        self.error(301)
-        self.response.headers['Location'] = 'https://www.perfetto.dev/'
+  def get(self):
+    self.error(301)
+    self.response.headers['Location'] = 'https://www.perfetto.dev/'
 
 
 class GitilesMirrorHandler(webapp2.RequestHandler):
-    def get(self, resource):
-        resource = resource.lower()
-        if resource not in RESOURCES:
-            self.error(404)
-            self.response.out.write('Rerource "%s" not found' % resource)
-            return
+  def get(self, resource):
+    resource = resource.lower()
+    if resource not in RESOURCES:
+      self.error(404)
+      self.response.out.write('Rerource "%s" not found' % resource)
+      return
 
-        url = BASE % RESOURCES[resource]
-        contents = memcache.get(url)
-        if not contents or self.request.get('reload'):
-            result = urlfetch.fetch(url)
-            if result.status_code != 200:
-                memcache.delete(url)
-                self.response.set_status(result.status_code)
-                self.response.write(
-                    'http error %d while fetching %s' % (
-                        result.status_code, url))
-                return
-            contents = base64.b64decode(result.content)
-            memcache.set(url, contents, time=3600)  # 1h
-        self.response.headers['Content-Type'] = 'text/plain'
-        self.response.headers['Content-Disposition'] = \
-            'attachment; filename="%s"' % resource
-        self.response.write(contents)
+    url = BASE % RESOURCES[resource]
+    contents = memcache.get(url)
+    if not contents or self.request.get('reload'):
+      result = urlfetch.fetch(url)
+      if result.status_code != 200:
+        memcache.delete(url)
+        self.response.set_status(result.status_code)
+        self.response.write(
+            'http error %d while fetching %s' % (
+                result.status_code, url))
+        return
+      contents = base64.b64decode(result.content)
+      memcache.set(url, contents, time=3600)  # 1h
+    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.headers['Content-Disposition'] = \
+        'attachment; filename="%s"' % resource
+    self.response.write(contents)
 
 
 app = webapp2.WSGIApplication([
