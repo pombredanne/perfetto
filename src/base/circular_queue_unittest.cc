@@ -70,7 +70,7 @@ TEST(CircularQueueTest, Int) {
   {
     std::minstd_rand0 rnd_engine(0);
     it = queue.begin();
-    for (int i = 0; i < kNumInts; ++i, ++it) {
+    for (size_t i = 0; i < kNumInts; ++i, ++it) {
       ASSERT_LT(it, queue.end());
       ASSERT_EQ(*it, static_cast<int>(rnd_engine()));
     }
