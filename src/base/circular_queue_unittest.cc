@@ -56,11 +56,11 @@ TEST(CircularQueueTest, Int) {
   ASSERT_EQ(queue.size(), 0u);
   ASSERT_EQ(queue.begin(), queue.end());
 
-  const auto kNumInts = 100000u;
+  const size_t kNumInts = 100000u;
 
   {
     std::minstd_rand0 rnd_engine(0);
-    for (int i = 0; i < kNumInts; i++) {
+    for (size_t i = 0; i < kNumInts; i++) {
       int n = static_cast<int>(rnd_engine());
       queue.emplace_back(n);
     }
