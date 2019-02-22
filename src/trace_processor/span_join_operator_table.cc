@@ -114,18 +114,13 @@ base::Optional<Table::Schema> SpanJoinOperatorTable::Init(
     partitioning_ = t1_desc.partition_col.empty()
                         ? PartitioningType::kNoPartitioning
                         : PartitioningType::kSamePartitioning;
-  } else {
-    partitioning_ = PartitioningType::kMixedPartitioning;
-  }
-
-  // Span joined views have to either be partitioned by the same key,
-  // or not partitioned at all.
-  if (partitioning_ == PartitioningType::kMixedPartitioning &&
-      t1_defn_.IsPartitioned() && t2_defn_.IsPartitioned()) {
+  } else if (t1_defn_.IsPartitioned() && t2_defn_.IsPartitioned()) {
     PERFETTO_ELOG("Mismatching partitions (%s, %s)",
                   t1_defn_.partition_col().c_str(),
                   t2_defn_.partition_col().c_str());
     return base::nullopt;
+  } else {
+    partitioning_ = PartitioningType::kMixedPartitioning;
   }
 
   std::vector<Table::Column> cols;
@@ -250,7 +245,7 @@ int SpanJoinOperatorTable::Cursor::Initialize(const QueryConstraints& qc,
   return Next();
 }
 
-bool SpanJoinOperatorTable::Cursor::IsOverlappingTimeSlices(
+bool SpanJoinOperatorTable::Cursor::IsOverlappingSpan(
     TableQueryState* t1,
     TableQueryState* t2,
     TableQueryState** next_stepped_table) {
@@ -298,7 +293,7 @@ int SpanJoinOperatorTable::SinglePartitioningCursor::Next() {
       continue;
     }
 
-    if (IsOverlappingTimeSlices(&t1_, &t2_, &next_stepped_table_)) {
+    if (IsOverlappingSpan(&t1_, &t2_, &next_stepped_table_)) {
       return SQLITE_OK;
     }
   }
@@ -344,7 +339,7 @@ int SpanJoinOperatorTable::MixedPartitioningCursor::Next() {
       continue;
     }
 
-    if (IsOverlappingTimeSlices(&t1_, &t2_, &next_stepped_table_)) {
+    if (IsOverlappingSpan(&t1_, &t2_, &next_stepped_table_)) {
       return SQLITE_OK;
     }
   }

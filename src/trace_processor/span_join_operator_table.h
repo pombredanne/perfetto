@@ -175,9 +175,9 @@ class SpanJoinOperatorTable : public Table {
       SpanJoinOperatorTable* const table_;
     };
 
-    static bool IsOverlappingTimeSlices(TableQueryState* t1,
-                                        TableQueryState* t2,
-                                        TableQueryState** next_stepped_table);
+    static bool IsOverlappingSpan(TableQueryState* t1,
+                                  TableQueryState* t2,
+                                  TableQueryState** next_stepped_table);
 
     TableQueryState t1_;
     TableQueryState t2_;
