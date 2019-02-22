@@ -16,8 +16,9 @@
 # This file should do the same thing when being invoked in any of these ways:
 # ./traceconv
 # python traceconv
+# bash traceconv
 # cat ./traceconv | bash
-# cat ./traceconv | python
+# cat ./traceconv | python -
 
 BASH_FALLBACK=""" "
 exec python - <<'#'EOF
