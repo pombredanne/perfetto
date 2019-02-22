@@ -56,7 +56,7 @@ message ChromeTracePacket {
 
   uint32 trusted_packet_sequence_id = 10;
 
-  optional InternedData interned_data = 12;
+  InternedData interned_data = 12;
 
   bool incremental_state_cleared = 41;
   bool previous_packet_dropped = 42;
