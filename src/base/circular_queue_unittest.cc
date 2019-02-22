@@ -56,7 +56,7 @@ TEST(CircularQueueTest, Int) {
   ASSERT_EQ(queue.size(), 0u);
   ASSERT_EQ(queue.begin(), queue.end());
 
-  const int kNumInts = 100000;
+  const auto kNumInts = 100000u;
 
   {
     std::minstd_rand0 rnd_engine(0);
