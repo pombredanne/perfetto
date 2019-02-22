@@ -23,9 +23,7 @@
 #include <limits>
 #include <map>
 #include <memory>
-#include <string>
 #include <unordered_map>
-#include <vector>
 
 #include "src/trace_processor/scoped_db.h"
 #include "src/trace_processor/table.h"
@@ -86,16 +84,9 @@ class SpanJoinOperatorTable : public Table {
   int BestIndex(const QueryConstraints& qc, BestIndexInfo* info) override;
 
  private:
-  enum class PartitioningType {
-    kNoPartitioning = 0,
-    kSamePartitioning = 1,
-    kMixedPartitioning = 2
-  };
-
   // Parsed version of a table descriptor.
   struct TableDescriptor {
-    static base::Optional<TableDescriptor> Parse(
-        const std::string& raw_descriptor);
+    static TableDescriptor Parse(const std::string& raw_descriptor);
 
     std::string name;
     std::string partition_col;
@@ -114,7 +105,7 @@ class SpanJoinOperatorTable : public Table {
     const std::string& partition_col() const { return partition_col_; }
     const std::vector<Table::Column>& columns() const { return cols_; }
 
-    bool IsPartitioned() const { return !partition_col_.empty(); }
+    bool is_parititioned() const { return partition_col_ != ""; }
 
    private:
     std::string name_;
@@ -122,16 +113,18 @@ class SpanJoinOperatorTable : public Table {
     std::vector<Table::Column> cols_;
   };
 
-  // Base class for a cursor on the span table.
+  // Cursor on the span table.
   class Cursor : public Table::Cursor {
    public:
     Cursor(SpanJoinOperatorTable*, sqlite3* db);
-    ~Cursor() override = default;
+    ~Cursor() override;
 
     int Initialize(const QueryConstraints& qc, sqlite3_value** argv);
+    int Next() override;
+    int Eof() override;
     int Column(sqlite3_context* context, int N) override;
 
-   protected:
+   private:
     // State of a query on a particular table.
     class TableQueryState {
      public:
@@ -142,21 +135,17 @@ class SpanJoinOperatorTable : public Table {
       int Initialize(const QueryConstraints& qc, sqlite3_value** argv);
       int StepAndCacheValues();
       void ReportSqliteResult(sqlite3_context* context, size_t index);
-      int PrepareRawStmt();
 
       const TableDefinition* definition() const { return defn_; }
 
       int64_t ts_start() const { return ts_start_; }
       int64_t ts_end() const { return ts_end_; }
       int64_t partition() const { return partition_; }
-      bool Eof() const {
-        return ts_start_ == std::numeric_limits<int64_t>::max();
-      }
 
      private:
-      std::string CreateSqlQuery(const std::vector<std::string>& cs) const;
+      std::string CreateSqlQuery(const std::vector<std::string>& cs);
+      int PrepareRawStmt(const std::string& sql);
 
-      std::string sql_query_;
       ScopedStmt stmt_;
 
       int64_t ts_start_ = std::numeric_limits<int64_t>::max();
@@ -168,33 +157,11 @@ class SpanJoinOperatorTable : public Table {
       SpanJoinOperatorTable* const table_;
     };
 
-    static bool IsOverlappingSpan(TableQueryState* t1,
-                                  TableQueryState* t2,
-                                  TableQueryState** next_stepped_table);
-
     TableQueryState t1_;
     TableQueryState t2_;
     TableQueryState* next_stepped_table_ = nullptr;
 
     SpanJoinOperatorTable* const table_;
-  };
-
-  class SinglePartitioningCursor : public Cursor {
-   public:
-    SinglePartitioningCursor(SpanJoinOperatorTable*, sqlite3* db);
-    ~SinglePartitioningCursor() override = default;
-
-    int Next() override;
-    int Eof() override;
-  };
-
-  class MixedPartitioningCursor : public Cursor {
-   public:
-    MixedPartitioningCursor(SpanJoinOperatorTable*, sqlite3* db);
-    ~MixedPartitioningCursor() override = default;
-
-    int Next() override;
-    int Eof() override;
   };
 
   // Identifier for a column by index in a given table.
@@ -216,7 +183,7 @@ class SpanJoinOperatorTable : public Table {
 
   TableDefinition t1_defn_;
   TableDefinition t2_defn_;
-  PartitioningType partitioning_;
+  bool is_same_partition_;
   std::unordered_map<size_t, ColumnLocator> global_index_to_column_locator_;
 
   sqlite3* const db_;
