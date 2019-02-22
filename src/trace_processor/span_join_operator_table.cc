@@ -20,6 +20,7 @@
 #include <string.h>
 #include <algorithm>
 #include <set>
+#include <utility>
 
 #include "perfetto/base/logging.h"
 #include "perfetto/base/string_splitter.h"
@@ -315,6 +316,7 @@ SpanJoinOperatorTable::MixedPartitioningCursor::MixedPartitioningCursor(
 
 int SpanJoinOperatorTable::MixedPartitioningCursor::Next() {
   while (true) {
+    int64_t prev_partition = t1_.partition();
     int err = next_stepped_table_->StepAndCacheValues();
     if (err != SQLITE_ROW && err != SQLITE_DONE) {
       // Propagate errors
@@ -325,7 +327,7 @@ int SpanJoinOperatorTable::MixedPartitioningCursor::Next() {
     }
 
     // t1 switched partitions, rewind the unpartitioned table.
-    if (t1_.ConsumeSwitchedPartition()) {
+    if (t1_.partition() != prev_partition) {
       int reset_err = t2_.PrepareRawStmt();
       if (reset_err != SQLITE_OK)
         return reset_err;
@@ -414,14 +416,12 @@ int SpanJoinOperatorTable::Cursor::TableQueryState::StepAndCacheValues() {
     ts_end_ = ts_start_ + dur;
     if (definition()->IsPartitioned()) {
       int64_t partition = sqlite3_column_int64(stmt, Column::kPartition);
-      switched_partition_ = partition_ != partition;
       partition_ = partition;
     }
   } else if (res == SQLITE_DONE) {
     ts_start_ = kI64Max;
     ts_end_ = kI64Max;
     partition_ = kI64Max;
-    switched_partition_ = false;
   }
   return res;
 }

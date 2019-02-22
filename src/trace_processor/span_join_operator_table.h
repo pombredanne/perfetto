@@ -23,7 +23,9 @@
 #include <limits>
 #include <map>
 #include <memory>
+#include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "src/trace_processor/scoped_db.h"
 #include "src/trace_processor/table.h"
@@ -151,14 +153,6 @@ class SpanJoinOperatorTable : public Table {
         return ts_start_ == std::numeric_limits<int64_t>::max();
       }
 
-      bool ConsumeSwitchedPartition() {
-        if (switched_partition_) {
-          switched_partition_ = false;
-          return true;
-        }
-        return false;
-      }
-
      private:
       std::string CreateSqlQuery(const std::vector<std::string>& cs) const;
 
@@ -168,7 +162,6 @@ class SpanJoinOperatorTable : public Table {
       int64_t ts_start_ = std::numeric_limits<int64_t>::max();
       int64_t ts_end_ = std::numeric_limits<int64_t>::max();
       int64_t partition_ = std::numeric_limits<int64_t>::max();
-      bool switched_partition_ = false;
 
       const TableDefinition* const defn_;
       sqlite3* const db_;
