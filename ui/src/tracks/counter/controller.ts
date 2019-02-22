@@ -53,18 +53,18 @@ class CounterTrackController extends TrackController<Config, Data> {
       this.minimumValueSeen = +result.columns[1].doubleValues![0];
       await this.query(
         `create virtual table ${this.tableName('window')} using window;`);
-      
+
       // TODO(taylori): Remove this view once span_join is fixed.
-      await this.query(`create view ${this.tableName('window_cpu')} as 
+      await this.query(`create view ${this.tableName('window_cpu')} as
         select ts, dur from ${this.tableName('window')} where cpu = 0;`);
-  
+
       await this.query(`create view ${this.tableName('counter_view')} as
         select ts,
         lead(ts) over (partition by ref_type order by ts) - ts as dur,
         value, name, ref
         from counters
         where name = '${this.config.name}' and ref = ${this.config.ref};`);
-  
+
       await this.query(`create virtual table ${this.tableName('span')} using
         span_join(${this.tableName('counter_view')},
         ${this.tableName('window')});`);
@@ -129,7 +129,6 @@ class CounterTrackController extends TrackController<Config, Data> {
       data.timestamps[row] = startSec;
       data.values[row] = value;
     }
-
 
     this.publish(data);
     this.busy = false;
