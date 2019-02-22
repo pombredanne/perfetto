@@ -60,7 +60,11 @@ std::vector<base::UnixSocketRaw> ConnectPool(const std::string& sock_name,
       continue;
     }
     if (!sock.SetTxTimeout(kClientSockTxTimeoutMs)) {
-      PERFETTO_PLOG("Failed to set timeout for %s", sock_name.c_str());
+      PERFETTO_PLOG("Failed to set send timeout for %s", sock_name.c_str());
+      continue;
+    }
+    if (!sock.SetRcvTimeout(kClientSockTxTimeoutMs)) {
+      PERFETTO_PLOG("Failed to set receive timeout for %s", sock_name.c_str());
       continue;
     }
     res.emplace_back(std::move(sock));
