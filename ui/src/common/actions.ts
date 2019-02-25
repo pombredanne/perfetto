@@ -233,10 +233,12 @@ export const StateActions = {
   // TODO(hjd): Remove setState - it causes problems due to reuse of ids.
   setState(state: StateDraft, args: {newState: State}): void {
     for (const key of Object.keys(state)) {
-      delete state[key];
+      // tslint:disable-next-line no-any
+      delete (state as any)[key];
     }
     for (const key of Object.keys(args.newState)) {
-      state[key] = args.newState[key];
+      // tslint:disable-next-line no-any
+      (state as any)[key] = (args.newState as any)[key];
     }
   },
 

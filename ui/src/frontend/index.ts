@@ -14,12 +14,11 @@
 
 import '../tracks/all_frontend';
 
-import {applyPatches, Patch, produce} from 'immer';
+import {applyPatches, Patch} from 'immer';
 import * as m from 'mithril';
 
 import {forwardRemoteCalls} from '../base/remote';
 import {Actions} from '../common/actions';
-import {State} from '../common/state';
 
 import {globals, QuantizedLoad, SliceDetails, ThreadDesc} from './globals';
 import {HomePage} from './home_page';
