@@ -73,7 +73,7 @@ message TrackEvent {
   // TODO(eseckler): May also want a debug_name for untyped debug-only events.
 
   // Unstable key/value annotations shown in the trace viewer but not intended
-  // for upload from the field or metrics use.
+  // for metrics use.
   repeated DebugAnnotation debug_annotations = 4;
 
   // Typed event arguments:

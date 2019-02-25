@@ -69,6 +69,8 @@ message TracePacket {
     BatteryCounters battery = 38;
     PowerRails power_rails = 40;
     AndroidLogPacket android_log = 39;
+
+    // Only used by TrackEvent.
     ProcessDescriptor process_descriptor = 43;
     ThreadDescriptor thread_descriptor = 44;
 

@@ -34,12 +34,12 @@ package perfetto.protos;
 // then refer to the entry by its position (interning ID, abbreviated "iid") in
 // its index.
 //
-// Because of the incremental build-up, the interning index will be corrupted
-// when TracePackets are lost, e.g. because a chunk was overridden in the
-// central ring buffer. To avoid invalidation of the whole trace in such a case,
-// the index is periodically reset (see |incremental_state_cleared| in
-// TracePacket). When packet loss occurs, the reader will only lose interning
-// data up to the next reset.
+// Because of the incremental build-up, the interning index will miss data when
+// TracePackets are lost, e.g. because a chunk was overridden in the central
+// ring buffer. To avoid invalidation of the whole trace in such a case, the
+// index is periodically reset (see |incremental_state_cleared| in TracePacket).
+// When packet loss occurs, the reader will only lose interning data up to the
+// next reset.
 // -----------------------------------------------------------------------------
 
 // Message that contains new entries for the interning indices of a packet
@@ -56,7 +56,8 @@ message InternedData {
   // index, thus interning IDs are scoped to the tracing session and field
   // (usually as a counter for efficient var-int encoding). It is illegal to
   // override entries in an index (using the same iid for two different values)
-  // within the same tracing session, even after a reset of the interning state.
+  // within the same tracing session, even after a reset of the emitted
+  // interning state.
   repeated EventCategory event_categories = 1;
   repeated LegacyEventName legacy_event_names = 2;
   repeated DebugAnnotationName debug_annotation_names = 3;

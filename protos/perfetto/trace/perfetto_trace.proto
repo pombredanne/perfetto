@@ -2532,6 +2532,8 @@ message TracePacket {
     BatteryCounters battery = 38;
     PowerRails power_rails = 40;
     AndroidLogPacket android_log = 39;
+
+    // Only used by TrackEvent.
     // removed field with id 43
     // removed field with id 44
 
