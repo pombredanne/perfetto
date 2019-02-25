@@ -110,8 +110,11 @@ std::atomic<const MallocDispatch*> g_dispatch{nullptr};
 // copies (ensuring that the client stays alive until no longer needed), and do
 // nothing if this master pointer is empty.
 //
-// Protected by g_client_lock.
-std::shared_ptr<perfetto::profiling::Client> g_client{nullptr};
+// This shared_ptr itself is protected by g_client_lock. Note that shared_ptr
+// handles are not thread-safe by themselves:
+// https://en.cppreference.com/w/cpp/memory/shared_ptr/atomic
+std::shared_ptr<perfetto::profiling::Client> g_client;
+
 // Protects g_client, and serves as an external lock for sampling decisions (see
 // perfetto::profiling::Sampler).
 //
@@ -299,18 +302,28 @@ void HEAPPROFD_ADD_PREFIX(_finalize)() {
   // any specific action to take, and cleanup can be left to the OS.
 }
 
-template <typename T>
-static T SampleAllocation(size_t size, void* addr, T result) {
+// Decides whether an allocation with the given address and size needs to be
+// sampled, and if so, records it. Performs the necessary synchronization (holds
+// |g_client_lock| spinlock) while accessing the shared sampler, and obtaining a
+// profiling client handle (shared_ptr).
+//
+// If the allocation is to be sampled, the recording is done without holding
+// |g_client_lock|. The client handle is guaranteed to not be invalidated while
+// the allocation is being recorded.
+//
+// If the attempt to record the allocation fails, initiates lazy shutdown of the
+// client & hooks.
+static void MaybeSampleAllocation(size_t size, void* addr) {
   size_t sampled_alloc_sz = 0;
-  std::shared_ptr<perfetto::profiling::Client> client{nullptr};
+  std::shared_ptr<perfetto::profiling::Client> client;
   {
     ScopedSpinlock s(&g_client_lock, ScopedSpinlock::Mode::Blocking);
     if (!g_client)  // no active client (most likely shutting down)
-      return result;
+      return;
 
-    sampled_alloc_sz = g_client->SampledAllocSizeLocked(size);
+    sampled_alloc_sz = g_client->DetermineSampledAllocSize(size);
     if (sampled_alloc_sz == 0)  // not sampling
-      return result;
+      return;
 
     client = g_client;  // owning copy
   }                     // unlock
@@ -319,31 +332,34 @@ static T SampleAllocation(size_t size, void* addr, T result) {
                             reinterpret_cast<uint64_t>(addr))) {
     ShutdownLazy();
   }
-  return result;
 }
 
 void* HEAPPROFD_ADD_PREFIX(_malloc)(size_t size) {
   const MallocDispatch* dispatch = GetDispatch();
   void* addr = dispatch->malloc(size);
-  return SampleAllocation(size, addr, addr);
+  MaybeSampleAllocation(size, addr);
+  return addr;
 }
 
 void* HEAPPROFD_ADD_PREFIX(_calloc)(size_t nmemb, size_t size) {
   const MallocDispatch* dispatch = GetDispatch();
   void* addr = dispatch->calloc(nmemb, size);
-  return SampleAllocation(size, addr, addr);
+  MaybeSampleAllocation(size, addr);
+  return addr;
 }
 
 void* HEAPPROFD_ADD_PREFIX(_aligned_alloc)(size_t alignment, size_t size) {
   const MallocDispatch* dispatch = GetDispatch();
   void* addr = dispatch->aligned_alloc(alignment, size);
-  return SampleAllocation(size, addr, addr);
+  MaybeSampleAllocation(size, addr);
+  return addr;
 }
 
 void* HEAPPROFD_ADD_PREFIX(_memalign)(size_t alignment, size_t size) {
   const MallocDispatch* dispatch = GetDispatch();
   void* addr = dispatch->memalign(alignment, size);
-  return SampleAllocation(size, addr, addr);
+  MaybeSampleAllocation(size, addr);
+  return addr;
 }
 
 int HEAPPROFD_ADD_PREFIX(_posix_memalign)(void** memptr,
@@ -354,12 +370,16 @@ int HEAPPROFD_ADD_PREFIX(_posix_memalign)(void** memptr,
   if (res != 0)
     return res;
 
-  return SampleAllocation(size, *memptr, res);
+  MaybeSampleAllocation(size, *memptr);
+  return res;
 }
 
+// Note: we record the free before calling the backing implementation to make
+// sure that the address is not reused before we've processed the deallocation
+// (which includes assigning a sequence id to it).
 void HEAPPROFD_ADD_PREFIX(_free)(void* pointer) {
   const MallocDispatch* dispatch = GetDispatch();
-  std::shared_ptr<perfetto::profiling::Client> client{nullptr};
+  std::shared_ptr<perfetto::profiling::Client> client;
   {
     ScopedSpinlock s(&g_client_lock, ScopedSpinlock::Mode::Blocking);
     client = g_client;  // owning copy (or empty)
@@ -376,21 +396,26 @@ void HEAPPROFD_ADD_PREFIX(_free)(void* pointer) {
 // client, and make the sampling decision in advance. Then record the
 // deallocation, call the real realloc, and finally record the sample if one is
 // necessary.
+//
+// As with the free, we record the deallocation before calling the backing
+// implementation to make sure the address is still exclusive while we're
+// processing it.
 void* HEAPPROFD_ADD_PREFIX(_realloc)(void* pointer, size_t size) {
   const MallocDispatch* dispatch = GetDispatch();
 
   size_t sampled_alloc_sz = 0;
-  std::shared_ptr<perfetto::profiling::Client> client{nullptr};
-  [&sampled_alloc_sz, &client, size] {
+  std::shared_ptr<perfetto::profiling::Client> client;
+  {
     ScopedSpinlock s(&g_client_lock, ScopedSpinlock::Mode::Blocking);
-    if (!g_client)  // no active client (most likely shutting down)
-      return;
+    // If there is no active client, we still want to reach the backing realloc,
+    // so keep going.
+    if (g_client) {
+      client = g_client;  // owning copy
+      sampled_alloc_sz = g_client->DetermineSampledAllocSize(size);
+    }
+  }  // unlock
 
-    client = g_client;  // owning copy
-    sampled_alloc_sz = g_client->SampledAllocSizeLocked(size);
-  }();
-
-  if (pointer && client) {
+  if (client && pointer) {
     if (!client->RecordFree(reinterpret_cast<uint64_t>(pointer)))
       ShutdownLazy();
   }

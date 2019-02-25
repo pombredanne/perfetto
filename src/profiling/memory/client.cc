@@ -343,7 +343,7 @@ bool Client::RecordFree(uint64_t alloc_address) {
   return success;
 }
 
-size_t Client::SampledAllocSizeLocked(size_t alloc_size) {
+size_t Client::DetermineSampledAllocSize(size_t alloc_size) {
   if (!inited_.load(std::memory_order_acquire))
     return 0;
   return sampler_.SampleSize(alloc_size);

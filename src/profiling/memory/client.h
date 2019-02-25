@@ -105,7 +105,13 @@ const char* GetThreadStackBase();
 
 constexpr uint32_t kClientSockTxTimeoutMs = 1000;
 
-// This is created and owned by the malloc hooks.
+// Profiling client, used to sample and record the malloc/free family of calls,
+// and communicate the necessary state to a separate profiling daemon process.
+//
+// Created and owned by the malloc hooks.
+//
+// Methods of this class are thread-safe unless otherwise stated, in which case
+// the caller needs to synchronize calls behind a mutex or similar.
 class Client {
  public:
   Client(std::vector<base::UnixSocketRaw> sockets);
@@ -114,8 +120,15 @@ class Client {
                     uint64_t total_size,
                     uint64_t alloc_address);
   bool RecordFree(uint64_t alloc_address);
-  size_t SampledAllocSizeLocked(size_t alloc_size);
   void Shutdown();
+
+  // Returns the number of bytes to assign to an allocation with the given
+  // |alloc_size|, based on the current sampling rate. A return value of zero
+  // means that the allocation should not be recorded. Not idempotent, each
+  // invocation mutates the sampler state.
+  //
+  // Not thread-safe.
+  size_t DetermineSampledAllocSize(size_t alloc_size);
 
   ClientConfiguration client_config_for_testing() { return client_config_; }
   bool inited() { return inited_; }
@@ -127,13 +140,13 @@ class Client {
   const uint64_t generation_;
 
   // TODO(rsavitski): used to check if the client is completely initialized
-  // after construction. The reads in RecordFree & SampledAllocSizeLocked are no
-  // longer necessary (was an optimization to not do redundant work after
+  // after construction. The reads in RecordFree & DetermineSampledAllocSize are
+  // no longer necessary (was an optimization to not do redundant work after
   // shutdown). Turn into a normal bool, or indicate construction failures
   // differently.
   std::atomic<bool> inited_{false};
   ClientConfiguration client_config_;
-  // NB: sampler_ operations require external synchronization.
+  // sampler_ operations are not thread-safe.
   Sampler sampler_;
   SocketPool socket_pool_;
   FreePage free_page_;

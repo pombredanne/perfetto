@@ -19,8 +19,6 @@
 #include <unistd.h>
 
 #include <atomic>
-#include <new>
-#include <utility>
 
 #include "perfetto/base/utils.h"
 
@@ -39,23 +37,6 @@ void ScopedSpinlock::LockSlow(Mode mode) {
     if (attempt && attempt % 1024 == 0)
       usleep(1000);
   }
-}
-
-ScopedSpinlock::ScopedSpinlock(ScopedSpinlock&& other) noexcept
-    : lock_(other.lock_), locked_(other.locked_) {
-  other.locked_ = false;
-}
-
-ScopedSpinlock& ScopedSpinlock::operator=(ScopedSpinlock&& other) {
-  if (this != &other) {
-    this->~ScopedSpinlock();
-    new (this) ScopedSpinlock(std::move(other));
-  }
-  return *this;
-}
-
-ScopedSpinlock::~ScopedSpinlock() {
-  Unlock();
 }
 
 }  // namespace profiling

@@ -22,6 +22,8 @@
 #include <atomic>
 #include <random>
 
+#include "perfetto/base/utils.h"
+
 namespace perfetto {
 namespace profiling {
 
@@ -31,10 +33,11 @@ constexpr uint64_t kSamplerSeed = 1;
 // each byte. The whole allocation gets accounted as often as the number of
 // sampled bytes it contains.
 //
-// NB: not thread-safe, requires external synchronization.
+// The algorithm is inspired by the Chromium sampling algorithm at
+// https://cs.chromium.org/search/?q=f:cc+symbol:AllocatorShimLogAlloc+package:%5Echromium$&type=cs
+// Googlers: see go/chrome-shp for more details.
 //
-// Googlers: see go/chrome-shp for more details about the sampling (from
-// Chrome's heap profiler).
+// NB: not thread-safe, requires external synchronization.
 class Sampler {
  public:
   Sampler(uint64_t sampling_interval)
@@ -48,13 +51,32 @@ class Sampler {
   //
   // Due to how the poission sampling works, some samples should be accounted
   // multiple times.
-  size_t SampleSize(size_t alloc_sz);
+  size_t SampleSize(size_t alloc_sz) {
+    if (PERFETTO_UNLIKELY(alloc_sz >= sampling_interval_))
+      return alloc_sz;
+    return sampling_interval_ * NumberOfSamples(alloc_sz);
+  }
 
  private:
-  int64_t NextSampleInterval();
+  int64_t NextSampleInterval() {
+    std::exponential_distribution<double> dist(sampling_rate_);
+    int64_t next = static_cast<int64_t>(dist(random_engine_));
+    // The +1 corrects the distribution of the first value in the interval.
+    // TODO(fmayer): Figure out why.
+    return next + 1;
+  }
+
   // Returns number of times a sample should be accounted. Due to how the
   // poission sampling works, some samples should be accounted multiple times.
-  size_t NumberOfSamples(size_t sz);
+  size_t NumberOfSamples(size_t alloc_sz) {
+    interval_to_next_sample_ -= alloc_sz;
+    size_t num_samples = 0;
+    while (PERFETTO_UNLIKELY(interval_to_next_sample_ <= 0)) {
+      interval_to_next_sample_ += NextSampleInterval();
+      ++num_samples;
+    }
+    return num_samples;
+  }
 
   uint64_t sampling_interval_;
   double sampling_rate_;

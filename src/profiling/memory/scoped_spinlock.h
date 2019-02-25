@@ -21,6 +21,8 @@
 #include "perfetto/base/utils.h"
 
 #include <atomic>
+#include <new>
+#include <utility>
 
 namespace perfetto {
 namespace profiling {
@@ -40,10 +42,20 @@ class ScopedSpinlock {
   ScopedSpinlock(const ScopedSpinlock&) = delete;
   ScopedSpinlock& operator=(const ScopedSpinlock&) = delete;
 
-  ScopedSpinlock(ScopedSpinlock&&) noexcept;
-  ScopedSpinlock& operator=(ScopedSpinlock&&);
+  ScopedSpinlock(ScopedSpinlock&& other) noexcept
+      : lock_(other.lock_), locked_(other.locked_) {
+    other.locked_ = false;
+  }
 
-  ~ScopedSpinlock();
+  ScopedSpinlock& operator=(ScopedSpinlock&& other) {
+    if (this != &other) {
+      this->~ScopedSpinlock();
+      new (this) ScopedSpinlock(std::move(other));
+    }
+    return *this;
+  }
+
+  ~ScopedSpinlock() { Unlock(); }
 
   void Unlock() {
     if (locked_) {
