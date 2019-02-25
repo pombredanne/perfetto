@@ -2578,9 +2578,9 @@ message TracePacket {
   // TracePacket. For example, previously emitted interned data will be
   // re-emitted if it is referred to again.
   //
-  // When the reader detects packet loss (|missing_packets_on_sequence|), it
-  // needs to skip packets in the sequence until the next one with this flag
-  // set, to ensure intact incremental data.
+  // When the reader detects packet loss (|previous_packet_dropped|), it needs
+  // to skip packets in the sequence until the next one with this flag set, to
+  // ensure intact incremental data.
   optional bool incremental_state_cleared = 41;
 
   // Flag set by the service if one or multiple packets on the packet's sequence

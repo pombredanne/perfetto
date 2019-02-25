@@ -39,7 +39,8 @@ package perfetto.protos;
 // association) are emitted as part of ProcessDescriptor and ThreadDescriptor
 // messages in separate TracePackets instead.
 //
-// Next reserved id: 7 (up to 15). Next id: 20.
+// Next reserved id: 7 (up to 15).
+// Next id: 20.
 message TrackEvent {
   // Timestamp in microseconds (usually CLOCK_MONOTONIC).
   oneof timestamp {
@@ -60,6 +61,9 @@ message TrackEvent {
   oneof thread_time {
     // Same encoding as |timestamp| fields above.
     int64 thread_time_delta_us = 2;
+    // TODO(eseckler): Consider removing absolute thread time support. It's
+    // currently required to support writing PHASE_COMPLETE events out-of-order,
+    // but shouldn't be required anymore when we split them into begin/end.
     int64 thread_time_absolute_us = 17;
   }
 
