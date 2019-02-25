@@ -100,11 +100,11 @@ class StringWriter {
   }
 
   // Appends a hex integer to the buffer.
-  void AppendHexInt(int64_t value) {
+  void AppendHexInt(uint32_t value) {
     // TODO(lalitm): trying to optimize this is premature given we almost never
     // print hex ints. Reevaluate this in the future if we do print them more.
     size_t res = static_cast<size_t>(
-        snprintf(buffer_ + pos_, size_ - pos_, "%llx", value));
+        snprintf(buffer_ + pos_, size_ - pos_, "%x", value));
     PERFETTO_DCHECK(pos_ + res <= size_);
     pos_ += res;
   }

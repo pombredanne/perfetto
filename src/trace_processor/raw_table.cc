@@ -158,15 +158,15 @@ void RawTable::FormatSystraceArgs(const std::string& event_name,
     write_value_at_index(BT::kToThreadFieldNumber - 1, write_value);
     write_arg(BT::kReplyFieldNumber - 1, write_value);
     writer->AppendString(" flags=0x");
-    write_value_at_index(BT::kFlagsFieldNumber - 1,
-                         [writer](const Variadic& value) {
-                           writer->AppendHexInt(value.int_value);
-                         });
+    write_value_at_index(
+        BT::kFlagsFieldNumber - 1, [writer](const Variadic& value) {
+          writer->AppendHexInt(static_cast<uint32_t>(value.int_value));
+        });
     writer->AppendString(" code=0x");
-    write_value_at_index(BT::kCodeFieldNumber - 1,
-                         [writer](const Variadic& value) {
-                           writer->AppendHexInt(value.int_value);
-                         });
+    write_value_at_index(
+        BT::kCodeFieldNumber - 1, [writer](const Variadic& value) {
+          writer->AppendHexInt(static_cast<uint32_t>(value.int_value));
+        });
     return;
   } else if (event_name == "binder_transaction_alloc_buf") {
     using BTAB = protos::BinderTransactionAllocBufFtraceEvent;
