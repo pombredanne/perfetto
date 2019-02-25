@@ -231,11 +231,13 @@ export const StateActions = {
   },
 
   // TODO(hjd): Remove setState - it causes problems due to reuse of ids.
-  setState(_state: StateDraft, _args: {newState: State}): void {
-    // This has to be handled at a higher level since we can't
-    // replace the whole tree here however we still need a method here
-    // so it appears on the proxy Actions class.
-    throw new Error('Called setState on StateActions.');
+  setState(state: StateDraft, args: {newState: State}): void {
+    for (const key of Object.keys(state)) {
+      delete state[key];
+    }
+    for (const key of Object.keys(args.newState)) {
+      state[key] = args.newState[key];
+    }
   },
 
   setRecordConfig(state: StateDraft, args: {config: RecordConfig;}): void {
@@ -292,8 +294,8 @@ export const StateActions = {
     };
   },
 
-  selectTimeSpan(state: StateDraft,
-                 args: {startTs: number, endTs: number}): void {
+  selectTimeSpan(
+      state: StateDraft, args: {startTs: number, endTs: number}): void {
     state.currentSelection = {
       kind: 'TIMESPAN',
       startTs: args.startTs,
