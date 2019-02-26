@@ -49,7 +49,6 @@ void MockProducer::Connect(TracingService* svc,
                            size_t shared_memory_size_hint_bytes) {
   producer_name_ = producer_name;
   service_endpoint_ = svc->ConnectProducer(this, uid, producer_name,
-                                           ProducerProcessModel::kInProcess,
                                            shared_memory_size_hint_bytes);
   auto checkpoint_name = "on_producer_connect_" + producer_name;
   auto on_connect = task_runner_->CreateCheckpoint(checkpoint_name);

@@ -222,8 +222,7 @@ TEST_F(TracingServiceImplTest, LockdownMode) {
 
   std::unique_ptr<MockProducer> producer_otheruid = CreateMockProducer();
   auto x = svc->ConnectProducer(producer_otheruid.get(), geteuid() + 1,
-                                "mock_producer_ouid",
-                                ProducerProcessModel::kInProcess, /*hint=*/0);
+                                "mock_producer_ouid");
   EXPECT_CALL(*producer_otheruid, OnConnect()).Times(0);
   task_runner.RunUntilIdle();
   Mock::VerifyAndClearExpectations(producer_otheruid.get());

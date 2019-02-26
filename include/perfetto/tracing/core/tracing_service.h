@@ -41,8 +41,6 @@ class Producer;
 class TraceConfig;
 class TraceWriter;
 
-enum class ProducerProcessModel { kRemote, kInProcess };
-
 // TODO: for the moment this assumes that all the calls happen on the same
 // thread/sequence. Not sure this will be the case long term in Chrome.
 
@@ -210,7 +208,6 @@ class PERFETTO_EXPORT TracingService {
       Producer*,
       uid_t uid,
       const std::string& name,
-      ProducerProcessModel,
       size_t shared_memory_size_hint_bytes = 0) = 0;
 
   // Connects a Consumer instance and obtains a ConsumerEndpoint, which is

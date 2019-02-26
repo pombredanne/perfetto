@@ -20,6 +20,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <set>
 
 #include "perfetto/base/gtest_prod_util.h"
@@ -69,8 +70,7 @@ class TracingServiceImpl : public TracingService {
                          TracingServiceImpl*,
                          base::TaskRunner*,
                          Producer*,
-                         const std::string& producer_name,
-                         bool runs_in_process);
+                         const std::string& producer_name);
     ~ProducerEndpointImpl() override;
 
     // TracingService::ProducerEndpoint implementation.
@@ -110,10 +110,10 @@ class TracingServiceImpl : public TracingService {
     friend class TracingServiceImplTest;
     ProducerEndpointImpl(const ProducerEndpointImpl&) = delete;
     ProducerEndpointImpl& operator=(const ProducerEndpointImpl&) = delete;
+    SharedMemoryArbiterImpl* GetOrCreateShmemArbiter();
 
     ProducerID const id_;
     const uid_t uid_;
-    const bool runs_in_process_;
     TracingServiceImpl* const service_;
     base::TaskRunner* const task_runner_;
     Producer* producer_;
@@ -137,8 +137,13 @@ class TracingServiceImpl : public TracingService {
     // before use.
     std::map<WriterID, BufferID> writers_;
 
-    // This is used only in in-process configurations (mostly tests).
+    // This is used only in in-process configurations. When it happens,
+    // different threads can access |inproc_shmem_arbiter_| concurrently.
+    // SharedMemoryArbiterImpl itself is thread-safe but its construction needs
+    // to be serialized.
+    std::mutex inproc_shmem_arbiter_mutex_;
     std::unique_ptr<SharedMemoryArbiterImpl> inproc_shmem_arbiter_;
+
     PERFETTO_THREAD_CHECKER(thread_checker_)
     base::WeakPtrFactory<ProducerEndpointImpl> weak_ptr_factory_;  // Keep last.
   };
@@ -224,8 +229,7 @@ class TracingServiceImpl : public TracingService {
       Producer*,
       uid_t uid,
       const std::string& producer_name,
-      ProducerProcessModel,
-      size_t shared_memory_size_hint_bytes) override;
+      size_t shared_memory_size_hint_bytes = 0) override;
 
   std::unique_ptr<TracingService::ConsumerEndpoint> ConnectConsumer(
       Consumer*,
