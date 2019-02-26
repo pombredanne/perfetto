@@ -68,8 +68,10 @@ class MockProcessTracker : public ProcessTracker {
   MockProcessTracker(TraceProcessorContext* context)
       : ProcessTracker(context) {}
 
-  MOCK_METHOD2(UpdateProcess,
-               UniquePid(uint32_t pid, base::StringView process_name));
+  MOCK_METHOD3(UpdateProcess,
+               UniquePid(uint32_t pid,
+                         base::Optional<uint32_t> ppid,
+                         base::StringView process_name));
 
   MOCK_METHOD2(UpdateThread, UniqueTid(uint32_t tid, uint32_t tgid));
 };
@@ -101,8 +103,7 @@ class ProtoTraceParserTest : public ::testing::Test {
     context_.event_tracker.reset(event_);
     process_ = new MockProcessTracker(&context_);
     context_.process_tracker.reset(process_);
-    const auto optim = OptimizationMode::kMinLatency;
-    context_.sorter.reset(new TraceSorter(&context_, optim, 0 /*window size*/));
+    context_.sorter.reset(new TraceSorter(&context_, 0 /*window size*/));
     context_.proto_parser.reset(new ProtoTraceParser(&context_));
   }
 
@@ -455,7 +456,8 @@ TEST_F(ProtoTraceParserTest, LoadProcessPacket) {
   process->set_pid(1);
   process->set_ppid(2);
 
-  EXPECT_CALL(*process_, UpdateProcess(1, base::StringView(kProcName1)));
+  EXPECT_CALL(*process_,
+              UpdateProcess(1, Eq(2u), base::StringView(kProcName1)));
   Tokenize(trace);
 }
 
@@ -472,7 +474,8 @@ TEST_F(ProtoTraceParserTest, LoadProcessPacket_FirstCmdline) {
   process->set_pid(1);
   process->set_ppid(2);
 
-  EXPECT_CALL(*process_, UpdateProcess(1, base::StringView(kProcName1)));
+  EXPECT_CALL(*process_,
+              UpdateProcess(1, Eq(2u), base::StringView(kProcName1)));
   Tokenize(trace);
 }
 

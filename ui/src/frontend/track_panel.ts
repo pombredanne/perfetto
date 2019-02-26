@@ -19,7 +19,8 @@ import {TrackState} from '../common/state';
 
 import {globals} from './globals';
 import {drawGridLines} from './gridline_helper';
-import {drawVerticalLine, drawVerticalSelection} from './vertical_line_helper';
+import {drawVerticalSelection,
+        drawVerticalLineAtTime} from './vertical_line_helper';
 import {Panel, PanelSize} from './panel';
 import {Track} from './track';
 import {TRACK_SHELL_WIDTH} from './track_constants';
@@ -75,10 +76,12 @@ class TrackShell implements m.ClassComponent<TrackShellAttrs> {
   }
 
   ondragstart(e: DragEvent) {
+    const dataTransfer = e.dataTransfer;
+    if (dataTransfer === null) return;
     this.dragging = true;
     globals.rafScheduler.scheduleFullRedraw();
-    e.dataTransfer.setData('perfetto/track', `${this.attrs!.trackState.id}`);
-    e.dataTransfer.setDragImage(new Image(), 0, 0);
+    dataTransfer.setData('perfetto/track', `${this.attrs!.trackState.id}`);
+    dataTransfer.setDragImage(new Image(), 0, 0);
     e.stopImmediatePropagation();
   }
 
@@ -90,8 +93,10 @@ class TrackShell implements m.ClassComponent<TrackShellAttrs> {
   ondragover(e: DragEvent) {
     if (this.dragging) return;
     if (!(e.target instanceof HTMLElement)) return;
-    if (!e.dataTransfer.types.includes('perfetto/track')) return;
-    e.dataTransfer.dropEffect = 'move';
+    const dataTransfer = e.dataTransfer;
+    if (dataTransfer === null) return;
+    if (!dataTransfer.types.includes('perfetto/track')) return;
+    dataTransfer.dropEffect = 'move';
     e.preventDefault();
 
     // Apply some hysteresis to the drop logic so that the lightened border
@@ -111,8 +116,10 @@ class TrackShell implements m.ClassComponent<TrackShellAttrs> {
 
   ondrop(e: DragEvent) {
     if (this.dropping === undefined) return;
+    const dataTransfer = e.dataTransfer;
+    if (dataTransfer === null) return;
     globals.rafScheduler.scheduleFullRedraw();
-    const srcId = e.dataTransfer.getData('perfetto/track');
+    const srcId = dataTransfer.getData('perfetto/track');
     const dstId = this.attrs!.trackState.id;
     globals.dispatch(Actions.moveTrack({srcId, op: this.dropping, dstId}));
     this.dropping = undefined;
@@ -218,22 +225,30 @@ export class TrackPanel extends Panel<TrackPanelAttrs> {
 
     const localState = globals.frontendLocalState;
     // Draw vertical line when hovering on the the notes panel.
-    if (localState.hoveredTimestamp !== -1) {
-      drawVerticalLine(ctx,
-                       localState.timeScale,
-                       localState.hoveredTimestamp,
-                       size.height,
-                       `#aaa`);
+    if (localState.showNotePreview) {
+      drawVerticalLineAtTime(ctx,
+                             localState.timeScale,
+                             localState.hoveredTimestamp,
+                             size.height,
+                             `#aaa`);
+    }
+    // Draw vertical line when shift is pressed.
+    if (localState.showTimeSelectPreview) {
+      drawVerticalLineAtTime(ctx,
+                             localState.timeScale,
+                             localState.hoveredTimestamp,
+                             size.height,
+                             `rgb(52,69,150)`);
     }
 
     if (globals.state.currentSelection !== null) {
       if (globals.state.currentSelection.kind === 'NOTE') {
         const note = globals.state.notes[globals.state.currentSelection.id];
-        drawVerticalLine(ctx,
-                        localState.timeScale,
-                        note.timestamp,
-                        size.height,
-                        note.color);
+        drawVerticalLineAtTime(ctx,
+                               localState.timeScale,
+                               note.timestamp,
+                               size.height,
+                               note.color);
       }
       if (globals.state.currentSelection.kind === 'TIMESPAN') {
         drawVerticalSelection(ctx,
