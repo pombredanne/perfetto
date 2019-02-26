@@ -171,7 +171,6 @@ interface NotesEditorPanelAttrs {
   id: string;
 }
 
-
 export class NotesEditorPanel extends Panel<NotesEditorPanelAttrs> {
   view({attrs}: m.CVnode<NotesEditorPanelAttrs>) {
     const note = globals.state.notes[attrs.id];
