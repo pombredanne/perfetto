@@ -69,7 +69,8 @@ class TracingServiceImpl : public TracingService {
                          TracingServiceImpl*,
                          base::TaskRunner*,
                          Producer*,
-                         const std::string& producer_name);
+                         const std::string& producer_name,
+                         bool runs_in_process);
     ~ProducerEndpointImpl() override;
 
     // TracingService::ProducerEndpoint implementation.
@@ -109,10 +110,10 @@ class TracingServiceImpl : public TracingService {
     friend class TracingServiceImplTest;
     ProducerEndpointImpl(const ProducerEndpointImpl&) = delete;
     ProducerEndpointImpl& operator=(const ProducerEndpointImpl&) = delete;
-    SharedMemoryArbiterImpl* GetOrCreateShmemArbiter();
 
     ProducerID const id_;
     const uid_t uid_;
+    const bool runs_in_process_;
     TracingServiceImpl* const service_;
     base::TaskRunner* const task_runner_;
     Producer* producer_;
@@ -223,7 +224,8 @@ class TracingServiceImpl : public TracingService {
       Producer*,
       uid_t uid,
       const std::string& producer_name,
-      size_t shared_memory_size_hint_bytes = 0) override;
+      ProducerProcessModel,
+      size_t shared_memory_size_hint_bytes) override;
 
   std::unique_ptr<TracingService::ConsumerEndpoint> ConnectConsumer(
       Consumer*,
