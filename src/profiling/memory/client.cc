@@ -57,11 +57,11 @@ std::vector<base::UnixSocketRaw> ConnectPool(const std::string& sock_name,
       PERFETTO_PLOG("Failed to connect to %s", sock_name.c_str());
       continue;
     }
-    if (!sock.SetTxTimeout(kClientSockTxTimeoutMs)) {
+    if (!sock.SetTxTimeout(kClientSockTimeoutMs)) {
       PERFETTO_PLOG("Failed to set send timeout for %s", sock_name.c_str());
       continue;
     }
-    if (!sock.SetRcvTimeout(kClientSockTxTimeoutMs)) {
+    if (!sock.SetRxTimeout(kClientSockTimeoutMs)) {
       PERFETTO_PLOG("Failed to set receive timeout for %s", sock_name.c_str());
       continue;
     }

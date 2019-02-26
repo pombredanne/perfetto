@@ -347,7 +347,7 @@ bool UnixSocketRaw::SetTxTimeout(uint32_t timeout_ms) {
                     sizeof(timeout)) == 0;
 }
 
-bool UnixSocketRaw::SetRcvTimeout(uint32_t timeout_ms) {
+bool UnixSocketRaw::SetRxTimeout(uint32_t timeout_ms) {
   PERFETTO_DCHECK(fd_);
   struct timeval timeout {};
   uint32_t timeout_sec = timeout_ms / 1000;
