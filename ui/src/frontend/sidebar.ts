@@ -239,7 +239,6 @@ function dispatchCreatePermalink(e: Event) {
 
 function downloadTrace(e: Event) {
   e.preventDefault();
-  console.log('downloadTrace');
   const engine = Object.values(globals.state.engines)[0];
   if (!engine) return;
   const src = engine.source;
