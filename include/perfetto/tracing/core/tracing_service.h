@@ -190,10 +190,7 @@ class PERFETTO_EXPORT TracingService {
   // essentially a 1:1 channel between one Producer and the Service.
   // The caller has to guarantee that the passed Producer will be alive as long
   // as the returned ProducerEndpoint is alive.
-  // The producer must live on the same thread of the service. Generally the
-  // Producer is just an IPC proxy and the real producer lives out-of-process.
-  // However, it is possible to wire up a real Producer in-process by setting
-  // ProducerProcessModel == kInProcess. When the kInProcess flag is set, the
+  // The producer must live on the same task runner of the service. However the
   // Producer.CreateTraceWriter() method can be called on any thread.
   // To disconnect just destroy the returned ProducerEndpoint object. It is safe
   // to destroy the Producer once the Producer::OnDisconnect() has been invoked.

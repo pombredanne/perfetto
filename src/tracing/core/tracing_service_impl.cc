@@ -1986,13 +1986,13 @@ TracingServiceImpl::ProducerEndpointImpl::GetOrCreateShmemArbiter() {
   return inproc_shmem_arbiter_.get();
 }
 
-// Can be called on arbitrary threads.
+// Can be called on any thread.
 std::unique_ptr<TraceWriter>
 TracingServiceImpl::ProducerEndpointImpl::CreateTraceWriter(BufferID buf_id) {
   return GetOrCreateShmemArbiter()->CreateTraceWriter(buf_id);
 }
 
-// Can be called on arbitrary threads.
+// Can be called on any thread.
 void TracingServiceImpl::ProducerEndpointImpl::NotifyFlushComplete(
     FlushRequestID id) {
   return GetOrCreateShmemArbiter()->NotifyFlushComplete(id);
