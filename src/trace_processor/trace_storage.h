@@ -25,6 +25,7 @@
 #include <utility>
 #include <vector>
 
+#include "perfetto/base/hasher.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/optional.h"
 #include "perfetto/base/string_view.h"
@@ -153,23 +154,21 @@ class TraceStorage {
 
     struct ArgHasher {
       uint64_t operator()(const Arg& arg) const noexcept {
-        uint64_t hash = kFnv1a64OffsetBasis;
-        hash ^= static_cast<decltype(hash)>(arg.key);
-        hash *= 1099511628211;  // FNV-1a-64 prime.
+        base::Hasher hasher;
+        hasher.Hash(static_cast<uint64_t>(arg.key));
         // We don't hash arg.flat_key because it's a subsequence of arg.key.
         switch (arg.value.type) {
           case Variadic::Type::kInt:
-            hash ^= static_cast<uint64_t>(arg.value.int_value);
+            hasher.Hash(static_cast<uint64_t>(arg.value.int_value));
             break;
           case Variadic::Type::kString:
-            hash ^= static_cast<uint64_t>(arg.value.string_value);
+            hasher.Hash(static_cast<uint64_t>(arg.value.string_value));
             break;
           case Variadic::Type::kReal:
-            hash ^= static_cast<uint64_t>(arg.value.real_value);
+            hasher.Hash(arg.value.real_value);
             break;
         }
-        hash *= kFnv1a64Prime;
-        return hash;
+        return hasher.result();
       }
     };
 
@@ -184,12 +183,12 @@ class TraceStorage {
     ArgSetId AddArgSet(const std::vector<Arg>& args,
                        uint32_t begin,
                        uint32_t end) {
-      ArgSetHash hash = kFnv1a64OffsetBasis;
+      base::Hasher hasher;
       for (uint32_t i = begin; i < end; i++) {
-        hash ^= ArgHasher()(args[i]);
-        hash *= kFnv1a64Prime;
+        hasher.Hash(ArgHasher()(args[i]));
       }
 
+      ArgSetHash hash = hasher.result();
       auto it = arg_row_for_hash_.find(hash);
       if (it != arg_row_for_hash_.end()) {
         return set_ids_[it->second];
@@ -210,9 +209,6 @@ class TraceStorage {
 
    private:
     using ArgSetHash = uint64_t;
-
-    static constexpr uint64_t kFnv1a64OffsetBasis = 0xcbf29ce484222325;
-    static constexpr uint64_t kFnv1a64Prime = 0xcbf29ce484222325;
 
     std::deque<ArgSetId> set_ids_;
     std::deque<StringId> flat_keys_;
