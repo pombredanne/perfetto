@@ -76,6 +76,7 @@ source_set("unittests") {
   deps = [
     ":test_support",
     ":tracing",
+    "inproc",  # DNS remove this
     "../../gn:default_deps",
     "../../gn:gtest_deps",
     "../../protos/perfetto/config:lite",
@@ -139,6 +140,19 @@ source_set("test_support") {
     "core/trace_writer_for_testing.h",
   ]
 }
+
+# source_set("inproc") {
+#   deps = [
+#     "../../gn:default_deps",
+#     # "../../protos/perfetto/config:lite",
+#     # "../../protos/perfetto/trace:lite",
+#     "../base",
+#   ]
+#   sources = [
+#     "inproc/inproc_producer_impl.cc",
+#     "inproc/inproc_producer_impl.h",
+#   ]
+# }
 
 if (perfetto_build_standalone || perfetto_build_with_android) {
   executable("consumer_api_test") {

@@ -1987,6 +1987,7 @@ TracingServiceImpl::ProducerEndpointImpl::GetOrCreateShmemArbiter() {
 
 std::unique_ptr<TraceWriter>
 TracingServiceImpl::ProducerEndpointImpl::CreateTraceWriter(BufferID buf_id) {
+  // TODO maybe remove these methods?
   PERFETTO_DCHECK_THREAD(thread_checker_);
   return GetOrCreateShmemArbiter()->CreateTraceWriter(buf_id);
 }
