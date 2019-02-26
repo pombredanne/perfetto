@@ -20,7 +20,6 @@ import {TimeSpan} from '../common/time';
 import {copyToClipboard} from './clipboard';
 import {DragGestureHandler} from './drag_gesture_handler';
 import {globals} from './globals';
-import {HeaderPanel} from './header_panel';
 import {NotesEditorPanel, NotesPanel} from './notes_panel';
 import {SliceDetailsPanel} from './slice_panel';
 import {OverviewTimelinePanel} from './overview_timeline_panel';
