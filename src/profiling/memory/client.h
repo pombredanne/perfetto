@@ -104,7 +104,7 @@ class FreePage {
 
 const char* GetThreadStackBase();
 
-constexpr uint32_t kClientSockTxTimeoutMs = 1000;
+constexpr uint32_t kClientSockTimeoutMs = 1000;
 
 // Profiling client, used to sample and record the malloc/free family of calls,
 // and communicate the necessary state to a separate profiling daemon process.
