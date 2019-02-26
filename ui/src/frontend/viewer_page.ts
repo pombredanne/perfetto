@@ -233,14 +233,7 @@ class TraceViewer implements m.ClassComponent {
   }
 
   view() {
-    const scrollingPanels: AnyAttrsVnode[] =
-        globals.state.scrollingTracks.length > 0 ?
-        [
-          m(HeaderPanel, {title: 'Tracks', key: 'tracksheader'}),
-          ...globals.state.scrollingTracks.map(
-              id => m(TrackPanel, {key: id, id})),
-        ] :
-        [];
+    const scrollingPanels: AnyAttrsVnode[] = [];
 
     for (const group of Object.values(globals.state.trackGroups)) {
       scrollingPanels.push(m(TrackGroupPanel, {
