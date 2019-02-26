@@ -278,9 +278,7 @@ bool HEAPPROFD_ADD_PREFIX(_initialize)(const MallocDispatch* malloc_dispatch,
   ScopedSpinlock s(&g_client_lock, ScopedSpinlock::Mode::Blocking);
 
   if (g_client) {
-    PERFETTO_LOG(
-        "Rejecting concurrent profiling initialization as client already "
-        "exists.");
+    PERFETTO_LOG("Rejecting concurrent profiling initialization.");
     return true;  // success as we're in a valid state
   }
 
@@ -321,7 +319,7 @@ static void MaybeSampleAllocation(size_t size, void* addr) {
     if (!g_client)  // no active client (most likely shutting down)
       return;
 
-    sampled_alloc_sz = g_client->DetermineSampledAllocSize(size);
+    sampled_alloc_sz = g_client->GetSampleSizeLocked(size);
     if (sampled_alloc_sz == 0)  // not sampling
       return;
 
@@ -371,7 +369,7 @@ int HEAPPROFD_ADD_PREFIX(_posix_memalign)(void** memptr,
     return res;
 
   MaybeSampleAllocation(size, *memptr);
-  return res;
+  return 0;
 }
 
 // Note: we record the free before calling the backing implementation to make
@@ -411,7 +409,7 @@ void* HEAPPROFD_ADD_PREFIX(_realloc)(void* pointer, size_t size) {
     // so keep going.
     if (g_client) {
       client = g_client;  // owning copy
-      sampled_alloc_sz = g_client->DetermineSampledAllocSize(size);
+      sampled_alloc_sz = g_client->GetSampleSizeLocked(size);
     }
   }  // unlock
 

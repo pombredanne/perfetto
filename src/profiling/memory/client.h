@@ -19,6 +19,7 @@
 
 #include <stddef.h>
 
+#include <atomic>
 #include <condition_variable>
 #include <mutex>
 #include <vector>
@@ -128,7 +129,11 @@ class Client {
   // invocation mutates the sampler state.
   //
   // Not thread-safe.
-  size_t DetermineSampledAllocSize(size_t alloc_size);
+  size_t GetSampleSizeLocked(size_t alloc_size) {
+    if (!inited_.load(std::memory_order_acquire))
+      return 0;
+    return sampler_.SampleSize(alloc_size);
+  }
 
   ClientConfiguration client_config_for_testing() { return client_config_; }
   bool inited() { return inited_; }
@@ -140,8 +145,8 @@ class Client {
   const uint64_t generation_;
 
   // TODO(rsavitski): used to check if the client is completely initialized
-  // after construction. The reads in RecordFree & DetermineSampledAllocSize are
-  // no longer necessary (was an optimization to not do redundant work after
+  // after construction. The reads in RecordFree & GetSampleSizeLocked are no
+  // longer necessary (was an optimization to not do redundant work after
   // shutdown). Turn into a normal bool, or indicate construction failures
   // differently.
   std::atomic<bool> inited_{false};
