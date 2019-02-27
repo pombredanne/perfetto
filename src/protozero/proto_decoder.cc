@@ -95,8 +95,10 @@ ProtoDecoder::Field ProtoDecoder::ReadField() {
       }
       pos = new_pos;
       field.length_limited.data = pos;
-      PERFETTO_CHECK(field_intvalue < proto_utils::kMaxMessageLength);
       field.length_limited.length = static_cast<size_t>(field_intvalue);
+      // If the message is larger than 256 MiB silently skip it.
+      if (PERFETTO_UNLIKELY(field_intvalue >= proto_utils::kMaxMessageLength))
+        field.length_limited.length = 0;
       pos += field_intvalue;
       break;
     }
