@@ -1992,9 +1992,9 @@ TracingServiceImpl::ProducerEndpointImpl::CreateTraceWriter(BufferID buf_id) {
   return GetOrCreateShmemArbiter()->CreateTraceWriter(buf_id);
 }
 
-// Can be called on any thread.
 void TracingServiceImpl::ProducerEndpointImpl::NotifyFlushComplete(
     FlushRequestID id) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
   return GetOrCreateShmemArbiter()->NotifyFlushComplete(id);
 }
 
