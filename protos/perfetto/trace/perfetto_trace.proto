@@ -180,6 +180,7 @@ enum VmstatCounters {
 // End of protos/perfetto/common/sys_stats_counters.proto
 
 // Begin of protos/perfetto/trace/android/android_log.proto
+
 message AndroidLogPacket {
   message LogEvent {
     // The log buffer (e.g. MAIN, SYSTEM, RADIO) the event comes from.
