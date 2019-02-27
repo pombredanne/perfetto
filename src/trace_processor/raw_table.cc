@@ -180,6 +180,18 @@ void RawTable::FormatSystraceArgs(const std::string& event_name,
     writer->AppendString(" transaction=");
     write_value_at_index(BTR::kDebugIdFieldNumber - 1, write_value);
     return;
+  } else if (event_name == "print") {
+    using P = protos::PrintFtraceEvent;
+    write_arg(P::kIpFieldNumber, write_value);
+    write_arg(P::kBufFieldNumber, [this, writer](const Variadic& value) {
+      const auto& str = storage_->GetString(value.string_value);
+
+      // If the last character is a newline in a print, just drop it.
+      auto chars_to_print = str.size() > 0 && str[str.size() - 1] == '\n'
+                                ? str.size() - 1
+                                : str.size();
+      writer->AppendString(str.c_str(), chars_to_print);
+    });
   }
 
   uint32_t arg = 0;
