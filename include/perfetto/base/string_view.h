@@ -21,7 +21,7 @@
 
 #include <string>
 
-#include "perfetto/base/hasher.h"
+#include "perfetto/base/hash.h"
 
 namespace perfetto {
 namespace base {
@@ -51,9 +51,9 @@ class StringView {
   std::string ToStdString() const { return std::string(data_, size_); }
 
   uint64_t Hash() const {
-    base::Hasher hasher;
-    hasher.Hash(data_, size_);
-    return hasher.result();
+    base::Hash hasher;
+    hasher.Update(data_, size_);
+    return hasher.digest();
   }
 
  private:

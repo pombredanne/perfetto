@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-#ifndef INCLUDE_PERFETTO_BASE_HASHER_H_
-#define INCLUDE_PERFETTO_BASE_HASHER_H_
+#ifndef INCLUDE_PERFETTO_BASE_HASH_H_
+#define INCLUDE_PERFETTO_BASE_HASH_H_
 
 #include <stddef.h>
 #include <stdint.h>
-#include <string.h>
+#include <type_traits>
 
 namespace perfetto {
 namespace base {
@@ -27,37 +27,28 @@ namespace base {
 // A helper class which computes a 64-bit hash of the input data.
 // The algorithm used is FNV-1a as it is fast and easy to implement and has
 // relatively few collisions.
-class Hasher {
+// WARNING: This hash function should not be used for any cryptographic purpose.
+class Hash {
  public:
-  // Creates an empty hasher object
-  Hasher() {}
+  // Creates an empty hash object
+  Hash() {}
 
-  // Hashes a 64 bit double.
-  void Hash(double data) {
-    uint64_t reintr = 0;
-    static_assert(sizeof(data) == sizeof(reintr),
-                  "double's size does not match uint64_t");
-    memcpy(&reintr, &data, sizeof(data));
-    Hash(reintr);
+  // Hashes a numeric value.
+  template <typename T,
+            typename std::enable_if<std::is_arithmetic<T>::value>* = nullptr>
+  void Update(T data) {
+    Update(reinterpret_cast<const char*>(&data), sizeof(data));
   }
 
-  // Hashes a 64 bit unsigned integer.
-  void Hash(uint64_t data) {
-    for (size_t i = 0; i < 8; i++) {
-      result_ *= kFnv1a64Prime;
-      result_ ^= static_cast<uint8_t>(data >> (i * 8) & 0xff);
-    }
-  }
-
-  // Hashes a string.
-  void Hash(const char* data, size_t size) {
+  // Hashes a byte array.
+  void Update(const char* data, size_t size) {
     for (size_t i = 0; i < size; i++) {
-      result_ *= kFnv1a64Prime;
       result_ ^= static_cast<uint8_t>(data[i]);
+      result_ *= kFnv1a64Prime;
     }
   }
 
-  uint64_t result() { return result_; }
+  uint64_t digest() { return result_; }
 
  private:
   static constexpr uint64_t kFnv1a64OffsetBasis = 0xcbf29ce484222325;
@@ -69,4 +60,4 @@ class Hasher {
 }  // namespace base
 }  // namespace perfetto
 
-#endif  // INCLUDE_PERFETTO_BASE_HASHER_H_
+#endif  // INCLUDE_PERFETTO_BASE_HASH_H_
