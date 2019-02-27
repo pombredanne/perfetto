@@ -357,16 +357,6 @@ canvas.main-canvas {
 
 .time-axis-panel {
   height: 12px;
-  overflow: visible;
-  .time-offset {
-    height: 20px;
-    font-family: 'Google Sans';
-    font-size: 12px;
-    color: #999;
-    width: var(--track-shell-width);
-    text-align: right;
-    padding-right: 5px;
-  }
 }
 
 .slice-details-panel {
@@ -540,15 +530,9 @@ button.query-ctrl {
   display: grid;
   grid-template-columns: auto 1fr;
   grid-template-rows: 1fr;
+  border-bottom: 1px solid var(--track-border-color);
   transition: background-color .4s, color .4s;
   height: 40px;
-  &::after {
-    display: block;
-    content: '';
-    grid-column: 1 / span 2;
-    border-top: 1px solid var(--track-border-color);
-    margin-top: -1px;
-  }
   &[collapsed=true] {
     background-color: var(--collapsed-background-transparent);
     .shell {
