@@ -38,6 +38,8 @@ import {Actions} from '../common/actions';
 
 const DRAG_HANDLE_HEIGHT_PX = 28;
 const DEFAULT_DETAILS_HEIGHT_PX = 230 + DRAG_HANDLE_HEIGHT_PX;
+const UP_ICON = 'keyboard_arrow_up';
+const DOWN_ICON = 'keyboard_arrow_down';
 
 class QueryTable extends Panel {
   view() {
@@ -106,8 +108,8 @@ interface DragHandleAttrs {
 class DragHandle implements m.ClassComponent<DragHandleAttrs> {
   private dragStartHeight = 0;
   private height = 0;
-  private resize: undefined|((height: number) => void);
-  private icon = 'keyboard_arrow_down';
+  private resize: (height: number) => void = () => {};
+  private isClosed = this.height === DRAG_HANDLE_HEIGHT_PX;
 
   oncreate({dom, attrs}: m.CVnodeDOM<DragHandleAttrs>) {
     this.resize = attrs.resize;
@@ -126,15 +128,9 @@ class DragHandle implements m.ClassComponent<DragHandleAttrs> {
   }
 
   onDrag(_x: number, y: number) {
-    if (this.resize) {
-      const newHeight = this.dragStartHeight + (DRAG_HANDLE_HEIGHT_PX / 2) - y;
-      this.resize(Math.floor(newHeight));
-      if (newHeight <= DRAG_HANDLE_HEIGHT_PX) {
-        this.icon = 'keyboard_arrow_up';
-      } else {
-        this.icon = 'keyboard_arrow_down';
-      }
-    }
+    const newHeight = this.dragStartHeight + (DRAG_HANDLE_HEIGHT_PX / 2) - y;
+    this.isClosed = Math.floor(newHeight) <= DRAG_HANDLE_HEIGHT_PX;
+    this.resize(Math.floor(newHeight));
     globals.rafScheduler.scheduleFullRedraw();
   }
 
@@ -145,27 +141,26 @@ class DragHandle implements m.ClassComponent<DragHandleAttrs> {
   onDragEnd() {}
 
   view() {
+    const icon = this.isClosed ? UP_ICON : DOWN_ICON;
+    const title = this.isClosed ? 'Show panel' : 'Hide panel';
     return m(
         '.handle',
-        m('.details-panel-heading', 'Current Selection'),
+        m('.handle-title', 'Current Selection'),
         m('i.material-icons',
           {
             onclick: () => {
-              if (this.resize) {
-                if (this.height === DRAG_HANDLE_HEIGHT_PX) {
-                  this.resize(DEFAULT_DETAILS_HEIGHT_PX);
-                  this.icon = 'keyboard_arrow_down';
-                } else {
-                  this.resize(DRAG_HANDLE_HEIGHT_PX);
-                  this.icon = 'keyboard_arrow_up';
-                }
-                globals.rafScheduler.scheduleFullRedraw();
+              if (this.height === DRAG_HANDLE_HEIGHT_PX) {
+                this.isClosed = false;
+                this.resize(DEFAULT_DETAILS_HEIGHT_PX);
+              } else {
+                this.isClosed = true;
+                this.resize(DRAG_HANDLE_HEIGHT_PX);
               }
+              globals.rafScheduler.scheduleFullRedraw();
             },
-            title: this.icon === 'keyboard_arrow_up' ? 'Show panel' :
-                                                       'Hide panel',
+            title
           },
-          this.icon));
+          icon));
   }
 }
 
