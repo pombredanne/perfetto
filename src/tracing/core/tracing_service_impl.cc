@@ -450,9 +450,8 @@ bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   return true;
 }
 
-void TracingServiceImpl::EnableAdditionalFilteredProducers(
-    ConsumerEndpointImpl* consumer,
-    const TraceConfig& cfg) {
+void TracingServiceImpl::ChangeTraceConfig(ConsumerEndpointImpl* consumer,
+                                           const TraceConfig& cfg) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   TracingSession* tracing_session =
       GetTracingSession(consumer->tracing_session_id_);
@@ -1788,15 +1787,15 @@ void TracingServiceImpl::ConsumerEndpointImpl::EnableTracing(
     NotifyOnTracingDisabled();
 }
 
-void TracingServiceImpl::ConsumerEndpointImpl::
-    EnableAdditionalFilteredProducers(const TraceConfig& cfg) {
+void TracingServiceImpl::ConsumerEndpointImpl::ChangeTraceConfig(
+    const TraceConfig& cfg) {
   if (!tracing_session_id_) {
     PERFETTO_LOG(
-        "Consumer called EnableAdditionalFilteredProducers() but tracing was "
+        "Consumer called ChangeTraceConfig() but tracing was "
         "not active");
     return;
   }
-  service_->EnableAdditionalFilteredProducers(this, cfg);
+  service_->ChangeTraceConfig(this, cfg);
 }
 
 void TracingServiceImpl::ConsumerEndpointImpl::StartTracing() {
@@ -2045,8 +2044,9 @@ void TracingServiceImpl::ProducerEndpointImpl::StopDataSource(
 
 SharedMemoryArbiterImpl*
 TracingServiceImpl::ProducerEndpointImpl::GetOrCreateShmemArbiter() {
-  PERFETTO_DCHECK_THREAD(thread_checker_);
+  std::lock_guard<std::mutex> lock(inproc_shmem_arbiter_mutex_);
   if (!inproc_shmem_arbiter_) {
+    PERFETTO_CHECK(shared_memory_ && shared_memory_->start());
     inproc_shmem_arbiter_.reset(new SharedMemoryArbiterImpl(
         shared_memory_->start(), shared_memory_->size(),
         shared_buffer_page_size_kb_ * 1024, this, task_runner_));
@@ -2054,10 +2054,16 @@ TracingServiceImpl::ProducerEndpointImpl::GetOrCreateShmemArbiter() {
   return inproc_shmem_arbiter_.get();
 }
 
+// Can be called on any thread.
 std::unique_ptr<TraceWriter>
 TracingServiceImpl::ProducerEndpointImpl::CreateTraceWriter(BufferID buf_id) {
-  PERFETTO_DCHECK_THREAD(thread_checker_);
   return GetOrCreateShmemArbiter()->CreateTraceWriter(buf_id);
+}
+
+void TracingServiceImpl::ProducerEndpointImpl::NotifyFlushComplete(
+    FlushRequestID id) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  return GetOrCreateShmemArbiter()->NotifyFlushComplete(id);
 }
 
 void TracingServiceImpl::ProducerEndpointImpl::OnTracingSetup() {
@@ -2102,12 +2108,6 @@ void TracingServiceImpl::ProducerEndpointImpl::StartDataSource(
     if (weak_this)
       weak_this->producer_->StartDataSource(ds_id, std::move(config));
   });
-}
-
-void TracingServiceImpl::ProducerEndpointImpl::NotifyFlushComplete(
-    FlushRequestID id) {
-  PERFETTO_DCHECK_THREAD(thread_checker_);
-  return GetOrCreateShmemArbiter()->NotifyFlushComplete(id);
 }
 
 void TracingServiceImpl::ProducerEndpointImpl::NotifyDataSourceStopped(
