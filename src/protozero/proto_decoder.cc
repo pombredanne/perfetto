@@ -90,15 +90,22 @@ ProtoDecoder::Field ProtoDecoder::ReadField() {
       // Alternatively, we may not have space to fully read the length
       // delimited field. Set the id to zero and return but don't update the
       // offset so a future read can read this field.
-      if (new_pos == pos || new_pos + field_intvalue > end) {
+      // It is safe to static_cast end - new_pos as new_pos will be <= end after
+      // ParseVarInt.
+      if (new_pos == pos ||
+          field_intvalue > static_cast<uint64_t>(end - new_pos)) {
         return field;
       }
+
+      // If the message is larger than 256 MiB silently skip it.
+      if (field_intvalue >= proto_utils::kMaxMessageLength) {
+        current_position_ = new_pos + field_intvalue;
+        return ReadField();
+      }
+
       pos = new_pos;
       field.length_limited.data = pos;
       field.length_limited.length = static_cast<size_t>(field_intvalue);
-      // If the message is larger than 256 MiB silently skip it.
-      if (PERFETTO_UNLIKELY(field_intvalue >= proto_utils::kMaxMessageLength))
-        field.length_limited.length = 0;
       pos += field_intvalue;
       break;
     }

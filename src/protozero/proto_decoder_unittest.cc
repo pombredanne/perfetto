@@ -55,7 +55,7 @@ TEST(ProtoDecoder, ReadString) {
   }
 }
 
-TEST(ProtoDecoder, VeryLargeFields) {
+TEST(ProtoDecoder, VeryLargeField) {
   const uint64_t size = 512 * 1024 * 1024 + 6;
   std::unique_ptr<uint8_t, perfetto::base::FreeDeleter> data(
       static_cast<uint8_t*>(malloc(size)));
@@ -69,9 +69,8 @@ TEST(ProtoDecoder, VeryLargeFields) {
 
   ProtoDecoder decoder(data.get(), size);
   ProtoDecoder::Field field = decoder.ReadField();
-  ASSERT_EQ(1, field.id);
-  ASSERT_EQ(ProtoWireType::kLengthDelimited, field.type);
-  ASSERT_EQ(0, field.length_limited.length);
+  ASSERT_EQ(0, field.id);
+  ASSERT_TRUE(decoder.IsEndOfBuffer());
 }
 
 TEST(ProtoDecoder, FixedData) {
