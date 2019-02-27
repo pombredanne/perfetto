@@ -182,8 +182,8 @@ void RawTable::FormatSystraceArgs(const std::string& event_name,
     return;
   } else if (event_name == "print") {
     using P = protos::PrintFtraceEvent;
-    write_arg(P::kIpFieldNumber, write_value);
-    write_arg(P::kBufFieldNumber, [this, writer](const Variadic& value) {
+    write_arg(P::kIpFieldNumber - 1, write_value);
+    write_arg(P::kBufFieldNumber - 1, [this, writer](const Variadic& value) {
       const auto& str = storage_->GetString(value.string_value);
 
       // If the last character is a newline in a print, just drop it.
@@ -192,6 +192,7 @@ void RawTable::FormatSystraceArgs(const std::string& event_name,
                                 : str.size();
       writer->AppendString(str.c_str(), chars_to_print);
     });
+    return;
   }
 
   uint32_t arg = 0;
@@ -204,7 +205,7 @@ void RawTable::ToSystrace(sqlite3_context* ctx,
                           int argc,
                           sqlite3_value** argv) {
   if (argc != 1 || sqlite3_value_type(argv[0]) != SQLITE_INTEGER) {
-    sqlite3_result_error(ctx, "Usage: systrace(id)", -1);
+    sqlite3_result_error(ctx, "Usage: to_ftrace(id)", -1);
     return;
   }
   RowId row_id = sqlite3_value_int64(argv[0]);
