@@ -71,15 +71,15 @@ class SharedMemoryArbiterImplTest : public AlignedBufferTest {
   std::function<void(const std::vector<uint32_t>&)> on_pages_complete_;
 };
 
-// This #define can be removed after googletest is rollled in Android.
+// TODO(costan): Remove this #define after googletest is rolled in Android.
 #if !defined(INSTANTIATE_TEST_SUITE_P)
 #define INSTANTIATE_TEST_SUITE_P(...) INSTANTIATE_TEST_CASE_P(__VA_ARGS__)
 #endif
 
 size_t const kPageSizes[] = {4096, 65536};
 INSTANTIATE_TEST_SUITE_P(PageSize,
-                        SharedMemoryArbiterImplTest,
-                        ::testing::ValuesIn(kPageSizes));
+                         SharedMemoryArbiterImplTest,
+                         ::testing::ValuesIn(kPageSizes));
 
 // The buffer has 14 pages (kNumPages), each will be partitioned in 14 chunks.
 // The test requests 30 chunks (2 full pages + 2 chunks from a 3rd page) and

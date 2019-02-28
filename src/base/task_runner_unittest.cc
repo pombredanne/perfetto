@@ -47,7 +47,7 @@ using TaskRunnerTypes = ::testing::Types<AndroidTaskRunner, UnixTaskRunner>;
 using TaskRunnerTypes = ::testing::Types<UnixTaskRunner>;
 #endif
 
-// This #define can be removed after googletest is rollled in Android.
+// TODO(costan): Remove this #define after googletest is rolled in Android.
 #if !defined(TYPED_TEST_SUITE)
 #define TYPED_TEST_SUITE(...) TYPED_TEST_CASE(__VA_ARGS__)
 #endif
