@@ -121,32 +121,20 @@ bool HeapprofdProducer::SourceMatchesTarget(const HeapprofdConfig& cfg) {
   return false;
 }
 
-void HeapprofdProducer::AdoptConnectedSockets(
-    std::vector<base::ScopedFile> inherited_sockets) {
+void HeapprofdProducer::UseAdoptedSocket() {
   PERFETTO_DCHECK(mode_ == HeapprofdMode::kChild);
+  Process process{target_pid_, target_cmdline_};
+  auto socket = base::UnixSocket::AdoptConnected(
+      std::move(inherited_fd_), &socket_delegate_, task_runner_,
+      base::SockType::kStream);
 
-  auto weak_producer = weak_factory_.GetWeakPtr();
-  for (auto& scoped_fd : inherited_sockets) {
-    // Manually enqueue the on-connection callback. Pass the raw fd into the
-    // closure as we cannot easily move-capture in c++11.
-    int fd = scoped_fd.release();
-    task_runner_->PostTask([weak_producer, fd] {
-      if (!weak_producer)
-        return;
+  HandleClientConnection(std::move(socket), std::move(process));
+}
 
-      auto socket = base::UnixSocket::AdoptConnected(
-          base::ScopedFile(fd), &weak_producer->socket_delegate_,
-          weak_producer->task_runner_, base::SockType::kStream);
-
-      // The forked heapprofd will not normally be able to read the target's
-      // cmdline under procfs, so pass peer's description explicitly.
-      Process process{weak_producer->target_pid_,
-                      weak_producer->target_cmdline_};
-
-      weak_producer->HandleClientConnection(std::move(socket),
-                                            std::move(process));
-    });
-  }
+void HeapprofdProducer::AdoptConnectedSocket(
+    base::ScopedFile inherited_socket) {
+  PERFETTO_DCHECK(mode_ == HeapprofdMode::kChild);
+  inherited_fd_ = std::move(inherited_socket);
 }
 
 // TODO(fmayer): Delete once we have generic reconnect logic.
@@ -229,6 +217,9 @@ void HeapprofdProducer::SetupDataSource(DataSourceInstanceID id,
 
   data_sources_.emplace(id, std::move(data_source));
   PERFETTO_DLOG("Set up data source.");
+
+  if (mode_ == HeapprofdMode::kChild)
+    UseAdoptedSocket();
 }
 
 void HeapprofdProducer::DoContinuousDump(DataSourceInstanceID id,

@@ -95,7 +95,7 @@ class HeapprofdProducer : public Producer, public UnwinderThread::Delegate {
 
   // Valid only if mode_ == kChild. Adopts the (connected) sockets inherited
   // from the target process, invoking the on-connection callback.
-  void AdoptConnectedSockets(std::vector<base::ScopedFile> inherited_sockets);
+  void AdoptConnectedSocket(base::ScopedFile inherited_socket);
 
   // Valid only if mode_ == kChild.
   void SetTargetProcess(pid_t target_pid, std::string target_cmdline);
@@ -139,6 +139,7 @@ class HeapprofdProducer : public Producer, public UnwinderThread::Delegate {
   // functionality specific to mode_ == kChild
   void TerminateProcess(int exit_status);
   bool SourceMatchesTarget(const HeapprofdConfig& cfg);
+  void UseAdoptedSocket();
 
   struct DataSource {
     DataSourceInstanceID id;
@@ -182,6 +183,7 @@ class HeapprofdProducer : public Producer, public UnwinderThread::Delegate {
   // state specific to mode_ == kChild
   pid_t target_pid_ = base::kInvalidPid;
   std::string target_cmdline_;
+  base::ScopedFile inherited_fd_;
 
   SocketDelegate socket_delegate_;
 
