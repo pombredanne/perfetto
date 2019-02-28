@@ -118,7 +118,7 @@ class CpuFreqTrackController extends TrackController<Config, Data> {
     }
 
     const isQuantized = this.shouldSummarize(resolution);
-    // |resolution| is in s/px we want # ns for 6px window:
+    // |resolution| is in s/px we want # ns for 10px window:
     const bucketSizeNs = Math.round(resolution * 10 * 1e9);
     let windowStartNs = startNs;
     if (isQuantized) {
