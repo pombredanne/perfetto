@@ -26,6 +26,7 @@ if (!build_with_chromium) {
 source_set("wire_protocol") {
   public_configs = [ "../../../buildtools:libunwindstack_config" ]
   deps = [
+    ":ring_buffer",
     "../../../buildtools:libunwindstack",
     "../../../gn:default_deps",
     "../../base",
