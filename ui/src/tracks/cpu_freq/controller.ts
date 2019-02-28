@@ -102,18 +102,6 @@ class CpuFreqTrackController extends TrackController<Config, Data> {
         from ${this.tableName('span_activity')};
       `);
 
-      await this.query(`create view ${this.tableName('weighted_activity')}
-      as select
-        ts,
-        dur,
-        quantum_ts,
-        freq*dur as weighted_freq,
-        case
-        when idle = -1 then -1 * dur
-        else dur
-        end as weighted_idle
-        from ${this.tableName('activity')}`);
-
       this.setup = true;
     }
 
@@ -141,12 +129,19 @@ class CpuFreqTrackController extends TrackController<Config, Data> {
         min(ts) as ts,
         sum(dur) as dur,
         case
-          when sum(weighted_idle) < 0 then cast(-1 as DOUBLE)
+          when min(idle) = -1 then cast(-1 as DOUBLE)
           else cast(0 as DOUBLE)
         end as idle,
         sum(weighted_freq)/sum(dur) as freq_avg,
         quantum_ts
-        from ${this.tableName('weighted_activity')}
+        from (
+          select
+          ts,
+          dur,
+          quantum_ts,
+          freq*dur as weighted_freq,
+          idle
+          from ${this.tableName('activity')})
         group by quantum_ts`;
     }
 

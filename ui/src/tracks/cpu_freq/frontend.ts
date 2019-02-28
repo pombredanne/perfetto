@@ -170,15 +170,10 @@ class CpuFreqTrack extends Track<Config, Data> {
       const centerY = MARGIN_TOP + RECT_HEIGHT / 2;
       ctx.fillText(text, this.mouseXpos + 10, centerY - 3);
       // Display idle value if current hover is idle.
-      if (this.hoveredIdle !== undefined) {
-        if (data.isQuantized) {
-          const idle = this.hoveredIdle >= 0 ? 'Mostly idle' : 'Mostly active';
-          ctx.fillText(idle, this.mouseXpos + 10, centerY + 11);
-        } else if (this.hoveredIdle !== -1) {
-          // Display the idle value +1 to be consistent with catapult.
-          const idle = `Idle: ${(this.hoveredIdle + 1).toLocaleString()}`;
-          ctx.fillText(idle, this.mouseXpos + 10, centerY + 11);
-        }
+      if (this.hoveredIdle !== undefined && this.hoveredIdle !== -1) {
+        // Display the idle value +1 to be consistent with catapult.
+        const idle = `Idle: ${(this.hoveredIdle + 1).toLocaleString()}`;
+        ctx.fillText(idle, this.mouseXpos + 10, centerY + 11);
       }
     }
 
