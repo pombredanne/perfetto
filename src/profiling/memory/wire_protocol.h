@@ -29,7 +29,6 @@
 #include <unwindstack/UserX86.h>
 #include <unwindstack/UserX86_64.h>
 
-#include "perfetto/base/scoped_file.h"
 #include "src/profiling/memory/shared_ring_buffer.h"
 
 namespace perfetto {
