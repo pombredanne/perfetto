@@ -102,6 +102,12 @@ TEST_P(AllTranslationTableTest, Create) {
   }
 }
 
+
+// This #define can be removed after googletest is rollled in Android.
+#if !defined(INSTANTIATE_TEST_SUITE_P)
+#define INSTANTIATE_TEST_SUITE_P(...) INSTANTIATE_TEST_CASE_P(__VA_ARGS__)
+#endif
+
 INSTANTIATE_TEST_SUITE_P(ByDevice, AllTranslationTableTest, ValuesIn(kDevices));
 
 TEST(TranslationTableTest, Seed) {

@@ -46,6 +46,11 @@ using TaskRunnerTypes = ::testing::Types<AndroidTaskRunner, UnixTaskRunner>;
 #else
 using TaskRunnerTypes = ::testing::Types<UnixTaskRunner>;
 #endif
+
+// This #define can be removed after googletest is rollled in Android.
+#if !defined(TYPED_TEST_SUITE)
+#define TYPED_TEST_SUITE(...) TYPED_TEST_CASE(__VA_ARGS__)
+#endif
 TYPED_TEST_SUITE(TaskRunnerTest, TaskRunnerTypes);
 
 struct TestPipe : Pipe {

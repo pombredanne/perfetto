@@ -29,6 +29,11 @@ using ChunkHeader = SharedMemoryABI::ChunkHeader;
 
 using SharedMemoryABITest = AlignedBufferTest;
 
+// This #define can be removed after googletest is rollled in Android.
+#if !defined(INSTANTIATE_TEST_SUITE_P)
+#define INSTANTIATE_TEST_SUITE_P(...) INSTANTIATE_TEST_CASE_P(__VA_ARGS__)
+#endif
+
 size_t const kPageSizes[] = {4096, 8192, 16384, 32768, 65536};
 INSTANTIATE_TEST_SUITE_P(PageSize, SharedMemoryABITest, ValuesIn(kPageSizes));
 
