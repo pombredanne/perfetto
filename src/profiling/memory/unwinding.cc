@@ -148,8 +148,6 @@ bool FileDescriptorMaps::Parse() {
 }
 
 void FileDescriptorMaps::Reset() {
-  for (unwindstack::MapInfo* info : maps_)
-    delete info;
   maps_.clear();
 }
 
