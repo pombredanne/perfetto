@@ -375,7 +375,7 @@ bool HeapprofdProducer::Dump(DataSourceInstanceID id,
   if (has_flush_id) {
     auto weak_producer = weak_factory_.GetWeakPtr();
     auto callback = [weak_producer, flush_id] {
-      if (!weak_producer)
+      if (weak_producer)
         return weak_producer->task_runner_->PostTask([weak_producer, flush_id] {
           if (weak_producer)
             return weak_producer->FinishDataSourceFlush(flush_id);
