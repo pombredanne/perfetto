@@ -143,8 +143,8 @@ RowId EventTracker::PushCounter(int64_t timestamp,
   }
   prev_timestamp_ = timestamp;
 
-  auto* counters = context_->storage->mutable_counters();
-  auto counter_row = counters->AddCounter(name_id, ref, ref_type);
+  auto* definitions = context_->storage->mutable_counter_definitions();
+  auto counter_row = definitions->AddCounterDefinition(name_id, ref, ref_type);
 
   auto* counter_values = context_->storage->mutable_counter_values();
   size_t idx = counter_values->AddCounterValue(counter_row, timestamp, value);

@@ -31,11 +31,11 @@ StorageSchema CounterValuesTable::CreateStorageSchema() {
   const auto& cs = storage_->counter_values();
   return StorageSchema::Builder()
       .AddColumn<IdColumn>("id", TableId::kCounterValues)
-      .AddNumericColumn("counter_row", &cs.counter_rows())
+      .AddNumericColumn("definition_row", &cs.definition_rows())
       .AddOrderedNumericColumn("ts", &cs.timestamps())
       .AddNumericColumn("value", &cs.values())
       .AddNumericColumn("arg_set_id", &cs.arg_set_ids())
-      .Build({"counter_row", "ts"});
+      .Build({"definition_row", "ts"});
 }
 
 uint32_t CounterValuesTable::RowCount() {
@@ -65,7 +65,7 @@ uint32_t CounterValuesTable::EstimateCost(const QueryConstraints& qc) {
     return std::find_if(cs.begin(), cs.end(), fn) != cs.end();
   };
 
-  if (has_eq_constraint("counter_row"))
+  if (has_eq_constraint("definition_row"))
     return RowCount() / 100;
   return RowCount();
 }

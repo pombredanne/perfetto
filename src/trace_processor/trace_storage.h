@@ -333,11 +333,13 @@ class TraceStorage {
     std::deque<int64_t> parent_stack_ids_;
   };
 
-  class Counters {
+  class CounterDefinitions {
    public:
     using Row = uint32_t;
 
-    inline uint32_t AddCounter(StringId name_id, int64_t ref, RefType type) {
+    inline uint32_t AddCounterDefinition(StringId name_id,
+                                         int64_t ref,
+                                         RefType type) {
       base::Hash hash;
       hash.Update(name_id);
       hash.Update(ref);
@@ -351,11 +353,11 @@ class TraceStorage {
       name_ids_.emplace_back(name_id);
       refs_.emplace_back(ref);
       types_.emplace_back(type);
-      hash_to_row_idx_.emplace(digest, counter_count() - 1);
-      return counter_count() - 1;
+      hash_to_row_idx_.emplace(digest, definition_count() - 1);
+      return definition_count() - 1;
     }
 
-    uint32_t counter_count() const {
+    uint32_t definition_count() const {
       return static_cast<uint32_t>(name_ids_.size());
     }
 
@@ -377,10 +379,10 @@ class TraceStorage {
 
   class CounterValues {
    public:
-    inline uint32_t AddCounterValue(Counters::Row counter_row,
+    inline uint32_t AddCounterValue(CounterDefinitions::Row definition_row,
                                     int64_t timestamp,
                                     double value) {
-      counter_rows_.emplace_back(counter_row);
+      definition_rows_.emplace_back(definition_row);
       timestamps_.emplace_back(timestamp);
       values_.emplace_back(value);
       arg_set_ids_.emplace_back(kInvalidArgSetId);
@@ -390,11 +392,11 @@ class TraceStorage {
     void set_arg_set_id(uint32_t row, ArgSetId id) { arg_set_ids_[row] = id; }
 
     uint32_t counter_value_count() const {
-      return static_cast<uint32_t>(counter_rows_.size());
+      return static_cast<uint32_t>(definition_rows_.size());
     }
 
-    const std::deque<Counters::Row>& counter_rows() const {
-      return counter_rows_;
+    const std::deque<CounterDefinitions::Row>& definition_rows() const {
+      return definition_rows_;
     }
 
     const std::deque<int64_t>& timestamps() const { return timestamps_; }
@@ -404,7 +406,7 @@ class TraceStorage {
     const std::deque<ArgSetId>& arg_set_ids() const { return arg_set_ids_; }
 
    private:
-    std::deque<Counters::Row> counter_rows_;
+    std::deque<CounterDefinitions::Row> definition_rows_;
     std::deque<int64_t> timestamps_;
     std::deque<double> values_;
     std::deque<ArgSetId> arg_set_ids_;
@@ -628,8 +630,12 @@ class TraceStorage {
   const NestableSlices& nestable_slices() const { return nestable_slices_; }
   NestableSlices* mutable_nestable_slices() { return &nestable_slices_; }
 
-  const Counters& counters() const { return counters_; }
-  Counters* mutable_counters() { return &counters_; }
+  const CounterDefinitions& counter_definitions() const {
+    return counter_definitions_;
+  }
+  CounterDefinitions* mutable_counter_definitions() {
+    return &counter_definitions_;
+  }
 
   const CounterValues& counter_values() const { return counter_values_; }
   CounterValues* mutable_counter_values() { return &counter_values_; }
@@ -700,7 +706,7 @@ class TraceStorage {
   NestableSlices nestable_slices_;
 
   // The type of counters in the trace. Can be thought of the the "metadata".
-  Counters counters_;
+  CounterDefinitions counter_definitions_;
 
   // The values from the Counter events from the trace. This includes CPU
   // frequency events as well systrace trace_marker counter events.

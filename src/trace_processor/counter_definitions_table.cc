@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-#include "src/trace_processor/counters_table.h"
+#include "src/trace_processor/counter_definitions_table.h"
 
 namespace perfetto {
 namespace trace_processor {
 
-CountersTable::CountersTable(sqlite3*, const TraceStorage* storage)
+CounterDefinitionsTable::CounterDefinitionsTable(sqlite3*,
+                                                 const TraceStorage* storage)
     : storage_(storage) {
   ref_types_.resize(RefType::kRefMax);
   ref_types_[RefType::kRefNoRef] = "";
@@ -31,25 +32,28 @@ CountersTable::CountersTable(sqlite3*, const TraceStorage* storage)
   ref_types_[RefType::kRefUtidLookupUpid] = "upid";
 }
 
-void CountersTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
-  Table::Register<CountersTable>(db, storage, "counters");
+void CounterDefinitionsTable::RegisterTable(sqlite3* db,
+                                            const TraceStorage* storage) {
+  Table::Register<CounterDefinitionsTable>(db, storage, "counter_definitions");
 }
 
-StorageSchema CountersTable::CreateStorageSchema() {
-  const auto& cs = storage_->counters();
+StorageSchema CounterDefinitionsTable::CreateStorageSchema() {
+  const auto& cs = storage_->counter_definitions();
   return StorageSchema::Builder()
-      .AddColumn<RowColumn>("counter_row")
+      .AddColumn<RowColumn>("definition_row")
       .AddStringColumn("name", &cs.name_ids(), &storage_->string_pool())
       .AddColumn<RefColumn>("ref", &cs.refs(), &cs.types(), storage_)
       .AddStringColumn("ref_type", &cs.types(), &ref_types_)
       .Build({"name", "ref", "ref_type"});
 }
 
-uint32_t CountersTable::RowCount() {
-  return static_cast<uint32_t>(storage_->counters().counter_count());
+uint32_t CounterDefinitionsTable::RowCount() {
+  return static_cast<uint32_t>(
+      storage_->counter_definitions().definition_count());
 }
 
-int CountersTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
+int CounterDefinitionsTable::BestIndex(const QueryConstraints& qc,
+                                       BestIndexInfo* info) {
   info->estimated_cost = EstimateCost(qc);
 
   // Only the string columns are handled by SQLite
@@ -65,7 +69,7 @@ int CountersTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
   return SQLITE_OK;
 }
 
-uint32_t CountersTable::EstimateCost(const QueryConstraints& qc) {
+uint32_t CounterDefinitionsTable::EstimateCost(const QueryConstraints& qc) {
   auto has_eq_constraint = [this, &qc](const std::string& col_name) {
     size_t c_idx = schema().ColumnIndexFromName(col_name);
     auto fn = [c_idx](const QueryConstraints::Constraint& c) {
@@ -90,17 +94,17 @@ uint32_t CountersTable::EstimateCost(const QueryConstraints& qc) {
   return RowCount();
 }
 
-CountersTable::RefColumn::RefColumn(std::string col_name,
-                                    const std::deque<int64_t>* refs,
-                                    const std::deque<RefType>* types,
-                                    const TraceStorage* storage)
+CounterDefinitionsTable::RefColumn::RefColumn(std::string col_name,
+                                              const std::deque<int64_t>* refs,
+                                              const std::deque<RefType>* types,
+                                              const TraceStorage* storage)
     : StorageColumn(col_name, false /* hidden */),
       refs_(refs),
       types_(types),
       storage_(storage) {}
 
-void CountersTable::RefColumn::ReportResult(sqlite3_context* ctx,
-                                            uint32_t row) const {
+void CounterDefinitionsTable::RefColumn::ReportResult(sqlite3_context* ctx,
+                                                      uint32_t row) const {
   auto ref = (*refs_)[row];
   auto type = (*types_)[row];
   if (type == RefType::kRefUtidLookupUpid) {
@@ -115,15 +119,14 @@ void CountersTable::RefColumn::ReportResult(sqlite3_context* ctx,
   }
 }
 
-CountersTable::RefColumn::Bounds CountersTable::RefColumn::BoundFilter(
-    int,
-    sqlite3_value*) const {
+CounterDefinitionsTable::RefColumn::Bounds
+CounterDefinitionsTable::RefColumn::BoundFilter(int, sqlite3_value*) const {
   return Bounds{};
 }
 
-void CountersTable::RefColumn::Filter(int op,
-                                      sqlite3_value* value,
-                                      FilteredRowIndex* index) const {
+void CounterDefinitionsTable::RefColumn::Filter(int op,
+                                                sqlite3_value* value,
+                                                FilteredRowIndex* index) const {
   bool op_is_null = sqlite_utils::IsOpIsNull(op);
   auto predicate = sqlite_utils::CreateNumericPredicate<int64_t>(op, value);
   index->FilterRows(
@@ -140,7 +143,8 @@ void CountersTable::RefColumn::Filter(int op,
       });
 }
 
-CountersTable::RefColumn::Comparator CountersTable::RefColumn::Sort(
+CounterDefinitionsTable::RefColumn::Comparator
+CounterDefinitionsTable::RefColumn::Sort(
     const QueryConstraints::OrderBy& ob) const {
   if (ob.desc) {
     return [this](uint32_t f, uint32_t s) { return -CompareRefsAsc(f, s); };
@@ -148,7 +152,8 @@ CountersTable::RefColumn::Comparator CountersTable::RefColumn::Sort(
   return [this](uint32_t f, uint32_t s) { return CompareRefsAsc(f, s); };
 }
 
-int CountersTable::RefColumn::CompareRefsAsc(uint32_t f, uint32_t s) const {
+int CounterDefinitionsTable::RefColumn::CompareRefsAsc(uint32_t f,
+                                                       uint32_t s) const {
   auto ref_f = (*refs_)[f];
   auto ref_s = (*refs_)[s];
 
