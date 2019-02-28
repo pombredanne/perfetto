@@ -159,13 +159,15 @@ Client::Client(base::Optional<base::UnixSocketRaw> sock)
     return;
   }
 
-  if (sock_->Receive(&client_config_, sizeof(client_config_)) !=
+  base::ScopedFile shmem_fd;
+
+  if (sock_->Receive(&client_config_, sizeof(client_config_), &shmem_fd, 1) !=
       sizeof(client_config_)) {
     PERFETTO_DFATAL("Failed to receive client config.");
     return;
   }
 
-  shmem_ = SharedRingBuffer::Create(client_config_.shmem_size);
+  shmem_ = SharedRingBuffer::Attach(std::move(shmem_fd));
   if (!shmem_ || !shmem_->is_valid()) {
     PERFETTO_DFATAL("Failed to create shmem.");
     return;
@@ -200,12 +202,11 @@ Client::Client(base::Optional<base::UnixSocketRaw> sock)
   int fds[kHandshakeSize];
   fds[kHandshakeMaps] = *maps;
   fds[kHandshakeMem] = *mem;
-  fds[kHandshakeShmem] = shmem_->fd();
 
   // Send an empty record to transfer fds for /proc/self/maps and
   // /proc/self/mem.
-  uint64_t size = 0;
-  if (sock_->Send(&size, sizeof(size), fds, kHandshakeSize) != sizeof(size)) {
+  if (sock_->Send(kSingleByte, sizeof(kSingleByte), fds, kHandshakeSize) !=
+      sizeof(kSingleByte)) {
     PERFETTO_DFATAL("Failed to send file descriptors.");
     return;
   }

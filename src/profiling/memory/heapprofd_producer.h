@@ -152,6 +152,7 @@ class HeapprofdProducer : public Producer, public UnwinderThread::Delegate {
   struct PendingProcess {
     std::unique_ptr<base::UnixSocket> sock;
     DataSourceInstanceID data_source_instance_id;
+    SharedRingBuffer shmem;
   };
 
   std::map<pid_t, PendingProcess> pending_processes_;

@@ -296,19 +296,12 @@ void UnwinderThread::HandleHandoffSocket(HandoffData handoff_data) {
                                                base::SockType::kStream);
   pid_t peer_pid = sock->peer_pid();
 
-  auto ring_buf =
-      SharedRingBuffer::Attach(std::move(handoff_data.fds[kHandshakeShmem]));
-  if (!ring_buf) {
-    PERFETTO_DFATAL("Failed to create shared ring buffer.");
-    return;
-  }
-
   UnwindingMetadata metadata(peer_pid,
                              std::move(handoff_data.fds[kHandshakeMaps]),
                              std::move(handoff_data.fds[kHandshakeMem]));
   SocketData socket_data{
       handoff_data.data_source_instance_id, std::move(sock),
-      std::move(metadata), std::move(ring_buf.value()),
+      std::move(metadata), std::move(handoff_data.shmem),
   };
   socket_data_.emplace(peer_pid, std::move(socket_data));
 }

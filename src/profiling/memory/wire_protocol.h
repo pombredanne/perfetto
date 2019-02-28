@@ -106,7 +106,6 @@ struct ClientConfiguration {
   // If interval == 1, sample every allocation.
   // Must be >= 1.
   uint64_t interval;
-  uint64_t shmem_size;
 };
 
 struct FreeMetadata {
@@ -117,8 +116,7 @@ struct FreeMetadata {
 enum HandshakeFDs : size_t {
   kHandshakeMaps = 0,
   kHandshakeMem = 1,
-  kHandshakeShmem = 2,
-  kHandshakeSize = 3,
+  kHandshakeSize = 2,
 };
 
 struct WireMessage {

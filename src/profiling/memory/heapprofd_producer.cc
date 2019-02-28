@@ -46,7 +46,6 @@ constexpr uint64_t kShmemSize = 8 * 1048576;  // ~8 MB
 ClientConfiguration MakeClientConfiguration(const DataSourceConfig& cfg) {
   ClientConfiguration client_config;
   client_config.interval = cfg.heapprofd_config().sampling_interval_bytes();
-  client_config.shmem_size = kShmemSize;
   return client_config;
 }
 
@@ -569,6 +568,7 @@ void HeapprofdProducer::SocketDelegate::OnDataAvailable(
     handoff_data.sock = self->ReleaseSocket();
     for (size_t i = 0; i < kHandshakeSize; ++i)
       handoff_data.fds[i] = std::move(fds[i]);
+    handoff_data.shmem = std::move(pending_process.shmem);
 
     auto ds_it =
         producer_->data_sources_.find(pending_process.data_source_instance_id);
@@ -614,13 +614,22 @@ void HeapprofdProducer::HandleClientConnection(
     return;
   }
 
+  auto shmem = SharedRingBuffer::Create(kShmemSize);
+  if (!shmem || !shmem->is_valid()) {
+    PERFETTO_LOG("Failed to create shared memory.");
+    return;
+  }
+
+  int raw_fd = shmem->fd();
+
   new_connection->Send(&data_source->client_configuration,
-                       sizeof(data_source->client_configuration), -1,
+                       sizeof(data_source->client_configuration), &raw_fd, 1,
                        base::UnixSocket::BlockingMode::kBlocking);
   pid_t peer_pid = new_connection->peer_pid();
   PendingProcess pending_process;
   pending_process.sock = std::move(new_connection);
   pending_process.data_source_instance_id = data_source->id;
+  pending_process.shmem = std::move(*shmem);
   pending_processes_.emplace(peer_pid, std::move(pending_process));
 }
 

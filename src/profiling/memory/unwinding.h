@@ -142,6 +142,7 @@ class UnwinderThread : public base::UnixSocket::EventListener {
     DataSourceInstanceID data_source_instance_id;
     base::UnixSocketRaw sock;
     base::ScopedFile fds[kHandshakeSize];
+    SharedRingBuffer shmem;
   };
 
   UnwinderThread(Delegate* delegate, base::TaskRunner* task_runner)
