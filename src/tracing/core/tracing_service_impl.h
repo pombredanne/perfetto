@@ -161,7 +161,7 @@ class TracingServiceImpl : public TracingService {
 
     // TracingService::ConsumerEndpoint implementation.
     void EnableTracing(const TraceConfig&, base::ScopedFile) override;
-    void EnableAdditionalFilteredProducers(const TraceConfig& cfg) override;
+    void ChangeTraceConfig(const TraceConfig& cfg) override;
     void StartTracing() override;
     void DisableTracing() override;
     void ReadBuffers() override;
