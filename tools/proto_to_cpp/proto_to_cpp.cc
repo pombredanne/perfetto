@@ -310,6 +310,9 @@ void ProtoToCpp::GenHeader(const Descriptor* msg, Printer* p) {
   p->Print("$n$(const $n$&);\n", "n", msg->name());
   p->Print("$n$& operator=(const $n$&);\n", "n", msg->name());
   p->Print("bool operator==(const $n$&) const;\n", "n", msg->name());
+  p->Print(
+      "bool operator!=(const $n$& other) const { return !(*this == other); }\n",
+      "n", msg->name());
   p->Print("\n");
 
   std::string proto_type = GetFwdDeclType(msg, true);

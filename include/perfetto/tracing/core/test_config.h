@@ -56,6 +56,9 @@ class PERFETTO_EXPORT TestConfig {
     DummyFields(const DummyFields&);
     DummyFields& operator=(const DummyFields&);
     bool operator==(const DummyFields&) const;
+    bool operator!=(const DummyFields& other) const {
+      return !(*this == other);
+    }
 
     // Conversion methods from/to the corresponding protobuf types.
     void FromProto(const perfetto::protos::TestConfig_DummyFields&);
@@ -134,6 +137,7 @@ class PERFETTO_EXPORT TestConfig {
   TestConfig(const TestConfig&);
   TestConfig& operator=(const TestConfig&);
   bool operator==(const TestConfig&) const;
+  bool operator!=(const TestConfig& other) const { return !(*this == other); }
 
   // Conversion methods from/to the corresponding protobuf types.
   void FromProto(const perfetto::protos::TestConfig&);

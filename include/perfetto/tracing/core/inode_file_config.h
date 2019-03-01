@@ -56,6 +56,9 @@ class PERFETTO_EXPORT InodeFileConfig {
     MountPointMappingEntry(const MountPointMappingEntry&);
     MountPointMappingEntry& operator=(const MountPointMappingEntry&);
     bool operator==(const MountPointMappingEntry&) const;
+    bool operator!=(const MountPointMappingEntry& other) const {
+      return !(*this == other);
+    }
 
     // Conversion methods from/to the corresponding protobuf types.
     void FromProto(
@@ -90,6 +93,9 @@ class PERFETTO_EXPORT InodeFileConfig {
   InodeFileConfig(const InodeFileConfig&);
   InodeFileConfig& operator=(const InodeFileConfig&);
   bool operator==(const InodeFileConfig&) const;
+  bool operator!=(const InodeFileConfig& other) const {
+    return !(*this == other);
+  }
 
   // Conversion methods from/to the corresponding protobuf types.
   void FromProto(const perfetto::protos::InodeFileConfig&);

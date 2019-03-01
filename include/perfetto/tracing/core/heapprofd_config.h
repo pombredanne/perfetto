@@ -56,6 +56,9 @@ class PERFETTO_EXPORT HeapprofdConfig {
     ContinuousDumpConfig(const ContinuousDumpConfig&);
     ContinuousDumpConfig& operator=(const ContinuousDumpConfig&);
     bool operator==(const ContinuousDumpConfig&) const;
+    bool operator!=(const ContinuousDumpConfig& other) const {
+      return !(*this == other);
+    }
 
     // Conversion methods from/to the corresponding protobuf types.
     void FromProto(
@@ -84,6 +87,9 @@ class PERFETTO_EXPORT HeapprofdConfig {
   HeapprofdConfig(const HeapprofdConfig&);
   HeapprofdConfig& operator=(const HeapprofdConfig&);
   bool operator==(const HeapprofdConfig&) const;
+  bool operator!=(const HeapprofdConfig& other) const {
+    return !(*this == other);
+  }
 
   // Conversion methods from/to the corresponding protobuf types.
   void FromProto(const perfetto::protos::HeapprofdConfig&);

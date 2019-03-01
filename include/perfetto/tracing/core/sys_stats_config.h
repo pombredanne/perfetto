@@ -193,6 +193,9 @@ class PERFETTO_EXPORT SysStatsConfig {
   SysStatsConfig(const SysStatsConfig&);
   SysStatsConfig& operator=(const SysStatsConfig&);
   bool operator==(const SysStatsConfig&) const;
+  bool operator!=(const SysStatsConfig& other) const {
+    return !(*this == other);
+  }
 
   // Conversion methods from/to the corresponding protobuf types.
   void FromProto(const perfetto::protos::SysStatsConfig&);
