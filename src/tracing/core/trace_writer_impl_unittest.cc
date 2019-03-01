@@ -21,6 +21,7 @@
 #include "perfetto/tracing/core/commit_data_request.h"
 #include "perfetto/tracing/core/trace_writer.h"
 #include "perfetto/tracing/core/tracing_service.h"
+#include "src/base/test/gtest_test_suite.h"
 #include "src/base/test/test_task_runner.h"
 #include "src/tracing/core/shared_memory_arbiter_impl.h"
 #include "src/tracing/test/aligned_buffer_test.h"
@@ -54,11 +55,6 @@ class TraceWriterImplTest : public AlignedBufferTest {
   std::unique_ptr<SharedMemoryArbiterImpl> arbiter_;
   std::function<void(const std::vector<uint32_t>&)> on_pages_complete_;
 };
-
-// TODO(costan): Remove this #define after googletest is rolled in Android.
-#if !defined(INSTANTIATE_TEST_SUITE_P)
-#define INSTANTIATE_TEST_SUITE_P(...) INSTANTIATE_TEST_CASE_P(__VA_ARGS__)
-#endif
 
 size_t const kPageSizes[] = {4096, 65536};
 INSTANTIATE_TEST_SUITE_P(PageSize,

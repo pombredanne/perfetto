@@ -18,6 +18,7 @@
 
 #include "gtest/gtest.h"
 #include "perfetto/tracing/core/basic_types.h"
+#include "src/base/test/gtest_test_suite.h"
 #include "src/tracing/test/aligned_buffer_test.h"
 
 namespace perfetto {
@@ -28,11 +29,6 @@ using Chunk = SharedMemoryABI::Chunk;
 using ChunkHeader = SharedMemoryABI::ChunkHeader;
 
 using SharedMemoryABITest = AlignedBufferTest;
-
-// TODO(costan): Remove this #define after googletest is rolled in Android.
-#if !defined(INSTANTIATE_TEST_SUITE_P)
-#define INSTANTIATE_TEST_SUITE_P(...) INSTANTIATE_TEST_CASE_P(__VA_ARGS__)
-#endif
 
 size_t const kPageSizes[] = {4096, 8192, 16384, 32768, 65536};
 INSTANTIATE_TEST_SUITE_P(PageSize, SharedMemoryABITest, ValuesIn(kPageSizes));

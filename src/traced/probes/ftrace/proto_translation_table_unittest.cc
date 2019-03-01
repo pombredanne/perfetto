@@ -20,6 +20,7 @@
 #include "gtest/gtest.h"
 #include "perfetto/trace/ftrace/ftrace_event.pbzero.h"
 #include "perfetto/trace/ftrace/generic.pbzero.h"
+#include "src/base/test/gtest_test_suite.h"
 #include "src/traced/probes/ftrace/event_info.h"
 #include "src/traced/probes/ftrace/ftrace_procfs.h"
 
@@ -101,11 +102,6 @@ TEST_P(AllTranslationTableTest, Create) {
     EXPECT_EQ(event->fields.at(1).strategy, kCStringToString);
   }
 }
-
-// TODO(costan): Remove this #define after googletest is rolled in Android.
-#if !defined(INSTANTIATE_TEST_SUITE_P)
-#define INSTANTIATE_TEST_SUITE_P(...) INSTANTIATE_TEST_CASE_P(__VA_ARGS__)
-#endif
 
 INSTANTIATE_TEST_SUITE_P(ByDevice, AllTranslationTableTest, ValuesIn(kDevices));
 

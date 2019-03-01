@@ -29,6 +29,7 @@
 
 #include "perfetto/base/file_utils.h"
 #include "perfetto/base/pipe.h"
+#include "src/base/test/gtest_test_suite.h"
 
 namespace perfetto {
 namespace base {
@@ -47,10 +48,6 @@ using TaskRunnerTypes = ::testing::Types<AndroidTaskRunner, UnixTaskRunner>;
 using TaskRunnerTypes = ::testing::Types<UnixTaskRunner>;
 #endif
 
-// TODO(costan): Remove this #define after googletest is rolled in Android.
-#if !defined(TYPED_TEST_SUITE)
-#define TYPED_TEST_SUITE(...) TYPED_TEST_CASE(__VA_ARGS__)
-#endif
 TYPED_TEST_SUITE(TaskRunnerTest, TaskRunnerTypes);
 
 struct TestPipe : Pipe {
