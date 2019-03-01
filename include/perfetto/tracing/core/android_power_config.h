@@ -78,6 +78,7 @@ class PERFETTO_EXPORT AndroidPowerConfig {
     battery_counters_.emplace_back();
     return &battery_counters_.back();
   }
+  void clear_battery_counters() { battery_counters_.clear(); }
 
   bool collect_power_rails() const { return collect_power_rails_; }
   void set_collect_power_rails(bool value) { collect_power_rails_ = value; }

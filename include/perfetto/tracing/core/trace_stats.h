@@ -170,6 +170,7 @@ class PERFETTO_EXPORT TraceStats {
     buffer_stats_.emplace_back();
     return &buffer_stats_.back();
   }
+  void clear_buffer_stats() { buffer_stats_.clear(); }
 
   uint32_t producers_connected() const { return producers_connected_; }
   void set_producers_connected(uint32_t value) { producers_connected_ = value; }

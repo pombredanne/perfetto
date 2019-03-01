@@ -69,6 +69,7 @@ class PERFETTO_EXPORT ProcessStatsConfig {
     quirks_.emplace_back();
     return &quirks_.back();
   }
+  void clear_quirks() { quirks_.clear(); }
 
   bool scan_all_processes_on_start() const {
     return scan_all_processes_on_start_;

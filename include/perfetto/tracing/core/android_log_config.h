@@ -86,6 +86,7 @@ class PERFETTO_EXPORT AndroidLogConfig {
     log_ids_.emplace_back();
     return &log_ids_.back();
   }
+  void clear_log_ids() { log_ids_.clear(); }
 
   AndroidLogPriority min_prio() const { return min_prio_; }
   void set_min_prio(AndroidLogPriority value) { min_prio_ = value; }
@@ -96,6 +97,7 @@ class PERFETTO_EXPORT AndroidLogConfig {
     filter_tags_.emplace_back();
     return &filter_tags_.back();
   }
+  void clear_filter_tags() { filter_tags_.clear(); }
 
  private:
   std::vector<AndroidLogId> log_ids_;

@@ -68,6 +68,7 @@ class PERFETTO_EXPORT FtraceConfig {
     ftrace_events_.emplace_back();
     return &ftrace_events_.back();
   }
+  void clear_ftrace_events() { ftrace_events_.clear(); }
 
   int atrace_categories_size() const {
     return static_cast<int>(atrace_categories_.size());
@@ -79,6 +80,7 @@ class PERFETTO_EXPORT FtraceConfig {
     atrace_categories_.emplace_back();
     return &atrace_categories_.back();
   }
+  void clear_atrace_categories() { atrace_categories_.clear(); }
 
   int atrace_apps_size() const { return static_cast<int>(atrace_apps_.size()); }
   const std::vector<std::string>& atrace_apps() const { return atrace_apps_; }
@@ -86,6 +88,7 @@ class PERFETTO_EXPORT FtraceConfig {
     atrace_apps_.emplace_back();
     return &atrace_apps_.back();
   }
+  void clear_atrace_apps() { atrace_apps_.clear(); }
 
   uint32_t buffer_size_kb() const { return buffer_size_kb_; }
   void set_buffer_size_kb(uint32_t value) { buffer_size_kb_ = value; }
