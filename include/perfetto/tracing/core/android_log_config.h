@@ -85,6 +85,7 @@ class PERFETTO_EXPORT AndroidLogConfig {
 
   int log_ids_size() const { return static_cast<int>(log_ids_.size()); }
   const std::vector<AndroidLogId>& log_ids() const { return log_ids_; }
+  std::vector<AndroidLogId>* mutable_log_ids() { return &log_ids_; }
   void clear_log_ids() { log_ids_.clear(); }
   AndroidLogId* add_log_ids() {
     log_ids_.emplace_back();
@@ -96,6 +97,7 @@ class PERFETTO_EXPORT AndroidLogConfig {
 
   int filter_tags_size() const { return static_cast<int>(filter_tags_.size()); }
   const std::vector<std::string>& filter_tags() const { return filter_tags_; }
+  std::vector<std::string>* mutable_filter_tags() { return &filter_tags_; }
   void clear_filter_tags() { filter_tags_.clear(); }
   std::string* add_filter_tags() {
     filter_tags_.emplace_back();

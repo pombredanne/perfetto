@@ -68,6 +68,7 @@ class PERFETTO_EXPORT ProcessStatsConfig {
 
   int quirks_size() const { return static_cast<int>(quirks_.size()); }
   const std::vector<Quirks>& quirks() const { return quirks_; }
+  std::vector<Quirks>* mutable_quirks() { return &quirks_; }
   void clear_quirks() { quirks_.clear(); }
   Quirks* add_quirks() {
     quirks_.emplace_back();

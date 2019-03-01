@@ -148,6 +148,7 @@ class PERFETTO_EXPORT CommitDataRequest {
 
     int patches_size() const { return static_cast<int>(patches_.size()); }
     const std::vector<Patch>& patches() const { return patches_; }
+    std::vector<Patch>* mutable_patches() { return &patches_; }
     void clear_patches() { patches_.clear(); }
     Patch* add_patches() {
       patches_.emplace_back();
@@ -190,6 +191,9 @@ class PERFETTO_EXPORT CommitDataRequest {
   const std::vector<ChunksToMove>& chunks_to_move() const {
     return chunks_to_move_;
   }
+  std::vector<ChunksToMove>* mutable_chunks_to_move() {
+    return &chunks_to_move_;
+  }
   void clear_chunks_to_move() { chunks_to_move_.clear(); }
   ChunksToMove* add_chunks_to_move() {
     chunks_to_move_.emplace_back();
@@ -201,6 +205,9 @@ class PERFETTO_EXPORT CommitDataRequest {
   }
   const std::vector<ChunkToPatch>& chunks_to_patch() const {
     return chunks_to_patch_;
+  }
+  std::vector<ChunkToPatch>* mutable_chunks_to_patch() {
+    return &chunks_to_patch_;
   }
   void clear_chunks_to_patch() { chunks_to_patch_.clear(); }
   ChunkToPatch* add_chunks_to_patch() {

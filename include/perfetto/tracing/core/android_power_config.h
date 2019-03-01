@@ -77,6 +77,9 @@ class PERFETTO_EXPORT AndroidPowerConfig {
   const std::vector<BatteryCounters>& battery_counters() const {
     return battery_counters_;
   }
+  std::vector<BatteryCounters>* mutable_battery_counters() {
+    return &battery_counters_;
+  }
   void clear_battery_counters() { battery_counters_.clear(); }
   BatteryCounters* add_battery_counters() {
     battery_counters_.emplace_back();

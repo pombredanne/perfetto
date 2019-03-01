@@ -71,6 +71,7 @@ class PERFETTO_EXPORT InodeFileConfig {
 
     int scan_roots_size() const { return static_cast<int>(scan_roots_.size()); }
     const std::vector<std::string>& scan_roots() const { return scan_roots_; }
+    std::vector<std::string>* mutable_scan_roots() { return &scan_roots_; }
     void clear_scan_roots() { scan_roots_.clear(); }
     std::string* add_scan_roots() {
       scan_roots_.emplace_back();
@@ -119,6 +120,9 @@ class PERFETTO_EXPORT InodeFileConfig {
   const std::vector<std::string>& scan_mount_points() const {
     return scan_mount_points_;
   }
+  std::vector<std::string>* mutable_scan_mount_points() {
+    return &scan_mount_points_;
+  }
   void clear_scan_mount_points() { scan_mount_points_.clear(); }
   std::string* add_scan_mount_points() {
     scan_mount_points_.emplace_back();
@@ -130,6 +134,9 @@ class PERFETTO_EXPORT InodeFileConfig {
   }
   const std::vector<MountPointMappingEntry>& mount_point_mapping() const {
     return mount_point_mapping_;
+  }
+  std::vector<MountPointMappingEntry>* mutable_mount_point_mapping() {
+    return &mount_point_mapping_;
   }
   void clear_mount_point_mapping() { mount_point_mapping_.clear(); }
   MountPointMappingEntry* add_mount_point_mapping() {

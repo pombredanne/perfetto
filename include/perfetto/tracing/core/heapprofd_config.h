@@ -106,6 +106,9 @@ class PERFETTO_EXPORT HeapprofdConfig {
   const std::vector<std::string>& process_cmdline() const {
     return process_cmdline_;
   }
+  std::vector<std::string>* mutable_process_cmdline() {
+    return &process_cmdline_;
+  }
   void clear_process_cmdline() { process_cmdline_.clear(); }
   std::string* add_process_cmdline() {
     process_cmdline_.emplace_back();
@@ -114,6 +117,7 @@ class PERFETTO_EXPORT HeapprofdConfig {
 
   int pid_size() const { return static_cast<int>(pid_.size()); }
   const std::vector<uint64_t>& pid() const { return pid_; }
+  std::vector<uint64_t>* mutable_pid() { return &pid_; }
   void clear_pid() { pid_.clear(); }
   uint64_t* add_pid() {
     pid_.emplace_back();

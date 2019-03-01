@@ -170,6 +170,7 @@ class PERFETTO_EXPORT TraceStats {
     return static_cast<int>(buffer_stats_.size());
   }
   const std::vector<BufferStats>& buffer_stats() const { return buffer_stats_; }
+  std::vector<BufferStats>* mutable_buffer_stats() { return &buffer_stats_; }
   void clear_buffer_stats() { buffer_stats_.clear(); }
   BufferStats* add_buffer_stats() {
     buffer_stats_.emplace_back();

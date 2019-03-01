@@ -210,6 +210,9 @@ class PERFETTO_EXPORT SysStatsConfig {
   const std::vector<MeminfoCounters>& meminfo_counters() const {
     return meminfo_counters_;
   }
+  std::vector<MeminfoCounters>* mutable_meminfo_counters() {
+    return &meminfo_counters_;
+  }
   void clear_meminfo_counters() { meminfo_counters_.clear(); }
   MeminfoCounters* add_meminfo_counters() {
     meminfo_counters_.emplace_back();
@@ -224,6 +227,9 @@ class PERFETTO_EXPORT SysStatsConfig {
   }
   const std::vector<VmstatCounters>& vmstat_counters() const {
     return vmstat_counters_;
+  }
+  std::vector<VmstatCounters>* mutable_vmstat_counters() {
+    return &vmstat_counters_;
   }
   void clear_vmstat_counters() { vmstat_counters_.clear(); }
   VmstatCounters* add_vmstat_counters() {
@@ -240,6 +246,7 @@ class PERFETTO_EXPORT SysStatsConfig {
   const std::vector<StatCounters>& stat_counters() const {
     return stat_counters_;
   }
+  std::vector<StatCounters>* mutable_stat_counters() { return &stat_counters_; }
   void clear_stat_counters() { stat_counters_.clear(); }
   StatCounters* add_stat_counters() {
     stat_counters_.emplace_back();
