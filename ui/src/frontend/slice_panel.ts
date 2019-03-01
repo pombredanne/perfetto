@@ -15,7 +15,6 @@
 import * as m from 'mithril';
 
 import {timeToCode} from '../common/time';
-
 import {globals} from './globals';
 import {Panel, PanelSize} from './panel';
 
