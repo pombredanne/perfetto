@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,10 +18,6 @@
 #define SRC_TRACE_PROCESSOR_COUNTER_VALUES_TABLE_H_
 
 #include "src/trace_processor/storage_table.h"
-
-#include <deque>
-#include <memory>
-#include <string>
 
 namespace perfetto {
 namespace trace_processor {

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 9 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,16 +56,7 @@ int CounterValuesTable::BestIndex(const QueryConstraints& qc,
 }
 
 uint32_t CounterValuesTable::EstimateCost(const QueryConstraints& qc) {
-  auto has_eq_constraint = [this, &qc](const std::string& col_name) {
-    size_t c_idx = schema().ColumnIndexFromName(col_name);
-    auto fn = [c_idx](const QueryConstraints::Constraint& c) {
-      return c.iColumn == static_cast<int>(c_idx) && sqlite_utils::IsOpEq(c.op);
-    };
-    const auto& cs = qc.constraints();
-    return std::find_if(cs.begin(), cs.end(), fn) != cs.end();
-  };
-
-  if (has_eq_constraint("definition_row"))
+  if (HasEqConstraint(qc, "definition_row"))
     return RowCount() / 100;
   return RowCount();
 }
