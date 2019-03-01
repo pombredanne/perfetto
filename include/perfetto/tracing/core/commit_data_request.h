@@ -141,11 +141,11 @@ class PERFETTO_EXPORT CommitDataRequest {
 
     int patches_size() const { return static_cast<int>(patches_.size()); }
     const std::vector<Patch>& patches() const { return patches_; }
+    void clear_patches() { patches_.clear(); }
     Patch* add_patches() {
       patches_.emplace_back();
       return &patches_.back();
     }
-    void clear_patches() { patches_.clear(); }
 
     bool has_more_patches() const { return has_more_patches_; }
     void set_has_more_patches(bool value) { has_more_patches_ = value; }
@@ -180,11 +180,11 @@ class PERFETTO_EXPORT CommitDataRequest {
   const std::vector<ChunksToMove>& chunks_to_move() const {
     return chunks_to_move_;
   }
+  void clear_chunks_to_move() { chunks_to_move_.clear(); }
   ChunksToMove* add_chunks_to_move() {
     chunks_to_move_.emplace_back();
     return &chunks_to_move_.back();
   }
-  void clear_chunks_to_move() { chunks_to_move_.clear(); }
 
   int chunks_to_patch_size() const {
     return static_cast<int>(chunks_to_patch_.size());
@@ -192,11 +192,11 @@ class PERFETTO_EXPORT CommitDataRequest {
   const std::vector<ChunkToPatch>& chunks_to_patch() const {
     return chunks_to_patch_;
   }
+  void clear_chunks_to_patch() { chunks_to_patch_.clear(); }
   ChunkToPatch* add_chunks_to_patch() {
     chunks_to_patch_.emplace_back();
     return &chunks_to_patch_.back();
   }
-  void clear_chunks_to_patch() { chunks_to_patch_.clear(); }
 
   uint64_t flush_request_id() const { return flush_request_id_; }
   void set_flush_request_id(uint64_t value) { flush_request_id_ = value; }

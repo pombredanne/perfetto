@@ -207,11 +207,11 @@ class PERFETTO_EXPORT SysStatsConfig {
   const std::vector<MeminfoCounters>& meminfo_counters() const {
     return meminfo_counters_;
   }
+  void clear_meminfo_counters() { meminfo_counters_.clear(); }
   MeminfoCounters* add_meminfo_counters() {
     meminfo_counters_.emplace_back();
     return &meminfo_counters_.back();
   }
-  void clear_meminfo_counters() { meminfo_counters_.clear(); }
 
   uint32_t vmstat_period_ms() const { return vmstat_period_ms_; }
   void set_vmstat_period_ms(uint32_t value) { vmstat_period_ms_ = value; }
@@ -222,11 +222,11 @@ class PERFETTO_EXPORT SysStatsConfig {
   const std::vector<VmstatCounters>& vmstat_counters() const {
     return vmstat_counters_;
   }
+  void clear_vmstat_counters() { vmstat_counters_.clear(); }
   VmstatCounters* add_vmstat_counters() {
     vmstat_counters_.emplace_back();
     return &vmstat_counters_.back();
   }
-  void clear_vmstat_counters() { vmstat_counters_.clear(); }
 
   uint32_t stat_period_ms() const { return stat_period_ms_; }
   void set_stat_period_ms(uint32_t value) { stat_period_ms_ = value; }
@@ -237,11 +237,11 @@ class PERFETTO_EXPORT SysStatsConfig {
   const std::vector<StatCounters>& stat_counters() const {
     return stat_counters_;
   }
+  void clear_stat_counters() { stat_counters_.clear(); }
   StatCounters* add_stat_counters() {
     stat_counters_.emplace_back();
     return &stat_counters_.back();
   }
-  void clear_stat_counters() { stat_counters_.clear(); }
 
  private:
   uint32_t meminfo_period_ms_ = {};

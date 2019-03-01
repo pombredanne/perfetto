@@ -123,11 +123,11 @@ class PERFETTO_EXPORT TraceConfig {
     const std::vector<std::string>& producer_name_filter() const {
       return producer_name_filter_;
     }
+    void clear_producer_name_filter() { producer_name_filter_.clear(); }
     std::string* add_producer_name_filter() {
       producer_name_filter_.emplace_back();
       return &producer_name_filter_.back();
     }
-    void clear_producer_name_filter() { producer_name_filter_.clear(); }
 
    private:
     DataSourceConfig config_ = {};
@@ -267,21 +267,21 @@ class PERFETTO_EXPORT TraceConfig {
 
   int buffers_size() const { return static_cast<int>(buffers_.size()); }
   const std::vector<BufferConfig>& buffers() const { return buffers_; }
+  void clear_buffers() { buffers_.clear(); }
   BufferConfig* add_buffers() {
     buffers_.emplace_back();
     return &buffers_.back();
   }
-  void clear_buffers() { buffers_.clear(); }
 
   int data_sources_size() const {
     return static_cast<int>(data_sources_.size());
   }
   const std::vector<DataSource>& data_sources() const { return data_sources_; }
+  void clear_data_sources() { data_sources_.clear(); }
   DataSource* add_data_sources() {
     data_sources_.emplace_back();
     return &data_sources_.back();
   }
-  void clear_data_sources() { data_sources_.clear(); }
 
   uint32_t duration_ms() const { return duration_ms_; }
   void set_duration_ms(uint32_t value) { duration_ms_ = value; }
@@ -298,11 +298,11 @@ class PERFETTO_EXPORT TraceConfig {
 
   int producers_size() const { return static_cast<int>(producers_.size()); }
   const std::vector<ProducerConfig>& producers() const { return producers_; }
+  void clear_producers() { producers_.clear(); }
   ProducerConfig* add_producers() {
     producers_.emplace_back();
     return &producers_.back();
   }
-  void clear_producers() { producers_.clear(); }
 
   const StatsdMetadata& statsd_metadata() const { return statsd_metadata_; }
   StatsdMetadata* mutable_statsd_metadata() { return &statsd_metadata_; }

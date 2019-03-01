@@ -68,11 +68,11 @@ class PERFETTO_EXPORT InodeFileConfig {
 
     int scan_roots_size() const { return static_cast<int>(scan_roots_.size()); }
     const std::vector<std::string>& scan_roots() const { return scan_roots_; }
+    void clear_scan_roots() { scan_roots_.clear(); }
     std::string* add_scan_roots() {
       scan_roots_.emplace_back();
       return &scan_roots_.back();
     }
-    void clear_scan_roots() { scan_roots_.clear(); }
 
    private:
     std::string mountpoint_ = {};
@@ -113,11 +113,11 @@ class PERFETTO_EXPORT InodeFileConfig {
   const std::vector<std::string>& scan_mount_points() const {
     return scan_mount_points_;
   }
+  void clear_scan_mount_points() { scan_mount_points_.clear(); }
   std::string* add_scan_mount_points() {
     scan_mount_points_.emplace_back();
     return &scan_mount_points_.back();
   }
-  void clear_scan_mount_points() { scan_mount_points_.clear(); }
 
   int mount_point_mapping_size() const {
     return static_cast<int>(mount_point_mapping_.size());
@@ -125,11 +125,11 @@ class PERFETTO_EXPORT InodeFileConfig {
   const std::vector<MountPointMappingEntry>& mount_point_mapping() const {
     return mount_point_mapping_;
   }
+  void clear_mount_point_mapping() { mount_point_mapping_.clear(); }
   MountPointMappingEntry* add_mount_point_mapping() {
     mount_point_mapping_.emplace_back();
     return &mount_point_mapping_.back();
   }
-  void clear_mount_point_mapping() { mount_point_mapping_.clear(); }
 
  private:
   uint32_t scan_interval_ms_ = {};

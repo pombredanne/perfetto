@@ -100,19 +100,19 @@ class PERFETTO_EXPORT HeapprofdConfig {
   const std::vector<std::string>& process_cmdline() const {
     return process_cmdline_;
   }
+  void clear_process_cmdline() { process_cmdline_.clear(); }
   std::string* add_process_cmdline() {
     process_cmdline_.emplace_back();
     return &process_cmdline_.back();
   }
-  void clear_process_cmdline() { process_cmdline_.clear(); }
 
   int pid_size() const { return static_cast<int>(pid_.size()); }
   const std::vector<uint64_t>& pid() const { return pid_; }
+  void clear_pid() { pid_.clear(); }
   uint64_t* add_pid() {
     pid_.emplace_back();
     return &pid_.back();
   }
-  void clear_pid() { pid_.clear(); }
 
   bool all() const { return all_; }
   void set_all(bool value) { all_ = value; }

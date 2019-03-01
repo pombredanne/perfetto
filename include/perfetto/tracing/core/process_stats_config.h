@@ -65,11 +65,11 @@ class PERFETTO_EXPORT ProcessStatsConfig {
 
   int quirks_size() const { return static_cast<int>(quirks_.size()); }
   const std::vector<Quirks>& quirks() const { return quirks_; }
+  void clear_quirks() { quirks_.clear(); }
   Quirks* add_quirks() {
     quirks_.emplace_back();
     return &quirks_.back();
   }
-  void clear_quirks() { quirks_.clear(); }
 
   bool scan_all_processes_on_start() const {
     return scan_all_processes_on_start_;

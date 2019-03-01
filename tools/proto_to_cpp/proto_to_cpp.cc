@@ -343,10 +343,10 @@ void ProtoToCpp::GenHeader(const Descriptor* msg, Printer* p) {
           "t", GetCppType(field, false), "n", field->lowercase_name());
       p->Print("const std::vector<$t$>& $n$() const { return $n$_; }\n", "t",
                GetCppType(field, false), "n", field->lowercase_name());
-      p->Print("$t$* add_$n$() { $n$_.emplace_back(); return &$n$_.back(); }\n",
-               "t", GetCppType(field, false), "n", field->lowercase_name());
       p->Print("void clear_$n$() { $n$_.clear(); }\n", "n",
                field->lowercase_name());
+      p->Print("$t$* add_$n$() { $n$_.emplace_back(); return &$n$_.back(); }\n",
+               "t", GetCppType(field, false), "n", field->lowercase_name());
     }
   }
   p->Outdent();
