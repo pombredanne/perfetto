@@ -47,6 +47,12 @@ class ProcessTracker {
   // implemented. This will include passing timestamps into the below methods
   // to ensure the correct upid/utid is found.
 
+  // Called when a task_newtask is observed. This force the tracker to start
+  // a new UTID for the thread, which is needed for TID-recycling resolution.
+  UniqueTid StartNewThread(int64_t timestamp,
+                           uint32_t tid,
+                           StringId thread_name_id);
+
   // Called when a sched switch event is seen in the trace. Retrieves the
   // UniqueTid that matches the tid or assigns a new UniqueTid and stores
   // the thread_name_id.
@@ -58,9 +64,6 @@ class ProcessTracker {
   // for the tid and the matching upid for the tgid and stores both.
   // Virtual for testing.
   virtual UniqueTid UpdateThread(uint32_t tid, uint32_t tgid);
-
-  // Sets the name of the thread identified by the tuple (tid,pid).
-  void UpdateThreadName(uint32_t tid, uint32_t pid, base::StringView name);
 
   // Called when a process is seen in a process tree. Retrieves the UniquePid
   // for that pid or assigns a new one.
@@ -86,14 +89,22 @@ class ProcessTracker {
     return tids_.equal_range(tid);
   }
 
+  // Marks the two threads as belonging to the same process, even if we don't
+  // know which one yet. If one of the two threads is later mapped to a process,
+  // the other will be mapped to the same process. The order of the two threads
+  // is irrelevant, Associate(A, B) has the same effect of Associate(B, A).
+  void AssociateThreads(UniqueTid, UniqueTid);
+
+ private:
+  // Called whenever we discover that the passed thread belongs to the passed
+  // process. The |pending_assocs_| vector is scanned to see if there are any
+  // other threads associated to the passed thread.
+  void ResolvePendingAssociations(UniqueTid, UniquePid);
+
   std::pair<UniquePid, TraceStorage::Process*> GetOrCreateProcess(
       uint32_t pid,
       int64_t start_ns);
 
-  void AssociateThreads(UniqueTid, UniqueTid);
-  void ResolveAssociation(UniqueTid, UniquePid);
-
- private:
   TraceProcessorContext* const context_;
 
   // Each tid can have multiple UniqueTid entries, a new UniqueTid is assigned
@@ -102,7 +113,7 @@ class ProcessTracker {
 
   // Each pid can have multiple UniquePid entries, a new UniquePid is assigned
   // each time a process is seen in the trace.
-  std::multimap<uint32_t /* pid (aka tgid) */, UniquePid> pids_;
+  std::map<uint32_t /* pid (aka tgid) */, UniquePid> pids_;
 
   // Pending thread associations. The meaning of a pair<ThreadA, ThreadB> in
   // this vector is: we know that A and B belong to the same process, but we

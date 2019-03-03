@@ -15,6 +15,7 @@
  */
 
 #include "src/trace_processor/process_tracker.h"
+#include "src/trace_processor/stats.h"
 
 #include <utility>
 
@@ -48,6 +49,12 @@ UniqueTid ProcessTracker::UpdateThread(int64_t timestamp,
   }
 
   // If none exist, assign a new utid and store it.
+  return StartNewThread(timestamp, tid, thread_name_id);
+}
+
+UniqueTid ProcessTracker::StartNewThread(int64_t timestamp,
+                                         uint32_t tid,
+                                         StringId thread_name_id) {
   UniqueTid new_utid = context_->storage->AddEmptyThread(tid);
   TraceStorage::Thread* thread = context_->storage->GetMutableThread(new_utid);
   thread->name_id = thread_name_id;
@@ -55,15 +62,6 @@ UniqueTid ProcessTracker::UpdateThread(int64_t timestamp,
     thread->start_ns = timestamp;
   tids_.emplace(tid, new_utid);
   return new_utid;
-};
-
-void ProcessTracker::UpdateThreadName(uint32_t tid,
-                                      uint32_t pid,
-                                      base::StringView name) {
-  UniqueTid utid = UpdateThread(tid, pid);
-  auto* thread = context_->storage->GetMutableThread(utid);
-  auto name_id = context_->storage->InternString(name);
-  thread->name_id = name_id;
 }
 
 UniqueTid ProcessTracker::UpdateThread(uint32_t tid, uint32_t pid) {
@@ -81,8 +79,6 @@ UniqueTid ProcessTracker::UpdateThread(uint32_t tid, uint32_t pid) {
       thread = iter_thread;
       utid = iter_utid;
       break;
-    } else {
-      // TODO error here.
     }
     const auto& iter_process =
         context_->storage->GetProcess(iter_thread->upid.value());
@@ -107,7 +103,7 @@ UniqueTid ProcessTracker::UpdateThread(uint32_t tid, uint32_t pid) {
         GetOrCreateProcess(pid, thread->start_ns);
   }
 
-  ResolveAssociation(utid, *thread->upid);
+  ResolvePendingAssociations(utid, *thread->upid);
 
   return utid;
 }
@@ -142,19 +138,10 @@ UniquePid ProcessTracker::UpdateProcess(uint32_t pid) {
 std::pair<UniquePid, TraceStorage::Process*> ProcessTracker::GetOrCreateProcess(
     uint32_t pid,
     int64_t start_ns) {
-  auto pids_pair = pids_.equal_range(pid);
-
-  base::Optional<UniquePid> found_upid;
-  for (auto it = pids_pair.first; it != pids_pair.second; it++) {
-    if (it->first == pid) {
-      found_upid = it->second;
-      break;
-    }
-  }
-
   UniquePid upid;
-  if (found_upid.has_value()) {
-    upid = found_upid.value();
+  auto it = pids_.find(pid);
+  if (it != pids_.end()) {
+    upid = it->second;
   } else {
     upid = context_->storage->AddEmptyProcess(pid);
     pids_.emplace(pid, upid);
@@ -171,22 +158,35 @@ void ProcessTracker::AssociateThreads(UniqueTid utid1, UniqueTid utid2) {
   TraceStorage::Thread* thd1 = context_->storage->GetMutableThread(utid1);
   TraceStorage::Thread* thd2 = context_->storage->GetMutableThread(utid2);
 
+  // First of all check if one of the two threads is already bound to a process.
+  // If that is the case, map the other thread to the same process and resolve
+  // recursively any associations pending on the other thread.
+
   if (thd1->upid.has_value() && !thd2->upid.has_value()) {
     thd2->upid = *thd1->upid;
-    ResolveAssociation(utid2, *thd1->upid);
+    ResolvePendingAssociations(utid2, *thd1->upid);
     return;
   }
 
   if (thd2->upid.has_value() && !thd1->upid.has_value()) {
-    thd1->upid = thd2->upid;
-    ResolveAssociation(utid1, *thd2->upid);
+    thd1->upid = *thd2->upid;
+    ResolvePendingAssociations(utid1, *thd2->upid);
+    return;
+  }
+
+  if (thd1->upid.has_value() && thd1->upid != thd2->upid) {
+    // Cannot associate two threads that belong to two different processes.
+    PERFETTO_ELOG("Process tracker failure. Cannot associate threads %u, %u",
+                  thd1->tid, thd2->tid);
+    context_->storage->IncrementStats(stats::process_tracker_errors);
     return;
   }
 
   pending_assocs_.emplace_back(utid1, utid2);
 }
 
-void ProcessTracker::ResolveAssociation(UniqueTid utid_arg, UniquePid upid) {
+void ProcessTracker::ResolvePendingAssociations(UniqueTid utid_arg,
+                                                UniquePid upid) {
   PERFETTO_DCHECK(context_->storage->GetMutableThread(utid_arg)->upid == upid);
   std::vector<UniqueTid> resolved_utids;
   resolved_utids.emplace_back(utid_arg);

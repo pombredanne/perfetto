@@ -647,13 +647,6 @@ void ProtoTraceParser::ParseProcess(TraceBlobView process) {
     }
   }
 
-  // Normalize process name: /system/bin/abc -> abc.
-  size_t slash = process_name.rfind('/');
-  if (!process_name.empty() && process_name.at(0) == '/' &&
-      slash < process_name.size() - 1) {
-    process_name = process_name.substr(slash + 1);
-  }
-
   context_->process_tracker->UpdateProcess(pid, ppid, process_name);
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
@@ -1040,7 +1033,6 @@ void ProtoTraceParser::ParseTaskNewTask(int64_t timestamp,
   }
 
   auto* proc_tracker = context_->process_tracker.get();
-  UniqueTid new_utid = proc_tracker->UpdateThread(timestamp, new_tid, new_comm);
 
   // task_newtask is raised both in the case of a new process creation (fork()
   // family) and thread creation (clone(CLONE_THREAD, ...)).
@@ -1049,13 +1041,19 @@ void ProtoTraceParser::ParseTaskNewTask(int64_t timestamp,
     // In the case of a brand new process, we know that the new tid is also the
     // main thread. We don't associate the two threads together, because they
     // belong to two different thread groups (i.e. processes).
+
+    // This call creates a new utid in case the a previous tid got recycled.
     proc_tracker->UpdateThread(new_tid, /*tgid=*/new_tid);
+
+    proc_tracker->UpdateThread(timestamp, new_tid, new_comm);
     return;
   }
 
   // This is a pthread_create or similar. Bind the two threads together, so
   // they get resolved under the same process.
   UniqueTid source_utid = proc_tracker->UpdateThread(timestamp, source_tid, 0);
+  UniqueTid new_utid =
+      proc_tracker->StartNewThread(timestamp, new_tid, new_comm);
   proc_tracker->AssociateThreads(source_utid, new_utid);
 }
 
