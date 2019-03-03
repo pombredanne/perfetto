@@ -42,6 +42,11 @@ service ConsumerPort {
   // in Android Q and are not supported in Android P.
   rpc EnableTracing(EnableTracingRequest) returns (EnableTracingResponse) {}
 
+  // Changes the configuration for a running tracing session; only possible
+  // for a subset of configuration options.
+  rpc ChangeTraceConfig(ChangeTraceConfigRequest)
+      returns (ChangeTraceConfigResponse) {}
+
   // Disables tracing for one or more data sources.
   rpc DisableTracing(DisableTracingRequest) returns (DisableTracingResponse) {}
 
@@ -110,6 +115,13 @@ message EnableTracingResponse {
 message StartTracingRequest {}
 
 message StartTracingResponse {}
+
+// Arguments for rpc ChangeTraceConfig().
+message ChangeTraceConfigRequest {
+  optional protos.TraceConfig trace_config = 1;
+}
+
+message ChangeTraceConfigResponse {}
 
 // Arguments for rpc DisableTracing().
 message DisableTracingRequest {

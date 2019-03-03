@@ -457,6 +457,28 @@ void TracingServiceImpl::ChangeTraceConfig(ConsumerEndpointImpl* consumer,
       GetTracingSession(consumer->tracing_session_id_);
   PERFETTO_DCHECK(tracing_session);
 
+  // We only support updating producer_name_filter (and pass-through configs)
+  // for now; null out any changeable fields and make sure the rest are
+  // identical.
+  TraceConfig new_config_cpy(cfg);
+  for (auto& ds_cfg : *new_config_cpy.mutable_data_sources()) {
+    ds_cfg.clear_producer_name_filter();
+    ds_cfg.mutable_config()->mutable_chrome_config()->set_trace_config("");
+  }
+
+  TraceConfig current_config_cpy(tracing_session->config);
+  for (auto& ds_cfg : *current_config_cpy.mutable_data_sources()) {
+    ds_cfg.clear_producer_name_filter();
+    ds_cfg.mutable_config()->mutable_chrome_config()->set_trace_config("");
+  }
+
+  if (new_config_cpy != current_config_cpy) {
+    PERFETTO_ELOG(
+        "An existing tracing session was attempted updated with an unsupported "
+        "configuration change.");
+    return;
+  }
+
   for (const TraceConfig::DataSource& cfg_data_source : cfg.data_sources()) {
     // Scan all the registered data sources with a matching name.
     auto range = data_sources_.equal_range(cfg_data_source.config().name());
