@@ -33,6 +33,18 @@ ProcessTracker::ProcessTracker(TraceProcessorContext* context)
 
 ProcessTracker::~ProcessTracker() = default;
 
+UniqueTid ProcessTracker::StartNewThread(int64_t timestamp,
+                                         uint32_t tid,
+                                         StringId thread_name_id) {
+  UniqueTid new_utid = context_->storage->AddEmptyThread(tid);
+  TraceStorage::Thread* thread = context_->storage->GetMutableThread(new_utid);
+  thread->name_id = thread_name_id;
+  if (timestamp)
+    thread->start_ns = timestamp;
+  tids_.emplace(tid, new_utid);
+  return new_utid;
+}
+
 UniqueTid ProcessTracker::UpdateThread(int64_t timestamp,
                                        uint32_t tid,
                                        StringId thread_name_id) {
@@ -50,18 +62,6 @@ UniqueTid ProcessTracker::UpdateThread(int64_t timestamp,
 
   // If none exist, assign a new utid and store it.
   return StartNewThread(timestamp, tid, thread_name_id);
-}
-
-UniqueTid ProcessTracker::StartNewThread(int64_t timestamp,
-                                         uint32_t tid,
-                                         StringId thread_name_id) {
-  UniqueTid new_utid = context_->storage->AddEmptyThread(tid);
-  TraceStorage::Thread* thread = context_->storage->GetMutableThread(new_utid);
-  thread->name_id = thread_name_id;
-  if (timestamp)
-    thread->start_ns = timestamp;
-  tids_.emplace(tid, new_utid);
-  return new_utid;
 }
 
 UniqueTid ProcessTracker::UpdateThread(uint32_t tid, uint32_t pid) {
@@ -108,6 +108,17 @@ UniqueTid ProcessTracker::UpdateThread(uint32_t tid, uint32_t pid) {
   return utid;
 }
 
+UniquePid ProcessTracker::StartNewProcess(int64_t timestamp, uint32_t pid) {
+  pids_.erase(pid);
+
+  // Create a new UTID for the main thread, so we don't end up reusing an old
+  // entry in case of TID recycling.
+  StartNewThread(timestamp, /*tid=*/pid, 0);
+
+  UniquePid upid = UpdateProcess(pid, timestamp);
+  return upid;
+}
+
 UniquePid ProcessTracker::UpdateProcess(uint32_t pid,
                                         base::Optional<uint32_t> ppid,
                                         base::StringView name) {
@@ -120,18 +131,12 @@ UniquePid ProcessTracker::UpdateProcess(uint32_t pid,
   if (ppid.has_value()) {
     process->pupid = GetOrCreateProcess(ppid.value(), 0 /* start_ns */).first;
   }
-
-  // Create an entry for the main thread.
-  UpdateThread(/*tid=*/pid, pid);
-
   return upid;
 }
 
-UniquePid ProcessTracker::UpdateProcess(uint32_t pid) {
+UniquePid ProcessTracker::UpdateProcess(uint32_t pid, int64_t start_ns) {
   UniquePid upid;
-  TraceStorage::Process* process;
-  std::tie(upid, process) = GetOrCreateProcess(pid, 0 /* start_ns */);
-  UpdateThread(/*tid=*/pid, pid);  // Create an entry for the main thread.
+  std::tie(upid, std::ignore) = GetOrCreateProcess(pid, start_ns);
   return upid;
 }
 
@@ -145,6 +150,12 @@ std::pair<UniquePid, TraceStorage::Process*> ProcessTracker::GetOrCreateProcess(
   } else {
     upid = context_->storage->AddEmptyProcess(pid);
     pids_.emplace(pid, upid);
+
+    // Create an entry for the main thread.
+    // We cannot call StartNewThread() here, because threads for this process
+    // (including the main thread) might have been seen already prior to this
+    // call. This call usually comes from the ProcessTree dump which is delayed.
+    UpdateThread(/*tid=*/pid, pid);
   }
 
   auto* process = context_->storage->GetMutableProcess(upid);

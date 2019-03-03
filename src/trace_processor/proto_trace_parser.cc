@@ -1041,11 +1041,7 @@ void ProtoTraceParser::ParseTaskNewTask(int64_t timestamp,
     // In the case of a brand new process, we know that the new tid is also the
     // main thread. We don't associate the two threads together, because they
     // belong to two different thread groups (i.e. processes).
-
-    // This call creates a new utid in case the a previous tid got recycled.
-    proc_tracker->UpdateThread(new_tid, /*tgid=*/new_tid);
-
-    proc_tracker->UpdateThread(timestamp, new_tid, new_comm);
+    proc_tracker->StartNewProcess(timestamp, new_tid);
     return;
   }
 

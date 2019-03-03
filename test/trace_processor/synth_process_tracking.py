@@ -61,7 +61,7 @@ trace.add_sched(ts=14, prev_pid=22, next_pid=0, prev_comm='p2-t2')
 
 # From the process tracker viewpoint we pretend we only scraped tids=20,21.
 trace.add_process_tree_packet(ts=15)
-trace.add_process(20, 1, "process_2")
+trace.add_process(20, 0, "process_2")
 trace.add_thread(21, 20, "p2-t1")
 
 # Finally the very complex case: a third process (pid=30) which spawns threads
@@ -82,7 +82,7 @@ trace.add_sched(ts=24, prev_pid=31, next_pid=32,
 trace.add_newtask(ts=25, tid=32, new_tid=34,
                   new_comm='p3-t4', flags=CLONE_THREAD)
 trace.add_process_tree_packet(ts=26)
-trace.add_process(30, 1, "process_3")
+trace.add_process(30, 0, "process_3")
 trace.add_thread(31, 30, "p3-t1")
 
 # This event pretends that TID=32 forks() a new process 40 (note the absence of
@@ -93,7 +93,7 @@ trace.add_sched(ts=28, prev_pid=32, next_pid=40,
                 prev_comm='p3-t2', next_comm='p4-t0')
 
 trace.add_process_tree_packet(ts=29)
-trace.add_process(40, 1, "process_4")
+trace.add_process(40, 0, "process_4")
 
 # And now, this new process starts a new thread that recycles TID=31 (previously
 # used as p3-t1, now becomes p4-t1).

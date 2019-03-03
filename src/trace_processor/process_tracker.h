@@ -53,6 +53,9 @@ class ProcessTracker {
                            uint32_t tid,
                            StringId thread_name_id);
 
+  // Same as above, but for processes.
+  UniquePid StartNewProcess(int64_t timestamp, uint32_t pid);
+
   // Called when a sched switch event is seen in the trace. Retrieves the
   // UniqueTid that matches the tid or assigns a new UniqueTid and stores
   // the thread_name_id.
@@ -75,7 +78,7 @@ class ProcessTracker {
   // Called when a process is seen in a process tree. Retrieves the UniquePid
   // for that pid or assigns a new one.
   // Virtual for testing.
-  virtual UniquePid UpdateProcess(uint32_t pid);
+  virtual UniquePid UpdateProcess(uint32_t pid, int64_t start_ts = 0);
 
   // Returns the bounds of a range that includes all UniquePids that have the
   // requested pid.
