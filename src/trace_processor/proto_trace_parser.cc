@@ -1038,18 +1038,15 @@ void ProtoTraceParser::ParseTaskNewTask(int64_t timestamp,
   // family) and thread creation (clone(CLONE_THREAD, ...)).
   static const uint32_t kCloneThread = 0x00010000;  // From kernel's sched.h.
   if ((clone_flags & kCloneThread) == 0) {
-    // In the case of a brand new process, we know that the new tid is also the
-    // main thread. We don't associate the two threads together, because they
-    // belong to two different thread groups (i.e. processes).
+    // This is a plain-old fork() or equivalent.
     proc_tracker->StartNewProcess(timestamp, new_tid);
     return;
   }
 
   // This is a pthread_create or similar. Bind the two threads together, so
-  // they get resolved under the same process.
-  UniqueTid source_utid = proc_tracker->UpdateThread(timestamp, source_tid, 0);
-  UniqueTid new_utid =
-      proc_tracker->StartNewThread(timestamp, new_tid, new_comm);
+  // they get resolved to the same process.
+  auto source_utid = proc_tracker->UpdateThread(timestamp, source_tid, 0);
+  auto new_utid = proc_tracker->StartNewThread(timestamp, new_tid, new_comm);
   proc_tracker->AssociateThreads(source_utid, new_utid);
 }
 

@@ -52,10 +52,6 @@ class ProcessTracker {
   UniqueTid StartNewThread(int64_t timestamp,
                            uint32_t tid,
                            StringId thread_name_id);
-
-  // Same as above, but for processes.
-  UniquePid StartNewProcess(int64_t timestamp, uint32_t pid);
-
   // Called when a sched switch event is seen in the trace. Retrieves the
   // UniqueTid that matches the tid or assigns a new UniqueTid and stores
   // the thread_name_id.
@@ -67,6 +63,10 @@ class ProcessTracker {
   // for the tid and the matching upid for the tgid and stores both.
   // Virtual for testing.
   virtual UniqueTid UpdateThread(uint32_t tid, uint32_t tgid);
+
+  // Called when a task_newtask without the CLONE_THREAD flag is observed.
+  // This force the tracker to start both a new UTID and a new UPID.
+  UniquePid StartNewProcess(int64_t timestamp, uint32_t pid);
 
   // Called when a process is seen in a process tree. Retrieves the UniquePid
   // for that pid or assigns a new one.
