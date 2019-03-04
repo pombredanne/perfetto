@@ -85,6 +85,9 @@ message TrackEvent {
   // trace. We intend to gradually transition these attributes to similar native
   // features in TrackEvent (e.g. async + flow events), or deprecate them
   // without replacement where transition is unsuitable.
+  //
+  // Next reserved id: 15 (up to 16).
+  // Next id: 20.
   message LegacyEvent {
     optional uint32 name_iid = 1;  // interned LegacyEventName.
     optional int32 phase = 2;
