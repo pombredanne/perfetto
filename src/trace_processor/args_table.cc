@@ -45,18 +45,22 @@ uint32_t ArgsTable::RowCount() {
 }
 
 int ArgsTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
-  // In the case of an id equality filter, we can do a very efficient lookup.
-  if (qc.constraints().size() == 1) {
-    auto id = static_cast<int>(schema().ColumnIndexFromName("arg_set_id"));
-    const auto& cs = qc.constraints().back();
-    if (cs.iColumn == id && sqlite_utils::IsOpEq(cs.op)) {
-      info->estimated_cost = 1;
-      return SQLITE_OK;
-    }
-  }
+  auto has_eq_constraint = [this, &qc](const std::string& col_name) {
+    size_t c_idx = schema().ColumnIndexFromName(col_name);
+    auto fn = [c_idx](const QueryConstraints::Constraint& c) {
+      return c.iColumn == static_cast<int>(c_idx) && sqlite_utils::IsOpEq(c.op);
+    };
+    const auto& cs = qc.constraints();
+    return std::find_if(cs.begin(), cs.end(), fn) != cs.end();
+  };
 
-  // Otherwise, just give the worst case scenario.
-  info->estimated_cost = static_cast<uint32_t>(storage_->args().args_count());
+  // In the case of an id equality filter, we can do a very efficient lookup.
+  if (has_eq_constraint("arg_set_id")) {
+    info->estimated_cost = 1;
+  } else {
+    // Otherwise, just give the worst case scenario.
+    info->estimated_cost = static_cast<uint32_t>(storage_->args().args_count());
+  }
   return SQLITE_OK;
 }
 

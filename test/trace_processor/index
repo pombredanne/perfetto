@@ -11,6 +11,9 @@ synth_1.py smoke.sql synth_1_smoke.out
 ../data/android_sched_and_ps.pb end_reason_neq.sql android_sched_and_ps_end_reason_neq.out
 ../data/android_sched_and_ps.pb end_reason_match.sql android_sched_and_ps_end_reason_match.out
 
+# Sched wakeup
+../data/android_sched_and_ps.pb sched_wakeup.sql sched_wakeup_android_sched_and_ps.out
+
 # CPU Frequency
 ../data/cpu_counters.pb b120487929.sql cpu_counters_b120487929.out
 

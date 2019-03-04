@@ -204,6 +204,7 @@ SpanJoinOperatorTable::CreateTableDefinition(const TableDescriptor& desc,
     if (IsRequiredColumn(col.name())) {
       ++required_columns_found;
       if (col.type() != Table::ColumnType::kLong &&
+          col.type() != Table::ColumnType::kInt &&
           col.type() != Table::ColumnType::kUnknown) {
         PERFETTO_ELOG("Invalid column type for %s", col.name().c_str());
         return base::nullopt;
@@ -389,8 +390,10 @@ int SpanJoinOperatorTable::LeftJoinCursor::Next() {
 
     // We always want t2's partition to be equal to or greater than t1's
     // partition. Similarily we always t2's end timestamp to be greater than to
-    // t1's start timestamp.
-    if (t2_.partition() < t1_.partition() || t2_.ts_end() <= t1_.ts_start()) {
+    // t1's start timestamp when the partitions are equal.
+    bool partition_equal = t1_.partition() == t2_.partition();
+    if (t2_.partition() < t1_.partition() ||
+        (partition_equal && t2_.ts_end() <= t1_.ts_start())) {
       next_stepped_table_ = &t2_;
       continue;
     }
