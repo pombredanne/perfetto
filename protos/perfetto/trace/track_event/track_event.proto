@@ -102,6 +102,7 @@ message TrackEvent {
     optional uint64 local_id = 10;
     optional uint64 global_id = 11;
 
+    // Consider the thread timestamps for async BEGIN/END event pairs as valid.
     optional bool use_async_tts = 9;
 
     optional uint64 bind_id = 8;
