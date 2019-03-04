@@ -39,8 +39,7 @@ UniqueTid ProcessTracker::StartNewThread(int64_t timestamp,
   UniqueTid new_utid = context_->storage->AddEmptyThread(tid);
   TraceStorage::Thread* thread = context_->storage->GetMutableThread(new_utid);
   thread->name_id = thread_name_id;
-  if (timestamp)
-    thread->start_ns = timestamp;
+  thread->start_ns = timestamp;
   tids_.emplace(tid, new_utid);
   return new_utid;
 }
