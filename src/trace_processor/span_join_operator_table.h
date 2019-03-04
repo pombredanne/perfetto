@@ -254,7 +254,8 @@ class SpanJoinOperatorTable : public Table {
   void CreateSchemaColsForDefn(const TableDefinition& defn,
                                std::vector<Table::Column>* cols);
 
-  bool is_left_join_;
+  bool is_left_join() const { return name() == "span_left_join"; }
+
   TableDefinition t1_defn_;
   TableDefinition t2_defn_;
   PartitioningType partitioning_;
