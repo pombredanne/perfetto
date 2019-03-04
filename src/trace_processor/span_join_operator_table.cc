@@ -319,6 +319,20 @@ int SpanJoinOperatorTable::Cursor::Column(sqlite3_context* context, int N) {
   return SQLITE_OK;
 }
 
+void SpanJoinOperatorTable::Cursor::SetupOverlappingSlice() {
+  // Set timestamp.
+  ts_ = std::max(t1_.ts_start(), t2_.ts_start());
+
+  // Set duration.
+  auto end = std::min(t1_.ts_end(), t2_.ts_end());
+  PERFETTO_DCHECK(end > ts_);
+  dur_ = end - ts_;
+
+  // Set the partition.
+  PERFETTO_DCHECK(t1_.partition() == t2_.partition());
+  partition_ = t1_.partition();
+}
+
 SpanJoinOperatorTable::LeftJoinCursor::LeftJoinCursor(
     SpanJoinOperatorTable* table,
     sqlite3* db)
@@ -330,6 +344,16 @@ SpanJoinOperatorTable::LeftJoinCursor::LeftJoinCursor(
 }
 
 int SpanJoinOperatorTable::LeftJoinCursor::Next() {
+  // Reset the null state of t2.
+  t2_null_ = false;
+
+  // From the previous Next() call, we figured we needed to emit the overlapping
+  // slice. Do that now.
+  if (emit_overlap_slice_) {
+    SetupOverlappingSlice();
+    return SQLITE_OK;
+  }
+
   while (true) {
     int err = next_stepped_table_->StepAndCacheValues();
 
@@ -368,14 +392,50 @@ int SpanJoinOperatorTable::LeftJoinCursor::Next() {
     // We always want t2's partition to be equal to or greater than t1's
     // partition. Similarily we always t2's end timestamp to be greater than to
     // t1's start timestamp.
-    if (t2_.partition() < t1_.partition()) {
+    if (t2_.partition() < t1_.partition() || t2_.ts_end() <= t1_.ts_start()) {
       next_stepped_table_ = &t2_;
       continue;
     }
-  }
 
-  // EOF
-  return SQLITE_OK;
+    // We now have 3 possible cases.
+    if (t2_.partition() > t1_.partition() || t2_.ts_start() >= t1_.ts_end()) {
+      // Case 1: t2's slice is ahead of t1's slice (either in terms of partiion
+      // or time). Just emit t1's slice with null t2 and step t1 forward.
+      next_stepped_table_ = &t1_;
+      t2_null_ = true;
+
+      ts_ = t1_.ts_start();
+      dur_ = t1_.ts_end() - t1_.ts_start();
+      partition_ = t1_.partition();
+      return SQLITE_OK;
+    } else {
+      // In either case here, we need to figure out the next table to step to
+      // and we should have an overlap.
+      bool is_overlapping = IsOverlappingSpan(&t1_, &t2_, &next_stepped_table_);
+      PERFETTO_DCHECK(is_overlapping);
+
+      if (t2_.ts_start() <= t1_.ts_start()) {
+        // Case 2: t2's slice starts before t1 slice. This means we need to emit
+        // a overlapping slice between t1's start and the lesser of t1 and t2's
+        // end.
+        return SQLITE_OK;
+      }
+
+      // Case 3: t1's slice starts before t2's slice. This is the most complex
+      // case and requires us to emit a null slice starting at the max of the
+      // end of the previously emitted slice and t2's start. We need to do this
+      // as may have emitted a slice previously associated with this t1 slice.
+      // We also need to setup to emit the overlapping slice on the next Next()
+      // call.
+      ts_ = std::max(t1_.ts_start(), ts_ + dur_);
+      PERFETTO_DCHECK(ts_ < t2_.ts_start());
+
+      dur_ = t2_.ts_start() - ts_;
+      partition_ = t1_.partition();
+      emit_overlap_slice_ = true;
+    }
+  }
+  PERFETTO_FATAL("For GCC");
 }
 
 int SpanJoinOperatorTable::LeftJoinCursor::Eof() {
@@ -413,18 +473,7 @@ int SpanJoinOperatorTable::SinglePartitioningCursor::Next() {
     if (IsOverlappingSpan(&t1_, &t2_, &next_stepped_table_))
       break;
   }
-
-  // Set timestamp.
-  ts_ = std::max(t1_.ts_start(), t2_.ts_start());
-
-  // Set duration.
-  auto end = std::min(t1_.ts_end(), t2_.ts_end());
-  PERFETTO_DCHECK(end > ts_);
-  dur_ = end - ts_;
-
-  // Set the partition.
-  PERFETTO_DCHECK(t1_.partition() == t2_.partition());
-  partition_ = t1_.partition();
+  SetupOverlappingSlice();
 
   // EOF
   return SQLITE_OK;
@@ -474,18 +523,7 @@ int SpanJoinOperatorTable::MixedPartitioningCursor::Next() {
     if (IsOverlappingSpan(&t1_, &t2_, &next_stepped_table_))
       break;
   }
-
-  // Set timestamp.
-  ts_ = std::max(t1_.ts_start(), t2_.ts_start());
-
-  // Set duration.
-  auto end = std::min(t1_.ts_end(), t2_.ts_end());
-  PERFETTO_DCHECK(end > ts_);
-  dur_ = end - ts_;
-
-  // Set the partition.
-  PERFETTO_DCHECK(t1_.partition() == t2_.partition());
-  partition_ = t1_.partition();
+  SetupOverlappingSlice();
 
   // EOF
   return SQLITE_OK;

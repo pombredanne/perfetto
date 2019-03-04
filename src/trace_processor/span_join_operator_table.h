@@ -184,6 +184,8 @@ class SpanJoinOperatorTable : public Table {
       SpanJoinOperatorTable* const table_;
     };
 
+    void SetupOverlappingSlice();
+
     static bool IsOverlappingSpan(TableQueryState* t1,
                                   TableQueryState* t2,
                                   TableQueryState** next_stepped_table);
@@ -226,6 +228,9 @@ class SpanJoinOperatorTable : public Table {
 
     int Next() override;
     int Eof() override;
+
+   private:
+    bool emit_overlap_slice_ = false;
   };
 
   // Identifier for a column by index in a given table.
