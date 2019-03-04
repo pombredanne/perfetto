@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,21 +14,13 @@
  * limitations under the License.
  */
 
-syntax = "proto2";
-option optimize_for = LITE_RUNTIME;
-package perfetto.protos;
+#include "perfetto/base/string_view.h"
 
-import "perfetto/common/android_log_constants.proto";
+namespace perfetto {
+namespace base {
 
-message AndroidLogConfig {
-  repeated AndroidLogId log_ids = 1;
+// static
+constexpr size_t StringView::npos;
 
-  reserved 2;  // Was |poll_ms|, deprecated.
-
-  // If set ignores all log messages whose prio is < the given value.
-  optional AndroidLogPriority min_prio = 3;
-
-  // If non-empty ignores all log messages whose tag doesn't match one of the
-  // specified values.
-  repeated string filter_tags = 4;
-}
+}  // namespace base
+}  // namespace perfetto
