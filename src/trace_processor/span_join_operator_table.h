@@ -194,9 +194,9 @@ class SpanJoinOperatorTable : public Table {
     TableQueryState t2_;
     TableQueryState* next_stepped_table_ = nullptr;
 
-    int64_t ts_ = std::numeric_limits<int64_t>::max();
-    int64_t dur_ = std::numeric_limits<int64_t>::max();
-    int64_t partition_ = std::numeric_limits<int64_t>::max();
+    int64_t ts_ = 0;
+    int64_t dur_ = 0;
+    int64_t partition_ = 0;
 
     bool t2_null_ = false;
 

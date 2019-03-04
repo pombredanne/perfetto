@@ -329,8 +329,12 @@ void SpanJoinOperatorTable::Cursor::SetupOverlappingSlice() {
   dur_ = end - ts_;
 
   // Set the partition.
-  PERFETTO_DCHECK(t1_.partition() == t2_.partition());
-  partition_ = t1_.partition();
+  if (table_->partitioning_ != PartitioningType::kNoPartitioning) {
+    PERFETTO_DCHECK(table_->partitioning_ ==
+                        PartitioningType::kMixedPartitioning ||
+                    t1_.partition() == t2_.partition());
+    partition_ = t1_.partition();
+  }
 }
 
 SpanJoinOperatorTable::LeftJoinCursor::LeftJoinCursor(
@@ -369,11 +373,16 @@ int SpanJoinOperatorTable::LeftJoinCursor::Next() {
     // If t2 has finished, we need to emit a slice for each slice in t1.
     if (t2_.Eof()) {
       next_stepped_table_ = &t1_;
-      t2_null_ = true;
 
-      ts_ = std::max(t1_.ts_start(), ts_ + dur_);
-      dur_ = t1_.ts_end() - t1_.ts_start();
+      if (partition_ == t1_.partition())
+        ts_ = std::max(t1_.ts_start(), ts_ + dur_);
+      else
+        ts_ = t1_.ts_start();
+      PERFETTO_DCHECK(ts_ < t1_.ts_end());
+      dur_ = t1_.ts_end() - ts_;
       partition_ = t1_.partition();
+
+      t2_null_ = true;
 
       return SQLITE_OK;
     }
@@ -391,11 +400,17 @@ int SpanJoinOperatorTable::LeftJoinCursor::Next() {
       // Case 1: t2's slice is ahead of t1's slice (either in terms of partiion
       // or time). Just emit t1's slice with null t2 and step t1 forward.
       next_stepped_table_ = &t1_;
+
+      if (partition_ == t1_.partition())
+        ts_ = std::max(t1_.ts_start(), ts_ + dur_);
+      else
+        ts_ = t1_.ts_start();
+      PERFETTO_DCHECK(ts_ < t1_.ts_end());
+      dur_ = t1_.ts_end() - ts_;
+      partition_ = t1_.partition();
+
       t2_null_ = true;
 
-      ts_ = std::max(t1_.ts_start(), ts_ + dur_);
-      dur_ = t1_.ts_end() - t1_.ts_start();
-      partition_ = t1_.partition();
       return SQLITE_OK;
     } else {
       // In either case here, we need to figure out the next table to step to
@@ -403,26 +418,32 @@ int SpanJoinOperatorTable::LeftJoinCursor::Next() {
       bool is_overlapping = IsOverlappingSpan(&t1_, &t2_, &next_stepped_table_);
       PERFETTO_DCHECK(is_overlapping);
 
-      if (t2_.ts_start() <= t1_.ts_start()) {
-        // Case 2: t2's slice starts before t1 slice. This means we need to emit
+      if (t2_.ts_start() <= t1_.ts_start() || ts_ + dur_ == t2_.ts_start()) {
+        // Case 2: t2's slice starts before t1 slice or we have already emitted
+        // all data up to the start of t2's start. This means we need to emit
         // a overlapping slice between t1's start and the lesser of t1 and t2's
         // end.
+        SetupOverlappingSlice();
         return SQLITE_OK;
       }
 
-      // Case 3: t1's slice starts before t2's slice. This is the most complex
-      // case and requires us to emit a null slice starting at the max of the
-      // end of the previously emitted slice and t2's start. We need to do this
-      // as may have emitted a slice previously associated with this t1 slice.
-      // We also need to setup to emit the overlapping slice on the next Next()
-      // call.
-      ts_ = std::max(t1_.ts_start(), ts_ + dur_);
+      // Case 3: t1's slice starts before t2's slice and we have some
+      // unexplained time between the end of the previous slice and the start of
+      // this one. This is the most complex case and requires us to emit a null
+      // slice starting at the max of the end of the previously emitted slice
+      // and t2's start. We need to do this as may have emitted a slice
+      // previously associated with this t1 slice. We also need to setup to emit
+      // the overlapping slice on the next Next() call.
+      if (partition_ == t1_.partition())
+        ts_ = std::max(t1_.ts_start(), ts_ + dur_);
+      else
+        ts_ = t1_.ts_start();
       PERFETTO_DCHECK(ts_ < t2_.ts_start());
-
       dur_ = t2_.ts_start() - ts_;
       partition_ = t1_.partition();
-      emit_overlap_slice_ = true;
+
       t2_null_ = true;
+      emit_overlap_slice_ = true;
 
       return SQLITE_OK;
     }
