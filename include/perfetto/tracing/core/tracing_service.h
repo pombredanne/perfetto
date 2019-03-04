@@ -147,7 +147,7 @@ class PERFETTO_EXPORT TracingService {
                                base::ScopedFile = base::ScopedFile()) = 0;
 
     // Update the trace config of an existing tracing session; only a subset
-    // of options can be changed mid-session. Currently only the only
+    // of options can be changed mid-session. Currently the only
     // supported functionality is expanding the list of producer_name_filters()
     // (or removing the filter entirely).
     virtual void ChangeTraceConfig(const TraceConfig&) = 0;

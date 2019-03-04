@@ -246,6 +246,73 @@ TEST_F(TracingServiceImplTest, LockdownMode) {
   consumer->WaitForTracingDisabled();
 }
 
+TEST_F(TracingServiceImplTest, ProducerNameFilterChange) {
+  std::unique_ptr<MockConsumer> consumer = CreateMockConsumer();
+  consumer->Connect(svc.get());
+
+  std::unique_ptr<MockProducer> producer1 = CreateMockProducer();
+  producer1->Connect(svc.get(), "mock_producer_1");
+  producer1->RegisterDataSource("data_source");
+
+  std::unique_ptr<MockProducer> producer2 = CreateMockProducer();
+  producer2->Connect(svc.get(), "mock_producer_2");
+  producer2->RegisterDataSource("data_source");
+
+  std::unique_ptr<MockProducer> producer3 = CreateMockProducer();
+  producer3->Connect(svc.get(), "mock_producer_3");
+  producer3->RegisterDataSource("data_source");
+
+  TraceConfig trace_config;
+  trace_config.add_buffers()->set_size_kb(128);
+  auto* data_source = trace_config.add_data_sources();
+  data_source->mutable_config()->set_name("data_source");
+  *data_source->add_producer_name_filter() = "mock_producer_1";
+
+  // Enable tracing with only mock_producer_1 enabled;
+  // the rest should not start up.
+  consumer->EnableTracing(trace_config);
+
+  producer1->WaitForTracingSetup();
+  producer1->WaitForDataSourceSetup("data_source");
+  producer1->WaitForDataSourceStart("data_source");
+
+  EXPECT_CALL(*producer2, OnConnect()).Times(0);
+  EXPECT_CALL(*producer3, OnConnect()).Times(0);
+  task_runner.RunUntilIdle();
+  Mock::VerifyAndClearExpectations(producer2.get());
+  Mock::VerifyAndClearExpectations(producer3.get());
+
+  // Enable mock_producer_2, the third one should still
+  // not get connected.
+  *data_source->add_producer_name_filter() = "mock_producer_2";
+  consumer->ChangeTraceConfig(trace_config);
+
+  producer2->WaitForTracingSetup();
+  producer2->WaitForDataSourceSetup("data_source");
+  producer2->WaitForDataSourceStart("data_source");
+
+  EXPECT_CALL(*producer3, OnConnect()).Times(0);
+  task_runner.RunUntilIdle();
+  Mock::VerifyAndClearExpectations(producer3.get());
+
+  // Enable mock_producer_3 but also try to do an
+  // unsupported change; the whole update should fail
+  // and mock_producer_3 should not get updated still.
+  *data_source->add_producer_name_filter() = "mock_producer_3";
+  trace_config.add_buffers()->set_size_kb(128);
+  consumer->ChangeTraceConfig(trace_config);
+
+  EXPECT_CALL(*producer3, OnConnect()).Times(0);
+  task_runner.RunUntilIdle();
+  Mock::VerifyAndClearExpectations(producer3.get());
+
+  consumer->DisableTracing();
+  consumer->FreeBuffers();
+  producer1->WaitForDataSourceStop("data_source");
+  producer2->WaitForDataSourceStop("data_source");
+  consumer->WaitForTracingDisabled();
+}
+
 TEST_F(TracingServiceImplTest, DisconnectConsumerWhileTracing) {
   std::unique_ptr<MockConsumer> consumer = CreateMockConsumer();
   consumer->Connect(svc.get());
