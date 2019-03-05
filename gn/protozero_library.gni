@@ -31,12 +31,10 @@ template("protozero_library") {
       component_build_force_source_set = true
     }
 
-    proto_deps = [ perfetto_root_path + "src/protozero" ]
+    link_deps = [ perfetto_root_path + "src/protozero" ]
 
     if (defined(invoker.deps)) {
-      link_deps = invoker.deps
-    } else {
-      link_deps = []
+      link_deps += invoker.deps
     }
 
     forward_variables_from(invoker,
