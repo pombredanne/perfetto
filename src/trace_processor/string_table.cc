@@ -79,7 +79,8 @@ int StringTable::Cursor::Column(sqlite3_context* context, int col) {
       sqlite_utils::ReportSqliteResult(context, row_);
       break;
     case Column::kString:
-      sqlite_utils::ReportSqliteResult(context, storage_->GetString(string_id));
+      sqlite_utils::ReportSqliteResult(context,
+                                       storage_->GetString(string_id).data());
       break;
   }
   return SQLITE_OK;

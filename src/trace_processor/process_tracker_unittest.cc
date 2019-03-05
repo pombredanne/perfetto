@@ -70,7 +70,7 @@ TEST_F(ProcessTrackerTest, PushTwoProcessEntries_DifferentPid) {
 TEST_F(ProcessTrackerTest, AddProcessEntry_CorrectName) {
   context.process_tracker->UpdateProcess(1, base::nullopt, "test");
   ASSERT_STREQ(
-      context.storage->GetString(context.storage->GetProcess(1).name_id),
+      context.storage->GetString(context.storage->GetProcess(1).name_id).data(),
       "test");
 }
 

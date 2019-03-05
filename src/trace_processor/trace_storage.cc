@@ -52,8 +52,8 @@ TraceStorage::TraceStorage() {
 }
 
 TraceStorage::~TraceStorage() {
-  for (const char* str : string_pool_) {
-    free(const_cast<char*>(str));
+  for (const base::StringView& str_view : string_pool_) {
+    free(const_cast<char*>(str_view.data()));
   }
 }
 
@@ -67,7 +67,8 @@ StringId TraceStorage::InternString(base::StringView str) {
     PERFETTO_DCHECK(base::StringView(string_pool_[id_it->second]) == str);
     return id_it->second;
   }
-  string_pool_.emplace_back(strndup(str.data(), str.size()));
+  string_pool_.emplace_back(
+      base::StringView(strndup(str.data(), str.size()), str.size()));
   StringId string_id = static_cast<uint32_t>(string_pool_.size() - 1);
   string_index_.emplace(hash, string_id);
   return string_id;

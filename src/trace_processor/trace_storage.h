@@ -555,7 +555,7 @@ class TraceStorage {
   }
 
   // Reading methods.
-  const char* GetString(StringId id) const {
+  const base::StringView& GetString(StringId id) const {
     PERFETTO_DCHECK(id < string_pool_.size());
     return string_pool_[id];
   }
@@ -608,7 +608,9 @@ class TraceStorage {
   const RawEvents& raw_events() const { return raw_events_; }
   RawEvents* mutable_raw_events() { return &raw_events_; }
 
-  const std::deque<const char*>& string_pool() const { return string_pool_; }
+  const std::deque<base::StringView>& string_pool() const {
+    return string_pool_;
+  }
 
   // |unique_processes_| always contains at least 1 element becuase the 0th ID
   // is reserved to indicate an invalid process.
@@ -643,7 +645,7 @@ class TraceStorage {
   Args args_;
 
   // One entry for each unique string in the trace.
-  std::deque<const char*> string_pool_;
+  std::deque<base::StringView> string_pool_;
 
   // One entry for each unique string in the trace.
   std::unordered_map<StringHash, StringId> string_index_;

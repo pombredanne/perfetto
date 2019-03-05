@@ -70,7 +70,7 @@ int RawTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
   return SQLITE_OK;
 }
 
-void RawTable::FormatSystraceArgs(const std::string& event_name,
+void RawTable::FormatSystraceArgs(base::StringView event_name,
                                   ArgSetId arg_set_id,
                                   base::StringWriter* writer) {
   const auto& set_ids = storage_->args().set_ids();
@@ -90,8 +90,7 @@ void RawTable::FormatSystraceArgs(const std::string& event_name,
         writer->AppendDouble(value.real_value);
         break;
       case TraceStorage::Args::Variadic::kString: {
-        const auto& str = storage_->GetString(value.string_value);
-        writer->AppendString(str.c_str(), str.size());
+        writer->AppendString(storage_->GetString(value.string_value));
       }
     }
   };
@@ -103,13 +102,10 @@ void RawTable::FormatSystraceArgs(const std::string& event_name,
                                              ValueWriter value_fn) {
     uint32_t arg_row = start_row + arg_idx;
     const auto& args = storage_->args();
-    const auto& key = storage_->GetString(args.keys()[arg_row]);
-    const auto& value = args.arg_values()[arg_row];
-
     writer->AppendChar(' ');
-    writer->AppendString(key.c_str(), key.length());
+    writer->AppendString(storage_->GetString(args.keys()[arg_row]));
     writer->AppendChar('=');
-    value_fn(value);
+    value_fn(args.arg_values()[arg_row]);
   };
 
   if (event_name == "sched_switch") {
@@ -194,10 +190,10 @@ void RawTable::FormatSystraceArgs(const std::string& event_name,
       const auto& str = storage_->GetString(value.string_value);
 
       // If the last character is a newline in a print, just drop it.
-      auto chars_to_print = str.size() > 0 && str[str.size() - 1] == '\n'
+      auto chars_to_print = str.size() > 0 && str.data()[str.size() - 1] == '\n'
                                 ? str.size() - 1
                                 : str.size();
-      writer->AppendString(str.c_str(), chars_to_print);
+      writer->AppendString(str.data(), chars_to_print);
     });
     return;
   }
@@ -239,7 +235,7 @@ void RawTable::ToSystrace(sqlite3_context* ctx,
 
   const auto& event_name = storage_->GetString(raw_evts.name_ids()[row]);
   writer.AppendChar(' ');
-  writer.AppendString(event_name.c_str(), event_name.size());
+  writer.AppendString(event_name.data(), event_name.size());
   writer.AppendChar(':');
 
   FormatSystraceArgs(event_name, raw_evts.arg_set_ids()[row], &writer);
