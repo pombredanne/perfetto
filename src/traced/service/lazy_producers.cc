@@ -58,9 +58,9 @@ void LazyProducers::StartTracing(TracingSessionID tsid,
 
     properties.emplace(it->second);
   }
-
   properties_for_trace_config_.emplace(tsid, std::move(properties));
 }
+
 void LazyProducers::StopTracing(TracingSessionID tsid) {
   auto it = properties_for_trace_config_.find(tsid);
   if (it == properties_for_trace_config_.end())
