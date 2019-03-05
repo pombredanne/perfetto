@@ -96,12 +96,14 @@ namespace profiling {
 class HeapTracker;
 
 struct Mapping {
-  uint64_t build_id;
-  uint64_t offset;
-  uint64_t start;
-  uint64_t end;
-  uint64_t load_bias;
-  std::vector<Interner<std::string>::Interned> path_components;
+  Mapping(Interned<std::string> b) : build_id(std::move(b)) {}
+
+  Interned<std::string> build_id;
+  uint64_t offset = 0;
+  uint64_t start = 0;
+  uint64_t end = 0;
+  uint64_t load_bias = 0;
+  std::vector<Interned<std::string>> path_components{};
 
   bool operator<(const Mapping& other) const {
     return std::tie(build_id, offset, start, end, load_bias, path_components) <
@@ -111,12 +113,10 @@ struct Mapping {
 };
 
 struct Frame {
-  Frame(Interner<Mapping>::Interned m,
-        Interner<std::string>::Interned fn_name,
-        uint64_t pc)
+  Frame(Interned<Mapping> m, Interned<std::string> fn_name, uint64_t pc)
       : mapping(m), function_name(fn_name), rel_pc(pc) {}
-  Interner<Mapping>::Interned mapping;
-  Interner<std::string>::Interned function_name;
+  Interned<Mapping> mapping;
+  Interned<std::string> function_name;
   uint64_t rel_pc;
 
   bool operator<(const Frame& other) const {
@@ -154,35 +154,34 @@ class GlobalCallstackTrie {
     // This is opaque except to GlobalCallstackTrie.
     friend class GlobalCallstackTrie;
 
-    Node(Interner<Frame>::Interned frame) : Node(std::move(frame), nullptr) {}
-    Node(Interner<Frame>::Interned frame, Node* parent)
+    Node(Interned<Frame> frame) : Node(std::move(frame), nullptr) {}
+    Node(Interned<Frame> frame, Node* parent)
         : parent_(parent), location_(std::move(frame)) {}
 
-    std::vector<Interner<Frame>::Interned> BuildCallstack() const;
     uintptr_t id() const { return reinterpret_cast<uintptr_t>(this); }
 
    private:
-    Node* GetOrCreateChild(const Interner<Frame>::Interned& loc);
+    Node* GetOrCreateChild(const Interned<Frame>& loc);
 
     uint64_t ref_count_ = 0;
     Node* const parent_;
-    const Interner<Frame>::Interned location_;
-    base::LookupSet<Node, const Interner<Frame>::Interned, &Node::location_>
-        children_;
+    const Interned<Frame> location_;
+    base::LookupSet<Node, const Interned<Frame>, &Node::location_> children_;
   };
 
   GlobalCallstackTrie() = default;
   GlobalCallstackTrie(const GlobalCallstackTrie&) = delete;
   GlobalCallstackTrie& operator=(const GlobalCallstackTrie&) = delete;
 
-  Node* CreateCallsite(const std::vector<unwindstack::FrameData>& locs);
+  Node* CreateCallsite(const std::vector<FrameData>& locs);
   static void DecrementNode(Node* node);
   static void IncrementNode(Node* node);
 
+  std::vector<Interned<Frame>> BuildCallstack(const Node* node) const;
+
  private:
-  Interner<Frame>::Interned InternCodeLocation(
-      const unwindstack::FrameData& loc);
-  Interner<Frame>::Interned MakeRootFrame();
+  Interned<Frame> InternCodeLocation(const FrameData& loc);
+  Interned<Frame> MakeRootFrame();
 
   Interner<std::string> string_interner_;
   Interner<Mapping> mapping_interner_;
@@ -192,16 +191,47 @@ class GlobalCallstackTrie {
 };
 
 struct DumpState {
-  void WriteMap(protos::pbzero::ProfilePacket* packet,
-                const Interner<Mapping>::Interned map);
-  void WriteFrame(protos::pbzero::ProfilePacket* packet,
-                  const Interner<Frame>::Interned frame);
-  void WriteString(protos::pbzero::ProfilePacket* packet,
-                   const Interner<std::string>::Interned& str);
+  DumpState(TraceWriter* tw, uint64_t* ni) : trace_writer(tw), next_index(ni) {
+    last_written = trace_writer->written();
+
+    current_trace_packet = trace_writer->NewTracePacket();
+    current_profile_packet = current_trace_packet->set_profile_packet();
+    current_profile_packet->set_index((*next_index)++);
+  }
+
+  void WriteMap(const Interned<Mapping> map);
+  void WriteFrame(const Interned<Frame> frame);
+  void WriteString(const Interned<std::string>& str);
 
   std::set<InternID> dumped_strings;
   std::set<InternID> dumped_frames;
   std::set<InternID> dumped_mappings;
+
+  std::set<GlobalCallstackTrie::Node*> callstacks_to_dump;
+
+  TraceWriter* trace_writer;
+  protos::pbzero::ProfilePacket* current_profile_packet;
+  TraceWriter::TracePacketHandle current_trace_packet;
+  uint64_t* next_index;
+  uint64_t last_written = 0;
+
+  void NewProfilePacket() {
+    PERFETTO_DLOG("New profile packet after %" PRIu64 " bytes. Total: %" PRIu64
+                  ", before %" PRIu64,
+                  trace_writer->written() - last_written,
+                  trace_writer->written(), last_written);
+    current_profile_packet->set_continued(true);
+    last_written = trace_writer->written();
+
+    current_trace_packet->Finalize();
+    current_trace_packet = trace_writer->NewTracePacket();
+    current_profile_packet = current_trace_packet->set_profile_packet();
+    current_profile_packet->set_index((*next_index)++);
+  }
+
+  uint64_t currently_written() {
+    return trace_writer->written() - last_written;
+  }
 };
 
 // Snapshot for memory allocations of a particular process. Shares callsites
@@ -212,33 +242,32 @@ class HeapTracker {
   explicit HeapTracker(GlobalCallstackTrie* callsites)
       : callsites_(callsites) {}
 
-  void RecordMalloc(const std::vector<unwindstack::FrameData>& stack,
+  void RecordMalloc(const std::vector<FrameData>& stack,
                     uint64_t address,
                     uint64_t size,
                     uint64_t sequence_number);
-  void RecordFree(uint64_t address, uint64_t sequence_number);
-  void Dump(protos::pbzero::ProfilePacket::ProcessHeapSamples* proto,
-            std::set<GlobalCallstackTrie::Node*>* callstacks_to_dump);
+  void Dump(pid_t pid, DumpState* dump_state);
+  void RecordFree(uint64_t address, uint64_t sequence_number) {
+    RecordOperation(sequence_number, address);
+  }
 
-  uint64_t GetSizeForTesting(const std::vector<unwindstack::FrameData>& stack);
+  uint64_t GetSizeForTesting(const std::vector<FrameData>& stack);
 
  private:
-  static constexpr uint64_t kNoopFree = 0;
-
+  // Sum of all the allocations for a given callstack.
   struct CallstackAllocations {
     CallstackAllocations(GlobalCallstackTrie::Node* n) : node(n) {}
+
+    uint64_t allocs = 0;
 
     uint64_t allocated = 0;
     uint64_t freed = 0;
     uint64_t allocation_count = 0;
     uint64_t free_count = 0;
 
-    GlobalCallstackTrie::Node* node;
+    GlobalCallstackTrie::Node* const node;
 
-    ~CallstackAllocations() {
-      if (node)
-        GlobalCallstackTrie::DecrementNode(node);
-    }
+    ~CallstackAllocations() { GlobalCallstackTrie::DecrementNode(node); }
 
     bool operator<(const CallstackAllocations& other) const {
       return node < other.node;
@@ -248,8 +277,7 @@ class HeapTracker {
   struct Allocation {
     Allocation(uint64_t size, uint64_t seq, CallstackAllocations* csa)
         : total_size(size), sequence_number(seq), callstack_allocations(csa) {
-      callstack_allocations->allocation_count++;
-      callstack_allocations->allocated += total_size;
+      callstack_allocations->allocs++;
     }
 
     Allocation() = default;
@@ -261,11 +289,19 @@ class HeapTracker {
       other.callstack_allocations = nullptr;
     }
 
+    void AddToCallstackAllocations() {
+      callstack_allocations->allocation_count++;
+      callstack_allocations->allocated += total_size;
+    }
+
+    void SubtractFromCallstackAllocations() {
+      callstack_allocations->free_count++;
+      callstack_allocations->freed += total_size;
+    }
+
     ~Allocation() {
-      if (callstack_allocations) {
-        callstack_allocations->free_count++;
-        callstack_allocations->freed += total_size;
-      }
+      if (callstack_allocations)
+        callstack_allocations->allocs--;
     }
 
     uint64_t total_size;
@@ -273,28 +309,30 @@ class HeapTracker {
     CallstackAllocations* callstack_allocations;
   };
 
-  // Sequencing logic works as following:
-  // * mallocs are immediately commited to |allocations_|. They are rejected if
-  //   the current malloc for the address has a higher sequence number.
+  CallstackAllocations* MaybeCreateCallstackAllocations(
+      GlobalCallstackTrie::Node* node) {
+    auto callstack_allocations_it = callstack_allocations_.find(node);
+    if (callstack_allocations_it == callstack_allocations_.end()) {
+      GlobalCallstackTrie::IncrementNode(node);
+      bool inserted;
+      std::tie(callstack_allocations_it, inserted) =
+          callstack_allocations_.emplace(node, node);
+      PERFETTO_DCHECK(inserted);
+    }
+    return &callstack_allocations_it->second;
+  }
+
+  void RecordOperation(uint64_t sequence_number, uint64_t address);
+
+  // Commits a malloc or free operation.
+  // See comment of pending_operations_ for encoding of malloc and free
+  // operations.
   //
-  //   If all operations with sequence numbers lower than the malloc have been
-  //   commited to |allocations_|, sequence_number_ is advanced and all
-  //   unblocked pending operations after the current id are commited to
-  //   |allocations_|. Otherwise, a no-op record is added to the pending
-  //   operations queue to maintain the contiguity of the sequence.
-
-  // * for frees:
-  //   if all operations with sequence numbers lower than the free have
-  //     been commited to |allocations_| (i.e sequence_number_ ==
-  //     sequence_number - 1) the free is commited to |allocations_| and
-  //     sequence_number_ is advanced. All unblocked pending operations are
-  //     commited to |allocations_|.
-  //   otherwise: the free is added to the queue of pending operations.
-
-  // Commits a free operation into |allocations_|.
-  // This must be  called after all operations up to sequence_number have been
-  // commited to |allocations_|.
-  void CommitFree(uint64_t sequence_number, uint64_t address);
+  // Committing a malloc operation: Add the allocations size to
+  // CallstackAllocation::allocated.
+  // Committing a free operation: Add the allocation's size to
+  // CallstackAllocation::freed and delete the allocation.
+  void CommitOperation(uint64_t sequence_number, uint64_t address);
 
   // We cannot use an interner here, because after the last allocation goes
   // away, we still need to keep the CallstackAllocations around until the next
@@ -305,20 +343,21 @@ class HeapTracker {
   std::vector<std::pair<decltype(callstack_allocations_)::iterator, uint64_t>>
       dead_callstack_allocations_;
 
-  // Address -> (size, sequence_number, code location)
-  std::map<uint64_t, Allocation> allocations_;
+  std::map<uint64_t /* allocation address */, Allocation> allocations_;
 
-  // if allocation address != 0, there is pending free of the address.
-  // if == 0, the pending operation is a no-op.
-  // No-op operations come from allocs that have already been commited to
-  // |allocations_|. It is important to keep track of them in the list of
-  // pending to maintain the contiguity of the sequence.
+  // An operation is either a commit of an allocation or freeing of an
+  // allocation. An operation is a free if its seq_id is larger than
+  // the sequence_number of the corresponding allocation. It is a commit if its
+  // seq_id is equal to the sequence_number of the corresponding allocation.
+  //
+  // If its seq_id is less than the sequence_number of the corresponding
+  // allocation it could be either, but is ignored either way.
   std::map<uint64_t /* seq_id */, uint64_t /* allocation address */>
-      pending_frees_;
+      pending_operations_;
 
   // The sequence number all mallocs and frees have been handled up to.
-  uint64_t sequence_number_ = 0;
-  GlobalCallstackTrie* const callsites_;
+  uint64_t committed_sequence_number_ = 0;
+  GlobalCallstackTrie* callsites_;
 };
 
 struct BookkeepingData {
@@ -327,12 +366,12 @@ struct BookkeepingData {
   explicit BookkeepingData(GlobalCallstackTrie* callsites)
       : heap_tracker(callsites) {}
 
-  HeapTracker heap_tracker;
-
   // This is different to a shared_ptr to HeapTracker, because we want to keep
   // it around until the first dump after the last socket for the PID has
-  // disconnected.
+  // disconnected
   uint64_t ref_count = 0;
+  uint64_t client_generation = 0;
+  HeapTracker heap_tracker;
 };
 
 // BookkeepingThread owns the BookkeepingData for all processes. The Run()
@@ -368,6 +407,12 @@ class BookkeepingThread {
   void HandleBookkeepingRecord(BookkeepingRecord* rec);
 
  private:
+  void HandleDumpRecord(BookkeepingRecord* rec);
+  void HandleFreeRecord(BookkeepingData* bookkeeping_data,
+                        BookkeepingRecord* rec);
+  void HandleMallocRecord(BookkeepingData* bookkeeping_data,
+                          BookkeepingRecord* rec);
+
   // Inform the bookkeeping thread that a socket for this pid disconnected.
   // After the last client for a PID disconnects, the BookkeepingData is
   // retained until the next dump, upon which it gets garbage collected.
@@ -379,6 +424,7 @@ class BookkeepingThread {
 
   std::map<pid_t, BookkeepingData> bookkeeping_data_;
   std::mutex bookkeeping_mutex_;
+  uint64_t next_index = 0;
 };
 
 void swap(BookkeepingThread::ProcessHandle&, BookkeepingThread::ProcessHandle&);

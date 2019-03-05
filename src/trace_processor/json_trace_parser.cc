@@ -30,8 +30,7 @@
 #include "src/trace_processor/slice_tracker.h"
 #include "src/trace_processor/trace_processor_context.h"
 
-#if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD) || \
-    PERFETTO_BUILDFLAG(PERFETTO_CHROMIUM_BUILD)
+#if !PERFETTO_BUILDFLAG(PERFETTO_STANDALONE_BUILD)
 #error The JSON trace parser is supported only in the standalone build for now.
 #endif
 
@@ -182,7 +181,7 @@ bool JsonTraceParser::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
     if (value.isMember("pid"))
       opt_pid = CoerceToUint32(value["pid"]);
     if (value.isMember("tid"))
-      opt_pid = CoerceToUint32(value["tid"]);
+      opt_tid = CoerceToUint32(value["tid"]);
 
     uint32_t pid = opt_pid.value_or(0);
     uint32_t tid = opt_tid.value_or(pid);
@@ -221,7 +220,7 @@ bool JsonTraceParser::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
         }
         if (strcmp(value["name"].asCString(), "process_name") == 0) {
           const char* proc_name = value["args"]["name"].asCString();
-          procs->UpdateProcess(pid, proc_name);
+          procs->UpdateProcess(pid, base::nullopt, proc_name);
           break;
         }
       }

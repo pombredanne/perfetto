@@ -11,6 +11,33 @@ syntax = "proto2";
 
 package perfetto.protos;
 
+// Begin of protos/perfetto/common/android_log_constants.proto
+
+// Values from NDK's android/log.h.
+enum AndroidLogId {
+  LID_DEFAULT = 0;  // MAIN.
+  LID_RADIO = 1;
+  LID_EVENTS = 2;
+  LID_SYSTEM = 3;
+  LID_CRASH = 4;
+  LID_STATS = 5;
+  LID_SECURITY = 6;
+  LID_KERNEL = 7;
+}
+
+enum AndroidLogPriority {
+  PRIO_UNSPECIFIED = 0;
+  PRIO_UNUSED = 1;  // _DEFAULT, but should never be seen in logs.
+  PRIO_VERBOSE = 2;
+  PRIO_DEBUG = 3;
+  PRIO_INFO = 4;
+  PRIO_WARN = 5;
+  PRIO_ERROR = 6;
+  PRIO_FATAL = 7;
+}
+
+// End of protos/perfetto/common/android_log_constants.proto
+
 // Begin of protos/perfetto/common/sys_stats_counters.proto
 
 // When editing entries here remember also to update "sys_stats_counters.h" with
@@ -152,6 +179,23 @@ enum VmstatCounters {
 }
 // End of protos/perfetto/common/sys_stats_counters.proto
 
+// Begin of protos/perfetto/config/android/android_log_config.proto
+
+message AndroidLogConfig {
+  repeated AndroidLogId log_ids = 1;
+
+  reserved 2;  // Was |poll_ms|, deprecated.
+
+  // If set ignores all log messages whose prio is < the given value.
+  optional AndroidLogPriority min_prio = 3;
+
+  // If non-empty ignores all log messages whose tag doesn't match one of the
+  // specified values.
+  repeated string filter_tags = 4;
+}
+
+// End of protos/perfetto/config/android/android_log_config.proto
+
 // Begin of protos/perfetto/config/chrome/chrome_config.proto
 
 // When editing this file run ./tools/gen_tracing_cpp_headers_from_protos.py
@@ -164,7 +208,6 @@ message ChromeConfig {
 // End of protos/perfetto/config/chrome/chrome_config.proto
 
 // Begin of protos/perfetto/config/data_source_config.proto
-
 
 // When editing this file run ./tools/gen_tracing_cpp_headers_from_protos.py
 // to reflect changes in the corresponding C++ headers.
@@ -205,6 +248,7 @@ message DataSourceConfig {
   optional SysStatsConfig sys_stats_config = 104;
   optional HeapprofdConfig heapprofd_config = 105;
   optional AndroidPowerConfig android_power_config = 106;
+  optional AndroidLogConfig android_log_config = 107;
 
   // This is a fallback mechanism to send a free-form text config to the
   // producer. In theory this should never be needed. All the code that
@@ -284,6 +328,9 @@ message AndroidPowerConfig {
   }
   optional uint32 battery_poll_ms = 1;
   repeated BatteryCounters battery_counters = 2;
+
+  // Where available enables per-power-rail measurements.
+  optional bool collect_power_rails = 3;
 }
 
 // End of protos/perfetto/config/power/android_power_config.proto
@@ -315,7 +362,7 @@ message ProcessStatsConfig {
   optional bool record_thread_names = 3;
 
   // If > 0 samples counters (see process_stats.proto) from
-  // /proc/pid/status every X ms.
+  // /proc/pid/status and oom_score_adj every X ms.
   // This is required to be > 100ms to avoid excessive CPU usage.
   // TODO(primiano): add CPU cost for change this value.
   optional uint32 proc_stats_poll_ms = 4;
@@ -330,7 +377,6 @@ message ProcessStatsConfig {
 // End of protos/perfetto/config/process_stats/process_stats_config.proto
 
 // Begin of protos/perfetto/config/sys_stats/sys_stats_config.proto
-
 
 // When editing this file run ./tools/gen_tracing_cpp_headers_from_protos.py
 // to reflect changes in the corresponding C++ headers.
@@ -436,7 +482,7 @@ message TestConfig {
 // It contains the general config for the logging buffer(s) and the configs for
 // all the data source being enabled.
 //
-// Next id: 14.
+// Next id: 17.
 message TraceConfig {
   message BufferConfig {
     optional uint32 size_kb = 1;
@@ -446,9 +492,17 @@ message TraceConfig {
 
     enum FillPolicy {
       UNSPECIFIED = 0;
+
+      // Default behavior. The buffer operates as a conventional ring buffer.
+      // If the writer is faster than the reader (or if the reader reads only
+      // after tracing is stopped) newly written packets will overwrite old
+      // packets.
       RING_BUFFER = 1;
-      // TODO: not implemented yet.
-      // STOP_WHEN_FULL = 2;
+
+      // Behaves like RING_BUFFER as long as there is space in the buffer or
+      // the reader catches up with the writer. As soon as the writer hits
+      // an unread chunk, it stops accepting new data in the buffer.
+      DISCARD = 2;
     }
     optional FillPolicy fill_policy = 4;
   }
@@ -514,6 +568,8 @@ message TraceConfig {
     optional int32 triggering_config_uid = 2;
     // The identifier of the config which triggered the alert.
     optional int64 triggering_config_id = 3;
+    // The identifier of the subscription which triggered this trace.
+    optional int64 triggering_subscription_id = 4;
   }
 
   // Statsd-specific metadata.
@@ -556,6 +612,17 @@ message TraceConfig {
   // quasi-real-time streaming mode and to guarantee some partial ordering of
   // events in the trace in windows of X ms.
   optional uint32 flush_period_ms = 13;
+
+  // Wait for this long for producers to acknowledge flush requests.
+  // Default 5s.
+  optional uint32 flush_timeout_ms = 14;
+
+  // Disable emitting clock timestamps into the trace.
+  optional bool disable_clock_snapshotting = 15;
+
+  // Android-only. If set, sends an intent to the Traceur system app when the
+  // trace ends to notify it about the trace readiness.
+  optional bool notify_traceur = 16;
 }
 
 // End of protos/perfetto/config/trace_config.proto

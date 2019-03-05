@@ -32,16 +32,17 @@ class CountersTable : public StorageTable {
 
   CountersTable(sqlite3*, const TraceStorage*);
 
-  // Table implementation.
-  base::Optional<Table::Schema> Init(int, const char* const*) override;
-  std::unique_ptr<Table::Cursor> CreateCursor(const QueryConstraints&,
-                                              sqlite3_value**) override;
+  // StorageTable implementation.
+  StorageSchema CreateStorageSchema() override;
+  uint32_t RowCount() override;
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
 
- private:
   class RefColumn final : public StorageColumn {
    public:
-    RefColumn(std::string col_name, const TraceStorage* storage);
+    RefColumn(std::string col_name,
+              const std::deque<int64_t>* refs,
+              const std::deque<RefType>* types,
+              const TraceStorage* storage);
 
     void ReportResult(sqlite3_context* ctx, uint32_t row) const override;
 
@@ -60,9 +61,12 @@ class CountersTable : public StorageTable {
    private:
     int CompareRefsAsc(uint32_t f, uint32_t s) const;
 
+    const std::deque<int64_t>* refs_;
+    const std::deque<RefType>* types_;
     const TraceStorage* storage_ = nullptr;
   };
 
+ private:
   std::deque<std::string> ref_types_;
   const TraceStorage* const storage_;
 };

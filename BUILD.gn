@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import("gn/perfetto.gni")
+import("gn/test.gni")
 
 if (perfetto_build_standalone || perfetto_build_with_android) {
   import("//gn/standalone/android.gni")
@@ -62,6 +63,7 @@ group("all") {
       deps += [
         ":perfetto_benchmarks",
         ":trace_processor",
+        "src/profiling/memory:ring_buffer",
         "src/tracing:consumer_api_test",
         "test/configs",
         "tools/ftrace_proto_gen:ftrace_proto_gen",
@@ -105,13 +107,13 @@ if (perfetto_build_standalone) {
   }
 }
 
-executable("perfetto_unittests") {
-  testonly = true
+test("perfetto_unittests") {
   deps = [
     "gn:default_deps",
     "gn:gtest_main",
     "src/base:unittests",
     "src/protozero:unittests",
+    "src/traced/service:unittests",
     "src/tracing:unittests",
   ]
 
@@ -119,6 +121,7 @@ executable("perfetto_unittests") {
     deps += [
       "src/ipc:unittests",
       "src/perfetto_cmd:unittests",
+      "src/profiling/memory:ring_buffer_unittests",
       "src/traced/probes:unittests",
       "src/traced/probes/filesystem:unittests",
       "src/traced/probes/ftrace:unittests",
@@ -137,8 +140,7 @@ executable("perfetto_unittests") {
 }
 
 if (perfetto_build_standalone || perfetto_build_with_android) {
-  executable("perfetto_integrationtests") {
-    testonly = true
+  test("perfetto_integrationtests") {
     deps = [
       "gn:default_deps",
       "gn:gtest_main",
@@ -147,9 +149,6 @@ if (perfetto_build_standalone || perfetto_build_with_android) {
     ]
     if (perfetto_build_standalone && !is_android) {
       deps += [ "src/trace_processor:integrationtests" ]
-    }
-    if (perfetto_build_with_android) {
-      cflags = [ "-DPERFETTO_BUILD_WITH_ANDROID" ]
     }
 
     # TODO(fmayer): Fix in process daemons.
@@ -210,17 +209,6 @@ if (perfetto_build_standalone || perfetto_build_with_android) {
     sources = [
       "src/perfetto_cmd/main.cc",
     ]
-    if (is_android) {
-      deps += [ "src/base:android_task_runner" ]
-    }
-    if (perfetto_build_with_android) {
-      cflags = [ "-DPERFETTO_BUILD_WITH_ANDROID" ]
-      libs = [
-        "binder",
-        "services",
-        "utils",
-      ]
-    }
   }
 
   if (perfetto_build_with_android) {
@@ -267,6 +255,8 @@ if (perfetto_build_with_embedder) {
       "include/perfetto/tracing/core",
       "protos/perfetto/trace:zero",
       "protos/perfetto/trace/chrome:zero",
+      "protos/perfetto/trace/interned_data:zero",
+      "protos/perfetto/trace/track_event:zero",
     ]
   }
 }
@@ -287,16 +277,33 @@ if (perfetto_build_standalone) {
     testonly = true
     deps = [
       "src/ipc:buffered_frame_deserializer_fuzzer",
+      "src/profiling/memory:shared_ring_buffer_fuzzer",
       "src/profiling/memory:unwinding_fuzzer",
+      "src/trace_processor:trace_processor_fuzzer",
       "src/traced/probes/ftrace:cpu_reader_fuzzer",
       "test:end_to_end_shared_memory_fuzzer",
     ]
   }
 }
 
+# WARNING: this builds correctly only when using the generated Android.bp.
+#
+# This library gets loaded into (and executes in) arbitrary android processes.
+# Logging must be non-allocating. This is achieved by defining
+# PERFETTO_ANDROID_ASYNC_SAFE_LOG, which needs to be set for all perfetto code
+# being compiled for this library. When generating Android.bp, the |cflags|
+# entry on this target is sufficient (as all sources are flattened into a
+# single bp target). However this is not correctly reflected in the gn
+# structure (which is a tree of targets) as the dependencies would not pick
+# up the flag (and thus use the wrong logging macro).
+#
+# This is deemed acceptable as, at the time of writing, there is no interest in
+# building this library standalone.
 if (perfetto_build_with_android) {
   # TODO(fmayer): Investigate shared library for common pieces.
   shared_library("heapprofd_client") {
+    configs -= [ "//gn/standalone:android_liblog" ]
+    cflags = [ "-DPERFETTO_ANDROID_ASYNC_SAFE_LOG" ]
     deps = [
       "src/profiling/memory:malloc_hooks",
     ]

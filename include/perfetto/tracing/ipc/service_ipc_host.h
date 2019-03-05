@@ -36,6 +36,10 @@ class TracingService;
 //   src/tracing/ipc/service/service_ipc_host_impl.cc
 class ServiceIPCHost {
  public:
+  static std::unique_ptr<ServiceIPCHost> CreateInstance(
+      base::TaskRunner*,
+      std::unique_ptr<TracingService>);
+
   static std::unique_ptr<ServiceIPCHost> CreateInstance(base::TaskRunner*);
   virtual ~ServiceIPCHost();
 

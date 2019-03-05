@@ -35,32 +35,21 @@ void CountersTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
   Table::Register<CountersTable>(db, storage, "counters");
 }
 
-base::Optional<Table::Schema> CountersTable::Init(int, const char* const*) {
-  const auto& counters = storage_->counters();
-  std::unique_ptr<StorageColumn> cols[] = {
-      IdColumnPtr("id", TableId::kCounters),
-      NumericColumnPtr("ts", &counters.timestamps(), false /* hidden */,
-                       true /* ordered */),
-      StringColumnPtr("name", &counters.name_ids(), &storage_->string_pool()),
-      NumericColumnPtr("value", &counters.values()),
-      NumericColumnPtr("dur", &counters.durations()),
-      TsEndPtr("ts_end", &counters.timestamps(), &counters.durations()),
-      std::unique_ptr<RefColumn>(new RefColumn("ref", storage_)),
-      StringColumnPtr("ref_type", &counters.types(), &ref_types_)};
-  schema_ = StorageSchema({
-      std::make_move_iterator(std::begin(cols)),
-      std::make_move_iterator(std::end(cols)),
-  });
-  return schema_.ToTableSchema({"name", "ts", "ref"});
+StorageSchema CountersTable::CreateStorageSchema() {
+  const auto& cs = storage_->counters();
+  return StorageSchema::Builder()
+      .AddColumn<IdColumn>("id", TableId::kCounters)
+      .AddOrderedNumericColumn("ts", &cs.timestamps())
+      .AddStringColumn("name", &cs.name_ids(), &storage_->string_pool())
+      .AddNumericColumn("value", &cs.values())
+      .AddColumn<RefColumn>("ref", &cs.refs(), &cs.types(), storage_)
+      .AddStringColumn("ref_type", &cs.types(), &ref_types_)
+      .AddNumericColumn("arg_set_id", &cs.arg_set_ids())
+      .Build({"name", "ts", "ref"});
 }
 
-std::unique_ptr<Table::Cursor> CountersTable::CreateCursor(
-    const QueryConstraints& qc,
-    sqlite3_value** argv) {
-  uint32_t count = static_cast<uint32_t>(storage_->counters().counter_count());
-  auto it = CreateBestRowIteratorForGenericSchema(count, qc, argv);
-  return std::unique_ptr<Table::Cursor>(
-      new Cursor(std::move(it), schema_.mutable_columns()));
+uint32_t CountersTable::RowCount() {
+  return static_cast<uint32_t>(storage_->counters().counter_count());
 }
 
 int CountersTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
@@ -69,8 +58,8 @@ int CountersTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
 
   // Only the string columns are handled by SQLite
   info->order_by_consumed = true;
-  size_t name_index = schema_.ColumnIndexFromName("name");
-  size_t ref_type_index = schema_.ColumnIndexFromName("ref_type");
+  size_t name_index = schema().ColumnIndexFromName("name");
+  size_t ref_type_index = schema().ColumnIndexFromName("ref_type");
   for (size_t i = 0; i < qc.constraints().size(); i++) {
     info->omit[i] =
         qc.constraints()[i].iColumn != static_cast<int>(name_index) &&
@@ -81,13 +70,18 @@ int CountersTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
 }
 
 CountersTable::RefColumn::RefColumn(std::string col_name,
+                                    const std::deque<int64_t>* refs,
+                                    const std::deque<RefType>* types,
                                     const TraceStorage* storage)
-    : StorageColumn(col_name, false /* hidden */), storage_(storage) {}
+    : StorageColumn(col_name, false /* hidden */),
+      refs_(refs),
+      types_(types),
+      storage_(storage) {}
 
 void CountersTable::RefColumn::ReportResult(sqlite3_context* ctx,
                                             uint32_t row) const {
-  auto ref = storage_->counters().refs()[row];
-  auto type = storage_->counters().types()[row];
+  auto ref = (*refs_)[row];
+  auto type = (*types_)[row];
   if (type == RefType::kRefUtidLookupUpid) {
     auto upid = storage_->GetThread(static_cast<uint32_t>(ref)).upid;
     if (upid.has_value()) {
@@ -109,15 +103,16 @@ CountersTable::RefColumn::Bounds CountersTable::RefColumn::BoundFilter(
 void CountersTable::RefColumn::Filter(int op,
                                       sqlite3_value* value,
                                       FilteredRowIndex* index) const {
-  auto predicate = sqlite_utils::CreatePredicate<int64_t>(op, value);
-  index->FilterRows([this, &predicate](uint32_t row) {
-    auto ref = storage_->counters().refs()[row];
-    auto type = storage_->counters().types()[row];
+  bool op_is_null = sqlite_utils::IsOpIsNull(op);
+  auto predicate = sqlite_utils::CreateNumericPredicate<int64_t>(op, value);
+  index->FilterRows([this, &predicate, op_is_null](uint32_t row) {
+    auto ref = (*refs_)[row];
+    auto type = (*types_)[row];
     if (type == RefType::kRefUtidLookupUpid) {
       auto upid = storage_->GetThread(static_cast<uint32_t>(ref)).upid;
       // Trying to filter null with any operation we currently handle
       // should return false.
-      return predicate(upid);
+      return upid.has_value() ? predicate(upid.value()) : op_is_null;
     }
     return predicate(ref);
   });
@@ -132,33 +127,28 @@ CountersTable::RefColumn::Comparator CountersTable::RefColumn::Sort(
 }
 
 int CountersTable::RefColumn::CompareRefsAsc(uint32_t f, uint32_t s) const {
-  auto ref_f = storage_->counters().refs()[f];
-  auto ref_s = storage_->counters().refs()[s];
+  auto ref_f = (*refs_)[f];
+  auto ref_s = (*refs_)[s];
 
-  auto type_f = storage_->counters().types()[f];
-  auto type_s = storage_->counters().types()[s];
+  auto type_f = (*types_)[f];
+  auto type_s = (*types_)[s];
 
+  base::Optional<int64_t> val_f = ref_f;
+  base::Optional<int64_t> val_s = ref_s;
   if (type_f == RefType::kRefUtidLookupUpid) {
-    auto upid_f = storage_->GetThread(static_cast<uint32_t>(ref_f)).upid;
-    if (type_s == RefType::kRefUtidLookupUpid) {
-      auto upid_s = storage_->GetThread(static_cast<uint32_t>(ref_s)).upid;
-      if (!upid_f.has_value() && !upid_s.has_value()) {
-        return 0;
-      } else if (!upid_f.has_value()) {
-        return -1;
-      } else if (!upid_s.has_value()) {
-        return 1;
-      }
-      return sqlite_utils::CompareValuesAsc(upid_f.value(), upid_s.value());
-    }
-    if (!upid_f.has_value())
-      return -1;
-  } else if (type_s == RefType::kRefUtidLookupUpid) {
-    auto upid_s = storage_->GetThread(static_cast<uint32_t>(ref_s)).upid;
-    if (!upid_s.has_value())
-      return 1;
+    val_f = storage_->GetThread(static_cast<uint32_t>(ref_f)).upid;
   }
-  return sqlite_utils::CompareValuesAsc(ref_f, ref_s);
+  if (type_s == RefType::kRefUtidLookupUpid) {
+    val_s = storage_->GetThread(static_cast<uint32_t>(ref_s)).upid;
+  }
+
+  if (val_f.has_value() && val_s.has_value()) {
+    return sqlite_utils::CompareValuesAsc(val_f.value(), val_s.value());
+  } else if (!val_f.has_value()) {
+    return val_s.has_value() ? -1 : 0;
+  } else {
+    return 1;
+  }
 }
 
 }  // namespace trace_processor

@@ -145,15 +145,23 @@ std::unique_ptr<TraceWriter> MockProducer::CreateTraceWriter(
   return service_endpoint_->CreateTraceWriter(buf_id);
 }
 
-void MockProducer::WaitForFlush(TraceWriter* writer_to_flush) {
+void MockProducer::WaitForFlush(TraceWriter* writer_to_flush, bool reply) {
+  std::vector<TraceWriter*> writers;
+  if (writer_to_flush)
+    writers.push_back(writer_to_flush);
+  WaitForFlush(writers, reply);
+}
+
+void MockProducer::WaitForFlush(std::vector<TraceWriter*> writers_to_flush,
+                                bool reply) {
   auto& expected_call = EXPECT_CALL(*this, Flush(_, _, _));
-  if (!writer_to_flush)
-    return;
-  expected_call.WillOnce(
-      Invoke([this, writer_to_flush](FlushRequestID flush_req_id,
-                                     const DataSourceInstanceID*, size_t) {
-        writer_to_flush->Flush();
-        service_endpoint_->NotifyFlushComplete(flush_req_id);
+  expected_call.WillOnce(Invoke(
+      [this, writers_to_flush, reply](FlushRequestID flush_req_id,
+                                      const DataSourceInstanceID*, size_t) {
+        for (auto* writer : writers_to_flush)
+          writer->Flush();
+        if (reply)
+          service_endpoint_->NotifyFlushComplete(flush_req_id);
       }));
 }
 

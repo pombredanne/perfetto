@@ -25,35 +25,22 @@ namespace trace_processor {
 
 class ArgsTable : public StorageTable {
  public:
-  using VarardicType = TraceStorage::Args::Varardic::Type;
+  using VariadicType = TraceStorage::Args::Variadic::Type;
 
   static void RegisterTable(sqlite3* db, const TraceStorage* storage);
 
   ArgsTable(sqlite3*, const TraceStorage*);
 
-  // Table implementation.
-  base::Optional<Table::Schema> Init(int, const char* const*) override;
-  std::unique_ptr<Table::Cursor> CreateCursor(const QueryConstraints&,
-                                              sqlite3_value**) override;
+  // StorageTable implementation.
+  StorageSchema CreateStorageSchema() override;
+  uint32_t RowCount() override;
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
 
  private:
-  class IdColumn final : public NumericColumn<RowId> {
-   public:
-    IdColumn(std::string col_name,
-             const TraceStorage* storage,
-             const std::deque<RowId>* ids);
-
-    void Filter(int op, sqlite3_value* value, FilteredRowIndex*) const override;
-
-   private:
-    const TraceStorage* storage_ = nullptr;
-  };
-
   class ValueColumn final : public StorageColumn {
    public:
     ValueColumn(std::string col_name,
-                VarardicType type,
+                VariadicType type,
                 const TraceStorage* storage);
 
     void ReportResult(sqlite3_context* ctx, uint32_t row) const override;
@@ -68,11 +55,11 @@ class ArgsTable : public StorageTable {
 
     Table::ColumnType GetType() const override {
       switch (type_) {
-        case VarardicType::kInt:
+        case VariadicType::kInt:
           return Table::ColumnType::kLong;
-        case VarardicType::kReal:
+        case VariadicType::kReal:
           return Table::ColumnType::kDouble;
-        case VarardicType::kString:
+        case VariadicType::kString:
           return Table::ColumnType::kString;
       }
       PERFETTO_FATAL("Not reached");  // For gcc
@@ -81,7 +68,7 @@ class ArgsTable : public StorageTable {
    private:
     int CompareRefsAsc(uint32_t f, uint32_t s) const;
 
-    TraceStorage::Args::Varardic::Type type_;
+    TraceStorage::Args::Variadic::Type type_;
     const TraceStorage* storage_ = nullptr;
   };
 
