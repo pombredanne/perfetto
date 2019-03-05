@@ -24,6 +24,8 @@ import {Panel, PanelSize} from './panel';
 import {Track} from './track';
 import {TrackContent} from './track_panel';
 import {trackRegistry} from './track_registry';
+import {drawVerticalSelection,
+        drawVerticalLineAtTime} from './vertical_line_helper';
 
 
 interface Attrs {
@@ -108,6 +110,42 @@ export class TrackGroupPanel extends Panel<Attrs> {
     ctx.translate(this.shellWidth, 0);
     this.summaryTrack.renderCanvas(ctx);
     ctx.restore();
+
+    const localState = globals.frontendLocalState;
+    // Draw vertical line when hovering on the the notes panel.
+    if (localState.showNotePreview) {
+      drawVerticalLineAtTime(ctx,
+                            localState.timeScale,
+                            localState.hoveredTimestamp,
+                            size.height,
+                            `#aaa`);
+    }
+    // Draw vertical line when shift is pressed.
+    if (localState.showTimeSelectPreview) {
+      drawVerticalLineAtTime(ctx,
+                            localState.timeScale,
+                            localState.hoveredTimestamp,
+                            size.height,
+                            `rgb(52,69,150)`);
+    }
+    if (globals.state.currentSelection !== null) {
+      if (globals.state.currentSelection.kind === 'NOTE') {
+        const note = globals.state.notes[globals.state.currentSelection.id];
+        drawVerticalLineAtTime(ctx,
+                               localState.timeScale,
+                               note.timestamp,
+                               size.height,
+                               note.color);
+      }
+      if (globals.state.currentSelection.kind === 'TIMESPAN') {
+        drawVerticalSelection(ctx,
+                              localState.timeScale,
+                              globals.state.currentSelection.startTs,
+                              globals.state.currentSelection.endTs,
+                              size.height,
+                              `rgba(52,69,150,0.3)`);
+      }
+    }
   }
 }
 

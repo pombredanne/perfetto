@@ -34,6 +34,7 @@ namespace {
 
 using ::testing::_;
 using ::testing::Args;
+using ::testing::AtLeast;
 using ::testing::ElementsAreArray;
 using ::testing::Eq;
 using ::testing::Pointwise;
@@ -44,14 +45,16 @@ class MockEventTracker : public EventTracker {
   MockEventTracker(TraceProcessorContext* context) : EventTracker(context) {}
   virtual ~MockEventTracker() = default;
 
-  MOCK_METHOD7(PushSchedSwitch,
+  MOCK_METHOD9(PushSchedSwitch,
                void(uint32_t cpu,
                     int64_t timestamp,
                     uint32_t prev_pid,
+                    base::StringView prev_comm,
+                    int32_t prev_prio,
                     int64_t prev_state,
                     uint32_t next_pid,
                     base::StringView next_comm,
-                    int32_t next_priority));
+                    int32_t next_prio));
 
   MOCK_METHOD5(PushCounter,
                RowId(int64_t timestamp,
@@ -66,8 +69,10 @@ class MockProcessTracker : public ProcessTracker {
   MockProcessTracker(TraceProcessorContext* context)
       : ProcessTracker(context) {}
 
-  MOCK_METHOD2(UpdateProcess,
-               UniquePid(uint32_t pid, base::StringView process_name));
+  MOCK_METHOD3(UpdateProcess,
+               UniquePid(uint32_t pid,
+                         base::Optional<uint32_t> ppid,
+                         base::StringView process_name));
 
   MOCK_METHOD2(UpdateThread, UniqueTid(uint32_t tid, uint32_t tgid));
 };
@@ -99,8 +104,7 @@ class ProtoTraceParserTest : public ::testing::Test {
     context_.event_tracker.reset(event_);
     process_ = new MockProcessTracker(&context_);
     context_.process_tracker.reset(process_);
-    const auto optim = OptimizationMode::kMinLatency;
-    context_.sorter.reset(new TraceSorter(&context_, optim, 0 /*window size*/));
+    context_.sorter.reset(new TraceSorter(&context_, 0 /*window size*/));
     context_.proto_parser.reset(new ProtoTraceParser(&context_));
   }
 
@@ -136,16 +140,20 @@ TEST_F(ProtoTraceParserTest, LoadSingleEvent) {
   event->set_timestamp(1000);
   event->set_pid(12);
 
-  static const char kProcName[] = "proc1";
+  static const char kProc1Name[] = "proc1";
+  static const char kProc2Name[] = "proc2";
   auto* sched_switch = event->mutable_sched_switch();
   sched_switch->set_prev_pid(10);
+  sched_switch->set_prev_comm(kProc2Name);
+  sched_switch->set_prev_prio(256);
   sched_switch->set_prev_state(32);
-  sched_switch->set_next_comm(kProcName);
+  sched_switch->set_next_comm(kProc1Name);
   sched_switch->set_next_pid(100);
   sched_switch->set_next_prio(1024);
 
-  EXPECT_CALL(*event_, PushSchedSwitch(10, 1000, 10, 32, 100,
-                                       base::StringView(kProcName), 1024));
+  EXPECT_CALL(*event_,
+              PushSchedSwitch(10, 1000, 10, base::StringView(kProc2Name), 256,
+                              32, 100, base::StringView(kProc1Name), 1024));
   Tokenize(trace);
 }
 
@@ -178,8 +186,10 @@ TEST_F(ProtoTraceParserTest, LoadEventsIntoRaw) {
   static const char buf_value[] = "This is a print event";
   print->set_buf(buf_value);
 
-  EXPECT_CALL(*storage_, InternString(base::StringView(task_newtask)));
+  EXPECT_CALL(*storage_, InternString(base::StringView(task_newtask)))
+      .Times(AtLeast(1));
   EXPECT_CALL(*storage_, InternString(base::StringView(buf_value)));
+  EXPECT_CALL(*process_, UpdateThread(123, 123));
 
   Tokenize(trace);
   const auto& raw = context_.storage->raw_events();
@@ -266,8 +276,11 @@ TEST_F(ProtoTraceParserTest, LoadMultipleEvents) {
   event->set_pid(12);
 
   static const char kProcName1[] = "proc1";
+  static const char kProcName2[] = "proc2";
   auto* sched_switch = event->mutable_sched_switch();
   sched_switch->set_prev_pid(10);
+  sched_switch->set_prev_comm(kProcName2);
+  sched_switch->set_prev_prio(256);
   sched_switch->set_prev_state(32);
   sched_switch->set_next_comm(kProcName1);
   sched_switch->set_next_pid(100);
@@ -277,19 +290,22 @@ TEST_F(ProtoTraceParserTest, LoadMultipleEvents) {
   event->set_timestamp(1001);
   event->set_pid(12);
 
-  static const char kProcName2[] = "proc2";
   sched_switch = event->mutable_sched_switch();
   sched_switch->set_prev_pid(100);
+  sched_switch->set_prev_comm(kProcName1);
+  sched_switch->set_prev_prio(256);
   sched_switch->set_prev_state(32);
   sched_switch->set_next_comm(kProcName2);
   sched_switch->set_next_pid(10);
   sched_switch->set_next_prio(512);
 
-  EXPECT_CALL(*event_, PushSchedSwitch(10, 1000, 10, 32, 100,
-                                       base::StringView(kProcName1), 1024));
+  EXPECT_CALL(*event_,
+              PushSchedSwitch(10, 1000, 10, base::StringView(kProcName2), 256,
+                              32, 100, base::StringView(kProcName1), 1024));
 
-  EXPECT_CALL(*event_, PushSchedSwitch(10, 1001, 100, 32, 10,
-                                       base::StringView(kProcName2), 512));
+  EXPECT_CALL(*event_,
+              PushSchedSwitch(10, 1001, 100, base::StringView(kProcName1), 256,
+                              32, 10, base::StringView(kProcName2), 512));
 
   Tokenize(trace);
 }
@@ -305,8 +321,11 @@ TEST_F(ProtoTraceParserTest, LoadMultiplePackets) {
   event->set_pid(12);
 
   static const char kProcName1[] = "proc1";
+  static const char kProcName2[] = "proc2";
   auto* sched_switch = event->mutable_sched_switch();
   sched_switch->set_prev_pid(10);
+  sched_switch->set_prev_comm(kProcName2);
+  sched_switch->set_prev_prio(256);
   sched_switch->set_prev_state(32);
   sched_switch->set_next_comm(kProcName1);
   sched_switch->set_next_pid(100);
@@ -319,19 +338,22 @@ TEST_F(ProtoTraceParserTest, LoadMultiplePackets) {
   event->set_timestamp(1001);
   event->set_pid(12);
 
-  static const char kProcName2[] = "proc2";
   sched_switch = event->mutable_sched_switch();
   sched_switch->set_prev_pid(100);
+  sched_switch->set_prev_comm(kProcName1);
+  sched_switch->set_prev_prio(256);
   sched_switch->set_prev_state(32);
   sched_switch->set_next_comm(kProcName2);
   sched_switch->set_next_pid(10);
   sched_switch->set_next_prio(512);
 
-  EXPECT_CALL(*event_, PushSchedSwitch(10, 1000, 10, 32, 100,
-                                       base::StringView(kProcName1), 1024));
+  EXPECT_CALL(*event_,
+              PushSchedSwitch(10, 1000, 10, base::StringView(kProcName2), 256,
+                              32, 100, base::StringView(kProcName1), 1024));
 
-  EXPECT_CALL(*event_, PushSchedSwitch(10, 1001, 100, 32, 10,
-                                       base::StringView(kProcName2), 512));
+  EXPECT_CALL(*event_,
+              PushSchedSwitch(10, 1001, 100, base::StringView(kProcName1), 256,
+                              32, 10, base::StringView(kProcName2), 512));
   Tokenize(trace);
 }
 
@@ -343,8 +365,11 @@ TEST_F(ProtoTraceParserTest, RepeatedLoadSinglePacket) {
   event->set_timestamp(1000);
   event->set_pid(12);
   static const char kProcName1[] = "proc1";
+  static const char kProcName2[] = "proc2";
   auto* sched_switch = event->mutable_sched_switch();
   sched_switch->set_prev_pid(10);
+  sched_switch->set_prev_comm(kProcName2);
+  sched_switch->set_prev_prio(256);
   sched_switch->set_prev_state(32);
   sched_switch->set_next_comm(kProcName1);
   sched_switch->set_next_pid(100);
@@ -356,20 +381,23 @@ TEST_F(ProtoTraceParserTest, RepeatedLoadSinglePacket) {
   event = bundle->add_event();
   event->set_timestamp(1001);
   event->set_pid(12);
-  static const char kProcName2[] = "proc2";
   sched_switch = event->mutable_sched_switch();
   sched_switch->set_prev_pid(100);
+  sched_switch->set_prev_comm(kProcName1);
+  sched_switch->set_prev_prio(256);
   sched_switch->set_prev_state(32);
   sched_switch->set_next_comm(kProcName2);
   sched_switch->set_next_pid(10);
   sched_switch->set_next_prio(512);
 
-  EXPECT_CALL(*event_, PushSchedSwitch(10, 1000, 10, 32, 100,
-                                       base::StringView(kProcName1), 1024));
+  EXPECT_CALL(*event_,
+              PushSchedSwitch(10, 1000, 10, base::StringView(kProcName2), 256,
+                              32, 100, base::StringView(kProcName1), 1024));
   Tokenize(trace_1);
 
-  EXPECT_CALL(*event_, PushSchedSwitch(10, 1001, 100, 32, 10,
-                                       base::StringView(kProcName2), 512));
+  EXPECT_CALL(*event_,
+              PushSchedSwitch(10, 1001, 100, base::StringView(kProcName1), 256,
+                              32, 10, base::StringView(kProcName2), 512));
   Tokenize(trace_2);
 }
 
@@ -431,7 +459,8 @@ TEST_F(ProtoTraceParserTest, LoadProcessPacket) {
   process->set_pid(1);
   process->set_ppid(2);
 
-  EXPECT_CALL(*process_, UpdateProcess(1, base::StringView(kProcName1)));
+  EXPECT_CALL(*process_,
+              UpdateProcess(1, Eq(2u), base::StringView(kProcName1)));
   Tokenize(trace);
 }
 
@@ -448,7 +477,8 @@ TEST_F(ProtoTraceParserTest, LoadProcessPacket_FirstCmdline) {
   process->set_pid(1);
   process->set_ppid(2);
 
-  EXPECT_CALL(*process_, UpdateProcess(1, base::StringView(kProcName1)));
+  EXPECT_CALL(*process_,
+              UpdateProcess(1, Eq(2u), base::StringView(kProcName1)));
   Tokenize(trace);
 }
 

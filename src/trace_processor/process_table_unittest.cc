@@ -61,8 +61,8 @@ class ProcessTableUnittest : public ::testing::Test {
 TEST_F(ProcessTableUnittest, SelectUpidAndName) {
   static const char kCommProc1[] = "process1";
   static const char kCommProc2[] = "process2";
-  context_.process_tracker->UpdateProcess(1, kCommProc1);
-  context_.process_tracker->UpdateProcess(2, kCommProc2);
+  context_.process_tracker->UpdateProcess(1, base::nullopt, kCommProc1);
+  context_.process_tracker->UpdateProcess(2, base::nullopt, kCommProc2);
 
   PrepareValidStatement("SELECT upid, name FROM process");
 
@@ -83,8 +83,8 @@ TEST_F(ProcessTableUnittest, SelectUpidAndName) {
 TEST_F(ProcessTableUnittest, SelectUpidAndNameWithFilter) {
   static const char kCommProc1[] = "process1";
   static const char kCommProc2[] = "process2";
-  context_.process_tracker->UpdateProcess(1, kCommProc1);
-  context_.process_tracker->UpdateProcess(2, kCommProc2);
+  context_.process_tracker->UpdateProcess(1, base::nullopt, kCommProc1);
+  context_.process_tracker->UpdateProcess(2, base::nullopt, kCommProc2);
 
   PrepareValidStatement("SELECT upid, name FROM process where upid = 2");
 
@@ -98,8 +98,8 @@ TEST_F(ProcessTableUnittest, SelectUpidAndNameWithFilter) {
 TEST_F(ProcessTableUnittest, SelectUpidAndNameWithOrder) {
   static const char kCommProc1[] = "process1";
   static const char kCommProc2[] = "process2";
-  context_.process_tracker->UpdateProcess(1, kCommProc1);
-  context_.process_tracker->UpdateProcess(2, kCommProc2);
+  context_.process_tracker->UpdateProcess(1, base::nullopt, kCommProc1);
+  context_.process_tracker->UpdateProcess(2, base::nullopt, kCommProc2);
 
   PrepareValidStatement("SELECT upid, name FROM process ORDER BY upid desc");
 
@@ -120,8 +120,8 @@ TEST_F(ProcessTableUnittest, SelectUpidAndNameWithOrder) {
 TEST_F(ProcessTableUnittest, SelectUpidAndNameFilterGt) {
   static const char kCommProc1[] = "process1";
   static const char kCommProc2[] = "process2";
-  context_.process_tracker->UpdateProcess(1, kCommProc1);
-  context_.process_tracker->UpdateProcess(2, kCommProc2);
+  context_.process_tracker->UpdateProcess(1, base::nullopt, kCommProc1);
+  context_.process_tracker->UpdateProcess(2, base::nullopt, kCommProc2);
 
   PrepareValidStatement("SELECT upid, name FROM process where upid > 1");
 
@@ -135,8 +135,8 @@ TEST_F(ProcessTableUnittest, SelectUpidAndNameFilterGt) {
 TEST_F(ProcessTableUnittest, SelectUpidAndNameFilterName) {
   static const char kCommProc1[] = "process1";
   static const char kCommProc2[] = "process2";
-  context_.process_tracker->UpdateProcess(1, kCommProc1);
-  context_.process_tracker->UpdateProcess(2, kCommProc2);
+  context_.process_tracker->UpdateProcess(1, base::nullopt, kCommProc1);
+  context_.process_tracker->UpdateProcess(2, base::nullopt, kCommProc2);
 
   PrepareValidStatement(
       "SELECT upid, name FROM process where name = \"process2\"");
@@ -151,8 +151,8 @@ TEST_F(ProcessTableUnittest, SelectUpidAndNameFilterName) {
 TEST_F(ProcessTableUnittest, SelectUpidAndNameFilterDifferentOr) {
   static const char kCommProc1[] = "process1";
   static const char kCommProc2[] = "process2";
-  context_.process_tracker->UpdateProcess(1, kCommProc1);
-  context_.process_tracker->UpdateProcess(2, kCommProc2);
+  context_.process_tracker->UpdateProcess(1, base::nullopt, kCommProc1);
+  context_.process_tracker->UpdateProcess(2, base::nullopt, kCommProc2);
 
   PrepareValidStatement(
       "SELECT upid, name FROM process where upid = 2 or name = \"process2\"");
@@ -167,8 +167,8 @@ TEST_F(ProcessTableUnittest, SelectUpidAndNameFilterDifferentOr) {
 TEST_F(ProcessTableUnittest, SelectUpidAndNameFilterSameOr) {
   static const char kCommProc1[] = "process1";
   static const char kCommProc2[] = "process2";
-  context_.process_tracker->UpdateProcess(1, kCommProc1);
-  context_.process_tracker->UpdateProcess(2, kCommProc2);
+  context_.process_tracker->UpdateProcess(1, base::nullopt, kCommProc1);
+  context_.process_tracker->UpdateProcess(2, base::nullopt, kCommProc2);
 
   PrepareValidStatement(
       "SELECT upid, name FROM process where upid = 1 or upid = 2");

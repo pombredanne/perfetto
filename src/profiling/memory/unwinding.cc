@@ -16,10 +16,6 @@
 
 #include "src/profiling/memory/unwinding.h"
 
-// TODO(fmayer): Maybe replace this with
-//   https://android.googlesource.com/platform/system/core/+/master/demangle/
-#include <cxxabi.h>
-
 #include <unwindstack/MachineArm.h>
 #include <unwindstack/MachineArm64.h>
 #include <unwindstack/MachineMips.h>
@@ -94,15 +90,6 @@ std::unique_ptr<unwindstack::Regs> CreateFromRawData(unwindstack::ArchEnum arch,
   return ret;
 }
 
-void MaybeDemangle(std::string* name) {
-  int ignored;
-  char* data = abi::__cxa_demangle(name->c_str(), nullptr, nullptr, &ignored);
-  if (data) {
-    *name = data;
-    free(data);
-  }
-}
-
 }  // namespace
 
 StackOverlayMemory::StackOverlayMemory(std::shared_ptr<unwindstack::Memory> mem,
@@ -149,7 +136,7 @@ bool FileDescriptorMaps::Parse() {
     return false;
   return android::procinfo::ReadMapFileContent(
       &content[0], [&](uint64_t start, uint64_t end, uint16_t flags,
-                       uint64_t pgoff, const char* name) {
+                       uint64_t pgoff, ino_t, const char* name) {
         // Mark a device map in /dev/ and not in /dev/ashmem/ specially.
         if (strncmp(name, "/dev/", 5) == 0 &&
             strncmp(name + 5, "ashmem/", 7) != 0) {
@@ -215,8 +202,6 @@ bool DoUnwind(WireMessage* msg, UnwindingMetadata* metadata, AllocRecord* out) {
         build_id = map_info->GetBuildID();
     }
 
-    if (base::EndsWith(fd.map_name, ".so"))
-      MaybeDemangle(&fd.function_name);
     out->frames.emplace_back(std::move(fd), std::move(build_id));
   }
 

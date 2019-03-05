@@ -20,6 +20,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <set>
 
 #include "perfetto/base/gtest_prod_util.h"
@@ -136,8 +137,12 @@ class TracingServiceImpl : public TracingService {
     // before use.
     std::map<WriterID, BufferID> writers_;
 
-    // This is used only in in-process configurations (mostly tests).
+    // This is used only in in-process configurations. The mutex protects
+    // concurrent construction of |inproc_shmem_arbiter_|.
+    // SharedMemoryArbiterImpl methods themselves are thread-safe.
+    std::mutex inproc_shmem_arbiter_mutex_;
     std::unique_ptr<SharedMemoryArbiterImpl> inproc_shmem_arbiter_;
+
     PERFETTO_THREAD_CHECKER(thread_checker_)
     base::WeakPtrFactory<ProducerEndpointImpl> weak_ptr_factory_;  // Keep last.
   };
@@ -297,6 +302,23 @@ class TracingServiceImpl : public TracingService {
       return timeout_ms ? timeout_ms : kDefaultFlushTimeoutMs;
     }
 
+    PacketSequenceID GetPacketSequenceID(ProducerID producer_id,
+                                         WriterID writer_id) {
+      auto key = std::make_pair(producer_id, writer_id);
+      auto it = packet_sequence_ids.find(key);
+      if (it != packet_sequence_ids.end())
+        return it->second;
+      // We shouldn't run out of sequence IDs (producer ID is 16 bit, writer IDs
+      // are limited to 1024).
+      static_assert(kMaxPacketSequenceID > kMaxProducerID * kMaxWriterID,
+                    "PacketSequenceID value space doesn't cover service "
+                    "sequence ID and all producer/writer ID combinations!");
+      PERFETTO_DCHECK(last_packet_sequence_id < kMaxPacketSequenceID);
+      PacketSequenceID sequence_id = ++last_packet_sequence_id;
+      packet_sequence_ids[key] = sequence_id;
+      return sequence_id;
+    }
+
     const TracingSessionID id;
 
     // The consumer that started the session.
@@ -329,6 +351,10 @@ class TracingServiceImpl : public TracingService {
     // BufferID (shared namespace amongst all consumers). This vector has as
     // many entries as |config.buffers_size()|.
     std::vector<BufferID> buffers_index;
+
+    std::map<std::pair<ProducerID, WriterID>, PacketSequenceID>
+        packet_sequence_ids;
+    PacketSequenceID last_packet_sequence_id = kServicePacketSequenceID;
 
     // When the last snapshots (clock, stats, sync marker) were emitted into
     // the output stream.
@@ -416,6 +442,10 @@ class TracingServiceImpl : public TracingService {
 
   uint8_t sync_marker_packet_[32];  // Lazily initialized.
   size_t sync_marker_packet_size_ = 0;
+
+  // Stats.
+  uint64_t chunks_discarded_ = 0;
+  uint64_t patches_discarded_ = 0;
 
   PERFETTO_THREAD_CHECKER(thread_checker_)
 

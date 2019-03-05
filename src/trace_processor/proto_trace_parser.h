@@ -65,6 +65,9 @@ class ProtoTraceParser {
   void ParseProcessStats(int64_t timestamp, TraceBlobView);
   void ParseProcessStatsProcess(int64_t timestamp, TraceBlobView);
   void ParseSchedSwitch(uint32_t cpu, int64_t timestamp, TraceBlobView);
+  void ParseSchedWakeup(int64_t timestamp, TraceBlobView);
+  void ParseTaskNewTask(int64_t ts, uint32_t source_tid, TraceBlobView);
+  void ParseTaskRename(int64_t ts, TraceBlobView);
   void ParseCpuFreq(int64_t timestamp, TraceBlobView);
   void ParseCpuIdle(int64_t timestamp, TraceBlobView);
   void ParsePrint(uint32_t cpu, int64_t timestamp, uint32_t pid, TraceBlobView);
@@ -86,6 +89,7 @@ class ProtoTraceParser {
   void ParseBatteryCounters(int64_t ts, TraceBlobView);
   void ParseOOMScoreAdjUpdate(int64_t ts, TraceBlobView);
   void ParseMmEventRecordField(int64_t ts, uint32_t pid, TraceBlobView);
+  void ParseSysEvent(int64_t ts, uint32_t pid, bool is_enter, TraceBlobView);
   void ParseClockSnapshot(TraceBlobView);
   std::pair<int /*type*/, int64_t> ParseClockField(TraceBlobView);
   void ParseAndroidLogPacket(TraceBlobView);
@@ -109,6 +113,7 @@ class ProtoTraceParser {
  private:
   TraceProcessorContext* context_;
   const StringId utid_name_id_;
+  const StringId sched_wakeup_name_id_;
   const StringId cpu_freq_name_id_;
   const StringId cpu_idle_name_id_;
   const StringId comm_name_id_;
@@ -165,6 +170,10 @@ class ProtoTraceParser {
   // Keep kMmEventCounterSize equal to mm_event_type::MM_TYPE_NUM in the kernel.
   static constexpr size_t kMmEventCounterSize = 7;
   std::array<MmEventCounterNames, kMmEventCounterSize> mm_event_counter_names_;
+
+  // Keep this in sync with the Linux syscall count.
+  static constexpr size_t kSysNameIdSize = 13;
+  std::array<StringId, kSysNameIdSize> sys_name_ids_;
 };
 
 }  // namespace trace_processor
