@@ -31,16 +31,15 @@ StorageSchema CounterValuesTable::CreateStorageSchema() {
   const auto& cs = storage_->counter_values();
   return StorageSchema::Builder()
       .AddColumn<IdColumn>("id", TableId::kCounterValues)
-      .AddNumericColumn("definition_row", &cs.definition_rows())
+      .AddNumericColumn("counter_id", &cs.counter_ids())
       .AddOrderedNumericColumn("ts", &cs.timestamps())
       .AddNumericColumn("value", &cs.values())
       .AddNumericColumn("arg_set_id", &cs.arg_set_ids())
-      .Build({"definition_row", "ts"});
+      .Build({"id"});
 }
 
 uint32_t CounterValuesTable::RowCount() {
-  return static_cast<uint32_t>(
-      storage_->counter_values().counter_value_count());
+  return storage_->counter_values().size();
 }
 
 int CounterValuesTable::BestIndex(const QueryConstraints& qc,

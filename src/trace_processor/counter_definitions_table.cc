@@ -40,16 +40,15 @@ void CounterDefinitionsTable::RegisterTable(sqlite3* db,
 StorageSchema CounterDefinitionsTable::CreateStorageSchema() {
   const auto& cs = storage_->counter_definitions();
   return StorageSchema::Builder()
-      .AddColumn<RowColumn>("definition_row")
+      .AddColumn<RowColumn>("counter_id")
       .AddStringColumn("name", &cs.name_ids(), &storage_->string_pool())
       .AddColumn<RefColumn>("ref", &cs.refs(), &cs.types(), storage_)
       .AddStringColumn("ref_type", &cs.types(), &ref_types_)
-      .Build({"name", "ref", "ref_type"});
+      .Build({"counter_id"});
 }
 
 uint32_t CounterDefinitionsTable::RowCount() {
-  return static_cast<uint32_t>(
-      storage_->counter_definitions().definition_count());
+  return storage_->counter_definitions().size();
 }
 
 int CounterDefinitionsTable::BestIndex(const QueryConstraints& qc,
@@ -61,15 +60,19 @@ int CounterDefinitionsTable::BestIndex(const QueryConstraints& qc,
   size_t ref_type_index = schema().ColumnIndexFromName("ref_type");
   info->order_by_consumed = true;
   for (size_t i = 0; i < qc.constraints().size(); i++) {
-    info->omit[i] =
-        qc.constraints()[i].iColumn != static_cast<int>(name_index) &&
-        qc.constraints()[i].iColumn != static_cast<int>(ref_type_index);
+    auto col = static_cast<size_t>(qc.constraints()[i].iColumn);
+    info->omit[i] = col != name_index && col != ref_type_index;
   }
 
   return SQLITE_OK;
 }
 
 uint32_t CounterDefinitionsTable::EstimateCost(const QueryConstraints& qc) {
+  // If there is a constraint on the counter id, we can efficiently filter
+  // to a single row.
+  if (HasEqConstraint(qc, "counter_id"))
+    return 1;
+
   auto eq_name = HasEqConstraint(qc, "name");
   auto eq_ref = HasEqConstraint(qc, "ref");
   auto eq_ref_type = HasEqConstraint(qc, "ref_type");

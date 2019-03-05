@@ -40,6 +40,7 @@
 #include "src/trace_processor/slice_tracker.h"
 #include "src/trace_processor/span_join_operator_table.h"
 #include "src/trace_processor/sql_stats_table.h"
+#include "src/trace_processor/sqlite3_str_split.h"
 #include "src/trace_processor/stats_table.h"
 #include "src/trace_processor/string_table.h"
 #include "src/trace_processor/table.h"
@@ -63,8 +64,12 @@ extern "C" int sqlite3_percentile_init(sqlite3* db,
                                        const sqlite3_api_routines* api);
 #endif
 
+namespace perfetto {
+namespace trace_processor {
 namespace {
+
 void InitializeSqliteModules(sqlite3* db) {
+  sqlite3_str_split_init(db);
 // In Android tree builds, we don't have the percentile module.
 // Just don't include it.
 #if !PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
@@ -118,11 +123,6 @@ void CreateBuiltinViews(sqlite3* db) {
     sqlite3_free(error);
   }
 }
-}  // namespace
-
-namespace perfetto {
-namespace trace_processor {
-namespace {
 
 bool IsPrefix(const std::string& a, const std::string& b) {
   return a.size() <= b.size() && b.substr(0, a.size()) == a;

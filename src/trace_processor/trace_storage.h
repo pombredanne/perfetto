@@ -333,17 +333,19 @@ class TraceStorage {
 
   class CounterDefinitions {
    public:
-    using Row = uint32_t;
+    using Id = uint32_t;
 
-    inline uint32_t AddCounterDefinition(StringId name_id,
-                                         int64_t ref,
-                                         RefType type) {
+    inline Id AddCounterDefinition(StringId name_id,
+                                   int64_t ref,
+                                   RefType type) {
       base::Hash hash;
       hash.Update(name_id);
       hash.Update(ref);
       hash.Update(type);
 
-      Hash digest = hash.digest();
+      // TODO(lalitm): this is a perf bottleneck and likely we can do something
+      // quite a bit better here.
+      uint64_t digest = hash.digest();
       auto it = hash_to_row_idx_.find(digest);
       if (it != hash_to_row_idx_.end())
         return it->second;
@@ -351,13 +353,11 @@ class TraceStorage {
       name_ids_.emplace_back(name_id);
       refs_.emplace_back(ref);
       types_.emplace_back(type);
-      hash_to_row_idx_.emplace(digest, definition_count() - 1);
-      return definition_count() - 1;
+      hash_to_row_idx_.emplace(digest, size() - 1);
+      return size() - 1;
     }
 
-    uint32_t definition_count() const {
-      return static_cast<uint32_t>(name_ids_.size());
-    }
+    uint32_t size() const { return static_cast<uint32_t>(name_ids_.size()); }
 
     const std::deque<StringId>& name_ids() const { return name_ids_; }
 
@@ -366,35 +366,31 @@ class TraceStorage {
     const std::deque<RefType>& types() const { return types_; }
 
    private:
-    using Hash = uint64_t;
-
     std::deque<StringId> name_ids_;
     std::deque<int64_t> refs_;
     std::deque<RefType> types_;
 
-    std::unordered_map<Hash, uint32_t> hash_to_row_idx_;
+    std::unordered_map<uint64_t, uint32_t> hash_to_row_idx_;
   };
 
   class CounterValues {
    public:
-    inline uint32_t AddCounterValue(CounterDefinitions::Row definition_row,
+    inline uint32_t AddCounterValue(CounterDefinitions::Id counter_id,
                                     int64_t timestamp,
                                     double value) {
-      definition_rows_.emplace_back(definition_row);
+      counter_ids_.emplace_back(counter_id);
       timestamps_.emplace_back(timestamp);
       values_.emplace_back(value);
       arg_set_ids_.emplace_back(kInvalidArgSetId);
-      return counter_value_count() - 1;
+      return size() - 1;
     }
 
     void set_arg_set_id(uint32_t row, ArgSetId id) { arg_set_ids_[row] = id; }
 
-    uint32_t counter_value_count() const {
-      return static_cast<uint32_t>(definition_rows_.size());
-    }
+    uint32_t size() const { return static_cast<uint32_t>(counter_ids_.size()); }
 
-    const std::deque<CounterDefinitions::Row>& definition_rows() const {
-      return definition_rows_;
+    const std::deque<CounterDefinitions::Id>& counter_ids() const {
+      return counter_ids_;
     }
 
     const std::deque<int64_t>& timestamps() const { return timestamps_; }
@@ -404,7 +400,7 @@ class TraceStorage {
     const std::deque<ArgSetId>& arg_set_ids() const { return arg_set_ids_; }
 
    private:
-    std::deque<CounterDefinitions::Row> definition_rows_;
+    std::deque<CounterDefinitions::Id> counter_ids_;
     std::deque<int64_t> timestamps_;
     std::deque<double> values_;
     std::deque<ArgSetId> arg_set_ids_;
