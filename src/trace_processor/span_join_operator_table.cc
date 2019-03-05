@@ -270,6 +270,10 @@ int SpanJoinOperatorTable::Cursor::Initialize(const QueryConstraints& qc,
   next_stepped_table_ = &t1_;
   err = t2_.StepAndCacheValues();
 
+  // If there is an error stepping the table, just return the error.
+  if (err != SQLITE_ROW && err != SQLITE_DONE)
+    return err;
+
   // Otherwise, find an overlapping span.
   return Next();
 }
