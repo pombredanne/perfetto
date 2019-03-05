@@ -44,8 +44,6 @@ template("protozero_library") {
                              "defines",
                              "generator_plugin_options",
                              "include_dirs",
-                             "link_deps",
-                             "proto_deps",
                              "proto_in_dir",
                              "proto_out_dir",
                              "sources",
