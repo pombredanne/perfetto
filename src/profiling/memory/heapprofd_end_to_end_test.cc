@@ -81,6 +81,19 @@ class HeapprofdDelegate : public ThreadDelegate {
 constexpr const char* kEnableHeapprofdProperty = "persist.heapprofd.enable";
 constexpr const char* kHeapprofdModeProperty = "heapprofd.usedebug.mode";
 
+std::string ReadProperty(const std::string& name, std::string def) {
+  const prop_info* pi = __system_property_find(name.c_str());
+  if (pi) {
+    __system_property_read_callback(
+        pi,
+        [](void* cookie, const char*, const char* value, uint32_t) {
+          *reinterpret_cast<std::string*>(cookie) = value;
+        },
+        &def);
+  }
+  return def;
+}
+
 int __attribute__((unused)) SetModeProperty(std::string* value) {
   if (value) {
     __system_property_set(kHeapprofdModeProperty, value->c_str());
@@ -90,17 +103,8 @@ int __attribute__((unused)) SetModeProperty(std::string* value) {
 }
 
 base::ScopedResource<std::string*, SetModeProperty, nullptr> EnableFork() {
-  std::string prev_property_value = "";
-  const prop_info* pi = __system_property_find(kHeapprofdModeProperty);
-  if (pi) {
-    __system_property_read_callback(
-        pi,
-        [](void* cookie, const char*, const char* value, uint32_t) {
-          *reinterpret_cast<std::string*>(cookie) = value;
-        },
-        &prev_property_value);
-  }
-  __system_property_set(kEnableHeapprofdProperty, "fork");
+  std::string prev_property_value = ReadProperty(kHeapprofdModeProperty, "");
+  __system_property_set(kHeapprofdModeProperty, "fork");
   return base::ScopedResource<std::string*, SetModeProperty, nullptr>(
       new std::string(prev_property_value));
 }
@@ -116,16 +120,7 @@ int __attribute__((unused)) SetEnableProperty(std::string* value) {
 base::ScopedResource<std::string*, SetEnableProperty, nullptr>
 StartSystemHeapprofdIfRequired() {
   base::ignore_result(TEST_PRODUCER_SOCK_NAME);
-  std::string prev_property_value = "0";
-  const prop_info* pi = __system_property_find(kEnableHeapprofdProperty);
-  if (pi) {
-    __system_property_read_callback(
-        pi,
-        [](void* cookie, const char*, const char* value, uint32_t) {
-          *reinterpret_cast<std::string*>(cookie) = value;
-        },
-        &prev_property_value);
-  }
+  std::string prev_property_value = ReadProperty(kEnableHeapprofdProperty, "0");
   __system_property_set(kEnableHeapprofdProperty, "1");
   WaitForHeapprofd(5000);
   return base::ScopedResource<std::string*, SetEnableProperty, nullptr>(
@@ -448,42 +443,50 @@ class HeapprofdEndToEnd : public ::testing::Test {
 };
 
 TEST_F(HeapprofdEndToEnd, Smoke_Central) {
+  ASSERT_EQ(ReadProperty(kHeapprofdModeProperty, ""), "");
   Smoke();
 }
 
 TEST_F(HeapprofdEndToEnd, Smoke_Fork) {
   // RAII handle that resets to central mode when out of scope.
   auto prop = EnableFork();
+  ASSERT_EQ(ReadProperty(kHeapprofdModeProperty, ""), "fork");
   Smoke();
 }
 
 TEST_F(HeapprofdEndToEnd, FinalFlush_Central) {
+  ASSERT_EQ(ReadProperty(kHeapprofdModeProperty, ""), "");
   FinalFlush();
 }
 
 TEST_F(HeapprofdEndToEnd, FinalFlush_Fork) {
   // RAII handle that resets to central mode when out of scope.
   auto prop = EnableFork();
+  ASSERT_EQ(ReadProperty(kHeapprofdModeProperty, ""), "fork");
   FinalFlush();
 }
 
 TEST_F(HeapprofdEndToEnd, NativeStartup_Central) {
+  ASSERT_EQ(ReadProperty(kHeapprofdModeProperty, ""), "");
   NativeStartup();
 }
 
 TEST_F(HeapprofdEndToEnd, NativeStartup_Fork) {
   // RAII handle that resets to central mode when out of scope.
   auto prop = EnableFork();
+  ASSERT_EQ(ReadProperty(kHeapprofdModeProperty, ""), "fork");
   NativeStartup();
 }
 
 TEST_F(HeapprofdEndToEnd, ReInit_Central) {
+  ASSERT_EQ(ReadProperty(kHeapprofdModeProperty, ""), "");
   ReInit();
 }
 
 TEST_F(HeapprofdEndToEnd, ReInit_Fork) {
   // RAII handle that resets to central mode when out of scope.
   auto prop = EnableFork();
+  ASSERT_EQ(ReadProperty(kHeapprofdModeProperty, ""), "fork");
   ReInit();
 }
 
