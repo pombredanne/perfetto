@@ -94,8 +94,7 @@ message TrackEvent {
     optional int64 duration_us = 3;
     optional int64 thread_duration_us = 4;
 
-    // TODO(eseckler): Remove once chromium uses the new fields.
-    optional uint32 flags = 5;  // e.g. global/process/thread scope, flow, ...
+    reserved 5;  // used to be |flags|.
 
     oneof id {
       optional uint64 unscoped_id = 6;
