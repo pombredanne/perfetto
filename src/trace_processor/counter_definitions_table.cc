@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -70,18 +70,9 @@ int CounterDefinitionsTable::BestIndex(const QueryConstraints& qc,
 }
 
 uint32_t CounterDefinitionsTable::EstimateCost(const QueryConstraints& qc) {
-  auto has_eq_constraint = [this, &qc](const std::string& col_name) {
-    size_t c_idx = schema().ColumnIndexFromName(col_name);
-    auto fn = [c_idx](const QueryConstraints::Constraint& c) {
-      return c.iColumn == static_cast<int>(c_idx) && sqlite_utils::IsOpEq(c.op);
-    };
-    const auto& cs = qc.constraints();
-    return std::find_if(cs.begin(), cs.end(), fn) != cs.end();
-  };
-
-  auto eq_name = has_eq_constraint("name");
-  auto eq_ref = has_eq_constraint("ref");
-  auto eq_ref_type = has_eq_constraint("ref_type");
+  auto eq_name = HasEqConstraint(qc, "name");
+  auto eq_ref = HasEqConstraint(qc, "ref");
+  auto eq_ref_type = HasEqConstraint(qc, "ref_type");
 
   // If there is a constraint on all three columns, we are going to only return
   // exaclty one row for sure so make the cost 1.
@@ -169,12 +160,16 @@ int CounterDefinitionsTable::RefColumn::CompareRefsAsc(uint32_t f,
     val_s = storage_->GetThread(static_cast<uint32_t>(ref_s)).upid;
   }
 
-  if (val_f.has_value() && val_s.has_value()) {
+  bool has_f = val_f.has_value();
+  bool has_s = val_s.has_value();
+  if (has_f && has_s) {
     return sqlite_utils::CompareValuesAsc(val_f.value(), val_s.value());
-  } else if (!val_f.has_value()) {
-    return val_s.has_value() ? -1 : 0;
-  } else {
+  } else if (has_f && !has_s) {
     return 1;
+  } else if (!has_f && has_s) {
+    return -1;
+  } else {
+    return 0;
   }
 }
 
