@@ -121,6 +121,7 @@ bool ParseSystraceTracePoint(base::StringView str, SystraceTracePoint* out) {
 ProtoTraceParser::ProtoTraceParser(TraceProcessorContext* context)
     : context_(context),
       utid_name_id_(context->storage->InternString("utid")),
+      sched_wakeup_name_id_(context->storage->InternString("sched_wakeup")),
       cpu_freq_name_id_(context->storage->InternString("cpufreq")),
       cpu_idle_name_id_(context->storage->InternString("cpuidle")),
       comm_name_id_(context->storage->InternString("comm")),
@@ -639,13 +640,14 @@ void ProtoTraceParser::ParseProcess(TraceBlobView process) {
         ppid = fld.as_uint32();
         break;
       case protos::ProcessTree::Process::kCmdlineFieldNumber:
-        if (process_name.empty())
+        if (process_name.empty())  // cmdline is a repeated field.
           process_name = fld.as_string();
         break;
       default:
         break;
     }
   }
+
   context_->process_tracker->UpdateProcess(pid, ppid, process_name);
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
@@ -682,6 +684,10 @@ void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
     switch (fld.id) {
       case protos::FtraceEvent::kSchedSwitchFieldNumber: {
         ParseSchedSwitch(cpu, timestamp, ftrace.slice(fld_off, fld.size()));
+        break;
+      }
+      case protos::FtraceEvent::kSchedWakeup: {
+        ParseSchedWakeup(timestamp, ftrace.slice(fld_off, fld.size()));
         break;
       }
       case protos::FtraceEvent::kCpuFrequency: {
@@ -735,8 +741,16 @@ void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
         ParseSysEvent(timestamp, pid, true, ftrace.slice(fld_off, fld.size()));
         break;
       }
-      case protos::FtraceEvent::kSysExit: {
+      case protos::FtraceEvent::kSysExitFieldNumber: {
         ParseSysEvent(timestamp, pid, false, ftrace.slice(fld_off, fld.size()));
+        break;
+      }
+      case protos::FtraceEvent::kTaskNewtaskFieldNumber: {
+        ParseTaskNewTask(timestamp, pid, ftrace.slice(fld_off, fld.size()));
+        break;
+      }
+      case protos::FtraceEvent::kTaskRenameFieldNumber: {
+        ParseTaskRename(timestamp, ftrace.slice(fld_off, fld.size()));
         break;
       }
       default:
@@ -997,6 +1011,93 @@ void ProtoTraceParser::ParseSchedSwitch(uint32_t cpu,
                                            prev_prio, prev_state, next_pid,
                                            next_comm, next_prio);
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
+}
+
+void ProtoTraceParser::ParseSchedWakeup(int64_t timestamp,
+                                        TraceBlobView sswitch) {
+  ProtoDecoder decoder(sswitch.data(), sswitch.length());
+
+  base::StringView comm;
+  uint32_t wakee_pid = 0;
+  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    switch (fld.id) {
+      case protos::SchedWakeupFtraceEvent::kCommFieldNumber:
+        comm = fld.as_string();
+        break;
+      case protos::SchedWakeupFtraceEvent::kPidFieldNumber:
+        wakee_pid = fld.as_uint32();
+        break;
+    }
+  }
+  StringId name_id = context_->storage->InternString(comm);
+  auto utid =
+      context_->process_tracker->UpdateThread(timestamp, wakee_pid, name_id);
+  context_->storage->mutable_instants()->AddInstantEvent(
+      timestamp, sched_wakeup_name_id_, 0 /* value */, utid, RefType::kRefUtid);
+  PERFETTO_DCHECK(decoder.IsEndOfBuffer());
+}
+
+void ProtoTraceParser::ParseTaskNewTask(int64_t timestamp,
+                                        uint32_t source_tid,
+                                        TraceBlobView event) {
+  ProtoDecoder decoder(event.data(), event.length());
+  uint32_t clone_flags = 0;
+  uint32_t new_tid = 0;
+  StringId new_comm = 0;
+
+  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    switch (fld.id) {
+      case protos::TaskNewtaskFtraceEvent::kCloneFlagsFieldNumber:
+        clone_flags = fld.as_uint32();
+        break;
+      case protos::TaskNewtaskFtraceEvent::kPidFieldNumber:
+        new_tid = fld.as_uint32();
+        break;
+      case protos::TaskNewtaskFtraceEvent::kCommFieldNumber:
+        new_comm = context_->storage->InternString(fld.as_string());
+        break;
+      default:
+        break;
+    }
+  }
+
+  auto* proc_tracker = context_->process_tracker.get();
+
+  // task_newtask is raised both in the case of a new process creation (fork()
+  // family) and thread creation (clone(CLONE_THREAD, ...)).
+  static const uint32_t kCloneThread = 0x00010000;  // From kernel's sched.h.
+  if ((clone_flags & kCloneThread) == 0) {
+    // This is a plain-old fork() or equivalent.
+    proc_tracker->StartNewProcess(timestamp, new_tid);
+    return;
+  }
+
+  // This is a pthread_create or similar. Bind the two threads together, so
+  // they get resolved to the same process.
+  auto source_utid = proc_tracker->UpdateThread(timestamp, source_tid, 0);
+  auto new_utid = proc_tracker->StartNewThread(timestamp, new_tid, new_comm);
+  proc_tracker->AssociateThreads(source_utid, new_utid);
+}
+
+void ProtoTraceParser::ParseTaskRename(int64_t timestamp, TraceBlobView event) {
+  ProtoDecoder decoder(event.data(), event.length());
+  uint32_t tid = 0;
+  StringId comm = 0;
+
+  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    switch (fld.id) {
+      case protos::TaskRenameFtraceEvent::kPidFieldNumber:
+        tid = fld.as_uint32();
+        break;
+      case protos::TaskRenameFtraceEvent::kNewcommFieldNumber:
+        comm = context_->storage->InternString(fld.as_string());
+        break;
+      default:
+        break;
+    }
+  }
+
+  context_->process_tracker->UpdateThread(timestamp, tid, comm);
 }
 
 void ProtoTraceParser::ParsePrint(uint32_t,
