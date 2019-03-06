@@ -333,9 +333,9 @@ class TracingServiceImpl : public TracingService {
     // prevent that a consumer re-attaches to a session from a different uid.
     uid_t const consumer_uid;
 
-    // The original trace config provided by the Consumer when calling
-    // EnableTracing().
-    const TraceConfig config;
+    // The trace config provided by the Consumer when calling
+    // EnableTracing(), plus any updates performed by ChangeTraceConfig.
+    TraceConfig config;
 
     // List of data source instances that have been enabled on the various
     // producers for this tracing session.
