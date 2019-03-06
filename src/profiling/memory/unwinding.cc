@@ -299,6 +299,8 @@ void UnwindingWorker::PostHandoffSocket(HandoffData handoff_data) {
   // Even with C++14, this cannot be moved, as std::function has to be
   // copyable, which HandoffData is not.
   HandoffData* raw_data = new HandoffData(std::move(handoff_data));
+  // We do not need to use a WeakPtr here because the TaskRunner gets Quit-ed
+  // before this object get destructed.
   task_runner_->PostTask([this, raw_data] {
     HandoffData data = std::move(*raw_data);
     delete raw_data;
@@ -323,6 +325,8 @@ void UnwindingWorker::HandleHandoffSocket(HandoffData handoff_data) {
 }
 
 void UnwindingWorker::PostDisconnectSocket(pid_t pid) {
+  // We do not need to use a WeakPtr here because the TaskRunner gets Quit-ed
+  // before this object get destructed.
   task_runner_->PostTask([this, pid] { HandleDisconnectSocket(pid); });
 }
 
