@@ -507,6 +507,13 @@ void TracingServiceImpl::ChangeTraceConfig(ConsumerEndpointImpl* consumer,
       continue;
     }
 
+    // TODO(oysteine): Just replacing the filter means that if
+    // there are any filter entries which were present in the original config,
+    // but removed from the config passed to ChangeTraceConfig, any matching
+    // producers will keep producing but newly added producers after this
+    // point will never start.
+    *cfg_data_source.mutable_producer_name_filter() = new_producer_name_filter;
+
     // Scan all the registered data sources with a matching name.
     auto range = data_sources_.equal_range(cfg_data_source.config().name());
     for (auto it = range.first; it != range.second; it++) {
@@ -537,15 +544,6 @@ void TracingServiceImpl::ChangeTraceConfig(ConsumerEndpointImpl* consumer,
 
       if (already_setup)
         continue;
-
-      // If the updated filter is empty, we now are OK with
-      // all producers and clear the current.. If not, we just add the new entry
-      // to the existing config.
-      if (new_producer_name_filter.empty()) {
-        cfg_data_source.clear_producer_name_filter();
-      } else {
-        *cfg_data_source.add_producer_name_filter() = producer->name_;
-      }
 
       // If it wasn't previously setup, set it up now.
       // (The per-producer config is optional).
