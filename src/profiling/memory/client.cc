@@ -280,6 +280,7 @@ bool Client::RecordMalloc(uint64_t alloc_size,
     return false;
   }
   if (!sock_.Send(kSingleByte, sizeof(kSingleByte))) {
+    PERFETTO_PLOG("Failed to send wire message.");
     Shutdown();
     return false;
   }
