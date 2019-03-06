@@ -542,7 +542,7 @@ void HeapprofdProducer::SocketDelegate::OnDataAvailable(
     producer_->UnwinderForPID(self->peer_pid())
         .PostHandoffSocket(std::move(handoff_data));
     producer_->pending_processes_.erase(it);
-  } else if (fds[0] || fds[1] || fds[2]) {
+  } else if (fds[kHandshakeMaps] || fds[kHandshakeMem]) {
     PERFETTO_DFATAL("%d: Received partial FDs.", self->peer_pid());
     producer_->pending_processes_.erase(it);
   } else {
