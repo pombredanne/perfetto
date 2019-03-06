@@ -56,7 +56,7 @@ base::Optional<base::UnixSocketRaw> Connect(const std::string& sock_name) {
     return base::nullopt;
   }
   if (!sock.SetTxTimeout(kClientSockTimeoutMs)) {
-    PERFETTO_PLOG("Failed to set timeout for %s", sock_name.c_str());
+    PERFETTO_PLOG("Failed to set send timeout for %s", sock_name.c_str());
     return base::nullopt;
   }
   if (!sock.SetRxTimeout(kClientSockTimeoutMs)) {
@@ -120,12 +120,12 @@ bool Client::FlushFrees(FreeMetadata* free_metadata) {
   WireMessage msg = {};
   msg.record_type = RecordType::Free;
   msg.free_header = free_metadata;
-  if (!SendWireMessage(&shmem_.value(), msg)) {
+  if (!SendWireMessage(&shmem_, msg)) {
     PERFETTO_PLOG("Failed to send wire message");
     Shutdown();
     return false;
   }
-  if (!sock_->Send(kSingleByte, sizeof(kSingleByte))) {
+  if (!sock_.Send(kSingleByte, sizeof(kSingleByte))) {
     Shutdown();
     return false;
   }
@@ -147,31 +147,15 @@ const char* GetThreadStackBase() {
   return stackaddr + stacksize;
 }
 
-std::atomic<uint64_t> Client::max_generation_{0};
-
 Client::Client(base::Optional<base::UnixSocketRaw> sock)
-    : generation_(++max_generation_),
-      sampler_(8192),  // placeholder until we receive the config (within ctor)
-      sock_(std::move(sock)),
+    : sampler_(8192),  // placeholder until we receive the config (within ctor)
       main_thread_stack_base_(FindMainThreadStack()) {
-  if (!sock_) {
+  if (!sock || !sock.value()) {
     PERFETTO_DFATAL("Socket not connected.");
     return;
   }
+  sock_ = std::move(sock.value());
 
-  base::ScopedFile shmem_fd;
-
-  if (sock_->Receive(&client_config_, sizeof(client_config_), &shmem_fd, 1) !=
-      sizeof(client_config_)) {
-    PERFETTO_DFATAL("Failed to receive client config.");
-    return;
-  }
-
-  shmem_ = SharedRingBuffer::Attach(std::move(shmem_fd));
-  if (!shmem_ || !shmem_->is_valid()) {
-    PERFETTO_DFATAL("Failed to create shmem.");
-    return;
-  }
   // We might be running in a process that is not dumpable (such as app
   // processes on user builds), in which case the /proc/self/mem will be chown'd
   // to root:root, and will not be accessible even to the process itself (see
@@ -205,14 +189,25 @@ Client::Client(base::Optional<base::UnixSocketRaw> sock)
 
   // Send an empty record to transfer fds for /proc/self/maps and
   // /proc/self/mem.
-  if (sock_->Send(kSingleByte, sizeof(kSingleByte), fds, kHandshakeSize) !=
+  if (sock_.Send(kSingleByte, sizeof(kSingleByte), fds, kHandshakeSize) !=
       sizeof(kSingleByte)) {
     PERFETTO_DFATAL("Failed to send file descriptors.");
     return;
   }
 
-  char buf[1];
-  sock_->Receive(buf, sizeof(buf));
+  base::ScopedFile shmem_fd;
+  if (sock_.Receive(&client_config_, sizeof(client_config_), &shmem_fd, 1) !=
+      sizeof(client_config_)) {
+    PERFETTO_DFATAL("Failed to receive client config.");
+    return;
+  }
+
+  auto shmem = SharedRingBuffer::Attach(std::move(shmem_fd));
+  if (!shmem || !shmem->is_valid()) {
+    PERFETTO_DFATAL("Failed to attach to shmem.");
+    return;
+  }
+  shmem_ = std::move(shmem.value());
 
   PERFETTO_DCHECK(client_config_.interval >= 1);
   sampler_ = Sampler(client_config_.interval);
@@ -279,12 +274,12 @@ bool Client::RecordMalloc(uint64_t alloc_size,
   msg.payload = const_cast<char*>(stacktop);
   msg.payload_size = static_cast<size_t>(stack_size);
 
-  if (!SendWireMessage(&shmem_.value(), msg)) {
+  if (!SendWireMessage(&shmem_, msg)) {
     PERFETTO_PLOG("Failed to send wire message.");
     Shutdown();
     return false;
   }
-  if (!sock_->Send(kSingleByte, sizeof(kSingleByte))) {
+  if (!sock_.Send(kSingleByte, sizeof(kSingleByte))) {
     Shutdown();
     return false;
   }

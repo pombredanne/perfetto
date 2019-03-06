@@ -105,9 +105,7 @@ TEST_F(ProcessTrackerTest, UpdateThreadCreate) {
 
   TraceStorage::Thread thread = context.storage->GetThread(1);
 
-  // We expect 3 threads: Invalid thread, main thread for pid, tid 12.
-  ASSERT_EQ(context.storage->thread_count(), 3);
-
+  ASSERT_EQ(context.storage->thread_count(), 2);
   auto tid_it = context.process_tracker->UtidsForTid(12);
   ASSERT_NE(tid_it.first, tid_it.second);
   ASSERT_EQ(thread.upid.value(), 1);

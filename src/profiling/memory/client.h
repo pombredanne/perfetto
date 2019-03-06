@@ -40,12 +40,13 @@ class FreePage {
  public:
   FreePage() { free_page_.num_entries = 0; }
 
-  // Add address to buffer. Flush if necessary using a socket borrowed from
-  // pool.
+  // Add address to buffer. Flush if necessary.
   // Can be called from any thread. Must not hold mutex_.
   bool Add(const uint64_t addr, uint64_t sequence_number, Client* client);
 
  private:
+  // TODO(fmayer): Sort out naming. It's confusing data FreePage has a member
+  // called free_page_ that is of type FreeMetadata.
   FreeMetadata free_page_;
   std::timed_mutex mutex_;
 };
@@ -90,9 +91,6 @@ class Client {
  private:
   const char* GetStackBase();
 
-  static std::atomic<uint64_t> max_generation_;
-  const uint64_t generation_;
-
   // TODO(rsavitski): used to check if the client is completely initialized
   // after construction. The reads in RecordFree & GetSampleSizeLocked are no
   // longer necessary (was an optimization to not do redundant work after
@@ -102,11 +100,11 @@ class Client {
   ClientConfiguration client_config_;
   // sampler_ operations are not thread-safe.
   Sampler sampler_;
-  base::Optional<base::UnixSocketRaw> sock_;
+  base::UnixSocketRaw sock_;
   FreePage free_page_;
   const char* main_thread_stack_base_ = nullptr;
   std::atomic<uint64_t> sequence_number_{0};
-  base::Optional<SharedRingBuffer> shmem_;
+  SharedRingBuffer shmem_;
 };
 
 }  // namespace profiling

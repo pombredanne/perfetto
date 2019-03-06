@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-// This file contains messages sent between the threads over BoundedQueue.
-
 #ifndef SRC_PROFILING_MEMORY_QUEUE_MESSAGES_H_
 #define SRC_PROFILING_MEMORY_QUEUE_MESSAGES_H_
 
@@ -24,6 +22,8 @@
 
 #include "perfetto/tracing/core/trace_writer.h"
 #include "src/profiling/memory/wire_protocol.h"
+
+// TODO(fmayer): Find better places to put these structs.
 
 namespace perfetto {
 namespace profiling {

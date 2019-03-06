@@ -16,9 +16,6 @@
 
 #include "src/profiling/memory/unwinding.h"
 
-#include <sys/types.h>
-#include <unistd.h>
-
 #include <unwindstack/MachineArm.h>
 #include <unwindstack/MachineArm64.h>
 #include <unwindstack/MachineMips.h>
@@ -94,22 +91,6 @@ std::unique_ptr<unwindstack::Regs> CreateFromRawData(unwindstack::ArchEnum arch,
   return ret;
 }
 
-// Behaves as a pread64, emulating it if not already exposed by the standard
-// library. Safe to use on 32bit platforms for addresses with the top bit set.
-// Clobbers the |fd| seek position if emulating.
-ssize_t ReadAtOffsetClobberSeekPos(int fd,
-                                   void* buf,
-                                   size_t count,
-                                   uint64_t addr) {
-#ifdef __BIONIC__
-  return pread64(fd, buf, count, static_cast<off64_t>(addr));
-#else
-  if (lseek64(fd, static_cast<off64_t>(addr), SEEK_SET) == -1)
-    return -1;
-  return read(fd, buf, count);
-#endif
-}
-
 }  // namespace
 
 StackOverlayMemory::StackOverlayMemory(std::shared_ptr<unwindstack::Memory> mem,
@@ -131,9 +112,12 @@ size_t StackOverlayMemory::Read(uint64_t addr, void* dst, size_t size) {
 FDMemory::FDMemory(base::ScopedFile mem_fd) : mem_fd_(std::move(mem_fd)) {}
 
 size_t FDMemory::Read(uint64_t addr, void* dst, size_t size) {
-  ssize_t rd = ReadAtOffsetClobberSeekPos(*mem_fd_, dst, size, addr);
+  if (lseek(*mem_fd_, static_cast<off_t>(addr), SEEK_SET) == -1)
+    return 0;
+
+  ssize_t rd = read(*mem_fd_, dst, size);
   if (rd == -1) {
-    PERFETTO_DPLOG("read at offset");
+    PERFETTO_DPLOG("read");
     return 0;
   }
   return static_cast<size_t>(rd);
@@ -232,26 +216,26 @@ bool DoUnwind(WireMessage* msg, UnwindingMetadata* metadata, AllocRecord* out) {
   return true;
 }
 
-void UnwinderThread::OnDisconnect(base::UnixSocket* self) {
-  auto it = socket_data_.find(self->peer_pid());
-  if (it == socket_data_.end()) {
+void UnwindingWorker::OnDisconnect(base::UnixSocket* self) {
+  auto it = client_data_.find(self->peer_pid());
+  if (it == client_data_.end()) {
     PERFETTO_DFATAL("Disconnected unexpecter socket.");
     return;
   }
-  SocketData& socket_data = it->second;
+  ClientData& socket_data = it->second;
   DataSourceInstanceID ds_id = socket_data.data_source_instance_id;
-  socket_data_.erase(it);
+  client_data_.erase(it);
   delegate_->PostSocketDisconnected(ds_id, self->peer_pid());
 }
 
-void UnwinderThread::OnDataAvailable(base::UnixSocket* self) {
-  auto it = socket_data_.find(self->peer_pid());
-  if (it == socket_data_.end()) {
+void UnwindingWorker::OnDataAvailable(base::UnixSocket* self) {
+  auto it = client_data_.find(self->peer_pid());
+  if (it == client_data_.end()) {
     PERFETTO_DFATAL("Unexpected data.");
     return;
   }
 
-  SocketData& socket_data = it->second;
+  ClientData& socket_data = it->second;
   SharedRingBuffer& shmem = socket_data.shmem;
   SharedRingBuffer::Buffer buf;
 
@@ -264,8 +248,8 @@ void UnwinderThread::OnDataAvailable(base::UnixSocket* self) {
   }
 }
 
-void UnwinderThread::HandleBuffer(SharedRingBuffer::Buffer* buf,
-                                  SocketData* socket_data) {
+void UnwindingWorker::HandleBuffer(SharedRingBuffer::Buffer* buf,
+                                   ClientData* socket_data) {
   WireMessage msg;
   // TODO(fmayer): standardise on char* or uint8_t*.
   // char* has stronger guarantees regarding aliasing.
@@ -295,7 +279,7 @@ void UnwinderThread::HandleBuffer(SharedRingBuffer::Buffer* buf,
   }
 }
 
-void UnwinderThread::PostHandoffSocket(HandoffData handoff_data) {
+void UnwindingWorker::PostHandoffSocket(HandoffData handoff_data) {
   // Even with C++14, this cannot be moved, as std::function has to be
   // copyable, which HandoffData is not.
   HandoffData* raw_data = new HandoffData(std::move(handoff_data));
@@ -306,7 +290,7 @@ void UnwinderThread::PostHandoffSocket(HandoffData handoff_data) {
   });
 }
 
-void UnwinderThread::HandleHandoffSocket(HandoffData handoff_data) {
+void UnwindingWorker::HandleHandoffSocket(HandoffData handoff_data) {
   auto sock = base::UnixSocket::AdoptConnected(handoff_data.sock.ReleaseFd(),
                                                this, this->task_runner_,
                                                base::SockType::kStream);
@@ -315,19 +299,19 @@ void UnwinderThread::HandleHandoffSocket(HandoffData handoff_data) {
   UnwindingMetadata metadata(peer_pid,
                              std::move(handoff_data.fds[kHandshakeMaps]),
                              std::move(handoff_data.fds[kHandshakeMem]));
-  SocketData socket_data{
+  ClientData client_data{
       handoff_data.data_source_instance_id, std::move(sock),
       std::move(metadata), std::move(handoff_data.shmem),
   };
-  socket_data_.emplace(peer_pid, std::move(socket_data));
+  client_data_.emplace(peer_pid, std::move(client_data));
 }
 
-void UnwinderThread::PostDisconnectSocket(pid_t pid) {
+void UnwindingWorker::PostDisconnectSocket(pid_t pid) {
   task_runner_->PostTask([this, pid] { HandleDisconnectSocket(pid); });
 }
 
-void UnwinderThread::HandleDisconnectSocket(pid_t pid) {
-  socket_data_.erase(pid);
+void UnwindingWorker::HandleDisconnectSocket(pid_t pid) {
+  client_data_.erase(pid);
 }
 
 }  // namespace profiling

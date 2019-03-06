@@ -19,7 +19,6 @@
 
 #include <string.h>
 
-#include <algorithm>
 #include <string>
 
 #include "perfetto/base/hash.h"

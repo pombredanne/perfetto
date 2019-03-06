@@ -128,7 +128,7 @@ struct UnwindingMetadata {
 
 bool DoUnwind(WireMessage*, UnwindingMetadata* metadata, AllocRecord* out);
 
-class UnwinderThread : public base::UnixSocket::EventListener {
+class UnwindingWorker : public base::UnixSocket::EventListener {
  public:
   class Delegate {
    public:
@@ -145,9 +145,15 @@ class UnwinderThread : public base::UnixSocket::EventListener {
     SharedRingBuffer shmem;
   };
 
-  UnwinderThread(Delegate* delegate, base::TaskRunner* task_runner)
+  UnwindingWorker(Delegate* delegate, base::TaskRunner* task_runner)
       : delegate_(delegate), task_runner_(task_runner) {}
 
+  // Public API safe to call from other threads.
+  void PostDisconnectSocket(pid_t pid);
+  void PostHandoffSocket(HandoffData);
+
+  // Implementation of UnixSocket::EventListener.
+  // Do not call explicitly.
   void OnDisconnect(base::UnixSocket* self) override;
   void OnNewIncomingConnection(base::UnixSocket*,
                                std::unique_ptr<base::UnixSocket>) override {
@@ -155,22 +161,19 @@ class UnwinderThread : public base::UnixSocket::EventListener {
   }
   void OnDataAvailable(base::UnixSocket* self) override;
 
-  void PostDisconnectSocket(pid_t pid);
-  void PostHandoffSocket(HandoffData);
-
  private:
-  struct SocketData {
+  struct ClientData {
     DataSourceInstanceID data_source_instance_id;
     std::unique_ptr<base::UnixSocket> sock;
     UnwindingMetadata metadata;
     SharedRingBuffer shmem;
   };
 
-  void HandleBuffer(SharedRingBuffer::Buffer* buf, SocketData* socket_data);
+  void HandleBuffer(SharedRingBuffer::Buffer* buf, ClientData* socket_data);
   void HandleHandoffSocket(HandoffData data);
   void HandleDisconnectSocket(pid_t pid);
 
-  std::map<pid_t, SocketData> socket_data_;
+  std::map<pid_t, ClientData> client_data_;
   Delegate* delegate_;
   base::TaskRunner* task_runner_;
 };

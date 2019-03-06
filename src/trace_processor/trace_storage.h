@@ -91,6 +91,7 @@ class TraceStorage {
   struct Process {
     explicit Process(uint32_t p) : pid(p) {}
     int64_t start_ns = 0;
+    int64_t end_ns = 0;
     StringId name_id = 0;
     uint32_t pid = 0;
     base::Optional<UniquePid> pupid;
@@ -100,6 +101,7 @@ class TraceStorage {
   struct Thread {
     explicit Thread(uint32_t t) : tid(t) {}
     int64_t start_ns = 0;
+    int64_t end_ns = 0;
     StringId name_id = 0;
     base::Optional<UniquePid> upid;
     uint32_t tid = 0;

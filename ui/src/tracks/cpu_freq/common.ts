@@ -19,7 +19,6 @@ export interface Data {
   end: number;
   resolution: number;
   maximumValue: number;
-  isQuantized: boolean;
 
   tsStarts: Float64Array;
   tsEnds: Float64Array;

@@ -51,38 +51,16 @@ ClientConfiguration MakeClientConfiguration(const DataSourceConfig& cfg) {
 
 }  // namespace
 
-// We create kUnwinderThreads unwinding threads and one bookeeping thread.
-// The bookkeeping thread is singleton in order to avoid expensive and
-// complicated synchronisation in the bookkeeping.
-//
-// We wire up the system by creating BoundedQueues between the threads. The main
-// thread runs the TaskRunner driving the SocketListener. The unwinding thread
-// takes the data received by the SocketListener and if it is a malloc does
-// stack unwinding, and if it is a free just forwards the content of the record
-// to the bookkeeping thread.
-//
-//             +--------------+
-//             |SocketListener|
-//             +------+-------+
-//                    |
-//          +--UnwindingRecord -+
-//          |                   |
-// +--------v-------+   +-------v--------+
-// |Unwinding Thread|   |Unwinding Thread|
-// +--------+-------+   +-------+--------+
-//          |                   |
-//          +-BookkeepingRecord +
-//                    |
-//           +--------v---------+
-//           |Bookkeeping Thread|
-//           +------------------+
+// We create kUnwinderThreads unwinding threads. Bookkeeping is done on the main
+// thread.
+// TODO(fmayer): Summarize threading document here.
 HeapprofdProducer::HeapprofdProducer(HeapprofdMode mode,
                                      base::TaskRunner* task_runner)
     : mode_(mode),
       task_runner_(task_runner),
       unwinding_task_runners_(kUnwinderThreads),
       unwinding_threads_(MakeUnwindingThreads(kUnwinderThreads)),
-      unwinder_threads_(MakeUnwinderThreads(kUnwinderThreads)),
+      unwinding_workers_(MakeUnwindingWorkers(kUnwinderThreads)),
       target_pid_(base::kInvalidPid),
       socket_delegate_(this),
       weak_factory_(this) {
@@ -99,9 +77,11 @@ HeapprofdProducer::~HeapprofdProducer() {
 }
 
 void HeapprofdProducer::SetTargetProcess(pid_t target_pid,
-                                         std::string target_cmdline) {
+                                         std::string target_cmdline,
+                                         base::ScopedFile inherited_socket) {
   target_pid_ = target_pid;
   target_cmdline_ = target_cmdline;
+  inherited_fd_ = std::move(inherited_socket);
 }
 
 bool HeapprofdProducer::SourceMatchesTarget(const HeapprofdConfig& cfg) {
@@ -121,7 +101,7 @@ bool HeapprofdProducer::SourceMatchesTarget(const HeapprofdConfig& cfg) {
   return false;
 }
 
-void HeapprofdProducer::UseAdoptedSocket() {
+void HeapprofdProducer::AdoptTargetProcessSocket() {
   PERFETTO_DCHECK(mode_ == HeapprofdMode::kChild);
   Process process{target_pid_, target_cmdline_};
   auto socket = base::UnixSocket::AdoptConnected(
@@ -129,12 +109,6 @@ void HeapprofdProducer::UseAdoptedSocket() {
       base::SockType::kStream);
 
   HandleClientConnection(std::move(socket), std::move(process));
-}
-
-void HeapprofdProducer::AdoptConnectedSocket(
-    base::ScopedFile inherited_socket) {
-  PERFETTO_DCHECK(mode_ == HeapprofdMode::kChild);
-  inherited_fd_ = std::move(inherited_socket);
 }
 
 // TODO(fmayer): Delete once we have generic reconnect logic.
@@ -219,7 +193,7 @@ void HeapprofdProducer::SetupDataSource(DataSourceInstanceID id,
   PERFETTO_DLOG("Set up data source.");
 
   if (mode_ == HeapprofdMode::kChild)
-    UseAdoptedSocket();
+    AdoptTargetProcessSocket();
 }
 
 void HeapprofdProducer::DoContinuousDump(DataSourceInstanceID id,
@@ -307,9 +281,6 @@ void HeapprofdProducer::StartDataSource(DataSourceInstanceID id,
 // child mode heapprofd needs to distinguish between causes of the client
 // reference being torn down.
 void HeapprofdProducer::StopDataSource(DataSourceInstanceID id) {
-  // DataSource holds ProfilingSession handles which on being destructed tear
-  // down the profiling on the client.
-
   auto it = data_sources_.find(id);
   if (it == data_sources_.end()) {
     if (mode_ == HeapprofdMode::kCentral)
@@ -325,16 +296,8 @@ void HeapprofdProducer::StopDataSource(DataSourceInstanceID id) {
 
   data_sources_.erase(it);
 
-  if (mode_ == HeapprofdMode::kChild) {
-    if (data_sources_.erase(id) == 1) {
-      PERFETTO_DLOG("Child mode exiting due to stopped data source.");
-      TerminateProcess(/*exit_status=*/0);  // does not return
-    }
-
-  } else {  // kCentral
-    if (data_sources_.erase(id) != 1)
-      PERFETTO_DFATAL("Trying to stop non existing data source: %" PRIu64, id);
-  }
+  if (mode_ == HeapprofdMode::kChild)
+    TerminateProcess(/*exit_status=*/0);  // does not return
 }
 
 void HeapprofdProducer::OnTracingSetup() {}
@@ -420,8 +383,8 @@ std::vector<std::thread> HeapprofdProducer::MakeUnwindingThreads(size_t n) {
   return ret;
 }
 
-std::vector<UnwinderThread> HeapprofdProducer::MakeUnwinderThreads(size_t n) {
-  std::vector<UnwinderThread> ret;
+std::vector<UnwindingWorker> HeapprofdProducer::MakeUnwindingWorkers(size_t n) {
+  std::vector<UnwindingWorker> ret;
   for (size_t i = 0; i < n; ++i) {
     ret.emplace_back(this, &unwinding_task_runners_[i]);
   }
@@ -531,8 +494,8 @@ void HeapprofdProducer::SocketDelegate::OnNewIncomingConnection(
   producer_->HandleClientConnection(std::move(new_connection), peer_process);
 }
 
-UnwinderThread& HeapprofdProducer::UnwinderForPID(pid_t pid) {
-  return unwinder_threads_[static_cast<uint64_t>(pid) % kUnwinderThreads];
+UnwindingWorker& HeapprofdProducer::UnwinderForPID(pid_t pid) {
+  return unwinding_workers_[static_cast<uint64_t>(pid) % kUnwinderThreads];
 }
 
 void HeapprofdProducer::SocketDelegate::OnDataAvailable(
@@ -550,24 +513,29 @@ void HeapprofdProducer::SocketDelegate::OnDataAvailable(
   self->Receive(buf, sizeof(buf), fds, base::ArraySize(fds));
 
   if (fds[0] && fds[1] && fds[2]) {
-    PERFETTO_DLOG("%d: Received FDs.", self->peer_pid());
-    self->Send(buf, sizeof(buf), -1, base::UnixSocket::BlockingMode::kBlocking);
+    auto ds_it =
+        producer_->data_sources_.find(pending_process.data_source_instance_id);
+    if (ds_it == producer_->data_sources_.end()) {
+      producer_->pending_processes_.erase(it);
+      return;
+    }
 
-    UnwinderThread::HandoffData handoff_data;
+    DataSource& data_source = ds_it->second;
+    data_source.heap_trackers.emplace(self->peer_pid(), &producer_->callsites_);
+
+    PERFETTO_DLOG("%d: Received FDs.", self->peer_pid());
+    int raw_fd = pending_process.shmem.fd();
+    self->Send(&data_source.client_configuration,
+               sizeof(data_source.client_configuration), &raw_fd, 1,
+               base::UnixSocket::BlockingMode::kBlocking);
+
+    UnwindingWorker::HandoffData handoff_data;
     handoff_data.data_source_instance_id =
         pending_process.data_source_instance_id;
     handoff_data.sock = self->ReleaseSocket();
     for (size_t i = 0; i < kHandshakeSize; ++i)
       handoff_data.fds[i] = std::move(fds[i]);
     handoff_data.shmem = std::move(pending_process.shmem);
-
-    auto ds_it =
-        producer_->data_sources_.find(pending_process.data_source_instance_id);
-    if (ds_it == producer_->data_sources_.end())
-      return;
-
-    DataSource& data_source = ds_it->second;
-    data_source.heap_trackers.emplace(self->peer_pid(), &producer_->callsites_);
 
     producer_->UnwinderForPID(self->peer_pid())
         .PostHandoffSocket(std::move(handoff_data));
@@ -611,11 +579,6 @@ void HeapprofdProducer::HandleClientConnection(
     return;
   }
 
-  int raw_fd = shmem->fd();
-
-  new_connection->Send(&data_source->client_configuration,
-                       sizeof(data_source->client_configuration), &raw_fd, 1,
-                       base::UnixSocket::BlockingMode::kBlocking);
   pid_t peer_pid = new_connection->peer_pid();
   PendingProcess pending_process;
   pending_process.sock = std::move(new_connection);

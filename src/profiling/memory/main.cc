@@ -38,7 +38,7 @@ namespace {
 
 int StartChildHeapprofd(pid_t target_pid,
                         std::string target_cmdline,
-                        base::ScopedFile inherited_sock_fds);
+                        base::ScopedFile inherited_sock_fd);
 int StartCentralHeapprofd();
 
 base::Event* g_dump_evt = nullptr;
@@ -64,6 +64,8 @@ int HeapprofdMain(int argc, char** argv) {
         cleanup_crash = true;
         break;
       case kTargetPid:
+        if (target_pid != kInvalidPid)
+          PERFETTO_FATAL("Duplicate exclusive-for-pid");
         target_pid = static_cast<pid_t>(atoi(optarg));
         break;
       case kTargetCmd:  // assumed to be already normalized
@@ -114,9 +116,9 @@ int StartChildHeapprofd(pid_t target_pid,
                         base::ScopedFile inherited_sock_fd) {
   base::UnixTaskRunner task_runner;
   HeapprofdProducer producer(HeapprofdMode::kChild, &task_runner);
-  producer.SetTargetProcess(target_pid, target_cmdline);
+  producer.SetTargetProcess(target_pid, target_cmdline,
+                            std::move(inherited_sock_fd));
   producer.ConnectWithRetries(GetProducerSocket());
-  producer.AdoptConnectedSocket(std::move(inherited_sock_fd));
   task_runner.Run();
   return 0;
 }

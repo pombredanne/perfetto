@@ -34,7 +34,6 @@ namespace {
 
 using ::testing::_;
 using ::testing::Args;
-using ::testing::AtLeast;
 using ::testing::ElementsAreArray;
 using ::testing::Eq;
 using ::testing::Pointwise;
@@ -186,10 +185,8 @@ TEST_F(ProtoTraceParserTest, LoadEventsIntoRaw) {
   static const char buf_value[] = "This is a print event";
   print->set_buf(buf_value);
 
-  EXPECT_CALL(*storage_, InternString(base::StringView(task_newtask)))
-      .Times(AtLeast(1));
+  EXPECT_CALL(*storage_, InternString(base::StringView(task_newtask)));
   EXPECT_CALL(*storage_, InternString(base::StringView(buf_value)));
-  EXPECT_CALL(*process_, UpdateThread(123, 123));
 
   Tokenize(trace);
   const auto& raw = context_.storage->raw_events();

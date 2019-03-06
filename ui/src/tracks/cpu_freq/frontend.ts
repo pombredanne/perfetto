@@ -134,10 +134,7 @@ class CpuFreqTrack extends Track<Config, Data> {
     ctx.font = '10px Google Sans';
 
     if (this.hoveredValue !== undefined && this.hoveredTs !== undefined) {
-      let text = `Freq: ${this.hoveredValue.toLocaleString()}kHz`;
-      if (data.isQuantized) {
-        text = `Weighted avg freq: ${this.hoveredValue.toLocaleString()}kHz`;
-      }
+      const text = `freq: ${this.hoveredValue.toLocaleString()}kHz`;
 
       const width = ctx.measureText(text).width;
       ctx.fillStyle = `hsl(${hue}, 45%, 75%)`;
@@ -172,7 +169,7 @@ class CpuFreqTrack extends Track<Config, Data> {
       // Display idle value if current hover is idle.
       if (this.hoveredIdle !== undefined && this.hoveredIdle !== -1) {
         // Display the idle value +1 to be consistent with catapult.
-        const idle = `Idle: ${(this.hoveredIdle + 1).toLocaleString()}`;
+        const idle = `idle: ${(this.hoveredIdle + 1).toLocaleString()}`;
         ctx.fillText(idle, this.mouseXpos + 10, centerY + 11);
       }
     }

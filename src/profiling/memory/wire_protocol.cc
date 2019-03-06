@@ -47,7 +47,7 @@ void UnsafeMemcpy(char* dest, const char* src, size_t n)
 
 bool SendWireMessage(SharedRingBuffer* shmem, const WireMessage& msg) {
   uint64_t total_size;
-  struct iovec iovecs[4] = {};
+  struct iovec iovecs[3] = {};
   // TODO(fmayer): Maye pack these two.
   iovecs[0].iov_base = const_cast<RecordType*>(&msg.record_type);
   iovecs[0].iov_len = sizeof(msg.record_type);

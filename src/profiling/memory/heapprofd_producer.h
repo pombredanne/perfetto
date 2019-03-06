@@ -48,7 +48,7 @@ struct Process {
 // clients. This can be implemented as an additional mode here.
 enum class HeapprofdMode { kCentral, kChild };
 
-class HeapprofdProducer : public Producer, public UnwinderThread::Delegate {
+class HeapprofdProducer : public Producer, public UnwindingWorker::Delegate {
  public:
   friend class SocketDelegate;
 
@@ -84,7 +84,7 @@ class HeapprofdProducer : public Producer, public UnwinderThread::Delegate {
   void ConnectWithRetries(const char* socket_name);
   void DumpAll();
 
-  // UnwinderThread::Delegate impl:
+  // UnwindingWorker::Delegate impl:
   void PostAllocRecord(AllocRecord) override;
   void PostFreeRecord(FreeRecord) override;
   void PostSocketDisconnected(DataSourceInstanceID, pid_t) override;
@@ -93,12 +93,10 @@ class HeapprofdProducer : public Producer, public UnwinderThread::Delegate {
   void HandleFreeRecord(FreeRecord);
   void HandleSocketDisconnected(DataSourceInstanceID, pid_t);
 
-  // Valid only if mode_ == kChild. Adopts the (connected) sockets inherited
-  // from the target process, invoking the on-connection callback.
-  void AdoptConnectedSocket(base::ScopedFile inherited_socket);
-
   // Valid only if mode_ == kChild.
-  void SetTargetProcess(pid_t target_pid, std::string target_cmdline);
+  void SetTargetProcess(pid_t target_pid,
+                        std::string target_cmdline,
+                        base::ScopedFile inherited_socket);
 
  private:
   void HandleClientConnection(std::unique_ptr<base::UnixSocket> new_connection,
@@ -124,14 +122,14 @@ class HeapprofdProducer : public Producer, public UnwinderThread::Delegate {
   const HeapprofdMode mode_;
 
   std::vector<std::thread> MakeUnwindingThreads(size_t n);
-  std::vector<UnwinderThread> MakeUnwinderThreads(size_t n);
+  std::vector<UnwindingWorker> MakeUnwindingWorkers(size_t n);
 
   void FinishDataSourceFlush(FlushRequestID flush_id);
   bool Dump(DataSourceInstanceID id,
             FlushRequestID flush_id,
             bool has_flush_id);
   void DoContinuousDump(DataSourceInstanceID id, uint32_t dump_interval);
-  UnwinderThread& UnwinderForPID(pid_t);
+  UnwindingWorker& UnwinderForPID(pid_t);
 
   // functionality specific to mode_ == kCentral
   std::unique_ptr<base::UnixSocket> MakeListeningSocket();
@@ -139,7 +137,10 @@ class HeapprofdProducer : public Producer, public UnwinderThread::Delegate {
   // functionality specific to mode_ == kChild
   void TerminateProcess(int exit_status);
   bool SourceMatchesTarget(const HeapprofdConfig& cfg);
-  void UseAdoptedSocket();
+
+  // Valid only if mode_ == kChild. Adopts the (connected) sockets inherited
+  // from the target process, invoking the on-connection callback.
+  void AdoptTargetProcessSocket();
 
   struct DataSource {
     DataSourceInstanceID id;
@@ -172,9 +173,12 @@ class HeapprofdProducer : public Producer, public UnwinderThread::Delegate {
   // of them were dropped.
   uint64_t next_index_ = 0;
 
+  // These are not fields in UnwinderThread as the task runner is not movable
+  // and that makes UnwinderThread very unwieldy objects (e.g. we cannot
+  // emplace_back into a vector as that requires movability.)
   std::vector<base::UnixTaskRunner> unwinding_task_runners_;
   std::vector<std::thread> unwinding_threads_;  // Only for ownership.
-  std::vector<UnwinderThread> unwinder_threads_;
+  std::vector<UnwindingWorker> unwinding_workers_;
 
   // state specific to mode_ == kCentral
   std::unique_ptr<base::UnixSocket> listening_socket_;
@@ -183,6 +187,8 @@ class HeapprofdProducer : public Producer, public UnwinderThread::Delegate {
   // state specific to mode_ == kChild
   pid_t target_pid_ = base::kInvalidPid;
   std::string target_cmdline_;
+  // This is a valid FD between SetTargetProcess and UseTargetProcessSocket
+  // only.
   base::ScopedFile inherited_fd_;
 
   SocketDelegate socket_delegate_;
