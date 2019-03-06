@@ -624,7 +624,7 @@ void HeapprofdProducer::PostSocketDisconnected(DataSourceInstanceID ds_id,
   auto weak_this = weak_factory_.GetWeakPtr();
   task_runner_->PostTask([weak_this, ds_id, pid] {
     if (weak_this)
-      HandleSocketDisconnected(ds_id, pid);
+      weak_this->HandleSocketDisconnected(ds_id, pid);
   });
 }
 
