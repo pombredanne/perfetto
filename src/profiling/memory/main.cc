@@ -64,7 +64,7 @@ int HeapprofdMain(int argc, char** argv) {
         cleanup_crash = true;
         break;
       case kTargetPid:
-        if (target_pid != kInvalidPid)
+        if (target_pid != base::kInvalidPid)
           PERFETTO_FATAL("Duplicate exclusive-for-pid");
         target_pid = static_cast<pid_t>(atoi(optarg));
         break;
