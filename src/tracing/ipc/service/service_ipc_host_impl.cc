@@ -106,6 +106,7 @@ void ServiceIPCHostImpl::Shutdown() {
   // spurious callbacks are issued.
   producer_ipc_port_.reset();
   consumer_ipc_port_.reset();
+  svc_.reset();
 }
 
 // Definitions for the base class ctor/dtor.
