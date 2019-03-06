@@ -168,6 +168,7 @@ class TracingServiceImpl : public TracingService {
 
     // TracingService::ConsumerEndpoint implementation.
     void EnableTracing(const TraceConfig&, base::ScopedFile) override;
+    void ChangeTraceConfig(const TraceConfig& cfg) override;
     void StartTracing() override;
     void DisableTracing() override;
     void ReadBuffers() override;
@@ -221,6 +222,8 @@ class TracingServiceImpl : public TracingService {
   bool EnableTracing(ConsumerEndpointImpl*,
                      const TraceConfig&,
                      base::ScopedFile);
+  void ChangeTraceConfig(ConsumerEndpointImpl*, const TraceConfig&);
+
   bool StartTracing(TracingSessionID);
   void DisableTracing(TracingSessionID, bool disable_immediately = false);
   void Flush(TracingSessionID tsid,
@@ -341,9 +344,9 @@ class TracingServiceImpl : public TracingService {
     // prevent that a consumer re-attaches to a session from a different uid.
     uid_t const consumer_uid;
 
-    // The original trace config provided by the Consumer when calling
-    // EnableTracing().
-    const TraceConfig config;
+    // The trace config provided by the Consumer when calling
+    // EnableTracing(), plus any updates performed by ChangeTraceConfig.
+    TraceConfig config;
 
     // List of data source instances that have been enabled on the various
     // producers for this tracing session.
@@ -373,6 +376,9 @@ class TracingServiceImpl : public TracingService {
 
     // Whether we mirrored the trace config back to the trace output yet.
     bool did_emit_config = false;
+
+    // Whether we put the system info into the trace output yet.
+    bool did_emit_system_info = false;
 
     State state = DISABLED;
 
@@ -418,6 +424,7 @@ class TracingServiceImpl : public TracingService {
   void SnapshotStats(TracingSession*, std::vector<TracePacket>*);
   TraceStats GetTraceStats(TracingSession* tracing_session);
   void MaybeEmitTraceConfig(TracingSession*, std::vector<TracePacket>*);
+  void MaybeEmitSystemInfo(TracingSession*, std::vector<TracePacket>*);
   void OnFlushTimeout(TracingSessionID, FlushRequestID);
   void OnDisableTracingTimeout(TracingSessionID);
   void DisableTracingNotifyConsumerAndFlushFile(TracingSession*);
