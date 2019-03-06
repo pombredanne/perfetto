@@ -590,15 +590,23 @@ void HeapprofdProducer::HandleClientConnection(
 void HeapprofdProducer::PostAllocRecord(AllocRecord alloc_rec) {
   // Once we can use C++14, this should be std::moved into the lambda instead.
   AllocRecord* raw_alloc_rec = new AllocRecord(std::move(alloc_rec));
-  task_runner_->PostTask(
-      [this, raw_alloc_rec] { HandleAllocRecord(std::move(*raw_alloc_rec)); });
+  auto weak_this = weak_factory_.GetWeakPtr();
+  task_runner_->PostTask([weak_this, raw_alloc_rec] {
+    if (weak_this)
+      weak_this->HandleAllocRecord(std::move(*raw_alloc_rec));
+    delete raw_alloc_rec;
+  });
 }
 
 void HeapprofdProducer::PostFreeRecord(FreeRecord free_rec) {
   // Once we can use C++14, this should be std::moved into the lambda instead.
   FreeRecord* raw_free_rec = new FreeRecord(std::move(free_rec));
-  task_runner_->PostTask(
-      [this, raw_free_rec] { HandleFreeRecord(std::move(*raw_free_rec)); });
+  auto weak_this = weak_factory_.GetWeakPtr();
+  task_runner_->PostTask([weak_this, raw_free_rec] {
+    if (weak_this)
+      weak_this->HandleFreeRecord(std::move(*raw_free_rec));
+    delete raw_free_rec;
+  });
 }
 
 void HeapprofdProducer::PostSocketDisconnected(DataSourceInstanceID ds_id,
