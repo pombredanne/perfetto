@@ -512,7 +512,8 @@ void HeapprofdProducer::SocketDelegate::OnDataAvailable(
   char buf[1];
   self->Receive(buf, sizeof(buf), fds, base::ArraySize(fds));
 
-  if (fds[0] && fds[1] && fds[2]) {
+  static_assert(kHandshakeSize == 2, "change if below.");
+  if (fds[0] && fds[1]) {
     auto ds_it =
         producer_->data_sources_.find(pending_process.data_source_instance_id);
     if (ds_it == producer_->data_sources_.end()) {
@@ -525,6 +526,7 @@ void HeapprofdProducer::SocketDelegate::OnDataAvailable(
 
     PERFETTO_DLOG("%d: Received FDs.", self->peer_pid());
     int raw_fd = pending_process.shmem.fd();
+    // TODO(fmayer): Full buffer could deadlock us here.
     self->Send(&data_source.client_configuration,
                sizeof(data_source.client_configuration), &raw_fd, 1,
                base::UnixSocket::BlockingMode::kBlocking);
@@ -552,6 +554,9 @@ HeapprofdProducer::DataSource* HeapprofdProducer::GetDataSourceForProcess(
     const Process& proc) {
   for (auto& ds_id_and_datasource : data_sources_) {
     DataSource& ds = ds_id_and_datasource.second;
+    if (ds.config.all())
+      return &ds;
+
     for (uint64_t pid : ds.config.pid()) {
       if (static_cast<pid_t>(pid) == proc.pid)
         return &ds;
@@ -580,6 +585,11 @@ void HeapprofdProducer::HandleClientConnection(
   }
 
   pid_t peer_pid = new_connection->peer_pid();
+  if (peer_pid != process.pid) {
+    PERFETTO_DFATAL("Invalid PID connected.");
+    return;
+  }
+
   PendingProcess pending_process;
   pending_process.sock = std::move(new_connection);
   pending_process.data_source_instance_id = data_source->id;
@@ -656,8 +666,10 @@ void HeapprofdProducer::HandleFreeRecord(FreeRecord free_rec) {
 
   const FreePageEntry* entries = free_metadata.entries;
   uint64_t num_entries = free_metadata.num_entries;
-  if (num_entries > kFreePageSize)
+  if (num_entries > kFreePageSize) {
+    PERFETTO_DFATAL("Malformed free page.");
     return;
+  }
   for (size_t i = 0; i < num_entries; ++i) {
     const FreePageEntry& entry = entries[i];
     heap_tracker.RecordFree(entry.addr, entry.sequence_number);

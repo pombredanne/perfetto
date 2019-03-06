@@ -233,6 +233,7 @@ bool DoUnwind(WireMessage* msg, UnwindingMetadata* metadata, AllocRecord* out) {
 }
 
 void UnwindingWorker::OnDisconnect(base::UnixSocket* self) {
+  // TODO(fmayer): Maybe try to drain shmem one last time.
   auto it = client_data_.find(self->peer_pid());
   if (it == client_data_.end()) {
     PERFETTO_DFATAL("Disconnected unexpecter socket.");
@@ -256,6 +257,8 @@ void UnwindingWorker::OnDataAvailable(base::UnixSocket* self) {
   SharedRingBuffer::Buffer buf;
 
   for (;;) {
+    // TODO(fmayer): Allow spinlock acquisition to fail and repost Task if it
+    // did.
     buf = shmem.BeginRead();
     if (!buf)
       break;

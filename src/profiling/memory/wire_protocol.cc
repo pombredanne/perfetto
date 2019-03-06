@@ -81,8 +81,10 @@ bool SendWireMessage(SharedRingBuffer* shmem, const WireMessage& msg) {
   SharedRingBuffer::Buffer buf;
   {
     ScopedSpinlock lock = shmem->AcquireLock(ScopedSpinlock::Mode::Try);
-    if (!lock.locked())
+    if (!lock.locked()) {
+      PERFETTO_DLOG("Failed to acquire spinlock.");
       return false;
+    }
     buf = shmem->BeginWrite(lock, total_size);
   }
   if (!buf) {
