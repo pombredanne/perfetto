@@ -513,7 +513,7 @@ void HeapprofdProducer::SocketDelegate::OnDataAvailable(
   self->Receive(buf, sizeof(buf), fds, base::ArraySize(fds));
 
   static_assert(kHandshakeSize == 2, "change if below.");
-  if (fds[0] && fds[1]) {
+  if (fds[kHandshakeMaps] && fds[kHandshakeMem]) {
     auto ds_it =
         producer_->data_sources_.find(pending_process.data_source_instance_id);
     if (ds_it == producer_->data_sources_.end()) {
@@ -621,8 +621,11 @@ void HeapprofdProducer::PostFreeRecord(FreeRecord free_rec) {
 
 void HeapprofdProducer::PostSocketDisconnected(DataSourceInstanceID ds_id,
                                                pid_t pid) {
-  task_runner_->PostTask(
-      [this, ds_id, pid] { HandleSocketDisconnected(ds_id, pid); });
+  auto weak_this = weak_factory_.GetWeakPtr();
+  task_runner_->PostTask([weak_this, ds_id, pid] {
+    if (weak_this)
+      HandleSocketDisconnected(ds_id, pid);
+  });
 }
 
 void HeapprofdProducer::HandleAllocRecord(AllocRecord alloc_rec) {

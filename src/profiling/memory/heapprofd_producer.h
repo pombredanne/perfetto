@@ -54,6 +54,7 @@ class HeapprofdProducer : public Producer, public UnwindingWorker::Delegate {
 
   // TODO(fmayer): Split into two delegates for the listening socket in kCentral
   // and for the per-client sockets to make this easier to understand?
+  // Alternatively, find a better name for this.
   class SocketDelegate : public base::UnixSocket::EventListener {
    public:
     SocketDelegate(HeapprofdProducer* producer) : producer_(producer) {}
