@@ -246,14 +246,14 @@ void UnwindingWorker::OnDisconnect(base::UnixSocket* self) {
 }
 
 void UnwindingWorker::OnDataAvailable(base::UnixSocket* self) {
+  char recv_buf[1024];
+  self->Receive(recv_buf, sizeof(recv_buf));
+
   auto it = client_data_.find(self->peer_pid());
   if (it == client_data_.end()) {
     PERFETTO_DFATAL("Unexpected data.");
     return;
   }
-
-  char recv_buf[1024];
-  self->Receive(recv_buf, sizeof(recv_buf));
 
   ClientData& socket_data = it->second;
   SharedRingBuffer& shmem = socket_data.shmem;
