@@ -246,6 +246,7 @@ void UnwindingWorker::OnDisconnect(base::UnixSocket* self) {
 }
 
 void UnwindingWorker::OnDataAvailable(base::UnixSocket* self) {
+  // Drain buffer to clear the notification.
   char recv_buf[1024];
   self->Receive(recv_buf, sizeof(recv_buf));
 
