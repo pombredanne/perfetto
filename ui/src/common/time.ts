@@ -32,11 +32,17 @@ export function fromNs(ns: number) {
 
 export function timeToCode(sec: number) {
   let result = '';
-  let ns = Math.abs(sec * 1e9);
-  const unitAndValue = [['m', 60], ['s', 1], ['ms', 0.001], ['μs', 0.000001]];
+  let ns = Math.round(sec * 1e9);
+  const unitAndValue = [
+    ['m', 60000000000],
+    ['s', 1000000000],
+    ['ms', 1000000],
+    ['us', 1000],
+    ['ns', 1]
+  ];
   unitAndValue.forEach(pair => {
     const unit = pair[0] as string;
-    const val = pair[1] as number * 1e9;
+    const val = pair[1] as number;
     if (ns >= val) {
       const i = Math.floor(ns / val);
       ns -= i * val;
