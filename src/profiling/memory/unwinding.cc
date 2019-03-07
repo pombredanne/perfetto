@@ -340,5 +340,7 @@ void UnwindingWorker::HandleDisconnectSocket(pid_t pid) {
   client_data_.erase(pid);
 }
 
+UnwindingWorker::Delegate::~Delegate() = default;
+
 }  // namespace profiling
 }  // namespace perfetto
