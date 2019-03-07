@@ -652,7 +652,7 @@ void HeapprofdProducer::HandleAllocRecord(AllocRecord alloc_rec) {
                        [&map](const std::string& prefix) {
                          return base::StartsWith(map, prefix);
                        }) != prefixes.cend()) {
-        frame_data.frame.function_name = "";
+        frame_data.frame.function_name = "FILTERED";
       }
     }
   }
