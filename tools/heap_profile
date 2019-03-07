@@ -189,9 +189,9 @@ def main(argv):
   try:
     int(perfetto_pid.strip())
   except ValueError:
-      print("Failed to invoke perfetto: {}".format(perfetto_pid),
-            file=sys.stderr)
-      return 1
+    print("Failed to invoke perfetto: {}".format(perfetto_pid),
+          file=sys.stderr)
+    return 1
 
   old_handler = signal.signal(signal.SIGINT, sigint_handler)
   print("Profiling active. Press Ctrl+C to terminate.")
