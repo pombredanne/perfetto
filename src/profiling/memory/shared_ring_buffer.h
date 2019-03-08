@@ -20,6 +20,7 @@
 #include "perfetto/base/optional.h"
 #include "perfetto/base/unix_socket.h"
 #include "perfetto/base/utils.h"
+#include "src/profiling/memory/scoped_spinlock.h"
 
 #include <atomic>
 #include <map>
@@ -29,42 +30,6 @@
 
 namespace perfetto {
 namespace profiling {
-
-class ScopedSpinlock {
- public:
-  enum class Mode { Try, Blocking };
-
-  ScopedSpinlock(std::atomic<bool>* lock, Mode mode) : lock_(lock) {
-    if (PERFETTO_LIKELY(!lock_->exchange(true, std::memory_order_acquire))) {
-      locked_ = true;
-      return;
-    }
-    LockSlow(mode);
-  }
-
-  ScopedSpinlock(const ScopedSpinlock&) = delete;
-  ScopedSpinlock& operator=(const ScopedSpinlock&) = delete;
-
-  ScopedSpinlock(ScopedSpinlock&&) noexcept;
-  ScopedSpinlock& operator=(ScopedSpinlock&&);
-
-  ~ScopedSpinlock();
-
-  void Unlock() {
-    if (locked_) {
-      PERFETTO_DCHECK(lock_->load());
-      lock_->store(false, std::memory_order_release);
-    }
-    locked_ = false;
-  }
-
-  bool locked() const { return locked_; }
-
- private:
-  void LockSlow(Mode mode);
-  std::atomic<bool>* lock_;
-  bool locked_ = false;
-};
 
 // A concurrent, multi-writer single-reader ring buffer FIFO, based on a
 // circular buffer over shared memory. It has similar semantics to a SEQ_PACKET
@@ -76,8 +41,13 @@ class ScopedSpinlock {
 // - Reads are atomic, no fragmentation.
 // - The reader sees writes in write order (% discarding).
 //
-// This class assumes that reader and write trust each other. Don't use in
-// untrusted contexts.
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// *IMPORTANT*: The ring buffer must be written under the assumption that the
+// other end modifies arbitrary shared memory without holding the spin-lock.
+// This means we must make local copies of read and write pointers for doing
+// bounds checks followed by reads / writes, as they might change in the
+// meantime.
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 //
 // TODO:
 // - Write a benchmark.
@@ -105,6 +75,8 @@ class SharedRingBuffer {
   static base::Optional<SharedRingBuffer> Attach(base::ScopedFile);
 
   ~SharedRingBuffer();
+  SharedRingBuffer() = default;
+
   SharedRingBuffer(SharedRingBuffer&&) noexcept;
   SharedRingBuffer& operator=(SharedRingBuffer&&);
 
@@ -127,7 +99,7 @@ class SharedRingBuffer {
 
  private:
   struct alignas(base::kPageSize) MetadataPage {
-    std::atomic<bool> spinlock;
+    alignas(uint64_t) std::atomic<bool> spinlock;
     uint64_t read_pos;
     uint64_t write_pos;
 
@@ -137,6 +109,11 @@ class SharedRingBuffer {
     std::atomic<uint64_t> num_writes_succeeded;
     std::atomic<uint64_t> num_writes_failed;
     std::atomic<uint64_t> num_reads_failed;
+  };
+
+  struct PointerPositions {
+    uint64_t read_pos;
+    uint64_t write_pos;
   };
 
   struct CreateFlag {};
@@ -149,21 +126,34 @@ class SharedRingBuffer {
   }
 
   void Initialize(base::ScopedFile mem_fd);
-  bool IsCorrupt();
+  bool IsCorrupt(const PointerPositions& pos);
 
-  inline size_t read_avail(const ScopedSpinlock& lock) {
+  inline base::Optional<PointerPositions> GetPointerPositions(
+      const ScopedSpinlock& lock) {
     PERFETTO_DCHECK(lock.locked());
-    PERFETTO_DCHECK(meta_->write_pos >= meta_->read_pos);
-    if (meta_->read_pos > meta_->write_pos)
-      return 0;
 
-    auto res = static_cast<size_t>(meta_->write_pos - meta_->read_pos);
+    PointerPositions pos;
+    pos.read_pos = meta_->read_pos;
+    pos.write_pos = meta_->write_pos;
+
+    base::Optional<PointerPositions> result;
+    if (IsCorrupt(pos)) {
+      meta_->num_reads_failed++;
+      return result;
+    }
+    result = pos;
+    return result;
+  }
+
+  inline size_t read_avail(const PointerPositions& pos) {
+    PERFETTO_DCHECK(pos.write_pos >= pos.read_pos);
+    auto res = static_cast<size_t>(pos.write_pos - pos.read_pos);
     PERFETTO_DCHECK(res <= size_);
     return res;
   }
 
-  inline size_t write_avail(const ScopedSpinlock& spinlock) {
-    return size_ - read_avail(spinlock);
+  inline size_t write_avail(const PointerPositions& pos) {
+    return size_ - read_avail(pos);
   }
 
   inline uint8_t* at(uint64_t pos) { return mem_ + (pos & (size_ - 1)); }

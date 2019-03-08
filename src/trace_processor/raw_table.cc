@@ -95,16 +95,18 @@ void RawTable::FormatSystraceArgs(const std::string& event_name,
       }
     }
   };
+  auto write_value_at_index = [this, start_row](uint32_t arg_idx,
+                                                ValueWriter value_fn) {
+    value_fn(storage_->args().arg_values()[start_row + arg_idx]);
+  };
   auto write_arg = [this, writer, start_row](uint32_t arg_idx,
                                              ValueWriter value_fn) {
     uint32_t arg_row = start_row + arg_idx;
-    if (arg_row != 0)
-      writer->AppendChar(' ');
-
     const auto& args = storage_->args();
     const auto& key = storage_->GetString(args.keys()[arg_row]);
     const auto& value = args.arg_values()[arg_row];
 
+    writer->AppendChar(' ');
     writer->AppendString(key.c_str(), key.length());
     writer->AppendChar('=');
     value_fn(value);
@@ -119,11 +121,85 @@ void RawTable::FormatSystraceArgs(const std::string& event_name,
       auto state = static_cast<uint16_t>(value.int_value);
       writer->AppendString(ftrace_utils::TaskState(state).ToString().data());
     });
-
     writer->AppendLiteral(" ==>");
     write_arg(SS::kNextCommFieldNumber - 1, write_value);
     write_arg(SS::kNextPidFieldNumber - 1, write_value);
     write_arg(SS::kNextPrioFieldNumber - 1, write_value);
+    return;
+  } else if (event_name == "sched_wakeup") {
+    using SW = protos::SchedWakeupFtraceEvent;
+    write_arg(SW::kCommFieldNumber - 1, write_value);
+    write_arg(SW::kPidFieldNumber - 1, write_value);
+    write_arg(SW::kPrioFieldNumber - 1, write_value);
+    write_arg(SW::kTargetCpuFieldNumber - 1, [writer](const Variadic& value) {
+      writer->AppendPaddedInt<'0', 3>(value.int_value);
+    });
+    return;
+  } else if (event_name == "clock_set_rate") {
+    // TODO(lalitm): this is a big hack but the best way to do this now.
+    // Doing this requires overhauling how we deal with args by pushing them all
+    // to an array and then reading back from that array.
+
+    // We use the string "todo" as the name to stay consistent with old
+    // trace_to_text print code.
+    writer->AppendString(" todo");
+    write_arg(0 /* state */, write_value);
+    write_arg(1 /* cpu_id */, write_value);
+    return;
+  } else if (event_name == "clk_set_rate") {
+    using CSR = protos::ClkSetRateFtraceEvent;
+    writer->AppendLiteral(" ");
+    write_value_at_index(CSR::kNameFieldNumber - 1, write_value);
+    writer->AppendLiteral(" ");
+    write_value_at_index(CSR::kRateFieldNumber - 1, write_value);
+    return;
+  } else if (event_name == "binder_transaction") {
+    using BT = protos::BinderTransactionFtraceEvent;
+    writer->AppendString(" transaction=");
+    write_value_at_index(BT::kDebugIdFieldNumber - 1, write_value);
+    writer->AppendString(" dest_node=");
+    write_value_at_index(BT::kTargetNodeFieldNumber - 1, write_value);
+    writer->AppendString(" dest_proc=");
+    write_value_at_index(BT::kToProcFieldNumber - 1, write_value);
+    writer->AppendString(" dest_thread=");
+    write_value_at_index(BT::kToThreadFieldNumber - 1, write_value);
+    write_arg(BT::kReplyFieldNumber - 1, write_value);
+    writer->AppendString(" flags=0x");
+    write_value_at_index(
+        BT::kFlagsFieldNumber - 1, [writer](const Variadic& value) {
+          writer->AppendHexInt(static_cast<uint32_t>(value.int_value));
+        });
+    writer->AppendString(" code=0x");
+    write_value_at_index(
+        BT::kCodeFieldNumber - 1, [writer](const Variadic& value) {
+          writer->AppendHexInt(static_cast<uint32_t>(value.int_value));
+        });
+    return;
+  } else if (event_name == "binder_transaction_alloc_buf") {
+    using BTAB = protos::BinderTransactionAllocBufFtraceEvent;
+    writer->AppendString(" transaction=");
+    write_value_at_index(BTAB::kDebugIdFieldNumber - 1, write_value);
+    write_arg(BTAB::kDataSizeFieldNumber - 1, write_value);
+    write_arg(BTAB::kOffsetsSizeFieldNumber - 1, write_value);
+    return;
+  } else if (event_name == "binder_transaction_received") {
+    using BTR = protos::BinderTransactionReceivedFtraceEvent;
+    writer->AppendString(" transaction=");
+    write_value_at_index(BTR::kDebugIdFieldNumber - 1, write_value);
+    return;
+  } else if (event_name == "print") {
+    using P = protos::PrintFtraceEvent;
+    write_arg(P::kIpFieldNumber - 1, write_value);
+    write_arg(P::kBufFieldNumber - 1, [this, writer](const Variadic& value) {
+      const auto& str = storage_->GetString(value.string_value);
+
+      // If the last character is a newline in a print, just drop it.
+      auto chars_to_print = str.size() > 0 && str[str.size() - 1] == '\n'
+                                ? str.size() - 1
+                                : str.size();
+      writer->AppendString(str.c_str(), chars_to_print);
+    });
+    return;
   }
 
   uint32_t arg = 0;
@@ -136,7 +212,7 @@ void RawTable::ToSystrace(sqlite3_context* ctx,
                           int argc,
                           sqlite3_value** argv) {
   if (argc != 1 || sqlite3_value_type(argv[0]) != SQLITE_INTEGER) {
-    sqlite3_result_error(ctx, "Usage: systrace(id)", -1);
+    sqlite3_result_error(ctx, "Usage: to_ftrace(id)", -1);
     return;
   }
   RowId row_id = sqlite3_value_int64(argv[0]);
@@ -164,10 +240,10 @@ void RawTable::ToSystrace(sqlite3_context* ctx,
   const auto& event_name = storage_->GetString(raw_evts.name_ids()[row]);
   writer.AppendChar(' ');
   writer.AppendString(event_name.c_str(), event_name.size());
-  writer.AppendLiteral(": ");
+  writer.AppendChar(':');
 
   FormatSystraceArgs(event_name, raw_evts.arg_set_ids()[row], &writer);
-  sqlite3_result_text(ctx, writer.CreateStringCopy().release(), -1, free);
+  sqlite3_result_text(ctx, writer.CreateStringCopy(), -1, free);
 }
 
 }  // namespace trace_processor
