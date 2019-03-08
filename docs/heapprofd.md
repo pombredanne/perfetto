@@ -4,13 +4,15 @@ Googlers, for design doc see: http://go/heapprofd-design
 
 **heapprofd requires Android Q.**
 
-heapprofd allows you to get a snapshot of the native heap of an Android
-process. This snapshot shows you which callstack of functions (both native and
-Java) caused the memory usage. This is useful for Android platform developers
-and app developers investigating memory issues.
+heapprofd is a tool that tracks native heap allocations & deallocations of an
+Android process within a given time period. The resulting profile can be used
+to attribute memory usage to particular function callstacks, supporting a mix
+of both native and java code. The tool should be useful to Android platform
+developers, and app developers investigating memory issues.
 
-On userdebug, you can profile all apps and most system services. On user, you
-can profile apps that have the profilable manifest flag set.
+On debug Android builds, you can profile all apps and most system services.
+On "user" builds, you can only use it on apps with the debuggable or
+profileable manifest flag.
 
 ## Quickstart
 
