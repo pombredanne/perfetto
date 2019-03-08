@@ -354,30 +354,58 @@ class TraceBuffer {
       ChunkID chunk_id;
     };
 
-    ChunkMeta(ChunkRecord* r, uint16_t p, bool c, uint8_t f, uid_t u)
-        : chunk_record{r},
-          trusted_uid{u},
-          is_complete{c},
-          flags{f},
-          num_fragments{p} {}
+    enum IndexFlags : uint8_t {
+      // If set, the chunk state was kChunkComplete at the time it was copied.
+      // If unset, the chunk was still kChunkBeingWritten while copied. When
+      // reading from the chunk's sequence, the sequence will not advance past
+      // this chunk until this flag is set.
+      kComplete = 1 << 0,
+
+      // If set, we skipped the last packet that we read from this chunk e.g.
+      // because we it was a continuation from a previous chunk that was dropped
+      // or due to an ABI violation.
+      kLastReadPacketSkipped = 1 << 1
+    };
+
+    ChunkMeta(ChunkRecord* r, uint16_t p, bool complete, uint8_t f, uid_t u)
+        : chunk_record{r}, trusted_uid{u}, flags{f}, num_fragments{p} {
+      if (complete)
+        index_flags = kComplete;
+    }
+
+    bool is_complete() const { return index_flags & kComplete; }
+
+    void set_complete(bool complete) {
+      if (complete) {
+        index_flags |= kComplete;
+      } else {
+        index_flags &= ~kComplete;
+      }
+    }
+
+    bool last_read_packet_skipped() const {
+      return index_flags & kLastReadPacketSkipped;
+    }
+
+    void set_last_read_packet_skipped(bool skipped) {
+      if (skipped) {
+        index_flags |= kLastReadPacketSkipped;
+      } else {
+        index_flags &= ~kLastReadPacketSkipped;
+      }
+    }
 
     ChunkRecord* const chunk_record;  // Addr of ChunkRecord within |data_|.
     const uid_t trusted_uid;          // uid of the producer.
 
-    // If true, the chunk state was kChunkComplete at the time it was copied. If
-    // false, the chunk was still kChunkBeingWritten while copied. |is_complete|
-    // == false prevents the sequence to read past this chunk.
-    bool is_complete = false;
-
-    // Wether we skipped the last packet e.g. because we it was a continuation
-    // from a previous chunk that was dropped or due to an ABI violation.
-    bool last_read_packet_skipped = false;
+    // Flags set by TraceBuffer to track the state of the chunk in the index.
+    uint8_t index_flags = 0;
 
     // Correspond to |chunk_record->flags| and |chunk_record->num_fragments|.
     // Copied here for performance reasons (avoids having to dereference
     // |chunk_record| while iterating over ChunkMeta) and to aid debugging in
     // case the buffer gets corrupted.
-    uint8_t flags = 0;           // See SharedMemoryABI::flags.
+    uint8_t flags = 0;           // See SharedMemoryABI::ChunkHeader::flags.
     uint16_t num_fragments = 0;  // Total number of packet fragments.
 
     uint16_t num_fragments_read = 0;  // Number of fragments already read.

@@ -48,11 +48,6 @@ bool PacketStreamValidator::Validate(const Slices& slices) {
     return false;
   }
 
-  if (packet.optional_previous_packet_dropped_case() !=
-      protos::TrustedPacket::OPTIONAL_PREVIOUS_PACKET_DROPPED_NOT_SET) {
-    return false;
-  }
-
   if (packet.has_trace_config())
     return false;
 
