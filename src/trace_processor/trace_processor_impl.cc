@@ -63,7 +63,23 @@ extern "C" int sqlite3_percentile_init(sqlite3* db,
                                        const sqlite3_api_routines* api);
 #endif
 
+namespace perfetto {
+namespace trace_processor {
 namespace {
+
+void InitializeSqliteModules(sqlite3* db) {
+  sqlite3_str_split_init(db);
+// In Android tree builds, we don't have the percentile module.
+// Just don't include it.
+#if !PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
+  char* error = nullptr;
+  sqlite3_percentile_init(db, &error, nullptr);
+  if (error) {
+    PERFETTO_ELOG("Error initializing: %s", error);
+    sqlite3_free(error);
+  }
+#endif
+}
 
 void CreateBuiltinTables(sqlite3* db) {
   char* error = nullptr;
@@ -92,25 +108,6 @@ void BuildBoundsTable(sqlite3* db, std::pair<int64_t, int64_t> bounds) {
     PERFETTO_ELOG("Error inserting bounds table: %s", error);
     sqlite3_free(error);
   }
-}
-}  // namespace
-
-namespace perfetto {
-namespace trace_processor {
-namespace {
-
-void InitializeSqliteModules(sqlite3* db) {
-  sqlite3_str_split_init(db);
-// In Android tree builds, we don't have the percentile module.
-// Just don't include it.
-#if !PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
-  char* error = nullptr;
-  sqlite3_percentile_init(db, &error, nullptr);
-  if (error) {
-    PERFETTO_ELOG("Error initializing: %s", error);
-    sqlite3_free(error);
-  }
-#endif
 }
 
 bool IsPrefix(const std::string& a, const std::string& b) {

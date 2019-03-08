@@ -30,9 +30,7 @@ constexpr char kSplitFieldIndexError[] =
 void sqlite_str_split(sqlite3_context* context,
                       int argc,
                       sqlite3_value** argv) {
-  if (argc != 3)
-    PERFETTO_FATAL("Invalid number of args");
-
+  PERFETTO_DCHECK(argc == 3);
   if (sqlite3_value_type(argv[1]) != SQLITE_TEXT) {
     sqlite3_result_error(context, kDelimiterError, -1);
     return;
@@ -44,7 +42,6 @@ void sqlite_str_split(sqlite3_context* context,
     sqlite3_result_error(context, kDelimiterError, -1);
     return;
   }
-
   if (sqlite3_value_type(argv[2]) != SQLITE_INTEGER) {
     sqlite3_result_error(context, kSplitFieldIndexError, -1);
     return;
@@ -54,7 +51,6 @@ void sqlite_str_split(sqlite3_context* context,
     sqlite3_result_error(context, kSplitFieldIndexError, -1);
     return;
   }
-
   if (sqlite3_value_type(argv[0]) != SQLITE_TEXT) {
     sqlite3_result_null(context);
     return;
