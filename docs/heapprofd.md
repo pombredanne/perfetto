@@ -4,7 +4,14 @@ Googlers, for design doc see: http://go/heapprofd-design
 
 **heapprofd requires Android Q.**
 
-## Using convenience script
+heapprofd allows you to get a snapshot of the native heap of an Android
+process. This snapshot shows you which callstack of functions (both native and
+Java) caused the memory usage.
+
+On userdebug, you can profile all apps and most system services. On user, you
+can profile apps that have the profilable manifest flag set.
+
+## Quickstart
 
 <!-- This uses github because gitiles does not allow to get the raw file. -->
 
@@ -33,22 +40,33 @@ The resulting profile proto contains four views on the data
   done at this callstack.
 
 **Googlers:** Head to http://pprof/ and upload the gzipped protos to get a
-visualization.
+visualization. *Tip: you might want to put `libart.so` as a "Hide regex" when
+profiling apps.*
 
 [Speedscope](https://speedscope.app) can also be used to visualize the heap
-dump, but will only show the space view.
+dump, but will only show the space view. *Tip: Click Left Heavy on the top
+left for a good visualisation.*
 
-## Manual
+## Manual instructions
+*It is not recommended to use these instructions unless you have advanced
+requirements or are developing heapprofd. Proceed with caution*
+
+### Download trace\_to\_text
+Download the latest trace\_to\_text for [Linux](
+https://storage.googleapis.com/perfetto/trace_to_text-4ab1d18e69bc70e211d27064505ed547aa82f919)
+or [MacOS](https://storage.googleapis.com/perfetto/trace_to_text-mac-2ba325f95c08e8cd5a78e04fa85ee7f2a97c847e).
+This is needed to convert the Perfetto trace to a pprof-compatible file.
+
+Compare the `sha1sum` of this file to the one contained in the file name.
+
+### Start profiling
 To start profiling the process `${PID}`, run the following sequence of commands.
 Adjust the `INTERVAL` to trade-off runtime impact for higher accuracy of the
 results. If `INTERVAL=1`, every allocation is sampled for maximum accuracy.
 Otherwise, a sample is taken every `INTERVAL` bytes on average.
 
 ```bash
-INTERVAL=128000
-
-adb shell su root setenforce 0
-adb shell su root start heapprofd
+INTERVAL=4096
 
 echo '
 buffers {
@@ -62,27 +80,26 @@ data_sources {
     heapprofd_config {
       sampling_interval_bytes: '${INTERVAL}'
       pid: '${PID}'
-      continuous_dump_config {
-        dump_phase_ms: 10000
-        dump_interval_ms: 1000
-      }
     }
   }
 }
 
 duration_ms: 20000
-' | adb shell perfetto --txt -c - -o /data/misc/perfetto-traces/trace
+' | adb shell perfetto --txt -c - -o /data/misc/perfetto-traces/profile
 
-adb pull /data/misc/perfetto-traces/trace /tmp/trace
+adb pull /data/misc/perfetto-traces/profile /tmp/profile
 ```
+
+### Convert to pprof compatible file
 
 While we work on UI support, you can convert the trace into pprof compatible
-heap dumps. To do so, run
+heap dumps.
+
+Use the trace\_to\_text file downloaded above, with XXXXXXX replaced with the
+`sha1sum` of the file.
 
 ```
-prodaccess
-/google/bin/users/fmayer/third_party/perfetto:trace_to_text_sig/trace_to_text \
-profile /tmp/trace
+trace_to_text-linux-XXXXXXX profile /tmp/profile
 ```
 
 This will create a directory in `/tmp/` containing the heap dumps. Run
