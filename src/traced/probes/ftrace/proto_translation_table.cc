@@ -61,16 +61,15 @@ ProtoTranslationTable::FtracePageHeaderSpec MakeFtracePageHeaderSpec(
 // matches the userspace bitness.
 ProtoTranslationTable::FtracePageHeaderSpec GuessFtracePageHeaderSpec() {
   ProtoTranslationTable::FtracePageHeaderSpec spec{};
-  uint16_t commit_size = 8;
+  uint16_t commit_size = sizeof(long);
 
   struct utsname sysinfo;
-  if (uname(&sysinfo) == 0) {
+  // If user space is 32-bit check the kernel to verify.
+  if (commit_size < 8 && uname(&sysinfo) == 0) {
     // Arm returns armv# for its machine type. The first (and only currently)
     // arm processor that supports 64bit is the armv8 series.
     commit_size = strstr(sysinfo.machine, "64") ||
                   strstr(sysinfo.machine, "armv8") ? 8 : 4;
-  } else {
-    commit_size = sizeof(long);
   }
 
   // header_page typically looks as follows on a 64-bit kernel:
