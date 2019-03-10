@@ -60,7 +60,7 @@ ProtoTranslationTable::FtracePageHeaderSpec MakeFtracePageHeaderSpec(
 // that from the uname() and if that fails assumes that the kernel bitness
 // matches the userspace bitness.
 ProtoTranslationTable::FtracePageHeaderSpec GuessFtracePageHeaderSpec() {
-  ProtoTranslationTable::FtracePageHeaderSpec spec;
+  ProtoTranslationTable::FtracePageHeaderSpec spec{};
   uint16_t commit_size = 8;
 
   struct utsname sysinfo;
@@ -69,6 +69,15 @@ ProtoTranslationTable::FtracePageHeaderSpec GuessFtracePageHeaderSpec() {
   } else {
     commit_size = sizeof(long);
   }
+
+  // header_page typically looks as follows on a 64-bit kernel:
+  // field: u64 timestamp; offset:0; size:8; signed:0;
+  // field: local_t commit; offset:8; size:8; signed:1;
+  // field: int overwrite; offset:8; size:1; signed:1;
+  // field: char data; offset:16; size:4080; signed:0;
+  //
+  // On a 32-bit kernel local_t is 32-bit wide and data starts @ offset 12.
+
   spec.timestamp = FtraceEvent::Field{"u64 timestamp", 0, 8, 0};
   spec.size = FtraceEvent::Field{"local_t commit", 8, commit_size, 1};
   spec.overwrite = FtraceEvent::Field{"int overwrite", 8, 1, 1};
@@ -395,7 +404,7 @@ std::unique_ptr<ProtoTranslationTable> ProtoTranslationTable::Create(
         // On some "user" builds of Android <P the ftrace/print event is not
         // selinux-whitelisted. Thankfully this event is an always-on built-in
         // so we don't need to write to its 'enable' file. However we need to
-        // know its binary layout to decode it, so we hard-code it.
+        // know its binary layout to decode it, so we hardcode it.
         ftrace_event.id = 5;  // Seems quite stable across kernels.
         ftrace_event.name = "print";
         // The only field we care about is:
@@ -408,6 +417,7 @@ std::unique_ptr<ProtoTranslationTable> ProtoTranslationTable::Create(
     }
 
     event.ftrace_event_id = ftrace_event.id;
+
     if (!common_fields_processed) {
       common_fields_end =
           MergeFields(ftrace_event.common_fields, &common_fields, event.name);
