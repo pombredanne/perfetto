@@ -67,7 +67,7 @@ ProtoTranslationTable::FtracePageHeaderSpec GuessFtracePageHeaderSpec() {
   if (uname(&sysinfo) == 0) {
     // Arm returns armv# for its machine type. The first (and only currently)
     // arm processor that supports 64bit is the armv8 series.
-    commit_size = strstr(sysinfo.machine, "64") || 
+    commit_size = strstr(sysinfo.machine, "64") ||
                   strstr(sysinfo.machine, "armv8") ? 8 : 4;
   } else {
     commit_size = sizeof(long);
