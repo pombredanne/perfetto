@@ -33,8 +33,6 @@ namespace trace_processor {
 
 namespace {
 
-constexpr int64_t kI64Max = std::numeric_limits<int64_t>::max();
-
 constexpr char kTsColumnName[] = "ts";
 constexpr char kDurColumnName[] = "dur";
 
@@ -50,10 +48,6 @@ SpanJoinOperatorTable::SpanJoinOperatorTable(sqlite3* db, const TraceStorage*)
 void SpanJoinOperatorTable::RegisterTable(sqlite3* db,
                                           const TraceStorage* storage) {
   Table::Register<SpanJoinOperatorTable>(db, storage, "span_join",
-                                         /* read_write */ false,
-                                         /* requires_args */ true);
-
-  Table::Register<SpanJoinOperatorTable>(db, storage, "span_left_join",
                                          /* read_write */ false,
                                          /* requires_args */ true);
 }
@@ -84,31 +78,28 @@ base::Optional<Table::Schema> SpanJoinOperatorTable::Init(
     std::swap(t1_desc, t2_desc);
   }
 
-  if (t1_desc.partition_col == t2_desc.partition_col) {
-    partitioning_ = t1_desc.partition_col.empty()
-                        ? PartitioningType::kNoPartitioning
-                        : PartitioningType::kSamePartitioning;
-  } else if (t1_desc.IsPartitioned() && t2_desc.IsPartitioned()) {
-    PERFETTO_ELOG("Mismatching partitions (%s, %s)",
-                  t1_desc.partition_col.c_str(), t2_desc.partition_col.c_str());
-    return base::nullopt;
-  } else {
-    if (is_left_join()) {
-      PERFETTO_ELOG("span_left_join not supported for mixed partitioning");
-      return base::nullopt;
-    }
-    partitioning_ = PartitioningType::kMixedPartitioning;
-  }
-
-  auto maybe_t1_defn = CreateTableDefinition(t1_desc, is_left_join());
+  auto maybe_t1_defn = CreateTableDefinition(t1_desc);
   if (!maybe_t1_defn.has_value())
     return base::nullopt;
   t1_defn_ = maybe_t1_defn.value();
 
-  auto maybe_t2_defn = CreateTableDefinition(t2_desc, false);
+  auto maybe_t2_defn = CreateTableDefinition(t2_desc);
   if (!maybe_t2_defn.has_value())
     return base::nullopt;
   t2_defn_ = maybe_t2_defn.value();
+
+  if (t1_desc.partition_col == t2_desc.partition_col) {
+    partitioning_ = t1_desc.partition_col.empty()
+                        ? PartitioningType::kNoPartitioning
+                        : PartitioningType::kSamePartitioning;
+  } else if (t1_defn_.IsPartitioned() && t2_defn_.IsPartitioned()) {
+    PERFETTO_ELOG("Mismatching partitions (%s, %s)",
+                  t1_defn_.partition_col().c_str(),
+                  t2_defn_.partition_col().c_str());
+    return base::nullopt;
+  } else {
+    partitioning_ = PartitioningType::kMixedPartitioning;
+  }
 
   std::vector<Table::Column> cols;
   // Ensure the shared columns are consistently ordered and are not
@@ -148,14 +139,8 @@ void SpanJoinOperatorTable::CreateSchemaColsForDefn(
 std::unique_ptr<Table::Cursor> SpanJoinOperatorTable::CreateCursor(
     const QueryConstraints& qc,
     sqlite3_value** argv) {
-  std::unique_ptr<SpanJoinOperatorTable::Cursor> cursor;
-  if (partitioning_ == PartitioningType::kMixedPartitioning) {
-    cursor.reset(new MixedPartitioningCursor(this, db_));
-  } else if (is_left_join()) {
-    cursor.reset(new LeftJoinCursor(this, db_));
-  } else {
-    cursor.reset(new SinglePartitioningCursor(this, db_));
-  }
+  auto cursor =
+      std::unique_ptr<SpanJoinOperatorTable::Cursor>(new Cursor(this, db_));
   int value = cursor->Initialize(qc, argv);
   return value != SQLITE_OK ? nullptr : std::move(cursor);
 }
@@ -191,8 +176,7 @@ SpanJoinOperatorTable::ComputeSqlConstraintsForDefinition(
 }
 
 base::Optional<SpanJoinOperatorTable::TableDefinition>
-SpanJoinOperatorTable::CreateTableDefinition(const TableDescriptor& desc,
-                                             bool should_emit_nulls) {
+SpanJoinOperatorTable::CreateTableDefinition(const TableDescriptor& desc) {
   auto cols = sqlite_utils::GetColumnsForTable(db_, desc.name);
 
   uint32_t required_columns_found = 0;
@@ -204,7 +188,6 @@ SpanJoinOperatorTable::CreateTableDefinition(const TableDescriptor& desc,
     if (IsRequiredColumn(col.name())) {
       ++required_columns_found;
       if (col.type() != Table::ColumnType::kLong &&
-          col.type() != Table::ColumnType::kInt &&
           col.type() != Table::ColumnType::kUnknown) {
         PERFETTO_ELOG("Invalid column type for %s", col.name().c_str());
         return base::nullopt;
@@ -229,8 +212,8 @@ SpanJoinOperatorTable::CreateTableDefinition(const TableDescriptor& desc,
   PERFETTO_DCHECK(dur_idx < cols.size());
   PERFETTO_DCHECK(desc.partition_col.empty() || partition_idx < cols.size());
 
-  return TableDefinition(desc.name, desc.partition_col, std::move(cols),
-                         should_emit_nulls, ts_idx, dur_idx, partition_idx);
+  return TableDefinition(desc.name, desc.partition_col, std::move(cols), ts_idx,
+                         dur_idx, partition_idx);
 }
 
 std::string SpanJoinOperatorTable::GetNameForGlobalColumnIndex(
@@ -267,320 +250,155 @@ int SpanJoinOperatorTable::Cursor::Initialize(const QueryConstraints& qc,
     return err;
 
   // We step table 2 and allow Next() to step from table 1.
-  next_stepped_table_ = &t1_;
-  err = t2_.StepAndCacheValues();
+  next_stepped_ = &t1_;
 
-  // If there is an error stepping the table, just return the error.
-  if (err != SQLITE_ROW && err != SQLITE_DONE)
-    return err;
+  auto res = t2_.Step();
+  bool is_mixed_part =
+      table_->partitioning_ == PartitioningType::kMixedPartitioning;
+  if (res.is_err() || (res.is_eof() && !is_mixed_part))
+    return res.err_code;
 
   // Otherwise, find an overlapping span.
   return Next();
 }
 
-bool SpanJoinOperatorTable::Cursor::IsOverlappingSpan(
-    TableQueryState* t1,
-    TableQueryState* t2,
-    TableQueryState** next_stepped_table) {
-  // Get both tables to have an overlapping slice.
-  if (t1->ts_end() <= t2->ts_start()) {
-    *next_stepped_table = t1;
+bool SpanJoinOperatorTable::Cursor::IsOverlappingSpan() {
+  if (t1_.partition() != t2_.partition()) {
+    return false;
+  } else if (t1_.ts_end() <= t2_.ts_start() || t2_.ts_end() <= t1_.ts_start()) {
     return false;
   }
-
-  if (t2->ts_end() <= t1->ts_start()) {
-    *next_stepped_table = t2;
-    return false;
-  }
-
-  // Both slices now have an overlapping slice and the same partition.
-  // Update the next stepped table to be the one which finishes earliest.
-  *next_stepped_table = t1->ts_end() <= t2->ts_end() ? t1 : t2;
   return true;
 }
 
-int SpanJoinOperatorTable::Cursor::Column(sqlite3_context* context, int N) {
-  if (N == Column::kTimestamp) {
-    sqlite3_result_int64(context, static_cast<sqlite3_int64>(ts_));
-  } else if (N == Column::kDuration) {
-    sqlite3_result_int64(context, static_cast<sqlite3_int64>(dur_));
-  } else if (N == Column::kPartition &&
-             table_->partitioning_ != PartitioningType::kNoPartitioning) {
-    sqlite3_result_int64(context, static_cast<sqlite3_int64>(partition_));
-  } else {
-    size_t index = static_cast<size_t>(N);
-    const auto& locator = table_->global_index_to_column_locator_[index];
-    if (locator.defn == t1_.definition()) {
-      // We don't currently support |t1_null_|.
-      t1_.ReportSqliteResult(context, locator.col_index);
-    } else {
-      if (t2_null_) {
-        sqlite3_result_null(context);
-      } else {
-        t2_.ReportSqliteResult(context, locator.col_index);
-      }
-    }
-  }
-  return SQLITE_OK;
-}
-
-void SpanJoinOperatorTable::Cursor::SetupOverlappingSlice() {
-  // Set timestamp.
-  ts_ = std::max(t1_.ts_start(), t2_.ts_start());
-
-  // Set duration.
-  auto end = std::min(t1_.ts_end(), t2_.ts_end());
-  PERFETTO_DCHECK(end > ts_);
-  dur_ = end - ts_;
-
-  // Set the partition.
-  if (table_->partitioning_ != PartitioningType::kNoPartitioning) {
-    PERFETTO_DCHECK(table_->partitioning_ ==
-                        PartitioningType::kMixedPartitioning ||
-                    t1_.partition() == t2_.partition());
-    partition_ = t1_.partition();
-  }
-}
-
-SpanJoinOperatorTable::LeftJoinCursor::LeftJoinCursor(
-    SpanJoinOperatorTable* table,
-    sqlite3* db)
-    : Cursor(table, db) {
-  PERFETTO_DCHECK(t1_.definition()->partition_col() ==
-                  t2_.definition()->partition_col());
-  PERFETTO_DCHECK(t1_.definition()->should_emit_nulls());
-  PERFETTO_DCHECK(!t2_.definition()->should_emit_nulls());
-}
-
-int SpanJoinOperatorTable::LeftJoinCursor::Next() {
-  // Reset the null state of t2.
-  t2_null_ = false;
-
-  // From the previous Next() call, we figured we needed to emit the overlapping
-  // slice. Do that now.
-  if (emit_overlap_slice_) {
-    SetupOverlappingSlice();
-    emit_overlap_slice_ = false;
-    return SQLITE_OK;
-  }
+int SpanJoinOperatorTable::Cursor::Next() {
+  // TODO: Propagate error msg to the table.
+  auto res = next_stepped_->Step();
+  if (res.is_err())
+    return res.err_code;
 
   while (true) {
-    int err = next_stepped_table_->StepAndCacheValues();
-
-    // TODO: Propagate error msg to the table.
-    if (err != SQLITE_ROW && err != SQLITE_DONE)
-      return err;
-
-    // For left joins, Eof == t1.Eof
-    if (Eof())
+    if (t1_.Eof())
       return SQLITE_OK;
 
-    // If t2 has finished, we need to emit a slice for each slice in t1.
     if (t2_.Eof()) {
-      next_stepped_table_ = &t1_;
-
-      if (partition_ == t1_.partition())
-        ts_ = std::max(t1_.ts_start(), ts_ + dur_);
-      else
-        ts_ = t1_.ts_start();
-      PERFETTO_DCHECK(ts_ < t1_.ts_end());
-      dur_ = t1_.ts_end() - ts_;
-      partition_ = t1_.partition();
-
-      t2_null_ = true;
-
-      return SQLITE_OK;
-    }
-
-    // We always want t2's partition to be equal to or greater than t1's
-    // partition. Similarily we always t2's end timestamp to be greater than to
-    // t1's start timestamp when the partitions are equal.
-    bool partition_equal = t1_.partition() == t2_.partition();
-    if (t2_.partition() < t1_.partition() ||
-        (partition_equal && t2_.ts_end() <= t1_.ts_start())) {
-      next_stepped_table_ = &t2_;
-      continue;
-    }
-
-    // We now have 3 possible cases.
-    if (t2_.partition() > t1_.partition() || t2_.ts_start() >= t1_.ts_end()) {
-      // Case 1: t2's slice is ahead of t1's slice (either in terms of partiion
-      // or time). Just emit t1's slice with null t2 and step t1 forward.
-      next_stepped_table_ = &t1_;
-
-      if (partition_ == t1_.partition())
-        ts_ = std::max(t1_.ts_start(), ts_ + dur_);
-      else
-        ts_ = t1_.ts_start();
-      PERFETTO_DCHECK(ts_ < t1_.ts_end());
-      dur_ = t1_.ts_end() - ts_;
-      partition_ = t1_.partition();
-
-      t2_null_ = true;
-
-      return SQLITE_OK;
-    } else {
-      // In either case here, we need to figure out the next table to step to
-      // and we should have an overlap.
-      bool is_overlapping = IsOverlappingSpan(&t1_, &t2_, &next_stepped_table_);
-      PERFETTO_DCHECK(is_overlapping);
-
-      if (t2_.ts_start() <= t1_.ts_start() || ts_ + dur_ == t2_.ts_start()) {
-        // Case 2: t2's slice starts before t1 slice or we have already emitted
-        // all data up to the start of t2's start. This means we need to emit
-        // a overlapping slice between t1's start and the lesser of t1 and t2's
-        // end.
-        SetupOverlappingSlice();
+      if (table_->partitioning_ != PartitioningType::kMixedPartitioning) {
         return SQLITE_OK;
+      } else {
+        res = t1_.StepToNextPartition();
+        if (PERFETTO_UNLIKELY(res.is_err()))
+          return res.err_code;
+        else if (PERFETTO_UNLIKELY(res.is_eof()))
+          continue;
+
+        res = t2_.StepToPartition(t1_.partition());
+        if (PERFETTO_UNLIKELY(res.is_err()))
+          return res.err_code;
+        else if (PERFETTO_UNLIKELY(res.is_eof()))
+          continue;
       }
-
-      // Case 3: t1's slice starts before t2's slice and we have some
-      // unexplained time between the end of the previous slice and the start of
-      // this one. This is the most complex case and requires us to emit a null
-      // slice starting at the max of the end of the previously emitted slice
-      // and t2's start. We need to do this as may have emitted a slice
-      // previously associated with this t1 slice. We also need to setup to emit
-      // the overlapping slice on the next Next() call.
-      if (partition_ == t1_.partition())
-        ts_ = std::max(t1_.ts_start(), ts_ + dur_);
-      else
-        ts_ = t1_.ts_start();
-      PERFETTO_DCHECK(ts_ < t2_.ts_start());
-      dur_ = t2_.ts_start() - ts_;
-      partition_ = t1_.partition();
-
-      t2_null_ = true;
-      emit_overlap_slice_ = true;
-
-      return SQLITE_OK;
-    }
-  }
-  PERFETTO_FATAL("For GCC");
-}
-
-int SpanJoinOperatorTable::LeftJoinCursor::Eof() {
-  return t1_.Eof();
-}
-
-SpanJoinOperatorTable::SinglePartitioningCursor::SinglePartitioningCursor(
-    SpanJoinOperatorTable* table,
-    sqlite3* db)
-    : Cursor(table, db) {
-  PERFETTO_DCHECK(t1_.definition()->partition_col() ==
-                  t2_.definition()->partition_col());
-  PERFETTO_DCHECK(!t1_.definition()->should_emit_nulls());
-  PERFETTO_DCHECK(!t2_.definition()->should_emit_nulls());
-}
-
-int SpanJoinOperatorTable::SinglePartitioningCursor::Next() {
-  while (true) {
-    int err = next_stepped_table_->StepAndCacheValues();
-    // TODO: Propagate error msg to the table.
-    if (err != SQLITE_ROW && err != SQLITE_DONE)
-      return err;
-
-    if (Eof())
-      return SQLITE_OK;
-
-    if (t1_.partition() < t2_.partition()) {
-      next_stepped_table_ = &t1_;
-      continue;
-    } else if (t2_.partition() < t1_.partition()) {
-      next_stepped_table_ = &t2_;
-      continue;
     }
 
-    if (IsOverlappingSpan(&t1_, &t2_, &next_stepped_table_))
+    auto partition = std::max(t1_.partition(), t2_.partition());
+    res = t1_.StepToPartition(partition);
+    if (PERFETTO_UNLIKELY(res.is_err()))
+      return res.err_code;
+    else if (PERFETTO_UNLIKELY(res.is_eof()))
+      continue;
+
+    res = t2_.StepToPartition(t1_.partition());
+    if (PERFETTO_UNLIKELY(res.is_err()))
+      return res.err_code;
+    else if (PERFETTO_UNLIKELY(res.is_eof()))
+      continue;
+
+    if (t1_.partition() != t2_.partition())
+      continue;
+
+    auto ts = std::max(t1_.ts_start(), t2_.ts_start());
+    res = t1_.StepUntil(ts);
+    if (PERFETTO_UNLIKELY(res.is_err()))
+      return res.err_code;
+    else if (PERFETTO_UNLIKELY(res.is_eof()))
+      continue;
+
+    res = t2_.StepUntil(t1_.ts_start());
+    if (PERFETTO_UNLIKELY(res.is_err()))
+      return res.err_code;
+    else if (PERFETTO_UNLIKELY(res.is_eof()))
+      continue;
+
+    if (IsOverlappingSpan())
       break;
   }
-  SetupOverlappingSlice();
+  next_stepped_ = t1_.ts_end() <= t2_.ts_end() ? &t1_ : &t2_;
 
-  // EOF
   return SQLITE_OK;
 }
 
-int SpanJoinOperatorTable::SinglePartitioningCursor::Eof() {
+int SpanJoinOperatorTable::Cursor::Eof() {
   return t1_.Eof() || t2_.Eof();
 }
 
-SpanJoinOperatorTable::MixedPartitioningCursor::MixedPartitioningCursor(
-    SpanJoinOperatorTable* table,
-    sqlite3* db)
-    : Cursor(table, db) {
-  PERFETTO_DCHECK(t1_.definition()->IsPartitioned());
-  PERFETTO_DCHECK(!t2_.definition()->IsPartitioned());
-  PERFETTO_DCHECK(!t1_.definition()->should_emit_nulls());
-  PERFETTO_DCHECK(!t2_.definition()->should_emit_nulls());
-}
+int SpanJoinOperatorTable::Cursor::Column(sqlite3_context* context, int N) {
+  PERFETTO_DCHECK(!t1_.Eof());
+  PERFETTO_DCHECK(!t2_.Eof());
 
-int SpanJoinOperatorTable::MixedPartitioningCursor::Next() {
-  while (true) {
-    int64_t prev_partition = t1_.partition();
-    int err = next_stepped_table_->StepAndCacheValues();
-    // TODO: Propagate error msg to the table.
-    if (err != SQLITE_ROW && err != SQLITE_DONE)
-      return err;
-
-    // For mixed partitioning, Eof == t1.Eof
-    if (Eof())
-      return SQLITE_OK;
-
-    // t1 switched partitions, rewind the unpartitioned table.
-    if (t1_.partition() != prev_partition) {
-      int reset_err = t2_.PrepareRawStmt();
-      if (reset_err != SQLITE_OK)
-        return reset_err;
-      next_stepped_table_ = &t2_;
-      continue;
-    }
-
-    // t2 is out of data, fast forward t1
-    if (t2_.Eof()) {
-      next_stepped_table_ = &t1_;
-      continue;
-    }
-
-    if (IsOverlappingSpan(&t1_, &t2_, &next_stepped_table_))
-      break;
+  if (N == Column::kTimestamp) {
+    auto max_ts = std::max(t1_.ts_start(), t2_.ts_start());
+    sqlite3_result_int64(context, static_cast<sqlite3_int64>(max_ts));
+  } else if (N == Column::kDuration) {
+    auto max_start = std::max(t1_.ts_start(), t2_.ts_start());
+    auto min_end = std::min(t1_.ts_end(), t2_.ts_end());
+    PERFETTO_DCHECK(min_end > max_start);
+    auto dur = min_end - max_start;
+    sqlite3_result_int64(context, static_cast<sqlite3_int64>(dur));
+  } else if (N == Column::kPartition &&
+             table_->partitioning_ != PartitioningType::kNoPartitioning) {
+    PERFETTO_DCHECK(table_->partitioning_ ==
+                        PartitioningType::kMixedPartitioning ||
+                    t1_.partition() == t2_.partition());
+    sqlite3_result_int64(context, static_cast<sqlite3_int64>(t1_.partition()));
+  } else {
+    size_t index = static_cast<size_t>(N);
+    const auto& locator = table_->global_index_to_column_locator_[index];
+    if (locator.defn == t1_.definition())
+      t1_.ReportSqliteResult(context, locator.col_index);
+    else
+      t2_.ReportSqliteResult(context, locator.col_index);
   }
-  SetupOverlappingSlice();
-
-  // EOF
   return SQLITE_OK;
 }
 
-int SpanJoinOperatorTable::MixedPartitioningCursor::Eof() {
-  return t1_.Eof();
+SpanJoinOperatorTable::Query::Query(SpanJoinOperatorTable* table,
+                                    const TableDefinition* definition,
+                                    sqlite3* db)
+    : defn_(definition), db_(db), table_(table) {
+  PERFETTO_DCHECK(!defn_->IsPartitioned() ||
+                  defn_->partition_idx() < defn_->columns().size());
 }
 
-SpanJoinOperatorTable::Cursor::TableQueryState::TableQueryState(
-    SpanJoinOperatorTable* table,
-    const TableDefinition* definition,
-    sqlite3* db)
-    : defn_(definition), db_(db), table_(table) {}
+SpanJoinOperatorTable::Query::~Query() = default;
 
-int SpanJoinOperatorTable::Cursor::TableQueryState::Initialize(
-    const QueryConstraints& qc,
-    sqlite3_value** argv) {
+int SpanJoinOperatorTable::Query::Initialize(const QueryConstraints& qc,
+                                             sqlite3_value** argv) {
   sql_query_ = CreateSqlQuery(
       table_->ComputeSqlConstraintsForDefinition(*defn_, qc, argv));
   return PrepareRawStmt();
 }
 
-int SpanJoinOperatorTable::Cursor::TableQueryState::StepAndCacheValues() {
+SpanJoinOperatorTable::Query::StepRet SpanJoinOperatorTable::Query::Step() {
+  PERFETTO_DCHECK(!eof_);
+
   sqlite3_stmt* stmt = stmt_.get();
 
-  auto ts_idx = static_cast<int>(definition()->ts_idx());
-  auto dur_idx = static_cast<int>(definition()->dur_idx());
-  auto partition_idx = static_cast<int>(definition()->partition_idx());
-  PERFETTO_DCHECK(!definition()->IsPartitioned() ||
-                  static_cast<size_t>(partition_idx) <
-                      definition()->columns().size());
+  auto ts_idx = static_cast<int>(defn_->ts_idx());
+  auto dur_idx = static_cast<int>(defn_->dur_idx());
 
-  // Keep stepping through rows as long as |ts_start_| == |ts_end_|.
   int res;
   do {
-    if (definition()->IsPartitioned()) {
+    if (defn_->IsPartitioned()) {
+      auto partition_idx = static_cast<int>(defn_->partition_idx());
       // Fastforward through any rows with null partition keys.
       int row_type;
       do {
@@ -596,20 +414,65 @@ int SpanJoinOperatorTable::Cursor::TableQueryState::StepAndCacheValues() {
       int64_t dur = sqlite3_column_int64(stmt, dur_idx);
       ts_start_ = ts;
       ts_end_ = ts_start_ + dur;
-      if (definition()->IsPartitioned()) {
+      if (defn_->IsPartitioned()) {
+        auto partition_idx = static_cast<int>(defn_->partition_idx());
         partition_ = sqlite3_column_int64(stmt, partition_idx);
       }
     } else if (res == SQLITE_DONE) {
-      ts_start_ = kI64Max;
-      ts_end_ = kI64Max;
-      partition_ = kI64Max;
+      eof_ = true;
+      return StepRet(StepRet::Code::kEof);
     }
   } while (ts_start_ == ts_end_ && res == SQLITE_ROW);
 
-  return res;
+  return res == SQLITE_ROW ? StepRet(StepRet::Code::kRow)
+                           : StepRet(StepRet::Code::kError, res);
 }
 
-std::string SpanJoinOperatorTable::Cursor::TableQueryState::CreateSqlQuery(
+SpanJoinOperatorTable::Query::StepRet
+SpanJoinOperatorTable::Query::StepToNextPartition() {
+  PERFETTO_DCHECK(defn_->IsPartitioned());
+  PERFETTO_DCHECK(!eof_);
+
+  auto current_partition = partition_;
+  while (partition_ <= current_partition) {
+    auto res = Step();
+    if (!res.is_row())
+      return res;
+  }
+  return StepRet(StepRet::Code::kRow);
+}
+
+SpanJoinOperatorTable::Query::StepRet
+SpanJoinOperatorTable::Query::StepToPartition(int64_t partition) {
+  PERFETTO_DCHECK(partition_ <= partition);
+  if (defn_->IsPartitioned()) {
+    while (partition_ < partition) {
+      auto res = StepToNextPartition();
+      if (!res.is_row())
+        return res;
+    }
+  } else if (!defn_->IsPartitioned() && partition_ < partition) {
+    int res = PrepareRawStmt();
+    if (res != SQLITE_OK)
+      return StepRet(StepRet::Code::kError, res);
+    partition_ = partition;
+  }
+  return StepRet(StepRet::Code::kRow);
+}
+
+SpanJoinOperatorTable::Query::StepRet SpanJoinOperatorTable::Query::StepUntil(
+    int64_t timestamp) {
+  PERFETTO_DCHECK(!eof_);
+  auto partition = partition_;
+  while (partition_ == partition && ts_end_ <= timestamp) {
+    auto res = Step();
+    if (!res.is_row())
+      return res;
+  }
+  return StepRet(StepRet::Code::kRow);
+}
+
+std::string SpanJoinOperatorTable::Query::CreateSqlQuery(
     const std::vector<std::string>& cs) const {
   std::vector<std::string> col_names;
   for (const Table::Column& c : defn_->columns()) {
@@ -630,18 +493,23 @@ std::string SpanJoinOperatorTable::Cursor::TableQueryState::CreateSqlQuery(
   return sql;
 }
 
-int SpanJoinOperatorTable::Cursor::TableQueryState::PrepareRawStmt() {
+int SpanJoinOperatorTable::Query::PrepareRawStmt() {
   sqlite3_stmt* stmt = nullptr;
   int err =
       sqlite3_prepare_v2(db_, sql_query_.c_str(),
                          static_cast<int>(sql_query_.size()), &stmt, nullptr);
   stmt_.reset(stmt);
+
+  ts_start_ = 0;
+  ts_end_ = 0;
+  partition_ = std::numeric_limits<int64_t>::lowest();
+  eof_ = false;
+
   return err;
 }
 
-void SpanJoinOperatorTable::Cursor::TableQueryState::ReportSqliteResult(
-    sqlite3_context* context,
-    size_t index) {
+void SpanJoinOperatorTable::Query::ReportSqliteResult(sqlite3_context* context,
+                                                      size_t index) {
   sqlite3_stmt* stmt = stmt_.get();
   int idx = static_cast<int>(index);
   switch (sqlite3_column_type(stmt, idx)) {
@@ -668,14 +536,12 @@ SpanJoinOperatorTable::TableDefinition::TableDefinition(
     std::string name,
     std::string partition_col,
     std::vector<Table::Column> cols,
-    bool should_emit_nulls,
     uint32_t ts_idx,
     uint32_t dur_idx,
     uint32_t partition_idx)
     : name_(std::move(name)),
       partition_col_(std::move(partition_col)),
       cols_(std::move(cols)),
-      should_emit_nulls_(should_emit_nulls),
       ts_idx_(ts_idx),
       dur_idx_(dur_idx),
       partition_idx_(partition_idx) {}

@@ -92,7 +92,7 @@ TEST_F(TraceProcessorIntegrationTest, TraceBounds) {
   Query("select start_ts, end_ts from trace_bounds", &res);
   ASSERT_EQ(res.num_records(), 1);
   ASSERT_EQ(res.columns(0).long_values(0), 81473009948313);
-  ASSERT_EQ(res.columns(1).long_values(0), 81492694724571);
+  ASSERT_EQ(res.columns(1).long_values(0), 81492700784311);
 }
 
 // TODO(hjd): Add trace to test_data.

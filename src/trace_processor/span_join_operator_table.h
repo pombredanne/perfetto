@@ -97,8 +97,6 @@ class SpanJoinOperatorTable : public Table {
     static base::Optional<TableDescriptor> Parse(
         const std::string& raw_descriptor);
 
-    bool IsPartitioned() const { return !partition_col.empty(); }
-
     std::string name;
     std::string partition_col;
   };
@@ -111,7 +109,6 @@ class SpanJoinOperatorTable : public Table {
     TableDefinition(std::string name,
                     std::string partition_col,
                     std::vector<Table::Column> cols,
-                    bool should_emit_nulls,
                     uint32_t ts_idx,
                     uint32_t dur_idx,
                     uint32_t partition_idx);
@@ -119,7 +116,6 @@ class SpanJoinOperatorTable : public Table {
     const std::string& name() const { return name_; }
     const std::string& partition_col() const { return partition_col_; }
     const std::vector<Table::Column>& columns() const { return cols_; }
-    bool should_emit_nulls() const { return should_emit_nulls_; }
 
     uint32_t ts_idx() const { return ts_idx_; }
     uint32_t dur_idx() const { return dur_idx_; }
@@ -131,11 +127,67 @@ class SpanJoinOperatorTable : public Table {
     std::string name_;
     std::string partition_col_;
     std::vector<Table::Column> cols_;
-    bool should_emit_nulls_;
-
     uint32_t ts_idx_ = std::numeric_limits<uint32_t>::max();
     uint32_t dur_idx_ = std::numeric_limits<uint32_t>::max();
     uint32_t partition_idx_ = std::numeric_limits<uint32_t>::max();
+  };
+
+  class Query {
+   public:
+    struct StepRet {
+      enum Code {
+        kRow,
+        kEof,
+        kError,
+      };
+
+      StepRet(Code c, int e = SQLITE_OK) : code(c), err_code(e) {}
+
+      bool is_row() const { return code == Code::kRow; }
+      bool is_eof() const { return code == Code::kEof; }
+      bool is_err() const { return code == Code::kError; }
+
+      Code code = Code::kEof;
+      int err_code = SQLITE_OK;
+    };
+
+    Query(SpanJoinOperatorTable*, const TableDefinition*, sqlite3* db);
+    virtual ~Query();
+
+    int Initialize(const QueryConstraints& qc, sqlite3_value** argv);
+
+    StepRet Step();
+    StepRet StepToNextPartition();
+    StepRet StepToPartition(int64_t partition);
+    StepRet StepUntil(int64_t timestamp);
+
+    void ReportSqliteResult(sqlite3_context* context, size_t index);
+
+    int64_t ts_start() const { return ts_start_; }
+    int64_t ts_end() const { return ts_end_; }
+    int64_t partition() const { return partition_; }
+
+    const TableDefinition* definition() const { return defn_; }
+
+    bool Eof() const { return eof_; }
+    bool IsPartitioned() const { return defn_->IsPartitioned(); }
+
+   private:
+    int PrepareRawStmt();
+    std::string CreateSqlQuery(const std::vector<std::string>& cs) const;
+
+    std::string sql_query_;
+    ScopedStmt stmt_;
+
+    int64_t ts_start_ = 0;
+    int64_t ts_end_ = 0;
+    int64_t partition_ = std::numeric_limits<int64_t>::lowest();
+
+    bool eof_ = false;
+
+    const TableDefinition* const defn_;
+    sqlite3* const db_;
+    SpanJoinOperatorTable* const table_;
   };
 
   // Base class for a cursor on the span table.
@@ -147,90 +199,17 @@ class SpanJoinOperatorTable : public Table {
     int Initialize(const QueryConstraints& qc, sqlite3_value** argv);
     int Column(sqlite3_context* context, int N) override;
 
+    int Next() override;
+    int Eof() override;
+
    protected:
-    // State of a query on a particular table.
-    class TableQueryState {
-     public:
-      TableQueryState(SpanJoinOperatorTable*,
-                      const TableDefinition*,
-                      sqlite3* db);
+    bool IsOverlappingSpan();
 
-      int Initialize(const QueryConstraints& qc, sqlite3_value** argv);
-      int StepAndCacheValues();
-      void ReportSqliteResult(sqlite3_context* context, size_t index);
-      int PrepareRawStmt();
-
-      const TableDefinition* definition() const { return defn_; }
-
-      int64_t ts_start() const { return ts_start_; }
-      int64_t ts_end() const { return ts_end_; }
-      int64_t partition() const { return partition_; }
-      bool Eof() const {
-        return ts_start_ == std::numeric_limits<int64_t>::max();
-      }
-
-     private:
-      std::string CreateSqlQuery(const std::vector<std::string>& cs) const;
-
-      std::string sql_query_;
-      ScopedStmt stmt_;
-
-      int64_t ts_start_ = std::numeric_limits<int64_t>::max();
-      int64_t ts_end_ = std::numeric_limits<int64_t>::max();
-      int64_t partition_ = std::numeric_limits<int64_t>::max();
-
-      const TableDefinition* const defn_;
-      sqlite3* const db_;
-      SpanJoinOperatorTable* const table_;
-    };
-
-    void SetupOverlappingSlice();
-
-    static bool IsOverlappingSpan(TableQueryState* t1,
-                                  TableQueryState* t2,
-                                  TableQueryState** next_stepped_table);
-
-    TableQueryState t1_;
-    TableQueryState t2_;
-    TableQueryState* next_stepped_table_ = nullptr;
-
-    int64_t ts_ = 0;
-    int64_t dur_ = 0;
-    int64_t partition_ = 0;
-
-    bool t2_null_ = false;
+    Query t1_;
+    Query t2_;
+    Query* next_stepped_ = nullptr;
 
     SpanJoinOperatorTable* const table_;
-  };
-
-  class SinglePartitioningCursor : public Cursor {
-   public:
-    SinglePartitioningCursor(SpanJoinOperatorTable*, sqlite3* db);
-    ~SinglePartitioningCursor() override = default;
-
-    int Next() override;
-    int Eof() override;
-  };
-
-  class MixedPartitioningCursor : public Cursor {
-   public:
-    MixedPartitioningCursor(SpanJoinOperatorTable*, sqlite3* db);
-    ~MixedPartitioningCursor() override = default;
-
-    int Next() override;
-    int Eof() override;
-  };
-
-  class LeftJoinCursor : public Cursor {
-   public:
-    LeftJoinCursor(SpanJoinOperatorTable*, sqlite3* db);
-    ~LeftJoinCursor() override = default;
-
-    int Next() override;
-    int Eof() override;
-
-   private:
-    bool emit_overlap_slice_ = false;
   };
 
   // Identifier for a column by index in a given table.
@@ -240,8 +219,7 @@ class SpanJoinOperatorTable : public Table {
   };
 
   base::Optional<TableDefinition> CreateTableDefinition(
-      const TableDescriptor& desc,
-      bool should_emit_nulls);
+      const TableDescriptor& desc);
 
   std::vector<std::string> ComputeSqlConstraintsForDefinition(
       const TableDefinition& defn,
@@ -253,8 +231,6 @@ class SpanJoinOperatorTable : public Table {
 
   void CreateSchemaColsForDefn(const TableDefinition& defn,
                                std::vector<Table::Column>* cols);
-
-  bool is_left_join() const { return name() == "span_left_join"; }
 
   TableDefinition t1_defn_;
   TableDefinition t2_defn_;
