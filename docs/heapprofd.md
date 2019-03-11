@@ -120,4 +120,3 @@ to get gzipped protos, which tools handling pprof profile protos expect.
 
 Follow the instructions in [Viewing the Data](#viewing-the-data) to visualise
 the results.
-
