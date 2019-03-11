@@ -90,7 +90,8 @@ The identifier into the args table. (see below)
 
 ### instants table
 The instants table contains the data about instant events (both kernel
-and userspace) in the trace. This includes sources like the lmk, sched_wakeup events etc.
+and userspace) in the trace. This includes sources like the lmk, sched_wakeup
+events etc.
 
 `id`  
 A unique identifier for the instant row.
