@@ -19,6 +19,7 @@
 #include <atomic>
 #include <type_traits>
 
+#include <errno.h>
 #include <inttypes.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -166,13 +167,16 @@ SharedRingBuffer::Buffer SharedRingBuffer::BeginWrite(
   Buffer result;
 
   base::Optional<PointerPositions> opt_pos = GetPointerPositions(spinlock);
-  if (!opt_pos)
+  if (!opt_pos) {
+    errno = EBADF;
     return result;
+  }
   auto pos = opt_pos.value();
 
   const uint64_t size_with_header =
       base::AlignUp<kAlignment>(size + kHeaderSize);
   if (size_with_header > write_avail(pos)) {
+    errno = EAGAIN;
     meta_->num_writes_failed++;
     return result;
   }
@@ -192,6 +196,8 @@ SharedRingBuffer::Buffer SharedRingBuffer::BeginWrite(
 }
 
 void SharedRingBuffer::EndWrite(Buffer buf) {
+  if (!buf)
+    return;
   uint8_t* wr_ptr = buf.data - kHeaderSize;
   PERFETTO_DCHECK(reinterpret_cast<uintptr_t>(wr_ptr) % kAlignment == 0);
   reinterpret_cast<std::atomic<uint32_t>*>(wr_ptr)->store(

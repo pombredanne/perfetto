@@ -461,7 +461,7 @@ SpanJoinOperatorTable::Query::StepToPartition(int64_t partition) {
     if (res != SQLITE_OK)
       return StepRet(StepRet::Code::kError, res);
     partition_ = partition;
-  } 
+  }
   return StepRet(StepRet::Code::kRow);
 }
 
