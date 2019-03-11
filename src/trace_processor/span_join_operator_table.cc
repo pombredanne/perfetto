@@ -277,16 +277,12 @@ int SpanJoinOperatorTable::Cursor::Next() {
   if (res.is_err())
     return res.err_code;
 
-  bool t1_part = t1_.IsPartitioned();
-  bool t2_part = t2_.IsPartitioned();
-  bool same_partition = (t1_part && t2_part) || (!t1_part && !t2_part);
-
   while (true) {
     if (t1_.Eof())
       return SQLITE_OK;
 
     if (t2_.Eof()) {
-      if (same_partition) {
+      if (table_->partitioning_ != PartitioningType::kMixedPartitioning) {
         return SQLITE_OK;
       } else {
         res = t1_.StepToNextPartition();
@@ -412,10 +408,6 @@ SpanJoinOperatorTable::Query::StepRet SpanJoinOperatorTable::Query::Step() {
     } else {
       res = sqlite3_step(stmt);
     }
-    if (res == SQLITE_DONE) {
-      eof_ = true;
-      return StepRet(StepRet::Code::kEof);
-    }
 
     if (res == SQLITE_ROW) {
       int64_t ts = sqlite3_column_int64(stmt, ts_idx);
@@ -426,6 +418,9 @@ SpanJoinOperatorTable::Query::StepRet SpanJoinOperatorTable::Query::Step() {
         auto partition_idx = static_cast<int>(defn_->partition_idx());
         partition_ = sqlite3_column_int64(stmt, partition_idx);
       }
+    } else if (res == SQLITE_DONE) {
+      eof_ = true;
+      return StepRet(StepRet::Code::kEof);
     }
   } while (ts_start_ == ts_end_ && res == SQLITE_ROW);
 
