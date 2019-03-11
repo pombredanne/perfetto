@@ -215,8 +215,9 @@ perfetto_fuzzer_test("unwinding_fuzzer") {
     ":ring_buffer",
     ":wire_protocol",
     "../../../gn:default_deps",
-    "../../../src/base",
+    "../../base",
     "../../base:test_support",
+    "../../tracing",
   ]
 }
 
@@ -228,6 +229,6 @@ perfetto_fuzzer_test("shared_ring_buffer_fuzzer") {
   deps = [
     ":ring_buffer",
     "../../../gn:default_deps",
-    "../../../src/base",
+    "../../base",
   ]
 }
