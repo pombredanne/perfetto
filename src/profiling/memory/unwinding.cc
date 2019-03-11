@@ -354,5 +354,7 @@ void UnwindingWorker::HandleBufferForTesting(
   HandleBuffer(buf, &client_data, peer_pid);
 }
 
+UnwindingWorker::Delegate::~Delegate() = default;
+
 }  // namespace profiling
 }  // namespace perfetto
