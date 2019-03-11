@@ -266,13 +266,16 @@ void UnwindingWorker::OnDataAvailable(base::UnixSocket* self) {
     buf = shmem.BeginRead();
     if (!buf)
       break;
-    HandleBuffer(&buf, &socket_data, socket_data.sock->peer_pid());
+    HandleBuffer(&buf, &socket_data.metadata,
+                 socket_data.data_source_instance_id,
+                 socket_data.sock->peer_pid());
     shmem.EndRead(std::move(buf));
   }
 }
 
 void UnwindingWorker::HandleBuffer(SharedRingBuffer::Buffer* buf,
-                                   ClientData* socket_data,
+                                   UnwindingMetadata* unwinding_metadata,
+                                   DataSourceInstanceID data_source_instance_id,
                                    pid_t peer_pid) {
   WireMessage msg;
   // TODO(fmayer): standardise on char* or uint8_t*.
@@ -288,13 +291,13 @@ void UnwindingWorker::HandleBuffer(SharedRingBuffer::Buffer* buf,
     AllocRecord rec;
     rec.alloc_metadata = *msg.alloc_header;
     rec.pid = peer_pid;
-    rec.data_source_instance_id = socket_data->data_source_instance_id;
-    DoUnwind(&msg, &socket_data->metadata, &rec);
+    rec.data_source_instance_id = data_source_instance_id;
+    DoUnwind(&msg, unwinding_metadata, &rec);
     delegate_->PostAllocRecord(std::move(rec));
   } else if (msg.record_type == RecordType::Free) {
     FreeRecord rec;
     rec.pid = peer_pid;
-    rec.data_source_instance_id = socket_data->data_source_instance_id;
+    rec.data_source_instance_id = data_source_instance_id;
     // We need to copy this, so we can return the memory to the shmem buffer.
     memcpy(&rec.metadata, msg.free_header, sizeof(*msg.free_header));
     delegate_->PostFreeRecord(std::move(rec));
@@ -340,18 +343,6 @@ void UnwindingWorker::PostDisconnectSocket(pid_t pid) {
 
 void UnwindingWorker::HandleDisconnectSocket(pid_t pid) {
   client_data_.erase(pid);
-}
-
-void UnwindingWorker::HandleBufferForTesting(
-    SharedRingBuffer::Buffer* buf,
-    DataSourceInstanceID data_source_instance_id,
-    std::unique_ptr<base::UnixSocket> sock,
-    UnwindingMetadata metadata,
-    SharedRingBuffer shmem,
-    pid_t peer_pid) {
-  ClientData client_data{data_source_instance_id, std::move(sock),
-                         std::move(metadata), std::move(shmem)};
-  HandleBuffer(buf, &client_data, peer_pid);
 }
 
 UnwindingWorker::Delegate::~Delegate() = default;

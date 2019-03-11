@@ -39,21 +39,15 @@ int FuzzUnwinding(const uint8_t* data, size_t size) {
   base::TestTaskRunner task_runner;
   UnwindingWorker worker(&nop_delegate, &task_runner);
 
-  std::unique_ptr<uint8_t[]> buf_data(new uint8_t[size]);
-  memcpy(buf_data.get(), data, size);
-  SharedRingBuffer::Buffer buf(buf_data.get(), size);
+  SharedRingBuffer::Buffer buf(const_cast<uint8_t*>(data), size);
 
   pid_t self_pid = getpid();
   DataSourceInstanceID id = 0;
   UnwindingMetadata metadata(self_pid,
                              base::OpenFile("/proc/self/maps", O_RDONLY),
                              base::OpenFile("/proc/self/mem", O_RDONLY));
-  // The following shouldn't be used by the unwinding codepath.
-  std::unique_ptr<base::UnixSocket> sock;
-  SharedRingBuffer shmem;
 
-  worker.HandleBufferForTesting(&buf, id, std::move(sock), std::move(metadata),
-                                std::move(shmem), self_pid);
+  worker.HandleBuffer(&buf, &metadata, id, self_pid);
   return 0;
 }
 

@@ -162,28 +162,22 @@ class UnwindingWorker : public base::UnixSocket::EventListener {
   }
   void OnDataAvailable(base::UnixSocket* self) override;
 
-  void HandleBufferForTesting(SharedRingBuffer::Buffer* buf,
-                              DataSourceInstanceID data_source_instance_id,
-                              std::unique_ptr<base::UnixSocket> sock,
-                              UnwindingMetadata metadata,
-                              SharedRingBuffer shmem,
-                              pid_t peer_pid);
+ public:  // public for fuzzing/testing
+  void HandleBuffer(SharedRingBuffer::Buffer* buf,
+                    UnwindingMetadata* unwinding_metadata,
+                    DataSourceInstanceID data_source_instance_id,
+                    pid_t peer_pid);
 
  private:
+  void HandleHandoffSocket(HandoffData data);
+  void HandleDisconnectSocket(pid_t pid);
+
   struct ClientData {
     DataSourceInstanceID data_source_instance_id;
     std::unique_ptr<base::UnixSocket> sock;
     UnwindingMetadata metadata;
     SharedRingBuffer shmem;
   };
-
-  // peer_pid is a separate argument from socket_data for testability, and
-  // outside of tests is equivalent to socket_data->sock->peer_pid().
-  void HandleBuffer(SharedRingBuffer::Buffer* buf,
-                    ClientData* socket_data,
-                    pid_t peer_pid);
-  void HandleHandoffSocket(HandoffData data);
-  void HandleDisconnectSocket(pid_t pid);
 
   std::map<pid_t, ClientData> client_data_;
   Delegate* delegate_;
