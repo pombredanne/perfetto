@@ -476,8 +476,11 @@ bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
           // disable if we've moved beyond a CONFIGURED state.
           auto* tracing_session_lamdba = weak_this->GetTracingSession(tsid);
           if (weak_this && tracing_session_lamdba &&
-              tracing_session_lamdba->state == TracingSession::CONFIGURED)
-            weak_this->FlushAndDisableTracing(tsid);
+              tracing_session_lamdba->state == TracingSession::CONFIGURED) {
+            PERFETTO_DLOG(
+                "Disabling TracingSession %" PRIu64 " due to timeout.", tsid);
+            weak_this->DisableTracing(tsid);
+          }
         },
         cfg.duration_ms());
   }
@@ -786,7 +789,7 @@ void TracingServiceImpl::ActivateTriggers(
         continue;
       }
       auto* producer = GetProducer(producer_id);
-      if (producer) {
+      if (!producer) {
         // The producer that sent us this trigger has disconnected before we got
         // the name.
         return;
@@ -806,6 +809,10 @@ void TracingServiceImpl::ActivateTriggers(
           // shouldn't destroy this task now.
           tracing_session->config.set_duration_ms(
               trigger->finalize_trace_delay_ms());
+          PERFETTO_DLOG("Triggering TracingSession %" PRIu64
+                        " with duration of %" PRIu32 "ms",
+                        iter->second.session,
+                        trigger->finalize_trace_delay_ms());
           StartTracing(iter->second.session);
           break;
         case TraceConfig::TriggerConfig::UNSPECIFIED:

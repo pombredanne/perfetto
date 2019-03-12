@@ -41,6 +41,7 @@ class MockProducerEndpoint : public TracingService::ProducerEndpoint {
   void UnregisterDataSource(const std::string&) override {}
   void NotifyFlushComplete(FlushRequestID) override {}
   void NotifyDataSourceStopped(DataSourceInstanceID) override {}
+  void ActivateTriggers(const ActivateTriggersRequest&) {}
   SharedMemory* shared_memory() const override { return nullptr; }
   size_t shared_buffer_page_size_kb() const override { return 0; }
   std::unique_ptr<TraceWriter> CreateTraceWriter(BufferID) override {
@@ -50,7 +51,6 @@ class MockProducerEndpoint : public TracingService::ProducerEndpoint {
   MOCK_METHOD2(CommitData, void(const CommitDataRequest&, CommitDataCallback));
   MOCK_METHOD2(RegisterTraceWriter, void(uint32_t, uint32_t));
   MOCK_METHOD1(UnregisterTraceWriter, void(uint32_t));
-  MOCK_METHOD1(ActivateTriggers, void(const ActivateTriggersRequest&));
 };
 
 class SharedMemoryArbiterImplTest : public AlignedBufferTest {

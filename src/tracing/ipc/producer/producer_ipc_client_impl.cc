@@ -278,7 +278,8 @@ void ProducerIPCClientImpl::ActivateTriggers(
     const ActivateTriggersRequest& req) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   if (!connected_) {
-    PERFETTO_DLOG("Cannot CommitData(), not connected to tracing service");
+    PERFETTO_DLOG(
+        "Cannot ActivateTriggers(), not connected to tracing service");
     return;
   }
   protos::ActivateTriggersRequest proto_req;
