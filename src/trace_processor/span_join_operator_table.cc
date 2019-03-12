@@ -407,7 +407,7 @@ int SpanJoinOperatorTable::Query::Initialize(const QueryConstraints& qc,
 SpanJoinOperatorTable::Query::StepRet SpanJoinOperatorTable::Query::Step() {
   PERFETTO_DCHECK(!Eof());
   sqlite3_stmt* stmt = stmt_.get();
-  int res;
+  int res = SQLITE_ROW;
   do {
     if (mode_ == Mode::kShadowSlice) {
       PERFETTO_DCHECK(defn_->emit_shadow_slices());
@@ -429,7 +429,6 @@ SpanJoinOperatorTable::Query::StepRet SpanJoinOperatorTable::Query::Step() {
         ts_end_ = CursorTs();
         partition_ = new_partition;
       }
-      res = SQLITE_ROW;
       continue;
     }
 
@@ -468,8 +467,6 @@ SpanJoinOperatorTable::Query::StepRet SpanJoinOperatorTable::Query::Step() {
       mode_ = Mode::kShadowSlice;
       ts_start_ = ts_end_;
       ts_end_ = std::numeric_limits<int64_t>::max();
-
-      return StepRet(StepRet::Code::kRow);
     }
   } while (ts_start_ == ts_end_ && res == SQLITE_ROW);
 
