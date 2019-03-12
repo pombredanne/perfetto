@@ -274,6 +274,15 @@ int SpanJoinOperatorTable::Cursor::Initialize(const QueryConstraints& qc,
   return Next();
 }
 
+bool SpanJoinOperatorTable::Cursor::IsOverlappingSpan() {
+  if (t1_.partition() != t2_.partition()) {
+    return false;
+  } else if (t1_.ts_end() <= t2_.ts_start() || t2_.ts_end() <= t1_.ts_start()) {
+    return false;
+  }
+  return true;
+}
+
 int SpanJoinOperatorTable::Cursor::Next() {
   // TODO: Propagate error msg to the table.
   auto res = next_stepped_->Step();
@@ -316,16 +325,15 @@ int SpanJoinOperatorTable::Cursor::Next() {
     else if (PERFETTO_UNLIKELY(res.is_eof()))
       continue;
 
-    PERFETTO_DCHECK(t2_shadow_slices || t2_.partition() <= t1_.partition());
-    if (t2_.partition() <= t1_.partition()) {
-      res = t2_.StepToPartition(t1_.partition());
-      if (PERFETTO_UNLIKELY(res.is_err()))
-        return res.err_code;
-      else if (PERFETTO_UNLIKELY(res.is_eof()))
-        continue;
-    }
+    res = t2_.StepToPartition(t1_.partition());
+    if (PERFETTO_UNLIKELY(res.is_err()))
+      return res.err_code;
+    else if (PERFETTO_UNLIKELY(res.is_eof()))
+      continue;
 
-    if (t1_.partition() == t2_.partition()) {
+    if (t1_.partition() < t2_.partition() && t2_shadow_slices) {
+      break;
+    } else if (t1_.partition() == t2_.partition()) {
       auto ts = t2_shadow_slices ? t1_.ts_start()
                                  : std::max(t1_.ts_start(), t2_.ts_start());
       res = t1_.StepUntil(ts);
@@ -339,21 +347,10 @@ int SpanJoinOperatorTable::Cursor::Next() {
         return res.err_code;
       else if (PERFETTO_UNLIKELY(res.is_eof()))
         continue;
-    } else if (!t2_shadow_slices) {
-      continue;
     }
 
-    bool match_partition = t1_.partition() == t2_.partition();
-    bool t1_after_t2 = t1_.ts_end() > t2_.ts_start();
-    bool t2_after_t1 = t2_.ts_end() > t1_.ts_start();
-    if (match_partition && t1_after_t2 && t2_after_t1) {
+    if (IsOverlappingSpan())
       break;
-    } else if (t2_shadow_slices) {
-      PERFETTO_DCHECK(!match_partition || (t1_after_t2 && t2_after_t1));
-      if (t2_.partition() < t1_.partition())
-        continue;
-      break;
-    }
   }
 
   if (t2_.Eof()) {
@@ -538,7 +535,7 @@ SpanJoinOperatorTable::Query::StepToNextPartition() {
 
 SpanJoinOperatorTable::Query::StepRet
 SpanJoinOperatorTable::Query::StepToPartition(int64_t partition) {
-  PERFETTO_DCHECK(partition_ <= partition);
+  PERFETTO_DCHECK(defn_->emit_shadow_slices() || partition_ <= partition);
   if (defn_->IsPartitioned()) {
     while (partition_ < partition) {
       auto res = StepToNextPartition();
