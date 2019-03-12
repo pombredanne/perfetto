@@ -401,7 +401,6 @@ int SpanJoinOperatorTable::Query::Initialize(const QueryConstraints& qc,
 SpanJoinOperatorTable::Query::StepRet SpanJoinOperatorTable::Query::Step() {
   PERFETTO_DCHECK(!Eof());
   sqlite3_stmt* stmt = stmt_.get();
-  int res = SQLITE_ROW;
   do {
     if (mode_ == Mode::kShadowSlice) {
       PERFETTO_DCHECK(defn_->emit_shadow_slices());
@@ -426,6 +425,7 @@ SpanJoinOperatorTable::Query::StepRet SpanJoinOperatorTable::Query::Step() {
       continue;
     }
 
+    int res;
     if (defn_->IsPartitioned()) {
       auto partition_idx = static_cast<int>(defn_->partition_idx());
       // Fastforward through any rows with null partition keys.
@@ -461,11 +461,12 @@ SpanJoinOperatorTable::Query::StepRet SpanJoinOperatorTable::Query::Step() {
       mode_ = Mode::kShadowSlice;
       ts_start_ = ts_end_;
       ts_end_ = std::numeric_limits<int64_t>::max();
+    } else {
+      return StepRet(StepRet::Code::kError, res);
     }
-  } while (ts_start_ == ts_end_ && res == SQLITE_ROW);
+  } while (ts_start_ == ts_end_);
 
-  return res == SQLITE_ROW ? StepRet(StepRet::Code::kRow)
-                           : StepRet(StepRet::Code::kError, res);
+  return StepRet(StepRet::Code::kRow);
 }
 
 SpanJoinOperatorTable::Query::StepRet
