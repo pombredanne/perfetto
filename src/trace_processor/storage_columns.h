@@ -354,6 +354,9 @@ class RowColumn final : public StorageColumn {
     // Makes the below code much more readable.
     using namespace sqlite_utils;
 
+    constexpr uint32_t kTMin = std::numeric_limits<uint32_t>::min();
+    constexpr uint32_t kTMax = std::numeric_limits<uint32_t>::max();
+
     uint32_t min = kTMin;
     uint32_t max = kTMax;
     if (IsOpGe(op) || IsOpGt(op)) {
@@ -398,10 +401,6 @@ class RowColumn final : public StorageColumn {
   }
 
   bool IsNaturallyOrdered() const override { return true; }
-
- private:
-  uint32_t kTMin = std::numeric_limits<uint32_t>::lowest();
-  uint32_t kTMax = std::numeric_limits<uint32_t>::max();
 };
 
 }  // namespace trace_processor

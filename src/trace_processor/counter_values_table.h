@@ -22,6 +22,8 @@
 namespace perfetto {
 namespace trace_processor {
 
+// The implementation of the SQLite table containing the values of counters
+// in the trace.
 class CounterValuesTable : public StorageTable {
  public:
   static void RegisterTable(sqlite3* db, const TraceStorage* storage);

@@ -44,6 +44,7 @@ StorageSchema InstantsTable::CreateStorageSchema() {
       .AddOrderedNumericColumn("ts", &instants.timestamps())
       .AddStringColumn("name", &instants.name_ids(), &storage_->string_pool())
       .AddNumericColumn("value", &instants.values())
+      // TODO(lalitm): remove this hack.
       .AddColumn<CounterDefinitionsTable::RefColumn>(
           "ref", &instants.refs(), &instants.types(), storage_)
       .AddStringColumn("ref_type", &instants.types(), &ref_types_)
