@@ -411,13 +411,15 @@ SpanJoinOperatorTable::Query::StepRet SpanJoinOperatorTable::Query::Step() {
   do {
     if (mode_ == Mode::kShadowSlice) {
       PERFETTO_DCHECK(defn_->emit_shadow_slices());
+      PERFETTO_DCHECK(defn_->IsPartitioned());
 
       if (cursor_eof_) {
         mode_ = Mode::kRealSlice;
         return StepRet(StepRet::Code::kEof);
       }
 
-      if (partition_ == CursorPartition()) {
+      int64_t new_partition = CursorPartition();
+      if (partition_ == new_partition) {
         mode_ = Mode::kRealSlice;
         ts_start_ = CursorTs();
         ts_end_ = ts_start_ + CursorDur();
@@ -425,8 +427,7 @@ SpanJoinOperatorTable::Query::StepRet SpanJoinOperatorTable::Query::Step() {
         mode_ = Mode::kShadowSlice;
         ts_start_ = 0;
         ts_end_ = CursorTs();
-        if (defn_->IsPartitioned())
-          partition_ = CursorPartition();
+        partition_ = new_partition;
       }
       res = SQLITE_ROW;
       continue;
@@ -446,11 +447,10 @@ SpanJoinOperatorTable::Query::StepRet SpanJoinOperatorTable::Query::Step() {
 
     if (res == SQLITE_ROW) {
       if (defn_->emit_shadow_slices()) {
-        int64_t new_partition =
-            defn_->IsPartitioned() ? CursorPartition() : partition_;
+        PERFETTO_DCHECK(defn_->IsPartitioned());
         mode_ = Mode::kShadowSlice;
         ts_start_ = ts_end_;
-        ts_end_ = partition_ == new_partition
+        ts_end_ = partition_ == CursorPartition()
                       ? CursorTs()
                       : std::numeric_limits<int64_t>::max();
       } else {
