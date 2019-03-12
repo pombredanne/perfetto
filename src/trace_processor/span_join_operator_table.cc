@@ -445,9 +445,9 @@ SpanJoinOperatorTable::Query::StepRet SpanJoinOperatorTable::Query::Step() {
     }
 
     if (res == SQLITE_ROW) {
-      int64_t new_partition =
-          defn_->IsPartitioned() ? CursorPartition() : partition_;
       if (defn_->emit_shadow_slices()) {
+        int64_t new_partition =
+            defn_->IsPartitioned() ? CursorPartition() : partition_;
         mode_ = Mode::kShadowSlice;
         ts_start_ = ts_end_;
         ts_end_ = partition_ == new_partition
@@ -457,7 +457,8 @@ SpanJoinOperatorTable::Query::StepRet SpanJoinOperatorTable::Query::Step() {
         mode_ = Mode::kRealSlice;
         ts_start_ = CursorTs();
         ts_end_ = ts_start_ + CursorDur();
-        partition_ = new_partition;
+        if (defn_->IsPartitioned())
+          partition_ = CursorPartition();
       }
     } else if (res == SQLITE_DONE) {
       cursor_eof_ = true;
