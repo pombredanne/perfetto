@@ -328,6 +328,9 @@ int SpanJoinOperatorTable::Cursor::Next() {
     else if (PERFETTO_UNLIKELY(res.is_eof()))
       continue;
 
+    if (t1_.partition() != t2_.partition())
+      continue;
+
     auto ts = t2_shadow_slices ? t1_.ts_start()
                                : std::max(t1_.ts_start(), t2_.ts_start());
     res = t1_.StepUntil(ts);
@@ -530,16 +533,17 @@ SpanJoinOperatorTable::Query::StepRet
 SpanJoinOperatorTable::Query::StepToPartition(int64_t partition) {
   PERFETTO_DCHECK(defn_->emit_shadow_slices() || partition_ <= partition);
   if (defn_->IsPartitioned()) {
-    while (partition_ < partition) {
-      auto res = StepToNextPartition();
-      if (!res.is_row())
-        return res;
-    }
     if (partition_ > partition) {
       mode_ = Mode::kEndOfPartitionShadowSlice;
       ts_start_ = 0;
       ts_end_ = std::numeric_limits<int64_t>::max();
       partition_ = partition;
+      return StepRet(StepRet::Code::kRow);
+    }
+    while (partition_ < partition) {
+      auto res = StepToNextPartition();
+      if (!res.is_row())
+        return res;
     }
   } else if (partition_ < partition) {
     int res = PrepareRawStmt();
