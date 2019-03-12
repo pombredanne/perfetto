@@ -372,15 +372,17 @@ int SpanJoinOperatorTable::Cursor::Column(sqlite3_context* context, int N) {
     sqlite3_result_int64(context, static_cast<sqlite3_int64>(dur));
   } else if (N == Column::kPartition &&
              table_->partitioning_ != PartitioningType::kNoPartitioning) {
+    PERFETTO_DCHECK(table_->partitioning_ ==
+                        PartitioningType::kMixedPartitioning ||
+                    t1_.partition() == t2_.partition());
     sqlite3_result_int64(context, static_cast<sqlite3_int64>(t1_.partition()));
   } else {
     size_t index = static_cast<size_t>(N);
     const auto& locator = table_->global_index_to_column_locator_[index];
-    if (locator.defn == t1_.definition()) {
+    if (locator.defn == t1_.definition())
       t1_.ReportSqliteResult(context, locator.col_index);
-    } else {
+    else
       t2_.ReportSqliteResult(context, locator.col_index);
-    }
   }
   return SQLITE_OK;
 }
