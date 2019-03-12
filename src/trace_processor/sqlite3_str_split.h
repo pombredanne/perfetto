@@ -14,18 +14,17 @@
  * limitations under the License.
  */
 
-syntax = "proto2";
-option optimize_for = LITE_RUNTIME;
+#ifndef SRC_TRACE_PROCESSOR_SQLITE3_STR_SPLIT_H_
+#define SRC_TRACE_PROCESSOR_SQLITE3_STR_SPLIT_H_
 
-package perfetto.protos;
+struct sqlite3;
 
-message Utsname {
-  optional string sysname = 1;
-  optional string version = 2;
-  optional string release = 3;
-  optional string machine = 4;
-}
+namespace perfetto {
+namespace trace_processor {
 
-message SystemInfo {
-  optional Utsname utsname = 1;
-}
+void sqlite3_str_split_init(sqlite3* db);
+
+}  // namespace trace_processor
+}  // namespace perfetto
+
+#endif  // SRC_TRACE_PROCESSOR_SQLITE3_STR_SPLIT_H_

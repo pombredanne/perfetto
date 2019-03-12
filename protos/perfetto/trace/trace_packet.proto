@@ -68,8 +68,8 @@ message TracePacket {
     TraceStats trace_stats = 35;
     ProfilePacket profile_packet = 37;
     BatteryCounters battery = 38;
-    AndroidLogPacket android_log = 39;
     PowerRails power_rails = 40;
+    AndroidLogPacket android_log = 39;
     SystemInfo system_info = 45;
 
     // Only used by TrackEvent.

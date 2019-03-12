@@ -1135,7 +1135,9 @@ void TracingServiceImpl::ReadBuffers(TracingSessionID tsid,
     while (!did_hit_threshold) {
       TracePacket packet;
       TraceBuffer::PacketSequenceProperties sequence_properties{};
-      if (!tbuf.ReadNextTracePacket(&packet, &sequence_properties)) {
+      bool previous_packet_dropped;
+      if (!tbuf.ReadNextTracePacket(&packet, &sequence_properties,
+                                    &previous_packet_dropped)) {
         break;
       }
       PERFETTO_DCHECK(sequence_properties.producer_id_trusted != 0);
@@ -1162,6 +1164,8 @@ void TracingServiceImpl::ReadBuffers(TracingSessionID tsid,
           tracing_session->GetPacketSequenceID(
               sequence_properties.producer_id_trusted,
               sequence_properties.writer_id));
+      if (previous_packet_dropped)
+        trusted_packet.set_previous_packet_dropped(previous_packet_dropped);
       static constexpr size_t kTrustedBufSize = 16;
       Slice slice = Slice::Allocate(kTrustedBufSize);
       PERFETTO_CHECK(
@@ -1823,10 +1827,11 @@ void TracingServiceImpl::MaybeEmitSystemInfo(
 #if !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
   struct utsname uname_info;
   if (uname(&uname_info) == 0) {
-    info->set_sysname(uname_info.sysname);
-    info->set_version(uname_info.version);
-    info->set_machine(uname_info.machine);
-    info->set_release(uname_info.release);
+    protos::Utsname* utsname_info = info->mutable_utsname();
+    utsname_info->set_sysname(uname_info.sysname);
+    utsname_info->set_version(uname_info.version);
+    utsname_info->set_machine(uname_info.machine);
+    utsname_info->set_release(uname_info.release);
   }
 #endif
   packet.set_trusted_uid(static_cast<int32_t>(uid_));
