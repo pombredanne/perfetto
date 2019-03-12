@@ -650,6 +650,8 @@ class TraceStorage {
   std::unordered_map<StringHash, StringId> string_index_;
 
   // One entry for each UniquePid, with UniquePid as the index.
+  // Never hold on to pointers to Process, as vector resize will
+  // invalidate them.
   std::vector<Process> unique_processes_;
 
   // One entry for each UniqueTid, with UniqueTid as the index.
