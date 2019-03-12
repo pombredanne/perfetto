@@ -348,17 +348,7 @@ int SpanJoinOperatorTable::Cursor::Next() {
     if (IsOverlappingSpan())
       break;
   }
-
-  if (t2_.Eof()) {
-    PERFETTO_DCHECK(t2_.definition()->emit_shadow_slices());
-    next_stepped_ = &t1_;
-  } else if (t1_.partition() == t2_.partition()) {
-    next_stepped_ = t1_.ts_end() <= t2_.ts_end() ? &t1_ : &t2_;
-  } else {
-    PERFETTO_DCHECK(t1_.partition() < t2_.partition());
-    PERFETTO_DCHECK(t2_.definition()->emit_shadow_slices());
-    next_stepped_ = &t1_;
-  }
+  next_stepped_ = t1_.ts_end() <= t2_.ts_end() ? &t1_ : &t2_;
 
   return SQLITE_OK;
 }
