@@ -507,7 +507,7 @@ SpanJoinOperatorTable::Query::StepToPartition(int64_t partition) {
       if (!res.is_row())
         return res;
     }
-  } else if (partition_ < partition) {
+  } else if (/* !defn_->IsPartitioned() && */ partition_ < partition) {
     int res = PrepareRawStmt();
     if (res != SQLITE_OK)
       return StepRet(StepRet::Code::kError, res);
