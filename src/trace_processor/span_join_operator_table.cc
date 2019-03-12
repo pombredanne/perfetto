@@ -359,24 +359,14 @@ int SpanJoinOperatorTable::Cursor::Eof() {
 
 int SpanJoinOperatorTable::Cursor::Column(sqlite3_context* context, int N) {
   PERFETTO_DCHECK(!t1_.Eof());
-
-  bool t2_null = t2_.Eof() || t1_.partition() < t2_.partition();
-  PERFETTO_DCHECK(!t2_null || t2_.definition()->emit_shadow_slices());
+  PERFETTO_DCHECK(!t2_.Eof());
 
   if (N == Column::kTimestamp) {
-    auto max_ts =
-        t2_null ? t1_.ts_start() : std::max(t1_.ts_start(), t2_.ts_start());
+    auto max_ts = std::max(t1_.ts_start(), t2_.ts_start());
     sqlite3_result_int64(context, static_cast<sqlite3_int64>(max_ts));
   } else if (N == Column::kDuration) {
-    int64_t max_start;
-    int64_t min_end;
-    if (t2_null) {
-      max_start = t1_.ts_start();
-      min_end = t1_.ts_end();
-    } else {
-      max_start = std::max(t1_.ts_start(), t2_.ts_start());
-      min_end = std::min(t1_.ts_end(), t2_.ts_end());
-    }
+    auto max_start = std::max(t1_.ts_start(), t2_.ts_start());
+    auto min_end = std::min(t1_.ts_end(), t2_.ts_end());
     PERFETTO_DCHECK(min_end > max_start);
     auto dur = min_end - max_start;
     sqlite3_result_int64(context, static_cast<sqlite3_int64>(dur));
@@ -389,11 +379,7 @@ int SpanJoinOperatorTable::Cursor::Column(sqlite3_context* context, int N) {
     if (locator.defn == t1_.definition()) {
       t1_.ReportSqliteResult(context, locator.col_index);
     } else {
-      if (t2_null) {
-        sqlite3_result_null(context);
-      } else {
-        t2_.ReportSqliteResult(context, locator.col_index);
-      }
+      t2_.ReportSqliteResult(context, locator.col_index);
     }
   }
   return SQLITE_OK;
