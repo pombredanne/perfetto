@@ -39,10 +39,6 @@ namespace perfetto {
 namespace trace_processor {
 
 TraceStorage::TraceStorage() {
-  string_pool_.reserve(8192);
-  unique_processes_.reserve(1024);
-  unique_threads_.reserve(1024);
-
   // Upid/utid 0 is reserved for idle processes/threads.
   unique_processes_.emplace_back(0);
   unique_threads_.emplace_back(0);
