@@ -295,10 +295,7 @@ int SpanJoinOperatorTable::Cursor::Next() {
       return SQLITE_OK;
 
     if (t2_.Eof()) {
-      if (t2_shadow_slices) {
-        break;
-      } else if (table_->partitioning_ !=
-                 PartitioningType::kMixedPartitioning) {
+      if (table_->partitioning_ != PartitioningType::kMixedPartitioning) {
         return SQLITE_OK;
       } else {
         PERFETTO_DCHECK(t1_.IsPartitioned() && !t2_.IsPartitioned());
@@ -331,23 +328,19 @@ int SpanJoinOperatorTable::Cursor::Next() {
     else if (PERFETTO_UNLIKELY(res.is_eof()))
       continue;
 
-    if (t1_.partition() < t2_.partition() && t2_shadow_slices) {
-      break;
-    } else if (t1_.partition() == t2_.partition()) {
-      auto ts = t2_shadow_slices ? t1_.ts_start()
-                                 : std::max(t1_.ts_start(), t2_.ts_start());
-      res = t1_.StepUntil(ts);
-      if (PERFETTO_UNLIKELY(res.is_err()))
-        return res.err_code;
-      else if (PERFETTO_UNLIKELY(res.is_eof()))
-        continue;
+    auto ts = t2_shadow_slices ? t1_.ts_start()
+                               : std::max(t1_.ts_start(), t2_.ts_start());
+    res = t1_.StepUntil(ts);
+    if (PERFETTO_UNLIKELY(res.is_err()))
+      return res.err_code;
+    else if (PERFETTO_UNLIKELY(res.is_eof()))
+      continue;
 
-      res = t2_.StepUntil(t1_.ts_start());
-      if (PERFETTO_UNLIKELY(res.is_err()))
-        return res.err_code;
-      else if (PERFETTO_UNLIKELY(res.is_eof()))
-        continue;
-    }
+    res = t2_.StepUntil(t1_.ts_start());
+    if (PERFETTO_UNLIKELY(res.is_err()))
+      return res.err_code;
+    else if (PERFETTO_UNLIKELY(res.is_eof()))
+      continue;
 
     if (IsOverlappingSpan())
       break;
@@ -541,6 +534,12 @@ SpanJoinOperatorTable::Query::StepToPartition(int64_t partition) {
       auto res = StepToNextPartition();
       if (!res.is_row())
         return res;
+    }
+    if (partition_ > partition) {
+      mode_ = Mode::kEndOfPartitionShadowSlice;
+      ts_start_ = 0;
+      ts_end_ = std::numeric_limits<int64_t>::max();
+      partition_ = partition;
     }
   } else if (partition_ < partition) {
     int res = PrepareRawStmt();
