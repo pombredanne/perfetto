@@ -279,7 +279,7 @@ export class TraceController extends Controller<States> {
 
     const counters = await engine.query(`
       select name, ref, ref_type, count(ref_type)
-      from counter_definitions
+      from counters
       where ref is not null
       group by name, ref, ref_type
       order by ref_type desc
