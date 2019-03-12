@@ -780,33 +780,33 @@ void TracingServiceImpl::ActivateTriggers(
   for (const auto& trigger_name : triggers.trigger_names()) {
     auto start_and_end_iter = triggers_to_sessions_.equal_range(trigger_name);
     for (auto iter = start_and_end_iter.first;
-         iter != start_and_end_iter.second;) {
+         iter != start_and_end_iter.second; ++iter) {
       auto* tracing_session = GetTracingSession(iter->second.session);
-      if (!tracing_session) {
-        // Tracing session has disappeared clean up so we don't have to iterate
-        // it in the future.
-        iter = triggers_to_sessions_.erase(iter);
-        continue;
-      }
+      PERFETTO_DCHECK(tracing_session);
+
       auto* producer = GetProducer(producer_id);
       if (!producer) {
         // The producer that sent us this trigger has disconnected before we got
-        // the name.
+        // the name so we just ignore this trigger.
         return;
       }
+
+      // If this trigger requires a certain producer to have sent it (non-empty
+      // producer_name()) ensure the producer who sent this trigger matches.
       auto* trigger = iter->second.trigger;
       if (!trigger->producer_name().empty() &&
           trigger->producer_name() != producer->name_) {
-        // This iterator doesn't match the requested producer name move on.
-        ++iter;
         continue;
       }
+
       switch (tracing_session->config.trigger_config().trigger_mode()) {
         case TraceConfig::TriggerConfig::START_TRACING:
+          // TODO(nuskos): DO NOT SUB-MIT Replace this 'magic' 3 with the proper
+          // way to get the current time. So when we create the packets
+          // dynamically on the fly we can insert it at the correct time.
+          tracing_session->received_triggers.push_back(
+              std::make_pair(3, trigger->name()));
           // We override the trace duration to be the trigger's requested value.
-          //
-          // TODO(nuskos): We need to let the clean up task know that we
-          // shouldn't destroy this task now.
           tracing_session->config.set_duration_ms(
               trigger->finalize_trace_delay_ms());
           StartTracing(iter->second.session);
@@ -816,7 +816,6 @@ void TracingServiceImpl::ActivateTriggers(
           // TODO(nuskos): Add finalize in followup CL.
           break;
       }
-      ++iter;
     }
   }
 }
@@ -1393,6 +1392,18 @@ void TracingServiceImpl::FreeBuffers(TracingSessionID tsid) {
     buffers_.erase(buffer_id);
   }
   bool notify_traceur = tracing_session->config.notify_traceur();
+
+  // Remove (if any) triggers that this session defined.
+  if (!tracing_session->config.trigger_config().triggers().empty()) {
+    for (auto iter = triggers_to_sessions_.begin();
+         iter != triggers_to_sessions_.end();) {
+      if (iter->second.session == tsid) {
+        iter = triggers_to_sessions_.erase(iter);
+      } else {
+        ++iter;
+      }
+    }
+  }
   tracing_sessions_.erase(tsid);
   UpdateMemoryGuardrail();
 
