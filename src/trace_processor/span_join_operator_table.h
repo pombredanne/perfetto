@@ -182,7 +182,6 @@ class SpanJoinOperatorTable : public Table {
     enum Mode {
       kRealSlice,
       kShadowSlice,
-      kEndOfPartitionShadowSlice,
     };
 
     int PrepareRawStmt();

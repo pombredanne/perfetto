@@ -406,40 +406,32 @@ int SpanJoinOperatorTable::Query::Initialize(const QueryConstraints& qc,
 
 SpanJoinOperatorTable::Query::StepRet SpanJoinOperatorTable::Query::Step() {
   PERFETTO_DCHECK(!Eof());
-  if (mode_ == Mode::kShadowSlice) {
-    PERFETTO_DCHECK(!cursor_eof_);
-
-    mode_ = Mode::kRealSlice;
-    ts_start_ = CursorTs();
-    ts_end_ = ts_start_ + CursorDur();
-
-    return StepRet(StepRet::Code::kRow);
-  } else if (mode_ == Mode::kEndOfPartitionShadowSlice) {
-    if (cursor_eof_) {
-      mode_ = Mode::kRealSlice;
-      return StepRet(StepRet::Code::kEof);
-    }
-
-    int64_t next_ts = CursorTs();
-    if (next_ts == 0) {
-      mode_ = Mode::kRealSlice;
-      ts_start_ = CursorTs();
-      ts_end_ = ts_start_ + CursorDur();
-    } else {
-      mode_ = Mode::kShadowSlice;
-      ts_start_ = 0;
-      ts_end_ = next_ts;
-    }
-
-    if (defn_->IsPartitioned())
-      partition_ = CursorPartition();
-
-    return StepRet(StepRet::Code::kRow);
-  }
-
   sqlite3_stmt* stmt = stmt_.get();
   int res;
   do {
+    if (mode_ == Mode::kShadowSlice) {
+      PERFETTO_DCHECK(defn_->emit_shadow_slices());
+
+      if (cursor_eof_) {
+        mode_ = Mode::kRealSlice;
+        return StepRet(StepRet::Code::kEof);
+      }
+
+      if (partition_ == CursorPartition()) {
+        mode_ = Mode::kRealSlice;
+        ts_start_ = CursorTs();
+        ts_end_ = ts_start_ + CursorDur();
+      } else {
+        mode_ = Mode::kShadowSlice;
+        ts_start_ = 0;
+        ts_end_ = CursorTs();
+        if (defn_->IsPartitioned())
+          partition_ = CursorPartition();
+      }
+      res = SQLITE_ROW;
+      continue;
+    }
+
     if (defn_->IsPartitioned()) {
       auto partition_idx = static_cast<int>(defn_->partition_idx());
       // Fastforward through any rows with null partition keys.
@@ -452,36 +444,27 @@ SpanJoinOperatorTable::Query::StepRet SpanJoinOperatorTable::Query::Step() {
       res = sqlite3_step(stmt);
     }
 
-    bool is_first_step = ts_start_ == ts_end_;
     if (res == SQLITE_ROW) {
       int64_t new_partition =
           defn_->IsPartitioned() ? CursorPartition() : partition_;
-      if (is_first_step || !defn_->emit_shadow_slices())
-        partition_ = new_partition;
-
-      int64_t old_partition = partition_;
-      int64_t next_start = CursorTs();
-      if (old_partition == new_partition) {
-        if (ts_end_ == next_start || !defn_->emit_shadow_slices()) {
-          mode_ = Mode::kRealSlice;
-          ts_start_ = next_start;
-          ts_end_ = ts_start_ + CursorDur();
-        } else {
-          mode_ = Mode::kShadowSlice;
-          ts_start_ = ts_end_;
-          ts_end_ = next_start;
-        }
-      } else {
-        mode_ = Mode::kEndOfPartitionShadowSlice;
+      if (defn_->emit_shadow_slices()) {
+        mode_ = Mode::kShadowSlice;
         ts_start_ = ts_end_;
-        ts_end_ = std::numeric_limits<int64_t>::max();
+        ts_end_ = partition_ == new_partition
+                      ? CursorTs()
+                      : std::numeric_limits<int64_t>::max();
+      } else {
+        mode_ = Mode::kRealSlice;
+        ts_start_ = CursorTs();
+        ts_end_ = ts_start_ + CursorDur();
+        partition_ = new_partition;
       }
     } else if (res == SQLITE_DONE) {
       cursor_eof_ = true;
-      if (is_first_step || !defn_->emit_shadow_slices())
+      if (!defn_->emit_shadow_slices())
         return StepRet(StepRet::Code::kEof);
 
-      mode_ = Mode::kEndOfPartitionShadowSlice;
+      mode_ = Mode::kShadowSlice;
       ts_start_ = ts_end_;
       ts_end_ = std::numeric_limits<int64_t>::max();
 
@@ -512,7 +495,7 @@ SpanJoinOperatorTable::Query::StepToPartition(int64_t partition) {
   PERFETTO_DCHECK(defn_->emit_shadow_slices() || partition_ <= partition);
   if (defn_->IsPartitioned()) {
     if (partition_ > partition) {
-      mode_ = Mode::kEndOfPartitionShadowSlice;
+      mode_ = Mode::kShadowSlice;
       ts_start_ = 0;
       ts_end_ = std::numeric_limits<int64_t>::max();
       partition_ = partition;
