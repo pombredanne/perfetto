@@ -303,17 +303,17 @@ class PERFETTO_EXPORT TraceConfig {
         producer_name_ = value;
       }
 
-      int64_t finalize_trace_delay_ms() const {
+      uint32_t finalize_trace_delay_ms() const {
         return finalize_trace_delay_ms_;
       }
-      void set_finalize_trace_delay_ms(int64_t value) {
+      void set_finalize_trace_delay_ms(uint32_t value) {
         finalize_trace_delay_ms_ = value;
       }
 
      private:
       std::string name_ = {};
       std::string producer_name_ = {};
-      int64_t finalize_trace_delay_ms_ = {};
+      uint32_t finalize_trace_delay_ms_ = {};
 
       // Allows to preserve unknown protobuf fields for compatibility
       // with future versions of .proto files.

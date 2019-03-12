@@ -198,7 +198,7 @@ message TraceConfig {
 
       // After a trace is received either in START or FINALIZE mode then the
       // trace will end |finalize_trace_delay_ms| after triggering.
-      optional int64 finalize_trace_delay_ms = 3;
+      optional uint32 finalize_trace_delay_ms = 3;
     }
     // A list of triggers which are related to this configuration. If ANY
     // trigger is seen then an action will be performed based on |trigger_mode|.
