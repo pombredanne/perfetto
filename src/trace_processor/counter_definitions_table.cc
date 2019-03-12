@@ -48,7 +48,7 @@ StorageSchema CounterDefinitionsTable::CreateStorageSchema() {
 }
 
 uint32_t CounterDefinitionsTable::RowCount() {
-  return static_cast<uint32_t>(storage_->counter_definitions().size());
+  return storage_->counter_definitions().size();
 }
 
 int CounterDefinitionsTable::BestIndex(const QueryConstraints& qc,

@@ -39,7 +39,7 @@ StorageSchema CounterValuesTable::CreateStorageSchema() {
 }
 
 uint32_t CounterValuesTable::RowCount() {
-  return static_cast<uint32_t>(storage_->counter_values().size());
+  return storage_->counter_values().size();
 }
 
 int CounterValuesTable::BestIndex(const QueryConstraints& qc,
