@@ -48,23 +48,16 @@ void LazyProducer::OnConnect() {
   endpoint_->RegisterDataSource(dsd);
 }
 
-void LazyProducer::SetupDataSource(DataSourceInstanceID id,
+void LazyProducer::SetupDataSource(DataSourceInstanceID,
                                    const DataSourceConfig&) {
-  if (active_sessions_.empty()) {
-    std::string prev_value = GetAndroidProperty(property_name_);
-    if (prev_value != "2")
-      if (!SetAndroidProperty(property_name_, "1"))
-        return;
-  }
-  active_sessions_.emplace(id);
+  if (!SetAndroidProperty(property_name_, "1"))
+    return;
+  active_sessions_++;
   generation_++;
 }
 
-void LazyProducer::StopDataSource(DataSourceInstanceID id) {
-  if (!active_sessions_.erase(id))
-    return;
-
-  if (!active_sessions_.empty())
+void LazyProducer::StopDataSource(DataSourceInstanceID) {
+  if (--active_sessions_)
     return;
 
   uint64_t cur_generation = generation_;
@@ -73,9 +66,7 @@ void LazyProducer::StopDataSource(DataSourceInstanceID id) {
       [weak_this, cur_generation] {
         if (!weak_this)
           return;
-        std::string prev_value =
-            weak_this->GetAndroidProperty(weak_this->property_name_);
-        if (prev_value != "2" && weak_this->generation_ == cur_generation)
+        if (weak_this->generation_ == cur_generation)
           weak_this->SetAndroidProperty(weak_this->property_name_, "0");
       },
       delay_ms_);
@@ -109,7 +100,7 @@ std::string LazyProducer::GetAndroidProperty(const std::string& name) {
 }
 
 LazyProducer::~LazyProducer() {
-  if (!active_sessions_.empty())
+  if (active_sessions_)
     SetAndroidProperty(property_name_, "0");
 }
 

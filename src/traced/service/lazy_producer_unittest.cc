@@ -49,37 +49,8 @@ TEST(LazyProducersTest, Simple) {
   base::TestTaskRunner task_runner;
   MockLazyProducer p(&task_runner);
   InSequence s;
-  EXPECT_CALL(p, GetAndroidProperty(kPropertyName)).WillOnce(Return(""));
   EXPECT_CALL(p, SetAndroidProperty(kPropertyName, "1")).WillOnce(Return(true));
   EXPECT_CALL(p, SetAndroidProperty(kPropertyName, "0")).WillOnce(Return(true));
-  p.SetupDataSource(1, cfg);
-  p.StopDataSource(1);
-  task_runner.RunUntilIdle();
-}
-
-TEST(LazyProducersTest, AlreadySet) {
-  DataSourceConfig cfg;
-  cfg.set_name(kDataSourceName);
-  base::TestTaskRunner task_runner;
-  MockLazyProducer p(&task_runner);
-  InSequence s;
-  EXPECT_CALL(p, GetAndroidProperty(kPropertyName)).WillOnce(Return("1"));
-  EXPECT_CALL(p, SetAndroidProperty(kPropertyName, _)).Times(0);
-  p.SetupDataSource(1, cfg);
-  p.StopDataSource(1);
-  task_runner.RunUntilIdle();
-}
-
-TEST(LazyProducersTest, Failed) {
-  DataSourceConfig cfg;
-  cfg.set_name(kDataSourceName);
-  base::TestTaskRunner task_runner;
-  MockLazyProducer p(&task_runner);
-  InSequence s;
-  EXPECT_CALL(p, GetAndroidProperty(kPropertyName)).WillOnce(Return(""));
-  EXPECT_CALL(p, SetAndroidProperty(kPropertyName, "1"))
-      .WillOnce(Return(false));
-  EXPECT_CALL(p, SetAndroidProperty(kPropertyName, "0")).Times(0);
   p.SetupDataSource(1, cfg);
   p.StopDataSource(1);
   task_runner.RunUntilIdle();
@@ -91,14 +62,31 @@ TEST(LazyProducersTest, RefCount) {
   base::TestTaskRunner task_runner;
   MockLazyProducer p(&task_runner);
   InSequence s;
-  EXPECT_CALL(p, GetAndroidProperty(kPropertyName)).WillOnce(Return(""));
-  EXPECT_CALL(p, SetAndroidProperty(kPropertyName, "1")).WillOnce(Return(true));
+  EXPECT_CALL(p, SetAndroidProperty(kPropertyName, "1"))
+      .WillRepeatedly(Return(true));
   p.SetupDataSource(1, cfg);
   p.SetupDataSource(2, cfg);
   p.StopDataSource(2);
   task_runner.RunUntilIdle();
   EXPECT_CALL(p, SetAndroidProperty(kPropertyName, "0")).WillOnce(Return(true));
   p.StopDataSource(1);
+  task_runner.RunUntilIdle();
+}
+
+TEST(LazyProducersTest, NoFlap) {
+  DataSourceConfig cfg;
+  cfg.set_name(kDataSourceName);
+  base::TestTaskRunner task_runner;
+  MockLazyProducer p(&task_runner);
+  InSequence s;
+  EXPECT_CALL(p, SetAndroidProperty(kPropertyName, "1"))
+      .WillRepeatedly(Return(true));
+  p.SetupDataSource(1, cfg);
+  p.StopDataSource(1);
+  p.SetupDataSource(2, cfg);
+  task_runner.RunUntilIdle();
+  p.StopDataSource(2);
+  EXPECT_CALL(p, SetAndroidProperty(kPropertyName, "0")).WillOnce(Return(true));
   task_runner.RunUntilIdle();
 }
 

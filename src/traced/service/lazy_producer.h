@@ -62,7 +62,7 @@ class LazyProducer : public Producer {
   std::string property_name_;
 
   std::unique_ptr<TracingService::ProducerEndpoint> endpoint_;
-  std::set<DataSourceInstanceID> active_sessions_;
+  uint64_t active_sessions_ = 0;
   uint64_t generation_ = 0;
 
   base::WeakPtrFactory<LazyProducer> weak_factory_;
