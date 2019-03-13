@@ -467,7 +467,7 @@ bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
 
   // For traces which use START_TRACE triggers we need to ensure that the
   // tracing session will be cleaned up when it times out.
-  if (is_start_trigger_trace && cfg.duration_ms() > 0) {
+  if (is_start_trigger_trace) {
     auto weak_this = weak_ptr_factory_.GetWeakPtr();
     task_runner_->PostDelayedTask(
         [weak_this, tsid] {
@@ -806,20 +806,19 @@ void TracingServiceImpl::ActivateTriggers(
 
       switch (tracing_session->config.trigger_config().trigger_mode()) {
         case TraceConfig::TriggerConfig::START_TRACING:
-          // TODO(nuskos): DO NOT SUB-MIT Replace this 'magic' 3 with the proper
-          // way to get the current time. So when we create the packets
-          // dynamically on the fly we can insert it at the correct time.
           tracing_session->received_triggers.push_back(std::make_pair(
               static_cast<uint64_t>(base::GetBootTimeNs().count()), trigger));
-          // If the session has already been triggered and moved into kStarted
-          // then we don't need to repeat that again.
+          // If the session has already been triggered and moved past CONFIGURED
+          // then we don't need to repeat StartTracing. This would work fine
+          // (StartTracing would return false) but would add error logs.
           if (tracing_session->state == TracingSession::CONFIGURED) {
             PERFETTO_DLOG("Triggering '%s' on TracingSession %" PRIu64
                           " with duration of %" PRIu32 "ms.",
                           trigger->name().c_str(), iter->second.session,
                           trigger->finalize_trace_delay_ms());
             // We override the trace duration to be the trigger's requested
-            // value.
+            // value, this ensures that the trace will end after this amount of
+            // time has passed.
             tracing_session->config.set_duration_ms(
                 trigger->finalize_trace_delay_ms());
             StartTracing(iter->second.session);
@@ -827,7 +826,8 @@ void TracingServiceImpl::ActivateTriggers(
           break;
         case TraceConfig::TriggerConfig::UNSPECIFIED:
         case TraceConfig::TriggerConfig::FINALIZE_TRACE:
-          // TODO(nuskos): Add finalize in followup CL.
+          // TODO(nuskos): Add finalize in followup CL and choose which mode is
+          // the default for UNSPECIFIED.
           break;
       }
     }
@@ -1409,13 +1409,14 @@ void TracingServiceImpl::FreeBuffers(TracingSessionID tsid) {
   bool notify_traceur = tracing_session->config.notify_traceur();
 
   // Remove (if any) triggers that this session defined.
-  if (!tracing_session->config.trigger_config().triggers().empty()) {
-    for (auto iter = triggers_to_sessions_.begin();
-         iter != triggers_to_sessions_.end();) {
-      if (iter->second.session == tsid) {
-        iter = triggers_to_sessions_.erase(iter);
+  for (const auto& trigger :
+       tracing_session->config.trigger_config().triggers()) {
+    auto iter_pair = triggers_to_sessions_.equal_range(trigger.name());
+    while (iter_pair.first != iter_pair.second) {
+      if (iter_pair.first->second.session == tsid) {
+        iter_pair.first = triggers_to_sessions_.erase(iter_pair.first);
       } else {
-        ++iter;
+        ++iter_pair.first;
       }
     }
   }
@@ -1939,8 +1940,8 @@ void TracingServiceImpl::MaybeEmitSystemInfo(
     return;
   tracing_session->did_emit_system_info = true;
   protos::TrustedPacket packet;
-  protos::SystemInfo* info = packet.mutable_system_info();
 #if !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+  protos::SystemInfo* info = packet.mutable_system_info();
   struct utsname uname_info;
   if (uname(&uname_info) == 0) {
     protos::Utsname* utsname_info = info->mutable_utsname();
