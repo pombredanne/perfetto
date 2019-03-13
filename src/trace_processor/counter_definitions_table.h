@@ -17,11 +17,12 @@
 #ifndef SRC_TRACE_PROCESSOR_COUNTER_DEFINITIONS_TABLE_H_
 #define SRC_TRACE_PROCESSOR_COUNTER_DEFINITIONS_TABLE_H_
 
-#include "src/trace_processor/storage_table.h"
-
 #include <deque>
 #include <memory>
 #include <string>
+#include <vector>
+
+#include "src/trace_processor/storage_table.h"
 
 namespace perfetto {
 namespace trace_processor {
@@ -69,7 +70,7 @@ class CounterDefinitionsTable : public StorageTable {
  private:
   uint32_t EstimateCost(const QueryConstraints&);
 
-  std::deque<std::string> ref_types_;
+  std::vector<std::string> ref_types_;
   const TraceStorage* const storage_;
 };
 }  // namespace trace_processor
