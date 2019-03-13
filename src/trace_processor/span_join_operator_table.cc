@@ -258,6 +258,15 @@ int SpanJoinOperatorTable::Cursor::Initialize(const QueryConstraints& qc,
   // table.
   if (table_->partitioning_ == PartitioningType::kMixedPartitioning) {
     PERFETTO_DCHECK(step_now->IsPartitioned());
+
+    // If we emit shadow slices, we need to clear out from the full partition
+    // shadow slice.
+    if (step_now->definition()->emit_shadow_slices()) {
+      res = step_now->StepToNextPartition();
+      if (PERFETTO_UNLIKELY(res.is_err()))
+        return res.err_code;
+    }
+
     res = next_stepped_->StepToPartition(step_now->partition());
     if (PERFETTO_UNLIKELY(res.is_err()))
       return res.err_code;
@@ -563,16 +572,6 @@ int SpanJoinOperatorTable::Query::PrepareRawStmt() {
   partition_ = std::numeric_limits<int64_t>::lowest();
   cursor_eof_ = false;
   mode_ = Mode::kRealSlice;
-
-  // If we are emitting shadow slices, we need to prime the cursor and then
-  // create a full partition shadow slice for the lowest partition if the
-  // query is partitioned..
-  if (defn_->emit_shadow_slices() && defn_->IsPartitioned()) {
-    auto ret = Step();
-    PERFETTO_DCHECK(!ret.is_eof());
-    if (PERFETTO_UNLIKELY(ret.is_err()))
-      return ret.err_code;
-  }
 
   return err;
 }
