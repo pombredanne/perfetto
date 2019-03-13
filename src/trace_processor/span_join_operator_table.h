@@ -97,8 +97,6 @@ class SpanJoinOperatorTable : public Table {
     static base::Optional<TableDescriptor> Parse(
         const std::string& raw_descriptor);
 
-    bool IsPartitioned() const { return !partition_col.empty(); }
-
     std::string name;
     std::string partition_col;
   };
@@ -111,7 +109,6 @@ class SpanJoinOperatorTable : public Table {
     TableDefinition(std::string name,
                     std::string partition_col,
                     std::vector<Table::Column> cols,
-                    bool emit_shadow_slices,
                     uint32_t ts_idx,
                     uint32_t dur_idx,
                     uint32_t partition_idx);
@@ -120,7 +117,6 @@ class SpanJoinOperatorTable : public Table {
     const std::string& partition_col() const { return partition_col_; }
     const std::vector<Table::Column>& columns() const { return cols_; }
 
-    bool emit_shadow_slices() const { return emit_shadow_slices_; }
     uint32_t ts_idx() const { return ts_idx_; }
     uint32_t dur_idx() const { return dur_idx_; }
     uint32_t partition_idx() const { return partition_idx_; }
@@ -131,7 +127,6 @@ class SpanJoinOperatorTable : public Table {
     std::string name_;
     std::string partition_col_;
     std::vector<Table::Column> cols_;
-    bool emit_shadow_slices_;
     uint32_t ts_idx_ = std::numeric_limits<uint32_t>::max();
     uint32_t dur_idx_ = std::numeric_limits<uint32_t>::max();
     uint32_t partition_idx_ = std::numeric_limits<uint32_t>::max();
@@ -174,33 +169,12 @@ class SpanJoinOperatorTable : public Table {
 
     const TableDefinition* definition() const { return defn_; }
 
-    bool Eof() const { return cursor_eof_ && mode_ == Mode::kRealSlice; }
+    bool Eof() const { return eof_; }
     bool IsPartitioned() const { return defn_->IsPartitioned(); }
-    bool IsRealSlice() const { return mode_ == Mode::kRealSlice; }
 
    private:
-    enum Mode {
-      kRealSlice,
-      kShadowSlice,
-    };
-
     int PrepareRawStmt();
     std::string CreateSqlQuery(const std::vector<std::string>& cs) const;
-
-    int64_t CursorTs() const {
-      auto ts_idx = static_cast<int>(defn_->ts_idx());
-      return sqlite3_column_int64(stmt_.get(), ts_idx);
-    }
-
-    int64_t CursorDur() const {
-      auto dur_idx = static_cast<int>(defn_->dur_idx());
-      return sqlite3_column_int64(stmt_.get(), dur_idx);
-    }
-
-    int64_t CursorPartition() const {
-      auto partition_idx = static_cast<int>(defn_->partition_idx());
-      return sqlite3_column_int64(stmt_.get(), partition_idx);
-    }
 
     std::string sql_query_;
     ScopedStmt stmt_;
@@ -209,8 +183,7 @@ class SpanJoinOperatorTable : public Table {
     int64_t ts_end_ = 0;
     int64_t partition_ = std::numeric_limits<int64_t>::lowest();
 
-    bool cursor_eof_ = false;
-    Mode mode_ = Mode::kRealSlice;
+    bool eof_ = false;
 
     const TableDefinition* const defn_;
     sqlite3* const db_;
@@ -245,16 +218,8 @@ class SpanJoinOperatorTable : public Table {
     size_t col_index;
   };
 
-  bool IsLeftJoin() const { return name() == "span_left_join"; }
-
-  const std::string& partition_col() const {
-    return t1_defn_.IsPartitioned() ? t1_defn_.partition_col()
-                                    : t2_defn_.partition_col();
-  }
-
   base::Optional<TableDefinition> CreateTableDefinition(
-      const TableDescriptor& desc,
-      bool emit_shadow_slices);
+      const TableDescriptor& desc);
 
   std::vector<std::string> ComputeSqlConstraintsForDefinition(
       const TableDefinition& defn,

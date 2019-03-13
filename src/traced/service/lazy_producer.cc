@@ -50,8 +50,7 @@ void LazyProducer::OnConnect() {
 
 void LazyProducer::SetupDataSource(DataSourceInstanceID,
                                    const DataSourceConfig&) {
-  if (!SetAndroidProperty(property_name_, "1"))
-    return;
+  SetAndroidProperty(property_name_, "1");
   active_sessions_++;
   generation_++;
 }

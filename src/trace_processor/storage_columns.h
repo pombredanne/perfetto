@@ -16,10 +16,8 @@
 #define SRC_TRACE_PROCESSOR_STORAGE_COLUMNS_H_
 
 #include <deque>
-#include <limits>
 #include <memory>
 #include <string>
-#include <vector>
 
 #include "src/trace_processor/filtered_row_index.h"
 #include "src/trace_processor/sqlite_utils.h"
@@ -201,11 +199,9 @@ class NumericColumn : public StorageColumn {
                       sqlite3_value* value,
                       FilteredRowIndex* index) const {
     auto predicate = sqlite_utils::CreateNumericPredicate<C>(op, value);
-    auto cast_predicate = [this,
-                           predicate](uint32_t row) PERFETTO_ALWAYS_INLINE {
+    index->FilterRows([this, &predicate](uint32_t row) {
       return predicate(static_cast<C>((*deque_)[row]));
-    };
-    index->FilterRows(cast_predicate);
+    });
   }
 
   bool is_naturally_ordered_ = false;
@@ -216,7 +212,7 @@ class StringColumn final : public StorageColumn {
  public:
   StringColumn(std::string col_name,
                const std::deque<Id>* deque,
-               const std::vector<std::string>* string_map,
+               const std::deque<std::string>* string_map,
                bool hidden = false)
       : StorageColumn(col_name, hidden),
         deque_(deque),
@@ -262,7 +258,7 @@ class StringColumn final : public StorageColumn {
 
  private:
   const std::deque<Id>* deque_ = nullptr;
-  const std::vector<std::string>* string_map_ = nullptr;
+  const std::deque<std::string>* string_map_ = nullptr;
 };
 
 // Column which represents the "ts_end" column present in all time based
@@ -272,7 +268,7 @@ class TsEndColumn final : public StorageColumn {
   TsEndColumn(std::string col_name,
               const std::deque<int64_t>* ts_start,
               const std::deque<int64_t>* dur);
-  ~TsEndColumn() override;
+  virtual ~TsEndColumn() override;
 
   void ReportResult(sqlite3_context*, uint32_t) const override;
 
@@ -299,7 +295,7 @@ class TsEndColumn final : public StorageColumn {
 class IdColumn final : public StorageColumn {
  public:
   IdColumn(std::string column_name, TableId table_id);
-  ~IdColumn() override;
+  virtual ~IdColumn() override;
 
   void ReportResult(sqlite3_context* ctx, uint32_t row) const override {
     auto id = TraceStorage::CreateRowId(table_id_, row);
@@ -312,7 +308,7 @@ class IdColumn final : public StorageColumn {
               sqlite3_value* value,
               FilteredRowIndex* index) const override {
     auto predicate = sqlite_utils::CreateNumericPredicate<RowId>(op, value);
-    index->FilterRows([this, predicate](uint32_t row) PERFETTO_ALWAYS_INLINE {
+    index->FilterRows([this, &predicate](uint32_t row) {
       return predicate(TraceStorage::CreateRowId(table_id_, row));
     });
   }
