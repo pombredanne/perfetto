@@ -86,10 +86,6 @@ base::Optional<Table::Schema> SpanJoinOperatorTable::Init(
                   t1_desc.partition_col.c_str(), t2_desc.partition_col.c_str());
     return base::nullopt;
   } else {
-    if (IsLeftJoin()) {
-      PERFETTO_ELOG("span_left_join not supported for mixed partitioning");
-      return base::nullopt;
-    }
     partitioning_ = PartitioningType::kMixedPartitioning;
   }
 
