@@ -22,8 +22,6 @@
 #include <set>
 #include <utility>
 
-#undef NDEBUG
-
 #include "perfetto/base/logging.h"
 #include "perfetto/base/string_splitter.h"
 #include "perfetto/base/string_utils.h"
