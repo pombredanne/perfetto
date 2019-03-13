@@ -120,7 +120,9 @@ TEST_F(EventTrackerTest, CounterDuration) {
   context.event_tracker->PushCounter(timestamp + 9, 1000, name_id, cpu,
                                      RefType::kRefCpuId);
 
-  ASSERT_EQ(context.storage->counter_definitions().size(), 4ul);
+  ASSERT_EQ(context.storage->counter_definitions().size(), 1ul);
+
+  ASSERT_EQ(context.storage->counter_values().size(), 4ul);
   ASSERT_EQ(context.storage->counter_values().timestamps().at(0), timestamp);
   ASSERT_EQ(context.storage->counter_values().values().at(0), 1000);
 
