@@ -16,8 +16,6 @@
 
 #include "src/tracing/test/mock_consumer.h"
 
-#include <cinttypes>
-
 #include "perfetto/tracing/core/trace_config.h"
 #include "perfetto/tracing/core/trace_stats.h"
 #include "src/base/test/test_task_runner.h"
