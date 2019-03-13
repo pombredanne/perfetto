@@ -25,6 +25,7 @@
 
 #if !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 #include <sys/uio.h>
+#include <sys/utsname.h>
 #include <unistd.h>
 #endif
 
@@ -50,6 +51,7 @@
 #include "src/tracing/core/trace_buffer.h"
 
 #include "perfetto/trace/clock_snapshot.pb.h"
+#include "perfetto/trace/system_info.pb.h"
 #include "perfetto/trace/trusted_packet.pb.h"
 
 // General note: this class must assume that Producers are malicious and will
@@ -361,7 +363,8 @@ bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
       &tracing_sessions_.emplace(tsid, TracingSession(tsid, consumer, cfg))
            .first->second;
 
-  for (const auto& trigger : cfg.trigger_config().triggers()) {
+  for (const auto& trigger :
+       tracing_session->config.trigger_config().triggers()) {
     triggers_to_sessions_.insert(
         std::make_pair(trigger.name(), TriggerInfo{tsid, &trigger}));
   }
@@ -780,47 +783,53 @@ void TracingServiceImpl::ActivateTriggers(
   for (const auto& trigger_name : triggers.trigger_names()) {
     auto start_and_end_iter = triggers_to_sessions_.equal_range(trigger_name);
     for (auto iter = start_and_end_iter.first;
-         iter != start_and_end_iter.second;) {
+         iter != start_and_end_iter.second; ++iter) {
       auto* tracing_session = GetTracingSession(iter->second.session);
-      if (!tracing_session) {
-        // Tracing session has disappeared clean up so we don't have to iterate
-        // it in the future.
-        iter = triggers_to_sessions_.erase(iter);
-        continue;
-      }
+      PERFETTO_DCHECK(tracing_session);
+
       auto* producer = GetProducer(producer_id);
       if (!producer) {
         // The producer that sent us this trigger has disconnected before we got
-        // the name.
+        // the name so we just ignore this trigger.
         return;
       }
+
       auto* trigger = iter->second.trigger;
+      PERFETTO_DCHECK(trigger->name() == trigger_name);
+
+      // If this trigger requires a certain producer to have sent it (non-empty
+      // producer_name()) ensure the producer who sent this trigger matches.
       if (!trigger->producer_name().empty() &&
           trigger->producer_name() != producer->name_) {
-        // This iterator doesn't match the requested producer name move on.
-        ++iter;
         continue;
       }
+
       switch (tracing_session->config.trigger_config().trigger_mode()) {
         case TraceConfig::TriggerConfig::START_TRACING:
-          // We override the trace duration to be the trigger's requested value.
-          //
-          // TODO(nuskos): We need to let the clean up task know that we
-          // shouldn't destroy this task now.
-          tracing_session->config.set_duration_ms(
-              trigger->finalize_trace_delay_ms());
-          PERFETTO_DLOG("Triggering TracingSession %" PRIu64
-                        " with duration of %" PRIu32 "ms",
-                        iter->second.session,
-                        trigger->finalize_trace_delay_ms());
-          StartTracing(iter->second.session);
+          // TODO(nuskos): DO NOT SUB-MIT Replace this 'magic' 3 with the proper
+          // way to get the current time. So when we create the packets
+          // dynamically on the fly we can insert it at the correct time.
+          tracing_session->received_triggers.push_back(std::make_pair(
+              static_cast<uint64_t>(base::GetBootTimeNs().count()), trigger));
+          // If the session has already been triggered and moved into kStarted
+          // then we don't need to repeat that again.
+          if (tracing_session->state == TracingSession::CONFIGURED) {
+            PERFETTO_DLOG("Triggering '%s' on TracingSession %" PRIu64
+                          " with duration of %" PRIu32 "ms.",
+                          trigger->name().c_str(), iter->second.session,
+                          trigger->finalize_trace_delay_ms());
+            // We override the trace duration to be the trigger's requested
+            // value.
+            tracing_session->config.set_duration_ms(
+                trigger->finalize_trace_delay_ms());
+            StartTracing(iter->second.session);
+          }
           break;
         case TraceConfig::TriggerConfig::UNSPECIFIED:
         case TraceConfig::TriggerConfig::FINALIZE_TRACE:
           // TODO(nuskos): Add finalize in followup CL.
           break;
       }
-      ++iter;
     }
   }
 }
@@ -1190,6 +1199,7 @@ void TracingServiceImpl::ReadBuffers(TracingSessionID tsid,
       SnapshotClocks(&packets);
   }
   MaybeEmitTraceConfig(tracing_session, &packets);
+  MaybeEmitSystemInfo(tracing_session, &packets);
 
   size_t packets_bytes = 0;  // SUM(slice.size() for each slice in |packets|).
   size_t total_slices = 0;   // SUM(#slices in |packets|).
@@ -1397,6 +1407,18 @@ void TracingServiceImpl::FreeBuffers(TracingSessionID tsid) {
     buffers_.erase(buffer_id);
   }
   bool notify_traceur = tracing_session->config.notify_traceur();
+
+  // Remove (if any) triggers that this session defined.
+  if (!tracing_session->config.trigger_config().triggers().empty()) {
+    for (auto iter = triggers_to_sessions_.begin();
+         iter != triggers_to_sessions_.end();) {
+      if (iter->second.session == tsid) {
+        iter = triggers_to_sessions_.erase(iter);
+      } else {
+        ++iter;
+      }
+    }
+  }
   tracing_sessions_.erase(tsid);
   UpdateMemoryGuardrail();
 
@@ -1902,6 +1924,32 @@ void TracingServiceImpl::MaybeEmitTraceConfig(
   tracing_session->did_emit_config = true;
   protos::TrustedPacket packet;
   tracing_session->config.ToProto(packet.mutable_trace_config());
+  packet.set_trusted_uid(static_cast<int32_t>(uid_));
+  packet.set_trusted_packet_sequence_id(kServicePacketSequenceID);
+  Slice slice = Slice::Allocate(static_cast<size_t>(packet.ByteSize()));
+  PERFETTO_CHECK(packet.SerializeWithCachedSizesToArray(slice.own_data()));
+  packets->emplace_back();
+  packets->back().AddSlice(std::move(slice));
+}
+
+void TracingServiceImpl::MaybeEmitSystemInfo(
+    TracingSession* tracing_session,
+    std::vector<TracePacket>* packets) {
+  if (tracing_session->did_emit_system_info)
+    return;
+  tracing_session->did_emit_system_info = true;
+  protos::TrustedPacket packet;
+  protos::SystemInfo* info = packet.mutable_system_info();
+#if !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+  struct utsname uname_info;
+  if (uname(&uname_info) == 0) {
+    protos::Utsname* utsname_info = info->mutable_utsname();
+    utsname_info->set_sysname(uname_info.sysname);
+    utsname_info->set_version(uname_info.version);
+    utsname_info->set_machine(uname_info.machine);
+    utsname_info->set_release(uname_info.release);
+  }
+#endif
   packet.set_trusted_uid(static_cast<int32_t>(uid_));
   packet.set_trusted_packet_sequence_id(kServicePacketSequenceID);
   Slice slice = Slice::Allocate(static_cast<size_t>(packet.ByteSize()));

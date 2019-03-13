@@ -88,10 +88,17 @@ class TracingServiceImplTest : public testing::Test {
     return svc->GetProducer(producer_id)->uid_;
   }
 
-  TracingServiceImpl::TracingSession* tracing_session() {
-    auto* session = svc->GetTracingSession(svc->last_tracing_session_id_);
+  TracingServiceImpl::TracingSession* GetTracingSession(TracingSessionID tsid) {
+    auto* session = svc->GetTracingSession(tsid);
     EXPECT_NE(nullptr, session);
     return session;
+  }
+  TracingServiceImpl::TracingSession* tracing_session() {
+    return GetTracingSession(GetTracingSessionID());
+  }
+
+  TracingSessionID GetTracingSessionID() {
+    return svc->last_tracing_session_id_;
   }
 
   const std::set<BufferID>& GetAllowedTargetBuffers(ProducerID producer_id) {
@@ -242,6 +249,13 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerDeferredStart) {
 
   auto writer1 = producer->CreateTraceWriter("ds_1");
   producer->WaitForFlush(writer1.get());
+
+  ASSERT_EQ(1u, tracing_session()->received_triggers.size());
+  // Just expect tht time is within one second of now to prevent flakyness.
+  EXPECT_NEAR(tracing_session()->received_triggers[0].first,
+              base::GetBootTimeNs().count(), 1e+9);
+  EXPECT_EQ("trigger_name",
+            tracing_session()->received_triggers[0].second->name());
 
   producer->WaitForDataSourceStop("ds_1");
   consumer->WaitForTracingDisabled();
@@ -506,10 +520,13 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerMultipleTraces) {
   // Make sure we don't get unexpected DataSourceStart() notifications yet from
   // consumer_1.
   task_runner_.RunUntilIdle();
+  auto tracing_session_1_id = GetTracingSessionID();
 
   (*trace_config.mutable_data_sources())[0].mutable_config()->set_name("ds_2");
-  (*trace_config.mutable_trigger_config()->mutable_triggers())[0].set_name(
-      "trigger_name_2");
+  trigger = trace_config.mutable_trigger_config()->add_triggers();
+  trigger->set_name("trigger_name_2");
+  trigger->set_finalize_trace_delay_ms(40);
+
   consumer_2->EnableTracing(trace_config);
 
   producer->WaitForDataSourceSetup("ds_2");
@@ -517,6 +534,8 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerMultipleTraces) {
   // Make sure we don't get unexpected DataSourceStart() notifications yet from
   // consumer_2.
   task_runner_.RunUntilIdle();
+  auto tracing_session_2_id = GetTracingSessionID();
+  EXPECT_NE(tracing_session_1_id, tracing_session_2_id);
 
   const DataSourceInstanceID id1 = producer->GetDataSourceInstanceId("ds_1");
   const DataSourceInstanceID id2 = producer->GetDataSourceInstanceId("ds_2");
@@ -531,6 +550,34 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerMultipleTraces) {
   // on the wrong checkpoint in the |task_runner_|.
   producer->WaitForDataSourceStart("ds_1");
   producer->WaitForDataSourceStart("ds_2");
+
+  // Now that they've started we can check the triggers they've seen.
+  auto* tracing_session_1 = GetTracingSession(tracing_session_1_id);
+  ASSERT_EQ(1u, tracing_session_1->received_triggers.size());
+  uint64_t first_trigger_ns = tracing_session_1->received_triggers[0].first;
+  // Just expect tht time is within one second of now to prevent flakyness.
+  EXPECT_NEAR(first_trigger_ns, base::GetBootTimeNs().count(), 1e+9);
+  EXPECT_EQ("trigger_name",
+            tracing_session_1->received_triggers[0].second->name());
+
+  // This is actually dependent on the order in which the triggers were received
+  // but there isn't really a better way then iteration order so probably not to
+  // brittle of a test. And this caught a real bug in implementation.
+  auto* tracing_session_2 = GetTracingSession(tracing_session_2_id);
+  ASSERT_EQ(2u, tracing_session_2->received_triggers.size());
+
+  uint64_t second_trigger_ns = tracing_session_2->received_triggers[0].first;
+  EXPECT_LT(first_trigger_ns, second_trigger_ns);
+  EXPECT_EQ("trigger_name",
+            tracing_session_2->received_triggers[0].second->name());
+  EXPECT_EQ(30, tracing_session_2->received_triggers[0]
+                    .second->finalize_trace_delay_ms());
+
+  EXPECT_LT(second_trigger_ns, tracing_session_2->received_triggers[1].first);
+  EXPECT_EQ("trigger_name_2",
+            tracing_session_2->received_triggers[1].second->name());
+  EXPECT_EQ(40, tracing_session_2->received_triggers[1]
+                    .second->finalize_trace_delay_ms());
 
   auto writer1 = producer->CreateTraceWriter("ds_1");
   auto writer2 = producer->CreateTraceWriter("ds_2");
@@ -810,7 +857,11 @@ TEST_F(TracingServiceImplTest, WriteIntoFileAndStopOnMaxSize) {
   producer->WaitForDataSourceSetup("data_source");
   producer->WaitForDataSourceStart("data_source");
 
-  static const int kNumPreamblePackets = 4;
+  // The preamble packets are:
+  // Config
+  // SystemInfo
+  // 3x unknown
+  static const int kNumPreamblePackets = 5;
   static const int kNumTestPackets = 10;
   static const char kPayload[] = "1234567890abcdef-";
 
