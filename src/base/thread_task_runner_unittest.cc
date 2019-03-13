@@ -32,7 +32,7 @@ class ThreadTaskRunnerTest : public ::testing::Test {
 
 TEST_F(ThreadTaskRunnerTest, ConstructedRunning) {
   ThreadTaskRunner task_runner = ThreadTaskRunner::CreateAndStart();
-  task_runner.Runner()->PostTask([this] { atomic_flag_ = true; });
+  task_runner.get()->PostTask([this] { atomic_flag_ = true; });
   // main thread not blocked, wait on the task explicitly
   while (!atomic_flag_) {
   }
@@ -40,15 +40,15 @@ TEST_F(ThreadTaskRunnerTest, ConstructedRunning) {
 
 TEST_F(ThreadTaskRunnerTest, RunsTasksOnOneDedicatedThread) {
   ThreadTaskRunner task_runner = ThreadTaskRunner::CreateAndStart();
-  EXPECT_FALSE(task_runner.Runner()->RunsTasksOnCurrentThread());
+  EXPECT_FALSE(task_runner.get()->RunsTasksOnCurrentThread());
 
   ThreadChecker thread_checker;
-  task_runner.Runner()->PostTask([&thread_checker] {
+  task_runner.get()->PostTask([&thread_checker] {
     // make thread_checker track the task thread
     thread_checker.DetachFromThread();
     EXPECT_TRUE(thread_checker.CalledOnValidThread());
   });
-  task_runner.Runner()->PostTask([this, &thread_checker] {
+  task_runner.get()->PostTask([this, &thread_checker] {
     // called on the same thread
     EXPECT_TRUE(thread_checker.CalledOnValidThread());
     atomic_flag_ = true;
@@ -60,11 +60,11 @@ TEST_F(ThreadTaskRunnerTest, RunsTasksOnOneDedicatedThread) {
 
 TEST_F(ThreadTaskRunnerTest, MovableOwnership) {
   ThreadTaskRunner task_runner = ThreadTaskRunner::CreateAndStart();
-  UnixTaskRunner* runner_ptr = task_runner.Runner();
+  UnixTaskRunner* runner_ptr = task_runner.get();
   EXPECT_NE(runner_ptr, nullptr);
 
   ThreadChecker thread_checker;
-  task_runner.Runner()->PostTask([&thread_checker] {
+  task_runner.get()->PostTask([&thread_checker] {
     // make thread_checker track the task thread
     thread_checker.DetachFromThread();
     EXPECT_TRUE(thread_checker.CalledOnValidThread());
@@ -72,12 +72,12 @@ TEST_F(ThreadTaskRunnerTest, MovableOwnership) {
 
   // move ownership and destroy old instance
   ThreadTaskRunner task_runner2 = std::move(task_runner);
-  EXPECT_EQ(task_runner.Runner(), nullptr);
+  EXPECT_EQ(task_runner.get(), nullptr);
   task_runner.~ThreadTaskRunner();
 
   // runner pointer is stable, and remains usable
-  EXPECT_EQ(task_runner2.Runner(), runner_ptr);
-  task_runner2.Runner()->PostTask([this, &thread_checker] {
+  EXPECT_EQ(task_runner2.get(), runner_ptr);
+  task_runner2.get()->PostTask([this, &thread_checker] {
     // task thread remains the same
     EXPECT_TRUE(thread_checker.CalledOnValidThread());
     atomic_flag_ = true;
@@ -114,7 +114,7 @@ TEST_F(ThreadTaskRunnerTest, EnqueuedTasksDestructedOnTaskThread) {
   ThreadChecker thread_checker;
   ThreadTaskRunner task_runner = ThreadTaskRunner::CreateAndStart();
 
-  task_runner.Runner()->PostTask([this, &thread_checker, &task_runner] {
+  task_runner.get()->PostTask([this, &thread_checker, &task_runner] {
     // make thread_checker track the task thread
     thread_checker.DetachFromThread();
     EXPECT_TRUE(thread_checker.CalledOnValidThread());
@@ -126,8 +126,8 @@ TEST_F(ThreadTaskRunnerTest, EnqueuedTasksDestructedOnTaskThread) {
     //   std::function. Will pass as we're posting from a task thread.
     // * for the still-pending task once the ThreadTaskRunner destruction causes
     //   the destruction of UnixTaskRunner.
-    task_runner.Runner()->PostDelayedTask(
-        DestructorThreadChecker(thread_checker), 100 * 1000 /*ms*/);
+    task_runner.get()->PostDelayedTask(DestructorThreadChecker(thread_checker),
+                                       100 * 1000 /*ms*/);
     atomic_flag_ = true;
   });
 

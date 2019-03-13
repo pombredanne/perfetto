@@ -315,7 +315,7 @@ void UnwindingWorker::PostHandoffSocket(HandoffData handoff_data) {
   HandoffData* raw_data = new HandoffData(std::move(handoff_data));
   // We do not need to use a WeakPtr here because the task runner will not
   // outlive its UnwindingWorker.
-  thread_task_runner_.Runner()->PostTask([this, raw_data] {
+  thread_task_runner_.get()->PostTask([this, raw_data] {
     HandoffData data = std::move(*raw_data);
     delete raw_data;
     HandleHandoffSocket(std::move(data));
@@ -324,7 +324,7 @@ void UnwindingWorker::PostHandoffSocket(HandoffData handoff_data) {
 
 void UnwindingWorker::HandleHandoffSocket(HandoffData handoff_data) {
   auto sock = base::UnixSocket::AdoptConnected(
-      handoff_data.sock.ReleaseFd(), this, this->thread_task_runner_.Runner(),
+      handoff_data.sock.ReleaseFd(), this, this->thread_task_runner_.get(),
       base::SockType::kStream);
   pid_t peer_pid = sock->peer_pid();
 
@@ -341,7 +341,7 @@ void UnwindingWorker::HandleHandoffSocket(HandoffData handoff_data) {
 void UnwindingWorker::PostDisconnectSocket(pid_t pid) {
   // We do not need to use a WeakPtr here because the task runner will not
   // outlive its UnwindingWorker.
-  thread_task_runner_.Runner()->PostTask(
+  thread_task_runner_.get()->PostTask(
       [this, pid] { HandleDisconnectSocket(pid); });
 }
 

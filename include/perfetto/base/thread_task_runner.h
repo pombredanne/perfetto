@@ -17,8 +17,7 @@
 #ifndef INCLUDE_PERFETTO_BASE_THREAD_TASK_RUNNER_H_
 #define INCLUDE_PERFETTO_BASE_THREAD_TASK_RUNNER_H_
 
-#include <condition_variable>
-#include <mutex>
+#include <functional>
 #include <thread>
 
 #include "perfetto/base/unix_task_runner.h"
@@ -26,9 +25,8 @@
 namespace perfetto {
 namespace base {
 
-// Handle that owns a UnixTaskRunner, and a dedicated task thread for that task
-// runner. Shuts down the runner and joins the thread upon destruction. Can be
-// moved to transfer ownership.
+// A UnixTaskRunner backed by a dedicated task thread. Shuts down the runner and
+// joins the thread upon destruction. Can be moved to transfer ownership.
 //
 // Guarantees that:
 // * the UnixTaskRunner will be constructed and destructed on the task thread.
@@ -52,14 +50,14 @@ class ThreadTaskRunner {
   //
   // Warning: do not call Quit() on the returned runner pointer, the termination
   // should be handled exclusively by this class' destructor.
-  UnixTaskRunner* Runner() { return runner_; }
+  UnixTaskRunner* get() { return task_runner_; }
 
  private:
   ThreadTaskRunner();
-  void RunTaskThread(std::mutex* init_lock, std::condition_variable* init_cv);
+  void RunTaskThread(std::function<void(UnixTaskRunner*)> initializer);
 
   std::thread thread_;
-  UnixTaskRunner* runner_ = nullptr;
+  UnixTaskRunner* task_runner_ = nullptr;
 };
 
 }  // namespace base
