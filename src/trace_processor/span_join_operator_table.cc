@@ -397,15 +397,27 @@ int SpanJoinOperatorTable::Query::Initialize(const QueryConstraints& qc,
 SpanJoinOperatorTable::Query::StepRet SpanJoinOperatorTable::Query::Step() {
   PERFETTO_DCHECK(!Eof());
   sqlite3_stmt* stmt = stmt_.get();
+
+  // In this loop, we will try and find the slice to from the cursor.
+  // Terminology: "Shadow slices" are slices which fill in the gaps between real
+  // slices from the underlying cursor in each partition (if any).
+  // For queries which don't need "shadow slices", we simply return non-zero
+  // duration slices from the underlying cursor.
   do {
     if (mode_ == Mode::kShadowSlice) {
       PERFETTO_DCHECK(defn_->emit_shadow_slices());
 
+      // If we're out of slices in the cursor, this shadow slice will be the
+      // final slice.
       if (cursor_eof_) {
         mode_ = Mode::kRealSlice;
         return StepRet(StepRet::Code::kEof);
       }
 
+      // Look ahead to see if the cursor changes partition (if the cursor is
+      // partitioned). If so, then we need to fill the gap between the ts == 0
+      // and the start of that slice. Otherwise after this slice, we have the
+      // real slice from the cursor.
       if (!defn_->IsPartitioned() || partition_ == CursorPartition()) {
         mode_ = Mode::kRealSlice;
         ts_start_ = CursorTs();
@@ -433,6 +445,8 @@ SpanJoinOperatorTable::Query::StepRet SpanJoinOperatorTable::Query::Step() {
     }
 
     if (res == SQLITE_ROW) {
+      // After every row, there will be a shadow slice so emit that if we need
+      // to do so. Otherwise, just emit the underlying slice.
       if (defn_->emit_shadow_slices()) {
         mode_ = Mode::kShadowSlice;
         ts_start_ = ts_end_;
@@ -451,6 +465,7 @@ SpanJoinOperatorTable::Query::StepRet SpanJoinOperatorTable::Query::Step() {
       if (!defn_->emit_shadow_slices())
         return StepRet(StepRet::Code::kEof);
 
+      // Close off the remainder of this partition with a shadow slice.
       mode_ = Mode::kShadowSlice;
       ts_start_ = ts_end_;
       ts_end_ = std::numeric_limits<int64_t>::max();
