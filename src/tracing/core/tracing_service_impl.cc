@@ -363,7 +363,8 @@ bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
       &tracing_sessions_.emplace(tsid, TracingSession(tsid, consumer, cfg))
            .first->second;
 
-  for (const auto& trigger : cfg.trigger_config().triggers()) {
+  for (const auto& trigger :
+       tracing_session->config.trigger_config().triggers()) {
     triggers_to_sessions_.insert(
         std::make_pair(trigger.name(), TriggerInfo{tsid, &trigger}));
   }
@@ -793,9 +794,11 @@ void TracingServiceImpl::ActivateTriggers(
         return;
       }
 
+      auto* trigger = iter->second.trigger;
+      PERFETTO_DCHECK(trigger->name() == trigger_name);
+
       // If this trigger requires a certain producer to have sent it (non-empty
       // producer_name()) ensure the producer who sent this trigger matches.
-      auto* trigger = iter->second.trigger;
       if (!trigger->producer_name().empty() &&
           trigger->producer_name() != producer->name_) {
         continue;
@@ -806,12 +809,21 @@ void TracingServiceImpl::ActivateTriggers(
           // TODO(nuskos): DO NOT SUB-MIT Replace this 'magic' 3 with the proper
           // way to get the current time. So when we create the packets
           // dynamically on the fly we can insert it at the correct time.
-          tracing_session->received_triggers.push_back(
-              std::make_pair(3, trigger->name()));
-          // We override the trace duration to be the trigger's requested value.
-          tracing_session->config.set_duration_ms(
-              trigger->finalize_trace_delay_ms());
-          StartTracing(iter->second.session);
+          tracing_session->received_triggers.push_back(std::make_pair(
+              static_cast<uint64_t>(base::GetBootTimeNs().count()), trigger));
+          // If the session has already been triggered and moved into kStarted
+          // then we don't need to repeat that again.
+          if (tracing_session->state == TracingSession::CONFIGURED) {
+            PERFETTO_DLOG("Triggering '%s' on TracingSession %" PRIu64
+                          " with duration of %" PRIu32 "ms.",
+                          trigger->name().c_str(), iter->second.session,
+                          trigger->finalize_trace_delay_ms());
+            // We override the trace duration to be the trigger's requested
+            // value.
+            tracing_session->config.set_duration_ms(
+                trigger->finalize_trace_delay_ms());
+            StartTracing(iter->second.session);
+          }
           break;
         case TraceConfig::TriggerConfig::UNSPECIFIED:
         case TraceConfig::TriggerConfig::FINALIZE_TRACE:
