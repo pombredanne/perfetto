@@ -52,17 +52,15 @@ void LazyProducer::SetupDataSource(DataSourceInstanceID id,
                                    const DataSourceConfig&) {
   if (active_sessions_.empty()) {
     std::string prev_value = GetAndroidProperty(property_name_);
-    if (prev_value != "" && prev_value != "0")
-      return;
-    if (!SetAndroidProperty(property_name_, "1"))
-      return;
+    if (prev_value != "2")
+      if (!SetAndroidProperty(property_name_, "1"))
+        return;
   }
   active_sessions_.emplace(id);
   generation_++;
 }
 
 void LazyProducer::StopDataSource(DataSourceInstanceID id) {
-  PERFETTO_LOG("Stop DS.");
   if (!active_sessions_.erase(id))
     return;
 
@@ -73,10 +71,11 @@ void LazyProducer::StopDataSource(DataSourceInstanceID id) {
   auto weak_this = weak_factory_.GetWeakPtr();
   task_runner_->PostDelayedTask(
       [weak_this, cur_generation] {
-        PERFETTO_LOG("Shutdown producer");
         if (!weak_this)
           return;
-        if (weak_this->generation_ == cur_generation)
+        std::string prev_value =
+            weak_this->GetAndroidProperty(weak_this->property_name_);
+        if (prev_value != "2" && weak_this->generation_ == cur_generation)
           weak_this->SetAndroidProperty(weak_this->property_name_, "0");
       },
       delay_ms_);

@@ -22,6 +22,9 @@ import "perfetto/config/trace_config.proto";
 import "perfetto/trace/android/android_log.proto";
 import "perfetto/trace/chrome/chrome_trace_event.proto";
 import "perfetto/trace/clock_snapshot.proto";
+import "perfetto/trace/track_event/process_descriptor.proto";
+import "perfetto/trace/track_event/thread_descriptor.proto";
+import "perfetto/trace/track_event/track_event.proto";
 import "perfetto/trace/filesystem/inode_file_map.proto";
 import "perfetto/trace/ftrace/ftrace_event_bundle.proto";
 import "perfetto/trace/ftrace/ftrace_stats.proto";
@@ -32,11 +35,7 @@ import "perfetto/trace/profiling/profile_packet.proto";
 import "perfetto/trace/ps/process_stats.proto";
 import "perfetto/trace/ps/process_tree.proto";
 import "perfetto/trace/sys_stats/sys_stats.proto";
-import "perfetto/trace/system_info.proto";
 import "perfetto/trace/test_event.proto";
-import "perfetto/trace/track_event/process_descriptor.proto";
-import "perfetto/trace/track_event/thread_descriptor.proto";
-import "perfetto/trace/track_event/track_event.proto";
 
 package perfetto.protos;
 
@@ -44,7 +43,7 @@ package perfetto.protos;
 // TracePacket(s).
 //
 // Next reserved id: 13 (up to 15).
-// Next id: 46.
+// Next id: 45.
 message TracePacket {
   // TODO(primiano): in future we should add a timestamp_clock_domain field to
   // allow mixing timestamps from different clock domains.
@@ -70,7 +69,6 @@ message TracePacket {
     BatteryCounters battery = 38;
     PowerRails power_rails = 40;
     AndroidLogPacket android_log = 39;
-    SystemInfo system_info = 45;
 
     // Only used by TrackEvent.
     ProcessDescriptor process_descriptor = 43;

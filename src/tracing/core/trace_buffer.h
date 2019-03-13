@@ -481,12 +481,6 @@ class TraceBuffer {
     kFailedStayOnSameSequence,
   };
 
-  enum class ReadPacketResult {
-    kSucceeded,
-    kFailedInvalidPacket,
-    kFailedEmptyPacket,
-  };
-
   explicit TraceBuffer(OverwritePolicy);
   TraceBuffer(const TraceBuffer&) = delete;
   TraceBuffer& operator=(const TraceBuffer&) = delete;
@@ -543,7 +537,7 @@ class TraceBuffer {
   // TracePacket can be nullptr, in which case the read state is still advanced.
   // When TracePacket is not nullptr, ProducerID must also be not null and will
   // be updated with the ProducerID that originally wrote the chunk.
-  ReadPacketResult ReadNextPacketInChunk(ChunkMeta*, TracePacket*);
+  bool ReadNextPacketInChunk(ChunkMeta*, TracePacket*);
 
   void DcheckIsAlignedAndWithinBounds(const uint8_t* ptr) const {
     PERFETTO_DCHECK(ptr >= begin() && ptr <= end() - sizeof(ChunkRecord));

@@ -24,5 +24,11 @@ service heapprofd /system/bin/heapprofd
 on property:persist.heapprofd.enable=1
     start heapprofd
 
+on property:persist.heapprofd.enable=2
+    start heapprofd
+
 on property:persist.heapprofd.enable=0
+    stop heapprofd
+
+on property:persist.heapprofd.enable=""
     stop heapprofd
