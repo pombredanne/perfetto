@@ -52,13 +52,6 @@ class TraceBuffer;
 class TraceConfig;
 class TracePacket;
 
-class TracingSessionObserver {
- public:
-  virtual void StartTracing(TracingSessionID, const TraceConfig&) = 0;
-  virtual void StopTracing(TracingSessionID) = 0;
-  virtual ~TracingSessionObserver();
-};
-
 // The tracing service business logic.
 class TracingServiceImpl : public TracingService {
  public:
@@ -248,10 +241,6 @@ class TracingServiceImpl : public TracingService {
     smb_scraping_enabled_ = enabled;
   }
 
-  void SetTracingSessionObserver(TracingSessionObserver* observer) {
-    tracing_session_observer_ = observer;
-  }
-
   // Exposed mainly for testing.
   size_t num_producers() const { return producers_.size(); }
   ProducerEndpointImpl* GetProducer(ProducerID) const;
@@ -377,9 +366,6 @@ class TracingServiceImpl : public TracingService {
     // Whether we mirrored the trace config back to the trace output yet.
     bool did_emit_config = false;
 
-    // Whether we put the system info into the trace output yet.
-    bool did_emit_system_info = false;
-
     State state = DISABLED;
 
     // If the consumer detached the session, this variable defines the key used
@@ -424,7 +410,6 @@ class TracingServiceImpl : public TracingService {
   void SnapshotStats(TracingSession*, std::vector<TracePacket>*);
   TraceStats GetTraceStats(TracingSession* tracing_session);
   void MaybeEmitTraceConfig(TracingSession*, std::vector<TracePacket>*);
-  void MaybeEmitSystemInfo(TracingSession*, std::vector<TracePacket>*);
   void OnFlushTimeout(TracingSessionID, FlushRequestID);
   void OnDisableTracingTimeout(TracingSessionID);
   void DisableTracingNotifyConsumerAndFlushFile(TracingSession*);
@@ -464,8 +449,6 @@ class TracingServiceImpl : public TracingService {
   // Stats.
   uint64_t chunks_discarded_ = 0;
   uint64_t patches_discarded_ = 0;
-
-  TracingSessionObserver* tracing_session_observer_ = nullptr;
 
   PERFETTO_THREAD_CHECKER(thread_checker_)
 

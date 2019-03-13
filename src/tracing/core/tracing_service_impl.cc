@@ -25,7 +25,6 @@
 
 #if !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 #include <sys/uio.h>
-#include <sys/utsname.h>
 #include <unistd.h>
 #endif
 
@@ -51,7 +50,6 @@
 #include "src/tracing/core/trace_buffer.h"
 
 #include "perfetto/trace/clock_snapshot.pb.h"
-#include "perfetto/trace/system_info.pb.h"
 #include "perfetto/trace/trusted_packet.pb.h"
 
 // General note: this class must assume that Producers are malicious and will
@@ -113,8 +111,6 @@ constexpr size_t TracingServiceImpl::kDefaultShmSize;
 constexpr size_t TracingServiceImpl::kMaxShmSize;
 constexpr uint32_t TracingServiceImpl::kDataSourceStopTimeoutMs;
 constexpr uint8_t TracingServiceImpl::kSyncMarker[];
-
-TracingSessionObserver::~TracingSessionObserver() = default;
 
 // static
 std::unique_ptr<TracingService> TracingService::CreateInstance(
@@ -346,9 +342,6 @@ bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   }
 
   const TracingSessionID tsid = ++last_tracing_session_id_;
-  if (tracing_session_observer_)
-    tracing_session_observer_->StartTracing(tsid, cfg);
-
   tracing_session =
       &tracing_sessions_.emplace(tsid, TracingSession(tsid, consumer, cfg))
            .first->second;
@@ -1017,9 +1010,6 @@ void TracingServiceImpl::FlushAndDisableTracing(TracingSessionID tsid) {
                   success, tsid);
     if (!weak_this)
       return;
-    if (weak_this->tracing_session_observer_)
-      weak_this->tracing_session_observer_->StopTracing(tsid);
-
     TracingSession* session = weak_this->GetTracingSession(tsid);
     if (session->consumer_maybe_null) {
       // If the consumer is still attached, just disable the session but give it
@@ -1103,7 +1093,6 @@ void TracingServiceImpl::ReadBuffers(TracingSessionID tsid,
       SnapshotClocks(&packets);
   }
   MaybeEmitTraceConfig(tracing_session, &packets);
-  MaybeEmitSystemInfo(tracing_session, &packets);
 
   size_t packets_bytes = 0;  // SUM(slice.size() for each slice in |packets|).
   size_t total_slices = 0;   // SUM(#slices in |packets|).
@@ -1816,32 +1805,6 @@ void TracingServiceImpl::MaybeEmitTraceConfig(
   tracing_session->did_emit_config = true;
   protos::TrustedPacket packet;
   tracing_session->config.ToProto(packet.mutable_trace_config());
-  packet.set_trusted_uid(static_cast<int32_t>(uid_));
-  packet.set_trusted_packet_sequence_id(kServicePacketSequenceID);
-  Slice slice = Slice::Allocate(static_cast<size_t>(packet.ByteSize()));
-  PERFETTO_CHECK(packet.SerializeWithCachedSizesToArray(slice.own_data()));
-  packets->emplace_back();
-  packets->back().AddSlice(std::move(slice));
-}
-
-void TracingServiceImpl::MaybeEmitSystemInfo(
-    TracingSession* tracing_session,
-    std::vector<TracePacket>* packets) {
-  if (tracing_session->did_emit_system_info)
-    return;
-  tracing_session->did_emit_system_info = true;
-  protos::TrustedPacket packet;
-  protos::SystemInfo* info = packet.mutable_system_info();
-#if !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
-  struct utsname uname_info;
-  if (uname(&uname_info) == 0) {
-    protos::Utsname* utsname_info = info->mutable_utsname();
-    utsname_info->set_sysname(uname_info.sysname);
-    utsname_info->set_version(uname_info.version);
-    utsname_info->set_machine(uname_info.machine);
-    utsname_info->set_release(uname_info.release);
-  }
-#endif
   packet.set_trusted_uid(static_cast<int32_t>(uid_));
   packet.set_trusted_packet_sequence_id(kServicePacketSequenceID);
   Slice slice = Slice::Allocate(static_cast<size_t>(packet.ByteSize()));

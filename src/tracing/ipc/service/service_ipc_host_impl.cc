@@ -29,33 +29,20 @@ namespace perfetto {
 // TODO(fmayer): implement per-uid connection limit (b/69093705).
 
 // Implements the publicly exposed factory method declared in
-// include/perfetto/tracing/ipc/service_ipc_host.h
-std::unique_ptr<ServiceIPCHost> ServiceIPCHost::CreateInstance(
-    base::TaskRunner* task_runner,
-    std::unique_ptr<TracingService> tracing_svc) {
-  return std::unique_ptr<ServiceIPCHost>(
-      new ServiceIPCHostImpl(task_runner, std::move(tracing_svc)));
-}
-
+// include/tracing/posix_ipc/posix_service_host.h.
 std::unique_ptr<ServiceIPCHost> ServiceIPCHost::CreateInstance(
     base::TaskRunner* task_runner) {
-  std::unique_ptr<SharedMemory::Factory> shm_factory(
-      new PosixSharedMemory::Factory());
-  auto tracing_svc =
-      TracingService::CreateInstance(std::move(shm_factory), task_runner);
-  return ServiceIPCHost::CreateInstance(task_runner, std::move(tracing_svc));
+  return std::unique_ptr<ServiceIPCHost>(new ServiceIPCHostImpl(task_runner));
 }
 
-ServiceIPCHostImpl::ServiceIPCHostImpl(base::TaskRunner* task_runner,
-                                       std::unique_ptr<TracingService> svc)
-    : task_runner_(task_runner), svc_(std::move(svc)) {}
+ServiceIPCHostImpl::ServiceIPCHostImpl(base::TaskRunner* task_runner)
+    : task_runner_(task_runner) {}
 
 ServiceIPCHostImpl::~ServiceIPCHostImpl() {}
 
 bool ServiceIPCHostImpl::Start(const char* producer_socket_name,
                                const char* consumer_socket_name) {
-  PERFETTO_CHECK(!started_);  // Check if already started.
-  started_ = true;
+  PERFETTO_CHECK(!svc_);  // Check if already started.
 
   // Initialize the IPC transport.
   producer_ipc_port_ =
@@ -67,8 +54,7 @@ bool ServiceIPCHostImpl::Start(const char* producer_socket_name,
 
 bool ServiceIPCHostImpl::Start(base::ScopedFile producer_socket_fd,
                                base::ScopedFile consumer_socket_fd) {
-  PERFETTO_CHECK(!started_);  // Check if already started.
-  started_ = true;
+  PERFETTO_CHECK(!svc_);  // Check if already started.
 
   // Initialize the IPC transport.
   producer_ipc_port_ =
@@ -79,6 +65,11 @@ bool ServiceIPCHostImpl::Start(base::ScopedFile producer_socket_fd,
 }
 
 bool ServiceIPCHostImpl::DoStart() {
+  // Create and initialize the platform-independent tracing business logic.
+  std::unique_ptr<SharedMemory::Factory> shm_factory(
+      new PosixSharedMemory::Factory());
+  svc_ = TracingService::CreateInstance(std::move(shm_factory), task_runner_);
+
   if (!producer_ipc_port_ || !consumer_ipc_port_) {
     Shutdown();
     return false;
@@ -97,7 +88,7 @@ bool ServiceIPCHostImpl::DoStart() {
   return true;
 }
 
-TracingService* ServiceIPCHostImpl::service_for_testing() const {
+TracingService* ServiceIPCHostImpl::service() const {
   return svc_.get();
 }
 

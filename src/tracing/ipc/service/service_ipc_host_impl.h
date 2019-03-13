@@ -33,7 +33,7 @@ class Host;
 // producer_ipc_service.cc and consumer_ipc_service.cc.
 class ServiceIPCHostImpl : public ServiceIPCHost {
  public:
-  ServiceIPCHostImpl(base::TaskRunner*, std::unique_ptr<TracingService> svc);
+  ServiceIPCHostImpl(base::TaskRunner*);
   ~ServiceIPCHostImpl() override;
 
   // ServiceIPCHost implementation.
@@ -42,13 +42,11 @@ class ServiceIPCHostImpl : public ServiceIPCHost {
   bool Start(base::ScopedFile producer_socket_fd,
              base::ScopedFile consumer_socket_fd) override;
 
-  TracingService* service_for_testing() const;
+  TracingService* service() const override;
 
  private:
   bool DoStart();
   void Shutdown();
-
-  bool started_ = false;
 
   base::TaskRunner* const task_runner_;
   std::unique_ptr<TracingService> svc_;  // The service business logic.
