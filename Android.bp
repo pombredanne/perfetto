@@ -1659,6 +1659,7 @@ genrule {
   name: "perfetto_protos_perfetto_trace_minimal_lite_gen",
   srcs: [
     "protos/perfetto/trace/clock_snapshot.proto",
+    "protos/perfetto/trace/system_info.proto",
   ],
   tools: [
     "aprotoc",
@@ -1666,6 +1667,7 @@ genrule {
   cmd: "mkdir -p $(genDir)/external/perfetto/protos && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto/protos --proto_path=external/perfetto/protos $(in)",
   out: [
     "external/perfetto/protos/perfetto/trace/clock_snapshot.pb.cc",
+    "external/perfetto/protos/perfetto/trace/system_info.pb.cc",
   ],
 }
 
@@ -1674,6 +1676,7 @@ genrule {
   name: "perfetto_protos_perfetto_trace_minimal_lite_gen_headers",
   srcs: [
     "protos/perfetto/trace/clock_snapshot.proto",
+    "protos/perfetto/trace/system_info.proto",
   ],
   tools: [
     "aprotoc",
@@ -1681,6 +1684,7 @@ genrule {
   cmd: "mkdir -p $(genDir)/external/perfetto/protos && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto/protos --proto_path=external/perfetto/protos $(in)",
   out: [
     "external/perfetto/protos/perfetto/trace/clock_snapshot.pb.h",
+    "external/perfetto/protos/perfetto/trace/system_info.pb.h",
   ],
   export_include_dirs: [
     "protos",
@@ -2154,6 +2158,7 @@ genrule {
   name: "perfetto_protos_perfetto_trace_zero_gen",
   srcs: [
     "protos/perfetto/trace/clock_snapshot.proto",
+    "protos/perfetto/trace/system_info.proto",
     "protos/perfetto/trace/test_event.proto",
     "protos/perfetto/trace/trace.proto",
     "protos/perfetto/trace/trace_packet.proto",
@@ -2165,6 +2170,7 @@ genrule {
   cmd: "mkdir -p $(genDir)/external/perfetto/protos && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto/protos --proto_path=external/perfetto/protos --plugin=protoc-gen-plugin=$(location perfetto_src_protozero_protoc_plugin_protoc_plugin___gn_standalone_toolchain_gcc_like_host_) --plugin_out=wrapper_namespace=pbzero:$(genDir)/external/perfetto/protos $(in)",
   out: [
     "external/perfetto/protos/perfetto/trace/clock_snapshot.pbzero.cc",
+    "external/perfetto/protos/perfetto/trace/system_info.pbzero.cc",
     "external/perfetto/protos/perfetto/trace/test_event.pbzero.cc",
     "external/perfetto/protos/perfetto/trace/trace.pbzero.cc",
     "external/perfetto/protos/perfetto/trace/trace_packet.pbzero.cc",
@@ -2176,6 +2182,7 @@ genrule {
   name: "perfetto_protos_perfetto_trace_zero_gen_headers",
   srcs: [
     "protos/perfetto/trace/clock_snapshot.proto",
+    "protos/perfetto/trace/system_info.proto",
     "protos/perfetto/trace/test_event.proto",
     "protos/perfetto/trace/trace.proto",
     "protos/perfetto/trace/trace_packet.proto",
@@ -2187,6 +2194,7 @@ genrule {
   cmd: "mkdir -p $(genDir)/external/perfetto/protos && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto/protos --proto_path=external/perfetto/protos --plugin=protoc-gen-plugin=$(location perfetto_src_protozero_protoc_plugin_protoc_plugin___gn_standalone_toolchain_gcc_like_host_) --plugin_out=wrapper_namespace=pbzero:$(genDir)/external/perfetto/protos $(in)",
   out: [
     "external/perfetto/protos/perfetto/trace/clock_snapshot.pbzero.h",
+    "external/perfetto/protos/perfetto/trace/system_info.pbzero.h",
     "external/perfetto/protos/perfetto/trace/test_event.pbzero.h",
     "external/perfetto/protos/perfetto/trace/trace.pbzero.h",
     "external/perfetto/protos/perfetto/trace/trace_packet.pbzero.h",
@@ -2953,7 +2961,6 @@ cc_test {
     "src/tracing/core/packet_stream_validator_unittest.cc",
     "src/tracing/core/patch_list_unittest.cc",
     "src/tracing/core/process_stats_config.cc",
-    "src/tracing/core/service_impl_unittest.cc",
     "src/tracing/core/shared_memory_abi.cc",
     "src/tracing/core/shared_memory_abi_unittest.cc",
     "src/tracing/core/shared_memory_arbiter_impl.cc",
@@ -2975,6 +2982,7 @@ cc_test {
     "src/tracing/core/trace_writer_impl.cc",
     "src/tracing/core/trace_writer_impl_unittest.cc",
     "src/tracing/core/tracing_service_impl.cc",
+    "src/tracing/core/tracing_service_impl_unittest.cc",
     "src/tracing/core/virtual_destructors.cc",
     "src/tracing/ipc/consumer/consumer_ipc_client_impl.cc",
     "src/tracing/ipc/default_socket.cc",
