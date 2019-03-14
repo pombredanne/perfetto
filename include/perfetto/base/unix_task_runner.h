@@ -71,6 +71,11 @@ class UnixTaskRunner : public TaskRunner {
   void RemoveFileDescriptorWatch(int fd) override;
   bool RunsTasksOnCurrentThread() const override;
 
+  // Returns true if the task runner is quitting, or has quit and hasn't been
+  // restarted since. Exposed primarily for ThreadTaskRunner, not necessary for
+  // normal use of this class.
+  bool QuitCalled();
+
  private:
   void WakeUp();
 

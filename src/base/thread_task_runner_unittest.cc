@@ -35,6 +35,7 @@ TEST_F(ThreadTaskRunnerTest, ConstructedRunning) {
   task_runner.get()->PostTask([this] { atomic_flag_ = true; });
   // main thread not blocked, wait on the task explicitly
   while (!atomic_flag_) {
+    std::this_thread::yield();
   }
 }
 
@@ -55,6 +56,7 @@ TEST_F(ThreadTaskRunnerTest, RunsTasksOnOneDedicatedThread) {
   });
 
   while (!atomic_flag_) {
+    std::this_thread::yield();
   }
 }
 
@@ -84,6 +86,7 @@ TEST_F(ThreadTaskRunnerTest, MovableOwnership) {
   });
 
   while (!atomic_flag_) {
+    std::this_thread::yield();
   }
 }
 
@@ -132,6 +135,7 @@ TEST_F(ThreadTaskRunnerTest, EnqueuedTasksDestructedOnTaskThread) {
   });
 
   while (!atomic_flag_) {
+    std::this_thread::yield();
   }
 }
 

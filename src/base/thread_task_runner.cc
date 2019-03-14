@@ -21,6 +21,7 @@
 #include <mutex>
 #include <thread>
 
+#include "perfetto/base/logging.h"
 #include "perfetto/base/unix_task_runner.h"
 
 namespace perfetto {
@@ -38,8 +39,12 @@ ThreadTaskRunner& ThreadTaskRunner::operator=(ThreadTaskRunner&& other) {
 }
 
 ThreadTaskRunner::~ThreadTaskRunner() {
-  if (task_runner_)
+  if (task_runner_) {
+    PERFETTO_CHECK(!task_runner_->QuitCalled());
     task_runner_->Quit();
+
+    PERFETTO_DCHECK(thread_.joinable());
+  }
   if (thread_.joinable())
     thread_.join();
 }
