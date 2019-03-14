@@ -3442,14 +3442,15 @@ message TraceConfig {
   // trace ends to notify it about the trace readiness.
   optional bool notify_traceur = 16;
 
-  // Triggers allow producers or consumers to start or stop the tracing session
-  // when an event occurs.
+  // Triggers allow producers to start or stop the tracing session when an event
+  // occurs.
   //
   // For example if we are tracing probabilistically, most traces will be
-  // uninteresting. However if we only if the device temperature reaches a
-  // certain threshold it may be useful to keep the trace (FINALIZE_TRACE) if we
-  // are already tracing or begin tracing (START_TRACING) to inspect whats
-  // happening.
+  // uninteresting. Triggers allow us to keep only the interesting ones such as
+  // those traces during which the device temperature reached a certain
+  // threshold. In this case the producer can activate a trigger to keep
+  // (FINALIZE_TRACE) the trace, otherwise it can also begin a trace
+  // (START_TRACING) because it knows something is about to happen.
   message TriggerConfig {
     enum TriggerMode {
       UNSPECIFIED = 0;
@@ -3457,9 +3458,9 @@ message TraceConfig {
       // When this mode is chosen, data sources are not started until one of the
       // |triggers| are received. This supports early initialization and fast
       // starting of the tracing system. On triggering, the session will then
-      // record for |finalize_trace_delay_ms|. However if no trigger is seen
+      // record for |finalize_trace_delay_ms|; However, if no trigger is seen
       // after |duration_ms| (in the general trace config must be set to a
-      // positive number), the session will be stopped and no data will be
+      // positive number) the session will be stopped and no data will be
       // returned.
       START_TRACING = 1;
 
