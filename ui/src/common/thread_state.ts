@@ -14,7 +14,8 @@
 
 export function translateState(state: string|undefined) {
   let result = '';
-  if (state === undefined || state.length > 2) return result;
+  if (state === undefined) return result;
+  if (state.length > 2) return state;
   switch (state[0]) {
     case 'R':
       result = 'Runnable';
