@@ -1535,7 +1535,7 @@ TracingServiceImpl::DataSourceInstance* TracingServiceImpl::SetupDataSource(
                             data_source.descriptor.will_notify_on_stop()));
   DataSourceInstance* ds_instance = &insert_iter->second;
 
-  // New data source instance starts out in SETUP state.
+  // New data source instance starts out in CONFIGURED state.
   if (tracing_session->consumer_maybe_null) {
     tracing_session->consumer_maybe_null->ObserveDataSourceInstanceStateChange(
         *producer, *ds_instance);
