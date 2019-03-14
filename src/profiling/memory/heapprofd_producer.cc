@@ -23,6 +23,8 @@
 #include <unistd.h>
 
 #include "perfetto/base/file_utils.h"
+#include "perfetto/base/string_utils.h"
+#include "perfetto/base/thread_task_runner.h"
 #include "perfetto/tracing/core/data_source_config.h"
 #include "perfetto/tracing/core/data_source_descriptor.h"
 #include "perfetto/tracing/core/trace_writer.h"
@@ -49,6 +51,15 @@ ClientConfiguration MakeClientConfiguration(const DataSourceConfig& cfg) {
   return client_config;
 }
 
+std::vector<UnwindingWorker> MakeUnwindingWorkers(HeapprofdProducer* delegate,
+                                                  size_t n) {
+  std::vector<UnwindingWorker> ret;
+  for (size_t i = 0; i < n; ++i) {
+    ret.emplace_back(delegate, base::ThreadTaskRunner::CreateAndStart());
+  }
+  return ret;
+}
+
 }  // namespace
 
 // We create kUnwinderThreads unwinding threads. Bookkeeping is done on the main
@@ -58,9 +69,7 @@ HeapprofdProducer::HeapprofdProducer(HeapprofdMode mode,
                                      base::TaskRunner* task_runner)
     : mode_(mode),
       task_runner_(task_runner),
-      unwinding_task_runners_(kUnwinderThreads),
-      unwinding_threads_(MakeUnwindingThreads(kUnwinderThreads)),
-      unwinding_workers_(MakeUnwindingWorkers(kUnwinderThreads)),
+      unwinding_workers_(MakeUnwindingWorkers(this, kUnwinderThreads)),
       target_pid_(base::kInvalidPid),
       socket_delegate_(this),
       weak_factory_(this) {
@@ -70,10 +79,11 @@ HeapprofdProducer::HeapprofdProducer(HeapprofdMode mode,
 }
 
 HeapprofdProducer::~HeapprofdProducer() {
-  for (auto& task_runner : unwinding_task_runners_)
-    task_runner.Quit();
-  for (std::thread& th : unwinding_threads_)
-    th.join();
+  // We only borrowed this from the environment variable.
+  // UnixSocket always owns the socket, so we need to manually release it
+  // here.
+  if (mode_ == HeapprofdMode::kCentral)
+    listening_socket_->ReleaseSocket().ReleaseFd().release();
 }
 
 void HeapprofdProducer::SetTargetProcess(pid_t target_pid,
@@ -307,7 +317,8 @@ bool HeapprofdProducer::Dump(DataSourceInstanceID id,
                              bool has_flush_id) {
   auto it = data_sources_.find(id);
   if (it == data_sources_.end()) {
-    PERFETTO_LOG("Invalid data source.");
+    PERFETTO_LOG(
+        "Data source not found (harmless if using continuous_dump_config).");
     return false;
   }
   DataSource& data_source = it->second;
@@ -373,22 +384,6 @@ void HeapprofdProducer::FinishDataSourceFlush(FlushRequestID flush_id) {
     endpoint_->NotifyFlushComplete(flush_id);
     flushes_in_progress_.erase(flush_id);
   }
-}
-
-std::vector<std::thread> HeapprofdProducer::MakeUnwindingThreads(size_t n) {
-  std::vector<std::thread> ret;
-  for (size_t i = 0; i < n; ++i) {
-    ret.emplace_back([this, i] { unwinding_task_runners_[i].Run(); });
-  }
-  return ret;
-}
-
-std::vector<UnwindingWorker> HeapprofdProducer::MakeUnwindingWorkers(size_t n) {
-  std::vector<UnwindingWorker> ret;
-  for (size_t i = 0; i < n; ++i) {
-    ret.emplace_back(this, &unwinding_task_runners_[i]);
-  }
-  return ret;
 }
 
 std::unique_ptr<base::UnixSocket> HeapprofdProducer::MakeListeningSocket() {
@@ -641,6 +636,19 @@ void HeapprofdProducer::HandleAllocRecord(AllocRecord alloc_rec) {
   if (heap_tracker_it == ds.heap_trackers.end()) {
     PERFETTO_LOG("Invalid PID in alloc record.");
     return;
+  }
+
+  const auto& prefixes = ds.config.skip_symbol_prefix();
+  if (!prefixes.empty()) {
+    for (FrameData& frame_data : alloc_rec.frames) {
+      const std::string& map = frame_data.frame.map_name;
+      if (std::find_if(prefixes.cbegin(), prefixes.cend(),
+                       [&map](const std::string& prefix) {
+                         return base::StartsWith(map, prefix);
+                       }) != prefixes.cend()) {
+        frame_data.frame.function_name = "FILTERED";
+      }
+    }
   }
 
   HeapTracker& heap_tracker = heap_tracker_it->second;
