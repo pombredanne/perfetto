@@ -64,9 +64,9 @@ export function hueForCpu(cpu: number): number {
 
 export function colorForState(state: string): Color {
   switch (state) {
-    case 'running':
+    case 'Running':
       return {c: 'dark green', h: 120, s: 44, l: 34};
-    case 'runnable':
+    case 'Runnable':
     case 'R':
       return {c: 'lime green', h: 75, s: 55, l: 47};
     default:

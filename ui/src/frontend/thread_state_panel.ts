@@ -14,6 +14,7 @@
 
 import * as m from 'mithril';
 
+import {translateState} from '../common/thread_state';
 import {timeToCode} from '../common/time';
 
 import {globals} from './globals';
@@ -39,7 +40,9 @@ export class ThreadStatePanel extends Panel<ThreadStateDetailsAttr> {
                   `${
                      timeToCode(attrs.ts - globals.state.traceTime.startSec)
                    }`)),
-              m('tr', m('td', `State`), m('td', `${attrs.state}`)),
+              m('tr',
+                m('td', `State`),
+                m('td', `${translateState(attrs.state)}`)),
               m('tr',
                 m('td', `Process`),
                 m('td', `${threadInfo.procName} [${threadInfo.pid}]`)),

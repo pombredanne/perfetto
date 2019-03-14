@@ -171,7 +171,7 @@ class Table : public sqlite3_vtab {
   }
 
   const Schema& schema() const { return schema_; }
-  const std::string name() const { return name_; }
+  const std::string& name() const { return name_; }
 
  private:
   template <typename TableType>

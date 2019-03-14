@@ -86,10 +86,10 @@ class ThreadStateTrackController extends TrackController<Config, Data> {
         select ts, dur, utid,
         case
         when end_state is not null
-        then 'running'
+        then 'Running'
         when lag(end_state) over ${this.tableName('ordered')} is not null
         then lag(end_state) over ${this.tableName('ordered')}
-        else 'runnable'
+        else 'Runnable'
         end as state
         from ${this.tableName('span')}
         where utid = ${this.config.utid}
