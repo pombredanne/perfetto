@@ -119,8 +119,8 @@ void CreateBuiltinViews(sqlite3* db) {
   char* error = nullptr;
   sqlite3_exec(db,
                "CREATE VIEW counters AS "
-               "SELECT * FROM counter_definitions "
-               "INNER JOIN counter_values USING(definition_row);",
+               "SELECT * FROM counter_values "
+               "INNER JOIN counter_definitions USING(counter_id);",
                0, 0, &error);
   if (error) {
     PERFETTO_ELOG("Error initializing: %s", error);

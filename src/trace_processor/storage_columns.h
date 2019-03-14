@@ -377,7 +377,7 @@ class RowColumn final : public StorageColumn {
       return bounds;
 
     bounds.min_idx = min;
-    bounds.max_idx = max;
+    bounds.max_idx = max + 1;
     bounds.consumed = true;
 
     return bounds;
