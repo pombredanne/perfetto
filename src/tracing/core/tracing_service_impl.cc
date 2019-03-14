@@ -106,7 +106,7 @@ uid_t geteuid() {
 }
 #endif  // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 
-bool IsStartTracingTrigger(const perfetto::TraceConfig& cfg) {
+bool HasStartTracingTrigger(const perfetto::TraceConfig& cfg) {
   return !cfg.trigger_config().triggers().empty() &&
          cfg.trigger_config().trigger_mode() ==
              TraceConfig::TriggerConfig::START_TRACING;
@@ -317,7 +317,7 @@ bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
     return false;
   }
 
-  const bool is_start_trigger_trace = IsStartTracingTrigger(cfg);
+  const bool is_start_trigger_trace = HasStartTracingTrigger(cfg);
   if (is_start_trigger_trace && cfg.duration_ms() <= 0) {
     PERFETTO_ELOG(
         "Requested a trace with START_TRACE triggers, but received (%" PRIu32
@@ -477,14 +477,15 @@ bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
           // In addition if the trace has started from the trigger we rely on
           // the |finalize_trace_delay_ms| from the trigger so don't flush and
           // disable if we've moved beyond a CONFIGURED state.
-          if (weak_this) {
-            auto* tracing_session_ptr = weak_this->GetTracingSession(tsid);
-            if (tracing_session_ptr &&
-                tracing_session_ptr->state == TracingSession::CONFIGURED) {
-              PERFETTO_DLOG(
-                  "Disabling TracingSession %" PRIu64 " due to timeout.", tsid);
-              weak_this->DisableTracing(tsid);
-            }
+          if (!weak_this) {
+            return;
+          }
+          auto* tracing_session_ptr = weak_this->GetTracingSession(tsid);
+          if (tracing_session_ptr &&
+              tracing_session_ptr->state == TracingSession::CONFIGURED) {
+            PERFETTO_DLOG(
+                "Disabling TracingSession %" PRIu64 " due to timeout.", tsid);
+            weak_this->DisableTracing(tsid);
           }
         },
         cfg.duration_ms());
@@ -791,11 +792,7 @@ void TracingServiceImpl::ActivateTriggers(
       PERFETTO_DCHECK(tracing_session);
 
       auto* producer = GetProducer(producer_id);
-      if (!producer) {
-        // The producer that sent us this trigger has disconnected before we got
-        // the name so we just ignore this trigger.
-        return;
-      }
+      PERFETTO_DCHECK(producer);
 
       auto* trigger = iter->second.trigger;
       PERFETTO_DCHECK(trigger->name() == trigger_name);
@@ -807,14 +804,14 @@ void TracingServiceImpl::ActivateTriggers(
         continue;
       }
 
+      // TODO(nuskos): Currently we store these triggers but don't actually
+      // return them inside ReadBuffers. In a followup CL add this
+      // functionality. Ensure that there is no race condition between
+      // future triggers being added and ReadBuffers processing this vector.
+      tracing_session->received_triggers.push_back(std::make_pair(
+          static_cast<uint64_t>(base::GetBootTimeNs().count()), trigger));
       switch (tracing_session->config.trigger_config().trigger_mode()) {
         case TraceConfig::TriggerConfig::START_TRACING:
-          // TODO(nuskos): Currently we store these triggers but don't actually
-          // return them inside ReadBuffers. In a followup CL add this
-          // functionality. Ensure that there is no race condition between
-          // future triggers being added and ReadBuffers processing this vector.
-          tracing_session->received_triggers.push_back(std::make_pair(
-              static_cast<uint64_t>(base::GetBootTimeNs().count()), trigger));
           // If the session has already been triggered and moved past CONFIGURED
           // then we don't need to repeat StartTracing. This would work fine
           // (StartTracing would return false) but would add error logs.
