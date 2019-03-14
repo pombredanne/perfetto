@@ -815,6 +815,8 @@ void TracingServiceImpl::DisableTracingNotifyConsumerAndFlushFile(
     TracingSession* tracing_session) {
   PERFETTO_DCHECK(tracing_session->state != TracingSession::DISABLED);
   for (auto& inst_kv : tracing_session->data_source_instances) {
+    if (inst_kv.second.state == DataSourceInstance::STOPPED)
+      continue;
     inst_kv.second.state = DataSourceInstance::STOPPED;
     ProducerEndpointImpl* producer = GetProducer(inst_kv.first);
     PERFETTO_DCHECK(producer);
@@ -1451,11 +1453,14 @@ void TracingServiceImpl::UnregisterDataSource(ProducerID producer_id,
     for (auto it = ds_instances.begin(); it != ds_instances.end();) {
       if (it->first == producer_id && it->second.data_source_name == name) {
         DataSourceInstanceID ds_inst_id = it->second.instance_id;
-        producer->StopDataSource(ds_inst_id);
-        it->second.state = DataSourceInstance::STOPPED;
-        if (kv.second.consumer_maybe_null) {
-          kv.second.consumer_maybe_null->ObserveDataSourceInstanceStateChange(
-              *producer, it->second);
+        if (it->second.state != DataSourceInstance::STOPPED) {
+          if (it->second.state != DataSourceInstance::STOPPING)
+            producer->StopDataSource(ds_inst_id);
+          it->second.state = DataSourceInstance::STOPPED;
+          if (kv.second.consumer_maybe_null) {
+            kv.second.consumer_maybe_null->ObserveDataSourceInstanceStateChange(
+                *producer, it->second);
+          }
         }
         it = ds_instances.erase(it);
       } else {
