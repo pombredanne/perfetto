@@ -57,6 +57,8 @@ class MockConsumer : public Consumer {
   std::vector<protos::TracePacket> ReadBuffers();
   void GetTraceStats();
   void WaitForTraceStats(bool success);
+  void ObserveEvents(uint32_t enabled_event_types);
+  ObservableEvents WaitForObservableEvents();
 
   TracingService::ConsumerEndpoint* endpoint() {
     return service_endpoint_.get();
