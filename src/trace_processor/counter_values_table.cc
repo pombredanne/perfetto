@@ -55,7 +55,7 @@ int CounterValuesTable::BestIndex(const QueryConstraints& qc,
 }
 
 uint32_t CounterValuesTable::EstimateCost(const QueryConstraints& qc) {
-  if (HasEqConstraint(qc, "definition_row"))
+  if (HasEqConstraint(qc, "counter_id"))
     return RowCount() / 100;
   return RowCount();
 }
