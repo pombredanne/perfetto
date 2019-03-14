@@ -187,8 +187,8 @@ message TraceConfig {
       // When this mode is chosen, data sources are not started until one of the
       // |triggers| are received. This supports early initialization and fast
       // starting of the tracing system. On triggering, the session will then
-      // record for |finalize_trace_delay_ms|; However, if no trigger is seen
-      // after |duration_ms| (in the general trace config must be set to a
+      // record for |finalize_trace_delay_ms|. However if no trigger is seen
+      // after |duration_ms| (in the general trace config; must be set to a
       // positive number) the session will be stopped and no data will be
       // returned.
       START_TRACING = 1;
