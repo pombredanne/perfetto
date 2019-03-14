@@ -171,33 +171,48 @@ message TraceConfig {
   // trace ends to notify it about the trace readiness.
   optional bool notify_traceur = 16;
 
-  // Sometimes a trace should do something when encountering certain triggers.
-  // This decides how Perfetto responds to these triggers.
+  // Triggers allow producers or consumers to start or stop the tracing session
+  // when an event occurs.
+  //
+  // For example if we are tracing probabilistically, most traces will be
+  // uninteresting. However if we only if the device temperature reaches a
+  // certain threshold it may be useful to keep the trace (FINALIZE_TRACE) if we
+  // are already tracing or begin tracing (START_TRACING) to inspect whats
+  // happening.
   message TriggerConfig {
     enum TriggerMode {
       UNSPECIFIED = 0;
 
-      // Request that Perfetto start up a trace using the surrounding
-      // TraceConfig once a trigger in |triggers| has been seen.
+      // When this mode is chosen, data sources are not started until one of the
+      // |triggers| are received. This supports early initialization and fast
+      // starting of the tracing system. On triggering, the session will then
+      // record for |finalize_trace_delay_ms|. However if no trigger is seen
+      // after |duration_ms| (in the general trace config must be set to a
+      // positive number), the session will be stopped and no data will be
+      // returned.
       START_TRACING = 1;
 
-      // Perfetto should start the trace as defined by the TraceConfig, but
-      // only return data to the consumer if Perfetto receives a trigger
-      // defined by |triggers|.
+      // When this mode is chosen, the session will be started via the normal
+      // EnableTracing() & StartTracing(). If no trigger is ever seen
+      // the session will be stopped after |duration_ms| and no data will be
+      // returned. However if triggered the trace will stop after
+      // |finalize_trace_delay_ms| and any data in the buffer will be returned
+      // to the consumer.
       FINALIZE_TRACE = 2;
     }
     optional TriggerMode trigger_mode = 1;
 
     message Trigger {
-      // Arbitrary name of the trigger.
+      // The producer must specify this name to activate the trigger.
       optional string name = 1;
 
-      // The producer that will send this trigger to Perfetto. This is optional
-      // if unset all producers can active this trigger.
+      // The producer that will send this trigger to Perfetto. This is optional.
+      // If unset all producers can activate this trigger.
       optional string producer_name = 2;
 
-      // After a trace is received either in START or FINALIZE mode then the
-      // trace will end |finalize_trace_delay_ms| after triggering.
+      // After a trigger is received either in START_TRACING or FINALIZE_TRACE
+      // mode then the trace will end |finalize_trace_delay_ms| after
+      // triggering.
       optional uint32 finalize_trace_delay_ms = 3;
     }
     // A list of triggers which are related to this configuration. If ANY

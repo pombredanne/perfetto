@@ -477,12 +477,14 @@ bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
           // In addition if the trace has started from the trigger we rely on
           // the |finalize_trace_delay_ms| from the trigger so don't flush and
           // disable if we've moved beyond a CONFIGURED state.
-          auto* tracing_session_lamdba = weak_this->GetTracingSession(tsid);
-          if (weak_this && tracing_session_lamdba &&
-              tracing_session_lamdba->state == TracingSession::CONFIGURED) {
-            PERFETTO_DLOG(
-                "Disabling TracingSession %" PRIu64 " due to timeout.", tsid);
-            weak_this->DisableTracing(tsid);
+          if (weak_this) {
+            auto* tracing_session_ptr = weak_this->GetTracingSession(tsid);
+            if (tracing_session_ptr &&
+                tracing_session_ptr->state == TracingSession::CONFIGURED) {
+              PERFETTO_DLOG(
+                  "Disabling TracingSession %" PRIu64 " due to timeout.", tsid);
+              weak_this->DisableTracing(tsid);
+            }
           }
         },
         cfg.duration_ms());
@@ -627,6 +629,7 @@ bool TracingServiceImpl::StartTracing(TracingSessionID tsid) {
   }
 
   tracing_session->state = TracingSession::STARTED;
+  tracing_session->session_ever_started = true;
 
   // Trigger delayed task if the trace is time limited.
   const uint32_t trace_duration_ms = tracing_session->config.duration_ms();
@@ -806,6 +809,10 @@ void TracingServiceImpl::ActivateTriggers(
 
       switch (tracing_session->config.trigger_config().trigger_mode()) {
         case TraceConfig::TriggerConfig::START_TRACING:
+          // TODO(nuskos): Currently we store these triggers but don't actually
+          // return them inside ReadBuffers. In a followup CL add this
+          // functionality. Ensure that there is no race condition between
+          // future triggers being added and ReadBuffers processing this vector.
           tracing_session->received_triggers.push_back(std::make_pair(
               static_cast<uint64_t>(base::GetBootTimeNs().count()), trigger));
           // If the session has already been triggered and moved past CONFIGURED
@@ -1171,6 +1178,15 @@ void TracingServiceImpl::ReadBuffers(TracingSessionID tsid,
     if (consumer)
       PERFETTO_DLOG("Cannot ReadBuffers(): no tracing session is active");
     return;  // TODO(primiano): signal failure?
+  }
+
+  // This can happen with |TraceConfig.deferred_start| or
+  // |START_TRACING| in the |TraceConfig.trigger_config(). In this case the
+  // trace hasn't started yet and there is nothing to read so we bail out to
+  // prevent synthetic packets like Clock snapshots being added.
+  if (!tracing_session->session_ever_started) {
+    PERFETTO_DLOG("Cannot ReadBuffers(): tracing session is not yet started");
+    return;
   }
 
   // This can happen if the file is closed by a previous task because it reaches
