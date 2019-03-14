@@ -342,6 +342,11 @@ class TracingServiceImpl : public TracingService {
     std::vector<std::pair<uint64_t, const TraceConfig::TriggerConfig::Trigger*>>
         received_triggers;
 
+    // Sometimes a session can go straight from CONFIGURED to DISABLED, in that
+    // case ReadBuffers returns no data including synthetic packets like clock
+    // snapshots.
+    bool session_ever_started = false;
+
     // The trace config provided by the Consumer when calling
     // EnableTracing(), plus any updates performed by ChangeTraceConfig.
     TraceConfig config;
