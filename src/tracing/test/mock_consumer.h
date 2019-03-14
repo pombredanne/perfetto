@@ -54,7 +54,9 @@ class MockConsumer : public Consumer {
   void FreeBuffers();
   void WaitForTracingDisabled(uint32_t timeout_ms = 3000);
   FlushRequest Flush(uint32_t timeout_ms = 10000);
-  std::vector<protos::TracePacket> ReadBuffers();
+  // If expect_empty is true we anticipate that the service will not call
+  // OnTraceData and will return an empty vector of packets.
+  std::vector<protos::TracePacket> ReadBuffers(bool expect_empty = false);
   void GetTraceStats();
   void WaitForTraceStats(bool success);
 

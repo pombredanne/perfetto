@@ -97,24 +97,33 @@ MockConsumer::FlushRequest MockConsumer::Flush(uint32_t timeout_ms) {
   return FlushRequest(wait_for_flush_completion);
 }
 
-std::vector<protos::TracePacket> MockConsumer::ReadBuffers() {
+std::vector<protos::TracePacket> MockConsumer::ReadBuffers(bool expect_empty) {
   std::vector<protos::TracePacket> decoded_packets;
   static int i = 0;
   std::string checkpoint_name = "on_read_buffers_" + std::to_string(i++);
   auto on_read_buffers = task_runner_->CreateCheckpoint(checkpoint_name);
-  EXPECT_CALL(*this, OnTraceData(_, _))
-      .WillRepeatedly(
-          Invoke([&decoded_packets, on_read_buffers](
-                     std::vector<TracePacket>* packets, bool has_more) {
-            for (TracePacket& packet : *packets) {
-              decoded_packets.emplace_back();
-              protos::TracePacket* decoded_packet = &decoded_packets.back();
-              packet.Decode(decoded_packet);
-            }
-            if (!has_more)
-              on_read_buffers();
-          }));
+  if (expect_empty) {
+    EXPECT_CALL(*this, OnTraceData(_, _)).Times(0);
+  } else {
+    EXPECT_CALL(*this, OnTraceData(_, _))
+        .WillRepeatedly(
+            Invoke([&decoded_packets, on_read_buffers](
+                       std::vector<TracePacket>* packets, bool has_more) {
+              for (TracePacket& packet : *packets) {
+                decoded_packets.emplace_back();
+                protos::TracePacket* decoded_packet = &decoded_packets.back();
+                packet.Decode(decoded_packet);
+              }
+              if (!has_more)
+                on_read_buffers();
+            }));
+  }
   service_endpoint_->ReadBuffers();
+  // If we don't expect any results back then we need to call the checkpoint
+  // ourselves after finishing ReadBuffers.
+  if (expect_empty) {
+    on_read_buffers();
+  }
   task_runner_->RunUntilCheckpoint(checkpoint_name);
   return decoded_packets;
 }

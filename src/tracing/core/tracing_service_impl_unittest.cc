@@ -93,6 +93,7 @@ class TracingServiceImplTest : public testing::Test {
     EXPECT_NE(nullptr, session);
     return session;
   }
+
   TracingServiceImpl::TracingSession* tracing_session() {
     return GetTracingSession(GetTracingSessionID());
   }
@@ -259,6 +260,15 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerDeferredStart) {
 
   producer->WaitForDataSourceStop("ds_1");
   consumer->WaitForTracingDisabled();
+  EXPECT_THAT(
+      consumer->ReadBuffers(),
+      Contains(Property(
+          &protos::TracePacket::trace_config,
+          Property(
+              &protos::TraceConfig::trigger_config,
+              Property(
+                  &protos::TraceConfig::TriggerConfig::trigger_mode,
+                  Eq(protos::TraceConfig::TriggerConfig::START_TRACING))))));
 }
 
 // Creates a tracing session with a START_TRACING trigger and checks that the
@@ -299,11 +309,13 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerTimeOut) {
 
   producer->WaitForDataSourceStop("ds_1");
   consumer->WaitForTracingDisabled();
+  EXPECT_THAT(consumer->ReadBuffers(/* expect_empty = */ true),
+              ::testing::IsEmpty());
 }
 
 // Creates a tracing session with a START_TRACING trigger and checks that
-// the session is not started with the trigger producer is different then the
-// producer that sent the trigger.
+// the session is not started when the configured trigger producer is different
+// than the producer that sent the trigger.
 TEST_F(TracingServiceImplTest, StartTracingTriggerDifferentProducer) {
   std::unique_ptr<MockConsumer> consumer = CreateMockConsumer();
   consumer->Connect(svc.get());
@@ -323,7 +335,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerDifferentProducer) {
   auto* trigger = trigger_config->add_triggers();
   trigger->set_name("trigger_name");
   trigger->set_finalize_trace_delay_ms(30);
-  trigger->set_producer_name("not_correct_name");
+  trigger->set_producer_name("correct_name");
 
   trace_config.set_duration_ms(50);
 
@@ -336,7 +348,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerDifferentProducer) {
   task_runner_.RunUntilIdle();
 
   // The trace won't start until we send the trigger called "trigger_name"
-  // coming from a producer called "not_correct_name". since we have a
+  // coming from a producer called "correct_name", since we have a
   // START_TRACING trigger defined. This is where we'd expect to have an
   // ActivateTriggers call to the producer->endpoint(), but we send the trigger
   // from a different producer so it is ignored.
@@ -349,7 +361,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerDifferentProducer) {
 }
 
 // Creates a tracing session with a START_TRACING trigger and checks that the
-// session is started with the trigger is received from the correct producer.
+// session is started when the trigger is received from the correct producer.
 TEST_F(TracingServiceImplTest, StartTracingTriggerCorrectProducer) {
   std::unique_ptr<MockConsumer> consumer = CreateMockConsumer();
   consumer->Connect(svc.get());
@@ -427,7 +439,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerDifferentTrigger) {
   // Make sure we don't get unexpected DataSourceStart() notifications yet.
   task_runner_.RunUntilIdle();
 
-  // The trace won't start until we send the trigger called "trigger_name".
+  // The trace won't start until we send the trigger called "trigger_name",
   // since we have a START_TRACING trigger defined. This is where we'd expect to
   // have an ActivateTriggers call to the producer->endpoint(), but we send a
   // different trigger.
@@ -486,7 +498,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerMultipleTriggers) {
 }
 
 // Creates two tracing sessions with a START_TRACING trigger and checks that
-// both are able to be trigger simultaneously.
+// both are able to be triggered simultaneously.
 TEST_F(TracingServiceImplTest, StartTracingTriggerMultipleTraces) {
   std::unique_ptr<MockConsumer> consumer_1 = CreateMockConsumer();
   consumer_1->Connect(svc.get());
@@ -561,7 +573,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerMultipleTraces) {
             tracing_session_1->received_triggers[0].second->name());
 
   // This is actually dependent on the order in which the triggers were received
-  // but there isn't really a better way then iteration order so probably not to
+  // but there isn't really a better way than iteration order so probably not to
   // brittle of a test. And this caught a real bug in implementation.
   auto* tracing_session_2 = GetTracingSession(tracing_session_2_id);
   ASSERT_EQ(2u, tracing_session_2->received_triggers.size());
