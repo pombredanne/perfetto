@@ -83,21 +83,6 @@ bool LazyProducer::SetAndroidProperty(const std::string& name,
 #endif
 }
 
-std::string LazyProducer::GetAndroidProperty(const std::string& name) {
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
-  // TODO(fmayer): Use __system_property_read_callback once we target a newer
-  // API level
-  char value[PROP_NAME_MAX];
-  __system_property_get(name.c_str(), value);
-  value[PROP_NAME_MAX - 1] = '\0';
-  return value;
-#else
-  // Allow this to be mocked out for tests on other platforms.
-  base::ignore_result(name);
-  PERFETTO_FATAL("Properties can only be read on Android.");
-#endif
-}
-
 LazyProducer::~LazyProducer() {
   if (active_sessions_)
     SetAndroidProperty(property_name_, "0");

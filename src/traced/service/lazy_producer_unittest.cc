@@ -40,7 +40,6 @@ class MockLazyProducer : public LazyProducer {
 
   MOCK_METHOD2(SetAndroidProperty,
                bool(const std::string&, const std::string&));
-  MOCK_METHOD1(GetAndroidProperty, std::string(const std::string&));
 };
 
 TEST(LazyProducersTest, Simple) {

@@ -52,7 +52,6 @@ class LazyProducer : public Producer {
 
   virtual bool SetAndroidProperty(const std::string& name,
                                   const std::string& value);
-  virtual std::string GetAndroidProperty(const std::string& name);
 
  private:
   base::TaskRunner* task_runner_;

@@ -67,16 +67,12 @@ namespace perfetto {
 namespace trace_processor {
 namespace {
 
-void InitializeSqlite(sqlite3* db) {
-  char* error = nullptr;
-  sqlite3_exec(db, "PRAGMA temp_store=2", 0, 0, &error);
-  if (error) {
-    PERFETTO_FATAL("Error setting pragma temp_store: %s", error);
-  }
+void InitializeSqliteModules(sqlite3* db) {
   sqlite3_str_split_init(db);
 // In Android tree builds, we don't have the percentile module.
 // Just don't include it.
 #if !PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
+  char* error = nullptr;
   sqlite3_percentile_init(db, &error, nullptr);
   if (error) {
     PERFETTO_ELOG("Error initializing: %s", error);
@@ -142,7 +138,7 @@ TraceType GuessTraceType(const uint8_t* data, size_t size) {
 TraceProcessorImpl::TraceProcessorImpl(const Config& cfg) {
   sqlite3* db = nullptr;
   PERFETTO_CHECK(sqlite3_open(":memory:", &db) == SQLITE_OK);
-  InitializeSqlite(db);
+  InitializeSqliteModules(db);
   CreateBuiltinTables(db);
   db_.reset(std::move(db));
 
