@@ -18,9 +18,11 @@ export interface Data {
   start: number;
   end: number;
   resolution: number;
+
+  strings: string[];
   startNs: Float64Array;
   endNs: Float64Array;
-  state: string[];
+  state: Uint16Array;  // Index into |strings|.
 }
 
 export interface Config { utid: number; }

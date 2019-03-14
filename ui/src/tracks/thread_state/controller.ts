@@ -123,15 +123,26 @@ class ThreadStateTrackController extends TrackController<Config, Data> {
       resolution,
       startNs: new Float64Array(numRows),
       endNs: new Float64Array(numRows),
-      state: [],
+      strings: [],
+      state: new Uint16Array(numRows)
     };
+
+    const stringIndexes = new Map<string, number>();
+    function internString(str: string) {
+      let idx = stringIndexes.get(str);
+      if (idx !== undefined) return idx;
+      idx = summary.strings.length;
+      summary.strings.push(str);
+      stringIndexes.set(str, idx);
+      return idx;
+    }
 
     for (let row = 0; row < numRows; row++) {
       const cols = result.columns;
       const start = fromNs(+cols[0].longValues![row]);
       summary.startNs[row] = start;
       summary.endNs[row] = start + fromNs(+cols[1].doubleValues![row]);
-      summary.state.push(cols[3].stringValues![row]);
+      summary.state[row] = internString(cols[3].stringValues![row]);
     }
 
     this.publish(summary);

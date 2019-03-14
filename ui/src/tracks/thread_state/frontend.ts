@@ -62,7 +62,7 @@ class ThreadStateTrack extends Track<Config, Data> {
     for (let i = 0; i < data.startNs.length; i++) {
       const tStart = data.startNs[i];
       const tEnd = data.endNs[i];
-      const state = data.state[i];
+      const state = data.strings[data.state[i]];
       if (tEnd <= visibleWindowTime.start || tStart >= visibleWindowTime.end) {
         continue;
       }
@@ -84,7 +84,7 @@ class ThreadStateTrack extends Track<Config, Data> {
       if (index[0] !== index[1]) {
         const tStart = data.startNs[index[0]];
         const tEnd = data.endNs[index[0]];
-        const state = data.state[index[0]];
+        const state = data.strings[data.state[index[0]]];
         const rectStart = timeScale.timeToPx(tStart);
         const rectEnd = timeScale.timeToPx(tEnd);
         const color = colorForState(state);
@@ -109,7 +109,7 @@ class ThreadStateTrack extends Track<Config, Data> {
     const time = timeScale.pxToTime(x);
     const index = search(data.startNs, time);
     const ts = index === -1 ? undefined : data.startNs[index];
-    const state = index === -1 ? undefined : data.state[index];
+    const state = index === -1 ? undefined : data.strings[data.state[index]];
     const utid = this.config.utid;
     if (ts && state) {
       globals.dispatch(Actions.selectThreadState({utid, ts, state}));
