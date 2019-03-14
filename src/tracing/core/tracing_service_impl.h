@@ -463,7 +463,7 @@ class TracingServiceImpl : public TracingService {
   std::map<TracingSessionID, TracingSession> tracing_sessions_;
   std::map<BufferID, std::unique_ptr<TraceBuffer>> buffers_;
 
-  // A map of triggers to the TracingSessionIDs that care about that event.
+  // A map of trigger_names to the TracingSessionIDs that care about that event.
   // Cleaned up when the TracingSession destructs.
   std::multimap<std::string, TriggerInfo> triggers_to_sessions_;
 
