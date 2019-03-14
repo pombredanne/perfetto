@@ -175,7 +175,7 @@ class TracingServiceImpl : public TracingService {
     void Detach(const std::string& key) override;
     void Attach(const std::string& key) override;
     void GetTraceStats() override;
-    void ObserveEvents(bool observe_data_source_instances) override;
+    void ObserveEvents(uint32_t enabled_event_types) override;
 
     // If |observe_data_source_instances == true|, will queue a task to notify
     // the consumer about the state change.
@@ -189,7 +189,7 @@ class TracingServiceImpl : public TracingService {
 
     // Returns a pointer to an ObservableEvents object that the caller can fill
     // and schedules a task to send the ObservableEvents to the consumer.
-    ObservableEvents* AddObservedEvents();
+    ObservableEvents* AddObservableEvents();
 
     base::TaskRunner* const task_runner_;
     TracingServiceImpl* const service_;
@@ -199,10 +199,10 @@ class TracingServiceImpl : public TracingService {
 
     // Whether the consumer is interested in DataSourceInstance state change
     // events.
-    bool observe_data_source_instances_ = false;
-    // Observed events that will be sent to the consumer. If set, a task to
+    uint32_t enabled_observable_event_types_ = ObservableEventType::kNone;
+    // ObservableEvents that will be sent to the consumer. If set, a task to
     // flush the events to the consumer has been queued.
-    std::unique_ptr<ObservableEvents> observed_events_;
+    std::unique_ptr<ObservableEvents> observable_events_;
 
     PERFETTO_THREAD_CHECKER(thread_checker_)
     base::WeakPtrFactory<ConsumerEndpointImpl> weak_ptr_factory_;  // Keep last.
@@ -301,13 +301,13 @@ class TracingServiceImpl : public TracingService {
     bool will_notify_on_stop;
 
     enum DataSourceInstanceState {
-      SETUP,
+      CONFIGURED,
       STARTING,
       STARTED,
       STOPPING,
       STOPPED
     };
-    DataSourceInstanceState state = SETUP;
+    DataSourceInstanceState state = CONFIGURED;
   };
 
   struct PendingFlush {
@@ -418,6 +418,9 @@ class TracingServiceImpl : public TracingService {
     // Whether we mirrored the trace config back to the trace output yet.
     bool did_emit_config = false;
 
+    // Whether we put the system info into the trace output yet.
+    bool did_emit_system_info = false;
+
     State state = DISABLED;
 
     // If the consumer detached the session, this variable defines the key used
@@ -465,6 +468,7 @@ class TracingServiceImpl : public TracingService {
   void SnapshotStats(TracingSession*, std::vector<TracePacket>*);
   TraceStats GetTraceStats(TracingSession* tracing_session);
   void MaybeEmitTraceConfig(TracingSession*, std::vector<TracePacket>*);
+  void MaybeEmitSystemInfo(TracingSession*, std::vector<TracePacket>*);
   void OnFlushTimeout(TracingSessionID, FlushRequestID);
   void OnDisableTracingTimeout(TracingSessionID);
   void DisableTracingNotifyConsumerAndFlushFile(TracingSession*);

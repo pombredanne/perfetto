@@ -711,8 +711,8 @@ void PerfettoCmd::OnTraceStats(bool /*success*/,
   // TODO(eseckler): Support GetTraceStats().
 }
 
-void PerfettoCmd::OnObservedEvents(
-    const ObservableEvents& /*observed_events*/) {
+void PerfettoCmd::OnObservableEvents(
+    const ObservableEvents& /*observable_events*/) {
   // TODO(eseckler): Support ObserveEvents().
 }
 

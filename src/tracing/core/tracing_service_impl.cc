@@ -25,6 +25,7 @@
 
 #if !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 #include <sys/uio.h>
+#include <sys/utsname.h>
 #include <unistd.h>
 #endif
 
@@ -50,6 +51,7 @@
 #include "src/tracing/core/trace_buffer.h"
 
 #include "perfetto/trace/clock_snapshot.pb.h"
+#include "perfetto/trace/system_info.pb.h"
 #include "perfetto/trace/trusted_packet.pb.h"
 
 // General note: this class must assume that Producers are malicious and will
@@ -625,7 +627,7 @@ void TracingServiceImpl::StartDataSourceInstance(
     ProducerEndpointImpl* producer,
     TracingSession* tracing_session,
     TracingServiceImpl::DataSourceInstance* instance) {
-  PERFETTO_DCHECK(instance->state == DataSourceInstance::SETUP);
+  PERFETTO_DCHECK(instance->state == DataSourceInstance::CONFIGURED);
   if (instance->will_notify_on_start) {
     instance->state = DataSourceInstance::STARTING;
   } else {
@@ -690,7 +692,7 @@ void TracingServiceImpl::DisableTracing(TracingSessionID tsid,
     const DataSourceInstanceID ds_inst_id = instance.instance_id;
     ProducerEndpointImpl* producer = GetProducer(producer_id);
     PERFETTO_DCHECK(producer);
-    PERFETTO_DCHECK(instance.state == DataSourceInstance::SETUP ||
+    PERFETTO_DCHECK(instance.state == DataSourceInstance::CONFIGURED ||
                     instance.state == DataSourceInstance::STARTING ||
                     instance.state == DataSourceInstance::STARTED);
     if (instance.will_notify_on_stop && !disable_immediately) {
@@ -1165,6 +1167,7 @@ void TracingServiceImpl::ReadBuffers(TracingSessionID tsid,
       SnapshotClocks(&packets);
   }
   MaybeEmitTraceConfig(tracing_session, &packets);
+  MaybeEmitSystemInfo(tracing_session, &packets);
 
   size_t packets_bytes = 0;  // SUM(slice.size() for each slice in |packets|).
   size_t total_slices = 0;   // SUM(#slices in |packets|).
@@ -1204,7 +1207,9 @@ void TracingServiceImpl::ReadBuffers(TracingSessionID tsid,
     while (!did_hit_threshold) {
       TracePacket packet;
       TraceBuffer::PacketSequenceProperties sequence_properties{};
-      if (!tbuf.ReadNextTracePacket(&packet, &sequence_properties)) {
+      bool previous_packet_dropped;
+      if (!tbuf.ReadNextTracePacket(&packet, &sequence_properties,
+                                    &previous_packet_dropped)) {
         break;
       }
       PERFETTO_DCHECK(sequence_properties.producer_id_trusted != 0);
@@ -1231,6 +1236,8 @@ void TracingServiceImpl::ReadBuffers(TracingSessionID tsid,
           tracing_session->GetPacketSequenceID(
               sequence_properties.producer_id_trusted,
               sequence_properties.writer_id));
+      if (previous_packet_dropped)
+        trusted_packet.set_previous_packet_dropped(previous_packet_dropped);
       static constexpr size_t kTrustedBufSize = 16;
       Slice slice = Slice::Allocate(kTrustedBufSize);
       PERFETTO_CHECK(
@@ -1897,6 +1904,32 @@ void TracingServiceImpl::MaybeEmitTraceConfig(
   packets->back().AddSlice(std::move(slice));
 }
 
+void TracingServiceImpl::MaybeEmitSystemInfo(
+    TracingSession* tracing_session,
+    std::vector<TracePacket>* packets) {
+  if (tracing_session->did_emit_system_info)
+    return;
+  tracing_session->did_emit_system_info = true;
+  protos::TrustedPacket packet;
+#if !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+  protos::SystemInfo* info = packet.mutable_system_info();
+  struct utsname uname_info;
+  if (uname(&uname_info) == 0) {
+    protos::Utsname* utsname_info = info->mutable_utsname();
+    utsname_info->set_sysname(uname_info.sysname);
+    utsname_info->set_version(uname_info.version);
+    utsname_info->set_machine(uname_info.machine);
+    utsname_info->set_release(uname_info.release);
+  }
+#endif
+  packet.set_trusted_uid(static_cast<int32_t>(uid_));
+  packet.set_trusted_packet_sequence_id(kServicePacketSequenceID);
+  Slice slice = Slice::Allocate(static_cast<size_t>(packet.ByteSize()));
+  PERFETTO_CHECK(packet.SerializeWithCachedSizesToArray(slice.own_data()));
+  packets->emplace_back();
+  packets->back().AddSlice(std::move(slice));
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // TracingServiceImpl::ConsumerEndpointImpl implementation
 ////////////////////////////////////////////////////////////////////////////////
@@ -2037,12 +2070,15 @@ void TracingServiceImpl::ConsumerEndpointImpl::GetTraceStats() {
 }
 
 void TracingServiceImpl::ConsumerEndpointImpl::ObserveEvents(
-    bool observe_data_source_instances) {
+    uint32_t enabled_event_types) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  observe_data_source_instances_ = observe_data_source_instances;
+  enabled_observable_event_types_ = enabled_event_types;
 
-  if (!observe_data_source_instances_)
+  if (enabled_observable_event_types_ == ObservableEventType::kNone)
     return;
+
+  PERFETTO_DCHECK(enabled_observable_event_types_ ==
+                  ObservableEventType::kDataSourceInstances);
 
   TracingSession* session = service_->GetTracingSession(tracing_session_id_);
   if (!session)
@@ -2059,17 +2095,19 @@ void TracingServiceImpl::ConsumerEndpointImpl::ObserveEvents(
 void TracingServiceImpl::ConsumerEndpointImpl::
     ObserveDataSourceInstanceStateChange(const ProducerEndpointImpl& producer,
                                          const DataSourceInstance& instance) {
-  if (!observe_data_source_instances_)
+  if (!(enabled_observable_event_types_ &
+        ObservableEventType::kDataSourceInstances)) {
     return;
+  }
 
-  if (instance.state != DataSourceInstance::SETUP &&
+  if (instance.state != DataSourceInstance::CONFIGURED &&
       instance.state != DataSourceInstance::STARTED &&
       instance.state != DataSourceInstance::STOPPED) {
     return;
   }
 
-  auto* observed_events = AddObservedEvents();
-  auto* change = observed_events->add_instance_state_changes();
+  auto* observable_events = AddObservableEvents();
+  auto* change = observable_events->add_instance_state_changes();
   change->set_producer_name(producer.name_);
   change->set_data_source_name(instance.data_source_name);
   if (instance.state == DataSourceInstance::STARTED) {
@@ -2088,20 +2126,20 @@ TracingServiceImpl::ConsumerEndpointImpl::GetWeakPtr() {
 }
 
 ObservableEvents*
-TracingServiceImpl::ConsumerEndpointImpl::AddObservedEvents() {
+TracingServiceImpl::ConsumerEndpointImpl::AddObservableEvents() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  if (!observed_events_) {
-    observed_events_.reset(new ObservableEvents());
+  if (!observable_events_) {
+    observable_events_.reset(new ObservableEvents());
     auto weak_this = GetWeakPtr();
     task_runner_->PostTask([weak_this] {
       if (!weak_this)
         return;
 
-      weak_this->consumer_->OnObservedEvents(*weak_this->observed_events_);
-      weak_this->observed_events_.reset();
+      weak_this->consumer_->OnObservableEvents(*weak_this->observable_events_);
+      weak_this->observable_events_.reset();
     });
   }
-  return observed_events_.get();
+  return observable_events_.get();
 }
 
 ////////////////////////////////////////////////////////////////////////////////

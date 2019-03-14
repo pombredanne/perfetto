@@ -96,7 +96,6 @@ service ConsumerPort {
 
   // Allows the consumer to observe certain state changes, such as data source
   // instances starting to record.
-  // TODO(eseckler): Extend this to support producers & data sources.
   rpc ObserveEvents(ObserveEventsRequest)
       returns (stream ObserveEventsResponse) {}
 
@@ -205,7 +204,8 @@ message GetTraceStatsResponse {
 
 // Arguments for rpc ObserveEvents.
 
-// To stop observing, send an empty request.
+// To stop observing events of a certain type, send a request with the remaining
+// types. To stop observing completely, send an empty request.
 message ObserveEventsRequest {
   repeated ObservableEvents.Type events_to_observe = 1;
 }

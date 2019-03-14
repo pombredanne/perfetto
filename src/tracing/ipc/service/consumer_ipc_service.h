@@ -83,7 +83,7 @@ class ConsumerIPCService : public protos::ConsumerPort {
     void OnDetach(bool) override;
     void OnAttach(bool, const TraceConfig&) override;
     void OnTraceStats(bool, const TraceStats&) override;
-    void OnObservedEvents(const ObservableEvents&) override;
+    void OnObservableEvents(const ObservableEvents&) override;
 
     void CloseObserveEventsResponseStream();
 
@@ -111,7 +111,7 @@ class ConsumerIPCService : public protos::ConsumerPort {
     DeferredGetTraceStatsResponse get_trace_stats_response;
 
     // After ObserveEvents() is invoked, this binds the async callback that
-    // allows to stream observed events back to the client.
+    // allows to stream ObservableEvents back to the client.
     DeferredObserveEventsResponse observe_events_response;
   };
 

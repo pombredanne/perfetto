@@ -76,8 +76,8 @@ class PERFETTO_EXPORT Consumer {
 
   // Called back by the Service (or transport layer) after invoking
   // TracingService::ConsumerEndpoint::ObserveEvents() whenever one or more
-  // observed events occur.
-  virtual void OnObservedEvents(const ObservableEvents&) = 0;
+  // ObservableEvents of enabled event types occur.
+  virtual void OnObservableEvents(const ObservableEvents&) = 0;
 };
 
 }  // namespace perfetto

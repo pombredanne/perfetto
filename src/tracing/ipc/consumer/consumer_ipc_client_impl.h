@@ -69,7 +69,7 @@ class ConsumerIPCClientImpl : public TracingService::ConsumerEndpoint,
   void Detach(const std::string& key) override;
   void Attach(const std::string& key) override;
   void GetTraceStats() override;
-  void ObserveEvents(bool observe_data_source_instances) override;
+  void ObserveEvents(uint32_t enabled_event_types) override;
 
   // ipc::ServiceProxy::EventListener implementation.
   // These methods are invoked by the IPC layer, which knows nothing about

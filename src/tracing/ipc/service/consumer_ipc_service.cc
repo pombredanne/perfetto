@@ -308,7 +308,7 @@ void ConsumerIPCService::RemoteConsumer::OnTraceStats(bool success,
   std::move(get_trace_stats_response).Resolve(std::move(response));
 }
 
-void ConsumerIPCService::RemoteConsumer::OnObservedEvents(
+void ConsumerIPCService::RemoteConsumer::OnObservableEvents(
     const ObservableEvents& events) {
   if (!observe_events_response.IsBound())
     return;

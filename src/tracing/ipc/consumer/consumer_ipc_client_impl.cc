@@ -298,14 +298,14 @@ void ConsumerIPCClientImpl::GetTraceStats() {
   consumer_port_.GetTraceStats(req, std::move(async_response));
 }
 
-void ConsumerIPCClientImpl::ObserveEvents(bool observe_data_source_instances) {
+void ConsumerIPCClientImpl::ObserveEvents(uint32_t enabled_event_types) {
   if (!connected_) {
     PERFETTO_DLOG("Cannot ObserveEvents(), not connected to tracing service");
     return;
   }
 
   protos::ObserveEventsRequest req;
-  if (observe_data_source_instances) {
+  if (enabled_event_types & ObservableEventType::kDataSourceInstances) {
     req.add_events_to_observe(
         protos::ObservableEvents::TYPE_DATA_SOURCES_INSTANCES);
   }
@@ -316,14 +316,14 @@ void ConsumerIPCClientImpl::ObserveEvents(bool observe_data_source_instances) {
   // before having destroyed this class. Hence binding |this| here is safe.
   async_response.Bind(
       [this](ipc::AsyncResult<protos::ObserveEventsResponse> response) {
-        // Skip empty response, no need to tell consumer about this.
+        // Skip empty response, which the service sends to close the stream.
         if (!response->events().instance_state_changes().size()) {
           PERFETTO_DCHECK(!response.has_more());
           return;
         }
         ObservableEvents events;
         events.FromProto(response->events());
-        consumer_->OnObservedEvents(events);
+        consumer_->OnObservableEvents(events);
       });
   consumer_port_.ObserveEvents(req, std::move(async_response));
 }
