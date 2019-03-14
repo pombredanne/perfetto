@@ -16,7 +16,6 @@ import * as m from 'mithril';
 
 import {translateState} from '../common/thread_state';
 import {timeToCode} from '../common/time';
-
 import {globals} from './globals';
 import {Panel, PanelSize} from './panel';
 
