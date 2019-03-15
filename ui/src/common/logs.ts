@@ -12,10 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+export const LogExistsKey = 'log-exists';
+export const LogBoundsKey = 'log-bounds';
+export const LogEntriesKey = 'log-entries';
+
+export interface LogExists { exists: boolean; }
+
 export interface LogBounds {
   startTs: number;
   endTs: number;
-  count: number;
+  firstRowTs: number;
+  lastRowTs: number;
+  total: number;
 }
 
 export interface LogEntries {
@@ -25,4 +33,3 @@ export interface LogEntries {
   tags: string[];
   messages: string[];
 }
-

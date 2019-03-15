@@ -16,8 +16,15 @@ import * as m from 'mithril';
 
 import {assertExists} from '../base/logging';
 import {Actions} from '../common/actions';
+import {
+  LogBounds,
+  LogBoundsKey,
+  LogEntries,
+  LogEntriesKey
+} from '../common/logs';
 import {timeToTimecode} from '../common/time';
-import {LogEntries, LogBounds} from '../common/logs';
+import {TimeSpan} from '../common/time';
+
 import {globals} from './globals';
 import {Panel} from './panel';
 
@@ -30,51 +37,49 @@ export class LogPanel extends Panel<{}> {
   private bounds?: LogBounds;
   private entries?: LogEntries;
 
-  private vizRowStart = 0;
-  private vizRowEnd = 0;
+  private visibleRowOffset = 0;
+  private visibleRowCount = 0;
 
   recomputeVisibleRowsAndUpdate() {
     const scrollContainer = assertExists(this.scrollContainer);
-    const firstRow = scrollContainer.children[0];
-    const prevStart = this.vizRowStart;
-    const prevEnd = this.vizRowEnd;
-    if (firstRow === null) {
-      this.vizRowStart = 0;
-      this.vizRowEnd = 0;
-    } else {
-      this.vizRowStart = Math.floor(scrollContainer.scrollTop / ROW_H);
-      this.vizRowEnd = Math.ceil(
-          (scrollContainer.scrollTop + scrollContainer.clientHeight) / ROW_H);
-    }
-    if (this.vizRowStart !== prevStart || this.vizRowEnd !== prevEnd) {
-      globals.dispatch(Actions.updateLogsPagination({
-        offset: this.vizRowStart,
-        count: this.vizRowEnd - this.vizRowStart,
-      }));
-      globals.rafScheduler.scheduleFullRedraw();
-    }
+
+    const prevOffset = this.visibleRowOffset;
+    const prevCount = this.visibleRowCount;
+    this.visibleRowOffset = Math.floor(scrollContainer.scrollTop / ROW_H);
+    this.visibleRowCount = Math.ceil(scrollContainer.clientHeight / ROW_H);
+
+    if (this.visibleRowOffset !== prevOffset ||
+        this.visibleRowCount !== prevCount)
+       {
+        globals.dispatch(Actions.updateLogsPagination({
+          offset: this.visibleRowOffset,
+          count: this.visibleRowCount,
+        }));
+      }
   }
 
   oncreate({dom}: m.CVnodeDOM) {
-    this.scrollContainer = assertExists(
-        dom.querySelector('.scrolling-container') as HTMLElement);
+    this.scrollContainer =
+        assertExists(dom.querySelector('.scrolling-container') as HTMLElement);
     this.scrollContainer.addEventListener(
         'scroll', this.onScroll.bind(this), {passive: true});
     this.recomputeVisibleRowsAndUpdate();
   }
 
   onupdate(_: m.CVnodeDOM) {
-    this.bounds = globals.trackDataStore.get('log-bounds') as LogBounds;
-    this.entries = globals.trackDataStore.get('log-entries') as LogEntries;
+    this.bounds = globals.trackDataStore.get(LogBoundsKey) as LogBounds;
+    this.entries = globals.trackDataStore.get(LogEntriesKey) as LogEntries;
     this.recomputeVisibleRowsAndUpdate();
   }
 
   onScroll() {
     if (this.scrollContainer === undefined) return;
     this.recomputeVisibleRowsAndUpdate();
+    globals.rafScheduler.scheduleFullRedraw();
   }
 
   onRowOver(ts: number) {
+    console.log('onRowOver');
     globals.frontendLocalState.setHoveredTimestamp(ts);
   }
 
@@ -82,13 +87,27 @@ export class LogPanel extends Panel<{}> {
     globals.frontendLocalState.setHoveredTimestamp(-1);
   }
 
-  private totalRows(): [boolean, number] {
-    if (!this.bounds) return [true, 0];
-    const isStale = false;
-    return [isStale, this.bounds.count];
+  private totalRows():
+      {isStale: boolean, total: number, offset: number, count: number} {
+    if (!this.bounds) {
+      return {isStale: false, total: 0, offset: 0, count: 0};
+    }
+    const {total, startTs, endTs, firstRowTs, lastRowTs} = this.bounds;
+    const vis = globals.frontendLocalState.visibleWindowTime;
+    const leftSpan = new TimeSpan(startTs, firstRowTs);
+    const rightSpan = new TimeSpan(lastRowTs, endTs);
+
+    const isStaleLeft = !leftSpan.isInBounds(vis.start);
+    const isStaleRight = !rightSpan.isInBounds(vis.end);
+    const isStale = isStaleLeft || isStaleRight;
+    const offset = Math.min(this.visibleRowOffset, total);
+    const visCount = Math.min(total, this.visibleRowCount);
+    return {isStale, total, count: visCount, offset};
   }
 
   view(_: m.CVnode<{}>) {
+    const {isStale, total, offset, count} = this.totalRows();
+
     const rows: m.Children = [];
     if (this.entries) {
       const offset = this.entries.offset;
@@ -96,13 +115,14 @@ export class LogPanel extends Panel<{}> {
       const priorities = this.entries.priorities;
       const tags = this.entries.tags;
       const messages = this.entries.messages;
-      for (let i=0; i<this.entries.timestamps.length; i++) {
+      for (let i = 0; i < this.entries.timestamps.length; i++) {
         const priorityLetter = PRIO_TO_LETTER[priorities[i]];
         const ts = timestamps[i];
-        let prioClass = priorityLetter || '';
+        const prioClass = priorityLetter || '';
         rows.push(
             m(`.row.${prioClass}`,
               {
+                'class': isStale ? 'stale' : '',
                 style: {top: `${(offset + i) * ROW_H}px`},
                 onmouseover: this.onRowOver.bind(this, ts / 1e9),
                 onmouseout: this.onRowOut.bind(this),
@@ -115,15 +135,16 @@ export class LogPanel extends Panel<{}> {
       }
     }
 
-    const [staleTotalRows, totalRows] = this.totalRows();
-    void staleTotalRows;
-    const vizRange = `[${this.vizRowStart}, ${this.vizRowEnd}]`;
-    return m('.log-panel',
-       m('header', `Logs rows ${vizRange} / ${totalRows}`),
+    return m(
+        '.log-panel',
+        m('header',
+          {
+            'class': isStale ? 'stale' : '',
+          },
+          `Logs rows [${offset}, ${offset + count}] / ${total}`),
         m('.scrolling-container',
-          m('.rows', {style: {height: `${totalRows * ROW_H}px`}}, rows)));
+          m('.rows', {style: {height: `${total * ROW_H}px`}}, rows)));
   }
 
   renderCanvas() {}
 }
-

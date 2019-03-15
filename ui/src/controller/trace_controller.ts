@@ -37,13 +37,13 @@ import {PROCESS_SUMMARY_TRACK} from '../tracks/process_summary/common';
 
 import {Child, Children, Controller} from './controller';
 import {globals} from './globals';
-import {QueryController, QueryControllerArgs} from './query_controller';
 import {LogsController} from './logs_controller';
-import {TrackControllerArgs, trackControllerRegistry} from './track_controller';
+import {QueryController, QueryControllerArgs} from './query_controller';
 import {
   SelectionController,
   SelectionControllerArgs
 } from './selection_controller';
+import {TrackControllerArgs, trackControllerRegistry} from './track_controller';
 
 type States = 'init'|'loading_trace'|'ready';
 

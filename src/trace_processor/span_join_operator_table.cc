@@ -20,9 +20,11 @@
 #include <string.h>
 #include <algorithm>
 #include <set>
+#include <utility>
 
 #include "perfetto/base/logging.h"
 #include "perfetto/base/string_splitter.h"
+#include "perfetto/base/string_utils.h"
 #include "perfetto/base/string_view.h"
 #include "src/trace_processor/sqlite_utils.h"
 
@@ -31,33 +33,11 @@ namespace trace_processor {
 
 namespace {
 
-constexpr int64_t kI64Max = std::numeric_limits<int64_t>::max();
-
 constexpr char kTsColumnName[] = "ts";
 constexpr char kDurColumnName[] = "dur";
 
 bool IsRequiredColumn(const std::string& name) {
   return name == kTsColumnName || name == kDurColumnName;
-}
-
-bool CheckRequiredColumns(const std::vector<Table::Column>& cols) {
-  int required_columns_found = 0;
-  for (const auto& col : cols) {
-    if (IsRequiredColumn(col.name())) {
-      ++required_columns_found;
-      if (col.type() != Table::ColumnType::kLong &&
-          col.type() != Table::ColumnType::kUnknown) {
-        PERFETTO_ELOG("Invalid column type for %s", col.name().c_str());
-        return false;
-      }
-    }
-  }
-  if (required_columns_found != 2) {
-    PERFETTO_ELOG("Required columns not found (found %d)",
-                  required_columns_found);
-    return false;
-  }
-  return true;
 }
 
 }  // namespace
@@ -81,42 +61,63 @@ base::Optional<Table::Schema> SpanJoinOperatorTable::Init(
     return base::nullopt;
   }
 
-  std::string t1_raw_desc = reinterpret_cast<const char*>(argv[3]);
-  auto t1_desc = TableDescriptor::Parse(t1_raw_desc);
-
-  std::string t2_raw_desc = reinterpret_cast<const char*>(argv[4]);
-  auto t2_desc = TableDescriptor::Parse(t2_raw_desc);
-
-  // For now, ensure that both tables are partitioned by the same column.
-  // TODO(lalitm): relax this constraint.
-  PERFETTO_CHECK(t1_desc.partition_col == t2_desc.partition_col);
-
-  // TODO(lalitm): add logic to ensure that the tables that are being joined
-  // are actually valid to be joined i.e. they have the same partition.
-  auto t1_cols = sqlite_utils::GetColumnsForTable(db_, t1_desc.name);
-  if (!CheckRequiredColumns(t1_cols))
+  auto maybe_t1_desc = TableDescriptor::Parse(
+      std::string(reinterpret_cast<const char*>(argv[3])));
+  if (!maybe_t1_desc.has_value())
     return base::nullopt;
+  auto t1_desc = *maybe_t1_desc;
 
-  auto t2_cols = sqlite_utils::GetColumnsForTable(db_, t2_desc.name);
-  if (!CheckRequiredColumns(t2_cols))
+  auto maybe_t2_desc = TableDescriptor::Parse(
+      std::string(reinterpret_cast<const char*>(argv[4])));
+  if (!maybe_t2_desc.has_value())
     return base::nullopt;
+  auto t2_desc = *maybe_t2_desc;
 
-  t1_defn_ = TableDefinition(t1_desc.name, t1_desc.partition_col, t1_cols);
-  t2_defn_ = TableDefinition(t2_desc.name, t2_desc.partition_col, t2_cols);
+  // If we're in the mixed case, ensure t1 is the partitioned table.
+  if (t1_desc.partition_col.empty() && !t2_desc.partition_col.empty()) {
+    std::swap(t1_desc, t2_desc);
+  }
+
+  auto maybe_t1_defn = CreateTableDefinition(t1_desc);
+  if (!maybe_t1_defn.has_value())
+    return base::nullopt;
+  t1_defn_ = maybe_t1_defn.value();
+
+  auto maybe_t2_defn = CreateTableDefinition(t2_desc);
+  if (!maybe_t2_defn.has_value())
+    return base::nullopt;
+  t2_defn_ = maybe_t2_defn.value();
+
+  if (t1_desc.partition_col == t2_desc.partition_col) {
+    partitioning_ = t1_desc.partition_col.empty()
+                        ? PartitioningType::kNoPartitioning
+                        : PartitioningType::kSamePartitioning;
+  } else if (t1_defn_.IsPartitioned() && t2_defn_.IsPartitioned()) {
+    PERFETTO_ELOG("Mismatching partitions (%s, %s)",
+                  t1_defn_.partition_col().c_str(),
+                  t2_defn_.partition_col().c_str());
+    return base::nullopt;
+  } else {
+    partitioning_ = PartitioningType::kMixedPartitioning;
+  }
 
   std::vector<Table::Column> cols;
+  // Ensure the shared columns are consistently ordered and are not
+  // present twice in the final schema
   cols.emplace_back(Column::kTimestamp, kTsColumnName, ColumnType::kLong);
   cols.emplace_back(Column::kDuration, kDurColumnName, ColumnType::kLong);
-
-  is_same_partition_ = t1_desc.partition_col == t2_desc.partition_col;
-  const auto& partition_col = t1_desc.partition_col;
-  if (is_same_partition_)
-    cols.emplace_back(Column::kPartition, partition_col, ColumnType::kLong);
+  if (partitioning_ != PartitioningType::kNoPartitioning)
+    cols.emplace_back(Column::kPartition, t1_desc.partition_col,
+                      ColumnType::kLong);
 
   CreateSchemaColsForDefn(t1_defn_, &cols);
   CreateSchemaColsForDefn(t2_defn_, &cols);
 
-  return Schema(cols, {Column::kTimestamp, Column::kPartition});
+  std::vector<size_t> primary_keys = {Column::kTimestamp};
+  if (partitioning_ != PartitioningType::kNoPartitioning) {
+    primary_keys.push_back(Column::kPartition);
+  }
+  return Schema(cols, primary_keys);
 }
 
 void SpanJoinOperatorTable::CreateSchemaColsForDefn(
@@ -124,9 +125,7 @@ void SpanJoinOperatorTable::CreateSchemaColsForDefn(
     std::vector<Table::Column>* cols) {
   for (size_t i = 0; i < defn.columns().size(); i++) {
     const auto& n = defn.columns()[i].name();
-    if (IsRequiredColumn(n))
-      continue;
-    if (n == defn.partition_col() && is_same_partition_)
+    if (IsRequiredColumn(n) || n == defn.partition_col())
       continue;
 
     ColumnLocator* locator = &global_index_to_column_locator_[cols->size()];
@@ -140,8 +139,8 @@ void SpanJoinOperatorTable::CreateSchemaColsForDefn(
 std::unique_ptr<Table::Cursor> SpanJoinOperatorTable::CreateCursor(
     const QueryConstraints& qc,
     sqlite3_value** argv) {
-  auto cursor = std::unique_ptr<SpanJoinOperatorTable::Cursor>(
-      new SpanJoinOperatorTable::Cursor(this, db_));
+  auto cursor =
+      std::unique_ptr<SpanJoinOperatorTable::Cursor>(new Cursor(this, db_));
   int value = cursor->Initialize(qc, argv);
   return value != SQLITE_OK ? nullptr : std::move(cursor);
 }
@@ -176,6 +175,47 @@ SpanJoinOperatorTable::ComputeSqlConstraintsForDefinition(
   return constraints;
 }
 
+base::Optional<SpanJoinOperatorTable::TableDefinition>
+SpanJoinOperatorTable::CreateTableDefinition(const TableDescriptor& desc) {
+  auto cols = sqlite_utils::GetColumnsForTable(db_, desc.name);
+
+  uint32_t required_columns_found = 0;
+  uint32_t ts_idx = std::numeric_limits<uint32_t>::max();
+  uint32_t dur_idx = std::numeric_limits<uint32_t>::max();
+  uint32_t partition_idx = std::numeric_limits<uint32_t>::max();
+  for (uint32_t i = 0; i < cols.size(); i++) {
+    auto col = cols[i];
+    if (IsRequiredColumn(col.name())) {
+      ++required_columns_found;
+      if (col.type() != Table::ColumnType::kLong &&
+          col.type() != Table::ColumnType::kUnknown) {
+        PERFETTO_ELOG("Invalid column type for %s", col.name().c_str());
+        return base::nullopt;
+      }
+    }
+
+    if (col.name() == kTsColumnName) {
+      ts_idx = i;
+    } else if (col.name() == kDurColumnName) {
+      dur_idx = i;
+    } else if (col.name() == desc.partition_col) {
+      partition_idx = i;
+    }
+  }
+  if (required_columns_found != 2) {
+    PERFETTO_ELOG("Required columns not found (found %d)",
+                  required_columns_found);
+    return base::nullopt;
+  }
+
+  PERFETTO_DCHECK(ts_idx < cols.size());
+  PERFETTO_DCHECK(dur_idx < cols.size());
+  PERFETTO_DCHECK(desc.partition_col.empty() || partition_idx < cols.size());
+
+  return TableDefinition(desc.name, desc.partition_col, std::move(cols), ts_idx,
+                         dur_idx, partition_idx);
+}
+
 std::string SpanJoinOperatorTable::GetNameForGlobalColumnIndex(
     const TableDefinition& defn,
     int global_column) {
@@ -184,7 +224,8 @@ std::string SpanJoinOperatorTable::GetNameForGlobalColumnIndex(
     return kTsColumnName;
   else if (col_idx == Column::kDuration)
     return kDurColumnName;
-  else if (is_same_partition_ && col_idx == Column::kPartition)
+  else if (col_idx == Column::kPartition &&
+           partitioning_ != PartitioningType::kNoPartitioning)
     return defn.partition_col().c_str();
 
   const auto& locator = global_index_to_column_locator_[col_idx];
@@ -209,160 +250,266 @@ int SpanJoinOperatorTable::Cursor::Initialize(const QueryConstraints& qc,
     return err;
 
   // We step table 2 and allow Next() to step from table 1.
-  next_stepped_table_ = &t1_;
-  err = t2_.StepAndCacheValues();
+  next_stepped_ = &t1_;
 
-  // If there's no data in this table, then we are done without even looking
-  // at the other table.
-  if (err != SQLITE_ROW)
-    return err == SQLITE_DONE ? SQLITE_OK : err;
+  auto res = t2_.Step();
+  bool is_mixed_part =
+      table_->partitioning_ == PartitioningType::kMixedPartitioning;
+  if (res.is_err() || (res.is_eof() && !is_mixed_part))
+    return res.err_code;
 
   // Otherwise, find an overlapping span.
   return Next();
 }
 
-SpanJoinOperatorTable::Cursor::~Cursor() {}
+bool SpanJoinOperatorTable::Cursor::IsOverlappingSpan() {
+  if (t1_.partition() != t2_.partition()) {
+    return false;
+  } else if (t1_.ts_end() <= t2_.ts_start() || t2_.ts_end() <= t1_.ts_start()) {
+    return false;
+  }
+  return true;
+}
 
 int SpanJoinOperatorTable::Cursor::Next() {
-  int err = next_stepped_table_->StepAndCacheValues();
-  for (; err == SQLITE_ROW; err = next_stepped_table_->StepAndCacheValues()) {
-    // Get both tables on the same parition.
-    if (t1_.partition() < t2_.partition()) {
-      next_stepped_table_ = &t1_;
-      continue;
-    } else if (t2_.partition() < t1_.partition()) {
-      next_stepped_table_ = &t2_;
-      continue;
+  // TODO: Propagate error msg to the table.
+  auto res = next_stepped_->Step();
+  if (res.is_err())
+    return res.err_code;
+
+  while (true) {
+    if (t1_.Eof())
+      return SQLITE_OK;
+
+    if (t2_.Eof()) {
+      if (table_->partitioning_ != PartitioningType::kMixedPartitioning) {
+        return SQLITE_OK;
+      } else {
+        res = t1_.StepToNextPartition();
+        if (PERFETTO_UNLIKELY(res.is_err()))
+          return res.err_code;
+        else if (PERFETTO_UNLIKELY(res.is_eof()))
+          continue;
+
+        res = t2_.StepToPartition(t1_.partition());
+        if (PERFETTO_UNLIKELY(res.is_err()))
+          return res.err_code;
+        else if (PERFETTO_UNLIKELY(res.is_eof()))
+          continue;
+      }
     }
 
-    // Get both tables to have an overlapping slice.
-    if (t1_.ts_end() <= t2_.ts_start() || t1_.ts_start() == t1_.ts_end()) {
-      next_stepped_table_ = &t1_;
+    auto partition = std::max(t1_.partition(), t2_.partition());
+    res = t1_.StepToPartition(partition);
+    if (PERFETTO_UNLIKELY(res.is_err()))
+      return res.err_code;
+    else if (PERFETTO_UNLIKELY(res.is_eof()))
       continue;
-    } else if (t2_.ts_end() <= t1_.ts_start() ||
-               t2_.ts_start() == t2_.ts_end()) {
-      next_stepped_table_ = &t2_;
-      continue;
-    }
 
-    // Both slices now have an overlapping slice and the same partition.
-    // Update the next stepped table to be the one which finishes earliest.
-    next_stepped_table_ = t1_.ts_end() <= t2_.ts_end() ? &t1_ : &t2_;
-    return SQLITE_OK;
+    res = t2_.StepToPartition(t1_.partition());
+    if (PERFETTO_UNLIKELY(res.is_err()))
+      return res.err_code;
+    else if (PERFETTO_UNLIKELY(res.is_eof()))
+      continue;
+
+    if (t1_.partition() != t2_.partition())
+      continue;
+
+    auto ts = std::max(t1_.ts_start(), t2_.ts_start());
+    res = t1_.StepUntil(ts);
+    if (PERFETTO_UNLIKELY(res.is_err()))
+      return res.err_code;
+    else if (PERFETTO_UNLIKELY(res.is_eof()))
+      continue;
+
+    res = t2_.StepUntil(t1_.ts_start());
+    if (PERFETTO_UNLIKELY(res.is_err()))
+      return res.err_code;
+    else if (PERFETTO_UNLIKELY(res.is_eof()))
+      continue;
+
+    if (IsOverlappingSpan())
+      break;
   }
-  return err == SQLITE_DONE ? SQLITE_OK : err;
+  next_stepped_ = t1_.ts_end() <= t2_.ts_end() ? &t1_ : &t2_;
+
+  return SQLITE_OK;
 }
 
 int SpanJoinOperatorTable::Cursor::Eof() {
-  return t1_.ts_start() == kI64Max || t2_.ts_start() == kI64Max;
+  return t1_.Eof() || t2_.Eof();
 }
 
 int SpanJoinOperatorTable::Cursor::Column(sqlite3_context* context, int N) {
-  switch (N) {
-    case Column::kTimestamp: {
-      auto max_ts = std::max(t1_.ts_start(), t2_.ts_start());
-      sqlite3_result_int64(context, static_cast<sqlite3_int64>(max_ts));
-      break;
-    }
-    case Column::kDuration: {
-      auto max_start = std::max(t1_.ts_start(), t2_.ts_start());
-      auto min_end = std::min(t1_.ts_end(), t2_.ts_end());
-      PERFETTO_DCHECK(min_end > max_start);
+  PERFETTO_DCHECK(!t1_.Eof());
+  PERFETTO_DCHECK(!t2_.Eof());
 
-      auto dur = min_end - max_start;
-      sqlite3_result_int64(context, static_cast<sqlite3_int64>(dur));
-      break;
-    }
-    case Column::kPartition: {
-      PERFETTO_DCHECK(t1_.partition() == t2_.partition());
-      sqlite3_result_int64(context,
-                           static_cast<sqlite3_int64>(t1_.partition()));
-      break;
-    }
-    default: {
-      size_t index = static_cast<size_t>(N);
-      const auto& locator = table_->global_index_to_column_locator_[index];
-      if (locator.defn == t1_.definition())
-        t1_.ReportSqliteResult(context, locator.col_index);
-      else
-        t2_.ReportSqliteResult(context, locator.col_index);
-      break;
-    }
+  if (N == Column::kTimestamp) {
+    auto max_ts = std::max(t1_.ts_start(), t2_.ts_start());
+    sqlite3_result_int64(context, static_cast<sqlite3_int64>(max_ts));
+  } else if (N == Column::kDuration) {
+    auto max_start = std::max(t1_.ts_start(), t2_.ts_start());
+    auto min_end = std::min(t1_.ts_end(), t2_.ts_end());
+    PERFETTO_DCHECK(min_end > max_start);
+    auto dur = min_end - max_start;
+    sqlite3_result_int64(context, static_cast<sqlite3_int64>(dur));
+  } else if (N == Column::kPartition &&
+             table_->partitioning_ != PartitioningType::kNoPartitioning) {
+    PERFETTO_DCHECK(table_->partitioning_ ==
+                        PartitioningType::kMixedPartitioning ||
+                    t1_.partition() == t2_.partition());
+    sqlite3_result_int64(context, static_cast<sqlite3_int64>(t1_.partition()));
+  } else {
+    size_t index = static_cast<size_t>(N);
+    const auto& locator = table_->global_index_to_column_locator_[index];
+    if (locator.defn == t1_.definition())
+      t1_.ReportSqliteResult(context, locator.col_index);
+    else
+      t2_.ReportSqliteResult(context, locator.col_index);
   }
   return SQLITE_OK;
 }
 
-SpanJoinOperatorTable::Cursor::TableQueryState::TableQueryState(
-    SpanJoinOperatorTable* table,
-    const TableDefinition* definition,
-    sqlite3* db)
-    : defn_(definition), db_(db), table_(table) {}
-
-int SpanJoinOperatorTable::Cursor::TableQueryState::Initialize(
-    const QueryConstraints& qc,
-    sqlite3_value** argv) {
-  auto cs = table_->ComputeSqlConstraintsForDefinition(*defn_, qc, argv);
-  return PrepareRawStmt(CreateSqlQuery(cs));
+SpanJoinOperatorTable::Query::Query(SpanJoinOperatorTable* table,
+                                    const TableDefinition* definition,
+                                    sqlite3* db)
+    : defn_(definition), db_(db), table_(table) {
+  PERFETTO_DCHECK(!defn_->IsPartitioned() ||
+                  defn_->partition_idx() < defn_->columns().size());
 }
 
-int SpanJoinOperatorTable::Cursor::TableQueryState::StepAndCacheValues() {
+SpanJoinOperatorTable::Query::~Query() = default;
+
+int SpanJoinOperatorTable::Query::Initialize(const QueryConstraints& qc,
+                                             sqlite3_value** argv) {
+  sql_query_ = CreateSqlQuery(
+      table_->ComputeSqlConstraintsForDefinition(*defn_, qc, argv));
+  return PrepareRawStmt();
+}
+
+SpanJoinOperatorTable::Query::StepRet SpanJoinOperatorTable::Query::Step() {
+  PERFETTO_DCHECK(!eof_);
+
   sqlite3_stmt* stmt = stmt_.get();
 
-  // Fastforward through any rows with null partition keys.
-  int res, row_type;
-  do {
-    res = sqlite3_step(stmt);
-    row_type = sqlite3_column_type(stmt, Column::kPartition);
-  } while (res == SQLITE_ROW && row_type == SQLITE_NULL);
+  auto ts_idx = static_cast<int>(defn_->ts_idx());
+  auto dur_idx = static_cast<int>(defn_->dur_idx());
 
-  if (res == SQLITE_ROW) {
-    int64_t ts = sqlite3_column_int64(stmt, Column::kTimestamp);
-    int64_t dur = sqlite3_column_int64(stmt, Column::kDuration);
-    int64_t partition = sqlite3_column_int64(stmt, Column::kPartition);
-    ts_start_ = ts;
-    ts_end_ = ts_start_ + dur;
-    partition_ = partition;
-  } else if (res == SQLITE_DONE) {
-    ts_start_ = kI64Max;
-    ts_end_ = kI64Max;
-    partition_ = kI64Max;
-  }
-  return res;
+  int res;
+  do {
+    if (defn_->IsPartitioned()) {
+      auto partition_idx = static_cast<int>(defn_->partition_idx());
+      // Fastforward through any rows with null partition keys.
+      int row_type;
+      do {
+        res = sqlite3_step(stmt);
+        row_type = sqlite3_column_type(stmt, partition_idx);
+      } while (res == SQLITE_ROW && row_type == SQLITE_NULL);
+    } else {
+      res = sqlite3_step(stmt);
+    }
+
+    if (res == SQLITE_ROW) {
+      int64_t ts = sqlite3_column_int64(stmt, ts_idx);
+      int64_t dur = sqlite3_column_int64(stmt, dur_idx);
+      ts_start_ = ts;
+      ts_end_ = ts_start_ + dur;
+      if (defn_->IsPartitioned()) {
+        auto partition_idx = static_cast<int>(defn_->partition_idx());
+        partition_ = sqlite3_column_int64(stmt, partition_idx);
+      }
+    } else if (res == SQLITE_DONE) {
+      eof_ = true;
+      return StepRet(StepRet::Code::kEof);
+    }
+  } while (ts_start_ == ts_end_ && res == SQLITE_ROW);
+
+  return res == SQLITE_ROW ? StepRet(StepRet::Code::kRow)
+                           : StepRet(StepRet::Code::kError, res);
 }
 
-std::string SpanJoinOperatorTable::Cursor::TableQueryState::CreateSqlQuery(
-    const std::vector<std::string>& cs) {
-  // TODO(lalitm): pass through constraints on other tables to those tables.
-  std::string sql;
-  sql += "SELECT ts, dur, `" + defn_->partition_col() + "`";
-  for (const auto& col : defn_->columns()) {
-    if (IsRequiredColumn(col.name()) || col.name() == defn_->partition_col())
-      continue;
-    sql += ", " + col.name();
+SpanJoinOperatorTable::Query::StepRet
+SpanJoinOperatorTable::Query::StepToNextPartition() {
+  PERFETTO_DCHECK(defn_->IsPartitioned());
+  PERFETTO_DCHECK(!eof_);
+
+  auto current_partition = partition_;
+  while (partition_ <= current_partition) {
+    auto res = Step();
+    if (!res.is_row())
+      return res;
   }
+  return StepRet(StepRet::Code::kRow);
+}
+
+SpanJoinOperatorTable::Query::StepRet
+SpanJoinOperatorTable::Query::StepToPartition(int64_t partition) {
+  PERFETTO_DCHECK(partition_ <= partition);
+  if (defn_->IsPartitioned()) {
+    while (partition_ < partition) {
+      auto res = StepToNextPartition();
+      if (!res.is_row())
+        return res;
+    }
+  } else if (!defn_->IsPartitioned() && partition_ < partition) {
+    int res = PrepareRawStmt();
+    if (res != SQLITE_OK)
+      return StepRet(StepRet::Code::kError, res);
+    partition_ = partition;
+  }
+  return StepRet(StepRet::Code::kRow);
+}
+
+SpanJoinOperatorTable::Query::StepRet SpanJoinOperatorTable::Query::StepUntil(
+    int64_t timestamp) {
+  PERFETTO_DCHECK(!eof_);
+  auto partition = partition_;
+  while (partition_ == partition && ts_end_ <= timestamp) {
+    auto res = Step();
+    if (!res.is_row())
+      return res;
+  }
+  return StepRet(StepRet::Code::kRow);
+}
+
+std::string SpanJoinOperatorTable::Query::CreateSqlQuery(
+    const std::vector<std::string>& cs) const {
+  std::vector<std::string> col_names;
+  for (const Table::Column& c : defn_->columns()) {
+    col_names.push_back("`" + c.name() + "`");
+  }
+
+  std::string sql = "SELECT " + base::Join(col_names, ", ");
   sql += " FROM " + defn_->name();
-  sql += " WHERE 1";
-  for (const auto& c : cs) {
-    sql += " AND " + c;
+  if (!cs.empty()) {
+    sql += " WHERE " + base::Join(cs, " AND ");
   }
-  sql += " ORDER BY `" + defn_->partition_col() + "`, ts;";
+  sql += " ORDER BY ";
+  sql += defn_->IsPartitioned()
+             ? base::Join({"`" + defn_->partition_col() + "`", "ts"}, ", ")
+             : "ts";
+  sql += ";";
+  PERFETTO_DLOG("%s", sql.c_str());
   return sql;
 }
 
-int SpanJoinOperatorTable::Cursor::TableQueryState::PrepareRawStmt(
-    const std::string& sql) {
-  PERFETTO_DLOG("%s", sql.c_str());
-  int size = static_cast<int>(sql.size());
-
+int SpanJoinOperatorTable::Query::PrepareRawStmt() {
   sqlite3_stmt* stmt = nullptr;
-  int err = sqlite3_prepare_v2(db_, sql.c_str(), size, &stmt, nullptr);
+  int err =
+      sqlite3_prepare_v2(db_, sql_query_.c_str(),
+                         static_cast<int>(sql_query_.size()), &stmt, nullptr);
   stmt_.reset(stmt);
+
+  ts_start_ = 0;
+  ts_end_ = 0;
+  partition_ = std::numeric_limits<int64_t>::lowest();
+  eof_ = false;
+
   return err;
 }
 
-void SpanJoinOperatorTable::Cursor::TableQueryState::ReportSqliteResult(
-    sqlite3_context* context,
-    size_t index) {
+void SpanJoinOperatorTable::Query::ReportSqliteResult(sqlite3_context* context,
+                                                      size_t index) {
   sqlite3_stmt* stmt = stmt_.get();
   int idx = static_cast<int>(index);
   switch (sqlite3_column_type(stmt, idx)) {
@@ -388,37 +535,44 @@ void SpanJoinOperatorTable::Cursor::TableQueryState::ReportSqliteResult(
 SpanJoinOperatorTable::TableDefinition::TableDefinition(
     std::string name,
     std::string partition_col,
-    std::vector<Table::Column> cols)
+    std::vector<Table::Column> cols,
+    uint32_t ts_idx,
+    uint32_t dur_idx,
+    uint32_t partition_idx)
     : name_(std::move(name)),
       partition_col_(std::move(partition_col)),
-      cols_(std::move(cols)) {}
+      cols_(std::move(cols)),
+      ts_idx_(ts_idx),
+      dur_idx_(dur_idx),
+      partition_idx_(partition_idx) {}
 
-SpanJoinOperatorTable::TableDescriptor
+base::Optional<SpanJoinOperatorTable::TableDescriptor>
 SpanJoinOperatorTable::TableDescriptor::Parse(
     const std::string& raw_descriptor) {
   // Descriptors have one of the following forms:
-  // table_name PARTITIONED column_name
+  // table_name [PARTITIONED column_name]
 
-  // Find the table name. Note we don't support not specifying a partition
-  // column at the moment.
+  // Find the table name.
   base::StringSplitter splitter(raw_descriptor, ' ');
   if (!splitter.Next())
-    return {};
-
-  std::string name = splitter.cur_token();
-  if (!splitter.Next())
-    return {};
-  if (strcmp(splitter.cur_token(), "PARTITIONED") != 0)
-    return {};
-  if (!splitter.Next())
-    return {};
-
-  std::string partition_col = splitter.cur_token();
+    return base::nullopt;
 
   TableDescriptor descriptor;
-  descriptor.name = std::move(name);
-  descriptor.partition_col = std::move(partition_col);
-  return descriptor;
+  descriptor.name = splitter.cur_token();
+  if (!splitter.Next())
+    return std::move(descriptor);
+
+  if (strcasecmp(splitter.cur_token(), "PARTITIONED") != 0) {
+    PERFETTO_ELOG("Invalid SPAN_JOIN token %s", splitter.cur_token());
+    return base::nullopt;
+  }
+  if (!splitter.Next()) {
+    PERFETTO_ELOG("Missing partitioning column");
+    return base::nullopt;
+  }
+
+  descriptor.partition_col = splitter.cur_token();
+  return std::move(descriptor);
 }
 
 }  // namespace trace_processor

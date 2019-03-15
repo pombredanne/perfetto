@@ -34,6 +34,7 @@ namespace {
 
 using ::testing::_;
 using ::testing::Args;
+using ::testing::AtLeast;
 using ::testing::ElementsAreArray;
 using ::testing::Eq;
 using ::testing::Pointwise;
@@ -68,8 +69,10 @@ class MockProcessTracker : public ProcessTracker {
   MockProcessTracker(TraceProcessorContext* context)
       : ProcessTracker(context) {}
 
-  MOCK_METHOD2(UpdateProcess,
-               UniquePid(uint32_t pid, base::StringView process_name));
+  MOCK_METHOD3(UpdateProcess,
+               UniquePid(uint32_t pid,
+                         base::Optional<uint32_t> ppid,
+                         base::StringView process_name));
 
   MOCK_METHOD2(UpdateThread, UniqueTid(uint32_t tid, uint32_t tgid));
 };
@@ -101,8 +104,7 @@ class ProtoTraceParserTest : public ::testing::Test {
     context_.event_tracker.reset(event_);
     process_ = new MockProcessTracker(&context_);
     context_.process_tracker.reset(process_);
-    const auto optim = OptimizationMode::kMinLatency;
-    context_.sorter.reset(new TraceSorter(&context_, optim, 0 /*window size*/));
+    context_.sorter.reset(new TraceSorter(&context_, 0 /*window size*/));
     context_.proto_parser.reset(new ProtoTraceParser(&context_));
   }
 
@@ -184,8 +186,10 @@ TEST_F(ProtoTraceParserTest, LoadEventsIntoRaw) {
   static const char buf_value[] = "This is a print event";
   print->set_buf(buf_value);
 
-  EXPECT_CALL(*storage_, InternString(base::StringView(task_newtask)));
+  EXPECT_CALL(*storage_, InternString(base::StringView(task_newtask)))
+      .Times(AtLeast(1));
   EXPECT_CALL(*storage_, InternString(base::StringView(buf_value)));
+  EXPECT_CALL(*process_, UpdateThread(123, 123));
 
   Tokenize(trace);
   const auto& raw = context_.storage->raw_events();
@@ -455,7 +459,8 @@ TEST_F(ProtoTraceParserTest, LoadProcessPacket) {
   process->set_pid(1);
   process->set_ppid(2);
 
-  EXPECT_CALL(*process_, UpdateProcess(1, base::StringView(kProcName1)));
+  EXPECT_CALL(*process_,
+              UpdateProcess(1, Eq(2u), base::StringView(kProcName1)));
   Tokenize(trace);
 }
 
@@ -472,7 +477,8 @@ TEST_F(ProtoTraceParserTest, LoadProcessPacket_FirstCmdline) {
   process->set_pid(1);
   process->set_ppid(2);
 
-  EXPECT_CALL(*process_, UpdateProcess(1, base::StringView(kProcName1)));
+  EXPECT_CALL(*process_,
+              UpdateProcess(1, Eq(2u), base::StringView(kProcName1)));
   Tokenize(trace);
 }
 
@@ -490,6 +496,9 @@ TEST_F(ProtoTraceParserTest, LoadThreadPacket) {
 
 TEST(SystraceParserTest, SystraceEvent) {
   SystraceTracePoint result{};
+
+  ASSERT_FALSE(ParseSystraceTracePoint(base::StringView(""), &result));
+
   ASSERT_TRUE(ParseSystraceTracePoint(base::StringView("B|1|foo"), &result));
   EXPECT_EQ(result, (SystraceTracePoint{'B', 1, base::StringView("foo"), 0}));
 

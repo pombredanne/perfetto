@@ -13,50 +13,69 @@
 // limitations under the License.
 
 import {Engine} from '../common/engine';
-import {TimeSpan} from '../common/time';
-import {LogsPagination} from '../common/state';
+import {
+  LogBounds,
+  LogBoundsKey,
+  LogEntries,
+  LogEntriesKey,
+  LogExistsKey
+} from '../common/logs';
+import {fromNs, TimeSpan} from '../common/time';
+
 import {Controller} from './controller';
 import {App} from './globals';
-import {LogEntries, LogBounds} from '../common/logs';
 
-export interface LogsControllerArgs {
-  engine: Engine;
-  app: App;
-}
-
-async function updateLogBounds(engine: Engine, span: TimeSpan): Promise<LogBounds> {
+async function updateLogBounds(
+    engine: Engine, span: TimeSpan): Promise<LogBounds> {
   const vizStartNs = Math.floor(span.start * 1e9);
   const vizEndNs = Math.ceil(span.end * 1e9);
-  const vizSqlBounds = `ts >= ${vizStartNs} and ts <= ${vizEndNs}`;
 
-  const countResult = await engine.queryOneRow(
-    `select count(*) as num_rows from android_logs where ${vizSqlBounds}`);
-  const count = countResult[0];
+  const countResult = await engine.queryOneRow(`
+     select min(ts), max(ts), count(ts)
+     from android_logs where ts >= ${vizStartNs} and ts <= ${vizEndNs}`);
 
+  const firstRowNs = countResult[0];
+  const lastRowNs = countResult[1];
+  const total = countResult[2];
+
+  const minResult = await engine.queryOneRow(`
+     select max(ts) from android_logs where ts < ${vizStartNs}`);
+  const startNs = minResult[0];
+
+  const maxResult = await engine.queryOneRow(`
+     select min(ts) from android_logs where ts > ${vizEndNs}`);
+  const endNs = maxResult[0];
+
+  const trace = await engine.getTraceTimeBounds();
+  const startTs = startNs ? fromNs(startNs) : trace.start;
+  const endTs = endNs ? fromNs(endNs) : trace.end;
+  const firstRowTs = firstRowNs ? fromNs(firstRowNs) : endTs;
+  const lastRowTs = lastRowNs ? fromNs(lastRowNs) : startTs;
   return {
-    startTs: span.start,
-    endTs: span.end,
-    count,
+    startTs,
+    endTs,
+    firstRowTs,
+    lastRowTs,
+    total,
   };
 }
 
-async function updateLogEntries(engine: Engine, span: TimeSpan, pagination: LogsPagination): Promise<LogEntries> {
+async function updateLogEntries(
+    engine: Engine, span: TimeSpan, pagination: Pagination):
+    Promise<LogEntries> {
   const vizStartNs = Math.floor(span.start * 1e9);
   const vizEndNs = Math.ceil(span.end * 1e9);
   const vizSqlBounds = `ts >= ${vizStartNs} and ts <= ${vizEndNs}`;
 
-  const offset = pagination.offset;
-  const count = Math.min(1000, Math.max(pagination.count, 100));
-
-  const rowsResult = await engine.query(
-     `select ts, prio, tag, msg from android_logs
+  const rowsResult =
+      await engine.query(`select ts, prio, tag, msg from android_logs
         where ${vizSqlBounds}
         order by ts
-        limit ${offset}, ${count}`);
+        limit ${pagination.start}, ${pagination.count}`);
 
   if (!rowsResult.numRecords) {
     return {
-      offset,
+      offset: pagination.start,
       timestamps: [],
       priorities: [],
       tags: [],
@@ -70,7 +89,7 @@ async function updateLogEntries(engine: Engine, span: TimeSpan, pagination: Logs
   const messages = rowsResult.columns[3].stringValues!;
 
   return {
-    offset,
+    offset: pagination.start,
     timestamps,
     priorities,
     tags,
@@ -79,23 +98,50 @@ async function updateLogEntries(engine: Engine, span: TimeSpan, pagination: Logs
 }
 
 class Pagination {
-  offset: number;
-  count: number;
+  private _offset: number;
+  private _count: number;
 
   constructor(offset: number, count: number) {
-    this.offset = offset;
-    this.count = count;
+    this._offset = offset;
+    this._count = count;
+  }
+
+  get start() {
+    return this._offset;
+  }
+
+  get count() {
+    return this._count;
   }
 
   get end() {
-    return this.offset + this.count;
+    return this._offset + this._count;
   }
 
   contains(other: Pagination): boolean {
-    return this.offset <= other.offset && other.end <= this.end;
+    return this.start <= other.start && other.end <= this.end;
+  }
+
+  grow(n: number): Pagination {
+    const newStart = Math.max(0, this.start - n / 2);
+    const newCount = this.count + n;
+    return new Pagination(newStart, newCount);
   }
 }
 
+export interface LogsControllerArgs {
+  engine: Engine;
+  app: App;
+}
+
+/**
+ * LogsController looks at two parts of the state:
+ * 1. The visible trace window
+ * 2. The requested offset and count the log lines to display
+ * And keeps two bits of published information up to date:
+ * 1. The total number of log messages in visible range
+ * 2. The logs lines that should be displayed
+ */
 export class LogsController extends Controller<'main'> {
   private app: App;
   private engine: Engine;
@@ -107,7 +153,21 @@ export class LogsController extends Controller<'main'> {
     this.app = args.app;
     this.engine = args.engine;
     this.span = new TimeSpan(0, 10);
-    this.pagination = new Pagination(0, 1);
+    this.pagination = new Pagination(0, 0);
+    this.publishHasAnyLogs();
+  }
+
+  async publishHasAnyLogs() {
+    const result = await this.engine.queryOneRow(`
+      select count(*) from android_logs
+    `);
+    const exists = result[0] > 0;
+    this.app.publish('TrackData', {
+      id: LogExistsKey,
+      data: {
+        exists,
+      },
+    });
   }
 
   run() {
@@ -122,28 +182,28 @@ export class LogsController extends Controller<'main'> {
     const needSpanUpdate = !oldSpan.equals(newSpan);
     const needPaginationUpdate = !oldPagination.contains(requestedPagination);
 
-    console.log('!!!!!', needSpanUpdate, needPaginationUpdate);
-
+    // TODO(hjd): We could waste a lot of time queueing useless updates here.
+    // We should avoid enqueuing a request when one is in progress.
     if (needSpanUpdate) {
       this.span = newSpan;
-      console.log('spanUpdate');
-
       updateLogBounds(this.engine, newSpan).then(data => {
         if (!newSpan.equals(this.span)) return;
         this.app.publish('TrackData', {
-          id: 'log-bounds',
+          id: LogBoundsKey,
           data,
         });
       });
     }
 
+    // TODO(hjd): We could waste a lot of time queueing useless updates here.
+    // We should avoid enqueuing a request when one is in progress.
     if (needSpanUpdate || needPaginationUpdate) {
-      this.pagination = new Pagination(Math.max(0, requestedPagination.offset-50), requestedPagination.count+50);
+      this.pagination = requestedPagination.grow(100);
 
       updateLogEntries(this.engine, newSpan, this.pagination).then(data => {
         if (!this.pagination.contains(requestedPagination)) return;
         this.app.publish('TrackData', {
-          id: 'log-entries',
+          id: LogEntriesKey,
           data,
         });
       });

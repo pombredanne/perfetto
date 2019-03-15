@@ -25,6 +25,7 @@
 
 #if !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 #include <sys/uio.h>
+#include <sys/utsname.h>
 #include <unistd.h>
 #endif
 
@@ -50,6 +51,7 @@
 #include "src/tracing/core/trace_buffer.h"
 
 #include "perfetto/trace/clock_snapshot.pb.h"
+#include "perfetto/trace/system_info.pb.h"
 #include "perfetto/trace/trusted_packet.pb.h"
 
 // General note: this class must assume that Producers are malicious and will
@@ -448,6 +450,120 @@ bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
     return StartTracing(tsid);
 
   return true;
+}
+
+void TracingServiceImpl::ChangeTraceConfig(ConsumerEndpointImpl* consumer,
+                                           const TraceConfig& updated_cfg) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  TracingSession* tracing_session =
+      GetTracingSession(consumer->tracing_session_id_);
+  PERFETTO_DCHECK(tracing_session);
+
+  if ((tracing_session->state != TracingSession::STARTED) &&
+      (tracing_session->state != TracingSession::CONFIGURED)) {
+    PERFETTO_ELOG(
+        "ChangeTraceConfig() was called for a tracing session which isn't "
+        "running.");
+    return;
+  }
+
+  // We only support updating producer_name_filter (and pass-through configs)
+  // for now; null out any changeable fields and make sure the rest are
+  // identical.
+  TraceConfig new_config_copy(updated_cfg);
+  for (auto& ds_cfg : *new_config_copy.mutable_data_sources()) {
+    ds_cfg.clear_producer_name_filter();
+  }
+
+  TraceConfig current_config_copy(tracing_session->config);
+  for (auto& ds_cfg : *current_config_copy.mutable_data_sources())
+    ds_cfg.clear_producer_name_filter();
+
+  if (new_config_copy != current_config_copy) {
+    PERFETTO_LOG(
+        "ChangeTraceConfig() was called with a config containing unsupported "
+        "changes; only adding to the producer_name_filter is currently "
+        "supported and will have an effect.");
+  }
+
+  for (TraceConfig::DataSource& cfg_data_source :
+       *tracing_session->config.mutable_data_sources()) {
+    // Find the updated producer_filter in the new config.
+    std::vector<std::string> new_producer_name_filter;
+    bool found_data_source = false;
+    for (auto it : updated_cfg.data_sources()) {
+      if (cfg_data_source.config().name() == it.config().name()) {
+        new_producer_name_filter = it.producer_name_filter();
+        found_data_source = true;
+        break;
+      }
+    }
+
+    // Bail out if data source not present in the new config.
+    if (!found_data_source) {
+      PERFETTO_ELOG(
+          "ChangeTraceConfig() called without a current data source also "
+          "present in the new "
+          "config: %s",
+          cfg_data_source.config().name().c_str());
+      continue;
+    }
+
+    // TODO(oysteine): Just replacing the filter means that if
+    // there are any filter entries which were present in the original config,
+    // but removed from the config passed to ChangeTraceConfig, any matching
+    // producers will keep producing but newly added producers after this
+    // point will never start.
+    *cfg_data_source.mutable_producer_name_filter() = new_producer_name_filter;
+
+    // Scan all the registered data sources with a matching name.
+    auto range = data_sources_.equal_range(cfg_data_source.config().name());
+    for (auto it = range.first; it != range.second; it++) {
+      ProducerEndpointImpl* producer = GetProducer(it->second.producer_id);
+      PERFETTO_DCHECK(producer);
+
+      // Check if the producer name of this data source is present
+      // in the name filter. We currently only support new filters, not removing
+      // old ones.
+      if (!new_producer_name_filter.empty() &&
+          std::find(new_producer_name_filter.begin(),
+                    new_producer_name_filter.end(),
+                    producer->name_) == new_producer_name_filter.end()) {
+        continue;
+      }
+
+      bool already_setup = false;
+      auto& ds_instances = tracing_session->data_source_instances;
+      for (auto instance_it = ds_instances.begin();
+           instance_it != ds_instances.end(); ++instance_it) {
+        if (instance_it->first == it->second.producer_id &&
+            instance_it->second.data_source_name ==
+                cfg_data_source.config().name()) {
+          already_setup = true;
+          break;
+        }
+      }
+
+      if (already_setup)
+        continue;
+
+      // If it wasn't previously setup, set it up now.
+      // (The per-producer config is optional).
+      TraceConfig::ProducerConfig producer_config;
+      for (auto& config : tracing_session->config.producers()) {
+        if (producer->name_ == config.producer_name()) {
+          producer_config = config;
+          break;
+        }
+      }
+
+      DataSourceInstance* ds_inst = SetupDataSource(
+          cfg_data_source, producer_config, it->second, tracing_session);
+
+      if (ds_inst && tracing_session->state == TracingSession::STARTED)
+        producer->StartDataSource(ds_inst->instance_id, ds_inst->config);
+    }
+  }
 }
 
 bool TracingServiceImpl::StartTracing(TracingSessionID tsid) {
@@ -979,6 +1095,7 @@ void TracingServiceImpl::ReadBuffers(TracingSessionID tsid,
       SnapshotClocks(&packets);
   }
   MaybeEmitTraceConfig(tracing_session, &packets);
+  MaybeEmitSystemInfo(tracing_session, &packets);
 
   size_t packets_bytes = 0;  // SUM(slice.size() for each slice in |packets|).
   size_t total_slices = 0;   // SUM(#slices in |packets|).
@@ -1018,7 +1135,9 @@ void TracingServiceImpl::ReadBuffers(TracingSessionID tsid,
     while (!did_hit_threshold) {
       TracePacket packet;
       TraceBuffer::PacketSequenceProperties sequence_properties{};
-      if (!tbuf.ReadNextTracePacket(&packet, &sequence_properties)) {
+      bool previous_packet_dropped;
+      if (!tbuf.ReadNextTracePacket(&packet, &sequence_properties,
+                                    &previous_packet_dropped)) {
         break;
       }
       PERFETTO_DCHECK(sequence_properties.producer_id_trusted != 0);
@@ -1045,6 +1164,8 @@ void TracingServiceImpl::ReadBuffers(TracingSessionID tsid,
           tracing_session->GetPacketSequenceID(
               sequence_properties.producer_id_trusted,
               sequence_properties.writer_id));
+      if (previous_packet_dropped)
+        trusted_packet.set_previous_packet_dropped(previous_packet_dropped);
       static constexpr size_t kTrustedBufSize = 16;
       Slice slice = Slice::Allocate(kTrustedBufSize);
       PERFETTO_CHECK(
@@ -1293,6 +1414,8 @@ TracingServiceImpl::DataSourceInstance* TracingServiceImpl::SetupDataSource(
   }
   // TODO(primiano): Add tests for registration ordering
   // (data sources vs consumers).
+  // TODO: This logic is duplicated in ChangeTraceConfig, consider refactoring
+  // it. Meanwhile update both.
   if (!cfg_data_source.producer_name_filter().empty()) {
     if (std::find(cfg_data_source.producer_name_filter().begin(),
                   cfg_data_source.producer_name_filter().end(),
@@ -1620,12 +1743,6 @@ void TracingServiceImpl::SnapshotClocks(std::vector<TracePacket>* packets) {
       PERFETTO_DLOG("clock_gettime failed for clock %d", clock.id);
   }
   for (auto& clock : clocks) {
-    // Put a timestamp in the base packet for sorting on the
-    // trace processor side.
-    if (clock.type == protos::ClockSnapshot::Clock::BOOTTIME) {
-      packet.set_timestamp(
-          static_cast<uint64_t>(base::FromPosixTimespec(clock.ts).count()));
-    };
     protos::ClockSnapshot::Clock* c = clock_snapshot->add_clocks();
     c->set_type(clock.type);
     c->set_timestamp(
@@ -1699,6 +1816,32 @@ void TracingServiceImpl::MaybeEmitTraceConfig(
   packets->back().AddSlice(std::move(slice));
 }
 
+void TracingServiceImpl::MaybeEmitSystemInfo(
+    TracingSession* tracing_session,
+    std::vector<TracePacket>* packets) {
+  if (tracing_session->did_emit_system_info)
+    return;
+  tracing_session->did_emit_system_info = true;
+  protos::TrustedPacket packet;
+  protos::SystemInfo* info = packet.mutable_system_info();
+#if !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+  struct utsname uname_info;
+  if (uname(&uname_info) == 0) {
+    protos::Utsname* utsname_info = info->mutable_utsname();
+    utsname_info->set_sysname(uname_info.sysname);
+    utsname_info->set_version(uname_info.version);
+    utsname_info->set_machine(uname_info.machine);
+    utsname_info->set_release(uname_info.release);
+  }
+#endif
+  packet.set_trusted_uid(static_cast<int32_t>(uid_));
+  packet.set_trusted_packet_sequence_id(kServicePacketSequenceID);
+  Slice slice = Slice::Allocate(static_cast<size_t>(packet.ByteSize()));
+  PERFETTO_CHECK(packet.SerializeWithCachedSizesToArray(slice.own_data()));
+  packets->emplace_back();
+  packets->back().AddSlice(std::move(slice));
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // TracingServiceImpl::ConsumerEndpointImpl implementation
 ////////////////////////////////////////////////////////////////////////////////
@@ -1734,6 +1877,17 @@ void TracingServiceImpl::ConsumerEndpointImpl::EnableTracing(
   PERFETTO_DCHECK_THREAD(thread_checker_);
   if (!service_->EnableTracing(this, cfg, std::move(fd)))
     NotifyOnTracingDisabled();
+}
+
+void TracingServiceImpl::ConsumerEndpointImpl::ChangeTraceConfig(
+    const TraceConfig& cfg) {
+  if (!tracing_session_id_) {
+    PERFETTO_LOG(
+        "Consumer called ChangeTraceConfig() but tracing was "
+        "not active");
+    return;
+  }
+  service_->ChangeTraceConfig(this, cfg);
 }
 
 void TracingServiceImpl::ConsumerEndpointImpl::StartTracing() {
@@ -1982,8 +2136,9 @@ void TracingServiceImpl::ProducerEndpointImpl::StopDataSource(
 
 SharedMemoryArbiterImpl*
 TracingServiceImpl::ProducerEndpointImpl::GetOrCreateShmemArbiter() {
-  PERFETTO_DCHECK_THREAD(thread_checker_);
+  std::lock_guard<std::mutex> lock(inproc_shmem_arbiter_mutex_);
   if (!inproc_shmem_arbiter_) {
+    PERFETTO_CHECK(shared_memory_ && shared_memory_->start());
     inproc_shmem_arbiter_.reset(new SharedMemoryArbiterImpl(
         shared_memory_->start(), shared_memory_->size(),
         shared_buffer_page_size_kb_ * 1024, this, task_runner_));
@@ -1991,10 +2146,16 @@ TracingServiceImpl::ProducerEndpointImpl::GetOrCreateShmemArbiter() {
   return inproc_shmem_arbiter_.get();
 }
 
+// Can be called on any thread.
 std::unique_ptr<TraceWriter>
 TracingServiceImpl::ProducerEndpointImpl::CreateTraceWriter(BufferID buf_id) {
-  PERFETTO_DCHECK_THREAD(thread_checker_);
   return GetOrCreateShmemArbiter()->CreateTraceWriter(buf_id);
+}
+
+void TracingServiceImpl::ProducerEndpointImpl::NotifyFlushComplete(
+    FlushRequestID id) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  return GetOrCreateShmemArbiter()->NotifyFlushComplete(id);
 }
 
 void TracingServiceImpl::ProducerEndpointImpl::OnTracingSetup() {
@@ -2039,12 +2200,6 @@ void TracingServiceImpl::ProducerEndpointImpl::StartDataSource(
     if (weak_this)
       weak_this->producer_->StartDataSource(ds_id, std::move(config));
   });
-}
-
-void TracingServiceImpl::ProducerEndpointImpl::NotifyFlushComplete(
-    FlushRequestID id) {
-  PERFETTO_DCHECK_THREAD(thread_checker_);
-  return GetOrCreateShmemArbiter()->NotifyFlushComplete(id);
 }
 
 void TracingServiceImpl::ProducerEndpointImpl::NotifyDataSourceStopped(
