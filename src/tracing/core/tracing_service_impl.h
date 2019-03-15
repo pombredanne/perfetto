@@ -179,8 +179,8 @@ class TracingServiceImpl : public TracingService {
 
     // If |observe_data_source_instances == true|, will queue a task to notify
     // the consumer about the state change.
-    void ObserveDataSourceInstanceStateChange(const ProducerEndpointImpl&,
-                                              const DataSourceInstance&);
+    void OnDataSourceInstanceStateChange(const ProducerEndpointImpl&,
+                                         const DataSourceInstance&);
 
    private:
     friend class TracingServiceImpl;
