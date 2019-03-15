@@ -1386,9 +1386,9 @@ void ProtoTraceParser::ParseTypedFtraceToRaw(uint32_t ftrace_id,
       timestamp, message_strings.message_name_id, cpu, utid);
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     if (fld.id >= kFtraceMaxFieldCount) {
-      PERFETTO_ELOG("Skipping ftrace event proto's field id (%" PRIu32
-                    "), as it is too large.",
-                    fld.id);
+      PERFETTO_DLOG(
+          "Skipping ftrace arg - proto field id is too large (%" PRIu32 ")",
+          fld.id);
       continue;
     }
     ProtoSchemaType type = m->fields[fld.id].type;
