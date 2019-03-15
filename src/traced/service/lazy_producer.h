@@ -44,12 +44,11 @@ class LazyProducer : public Producer {
   }
   void Flush(FlushRequestID, const DataSourceInstanceID*, size_t) override {}
 
-  void ConnectInProcess(TracingService* svc);
-
   void OnConnect() override;
   void SetupDataSource(DataSourceInstanceID, const DataSourceConfig&) override;
   void StopDataSource(DataSourceInstanceID) override;
 
+  void ConnectInProcess(TracingService* svc);
   virtual bool SetAndroidProperty(const std::string& name,
                                   const std::string& value);
 
@@ -64,7 +63,7 @@ class LazyProducer : public Producer {
   uint64_t active_sessions_ = 0;
   uint64_t generation_ = 0;
 
-  base::WeakPtrFactory<LazyProducer> weak_factory_;
+  base::WeakPtrFactory<LazyProducer> weak_factory_;  // Keep last.
 };
 
 }  // namespace perfetto

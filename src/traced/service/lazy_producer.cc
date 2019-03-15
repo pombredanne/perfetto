@@ -79,7 +79,7 @@ bool LazyProducer::SetAndroidProperty(const std::string& name,
   // Allow this to be mocked out for tests on other platforms.
   base::ignore_result(name);
   base::ignore_result(value);
-  PERFETTO_FATAL("Properties can only be set on Android.");
+  return true;
 #endif
 }
 
