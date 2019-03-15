@@ -634,7 +634,7 @@ void TracingServiceImpl::StartDataSourceInstance(
     instance->state = DataSourceInstance::STARTED;
   }
   if (tracing_session->consumer_maybe_null) {
-    tracing_session->consumer_maybe_null->ObserveDataSourceInstanceStateChange(
+    tracing_session->consumer_maybe_null->OnDataSourceInstanceStateChange(
         *producer, *instance);
   }
   producer->StartDataSource(instance->instance_id, instance->config);
@@ -701,8 +701,8 @@ void TracingServiceImpl::DisableTracing(TracingSessionID tsid,
       instance.state = DataSourceInstance::STOPPED;
     }
     if (tracing_session->consumer_maybe_null) {
-      tracing_session->consumer_maybe_null
-          ->ObserveDataSourceInstanceStateChange(*producer, instance);
+      tracing_session->consumer_maybe_null->OnDataSourceInstanceStateChange(
+          *producer, instance);
     }
     producer->StopDataSource(ds_inst_id);
   }
@@ -752,7 +752,7 @@ void TracingServiceImpl::NotifyDataSourceStarted(
     ProducerEndpointImpl* producer = GetProducer(producer_id);
     PERFETTO_DCHECK(producer);
     if (tracing_session.consumer_maybe_null) {
-      tracing_session.consumer_maybe_null->ObserveDataSourceInstanceStateChange(
+      tracing_session.consumer_maybe_null->OnDataSourceInstanceStateChange(
           *producer, *instance);
     }
   }  // for (tracing_session)
@@ -782,7 +782,7 @@ void TracingServiceImpl::NotifyDataSourceStopped(
     ProducerEndpointImpl* producer = GetProducer(producer_id);
     PERFETTO_DCHECK(producer);
     if (tracing_session.consumer_maybe_null) {
-      tracing_session.consumer_maybe_null->ObserveDataSourceInstanceStateChange(
+      tracing_session.consumer_maybe_null->OnDataSourceInstanceStateChange(
           *producer, *instance);
     }
 
@@ -821,8 +821,8 @@ void TracingServiceImpl::DisableTracingNotifyConsumerAndFlushFile(
     ProducerEndpointImpl* producer = GetProducer(inst_kv.first);
     PERFETTO_DCHECK(producer);
     if (tracing_session->consumer_maybe_null) {
-      tracing_session->consumer_maybe_null
-          ->ObserveDataSourceInstanceStateChange(*producer, inst_kv.second);
+      tracing_session->consumer_maybe_null->OnDataSourceInstanceStateChange(
+          *producer, inst_kv.second);
     }
   }
   tracing_session->state = TracingSession::DISABLED;
@@ -1458,7 +1458,7 @@ void TracingServiceImpl::UnregisterDataSource(ProducerID producer_id,
             producer->StopDataSource(ds_inst_id);
           it->second.state = DataSourceInstance::STOPPED;
           if (kv.second.consumer_maybe_null) {
-            kv.second.consumer_maybe_null->ObserveDataSourceInstanceStateChange(
+            kv.second.consumer_maybe_null->OnDataSourceInstanceStateChange(
                 *producer, it->second);
           }
         }
@@ -1542,7 +1542,7 @@ TracingServiceImpl::DataSourceInstance* TracingServiceImpl::SetupDataSource(
 
   // New data source instance starts out in CONFIGURED state.
   if (tracing_session->consumer_maybe_null) {
-    tracing_session->consumer_maybe_null->ObserveDataSourceInstanceStateChange(
+    tracing_session->consumer_maybe_null->OnDataSourceInstanceStateChange(
         *producer, *ds_instance);
   }
 

@@ -176,8 +176,8 @@ class TracingServiceImpl : public TracingService {
     void GetTraceStats() override;
 
     // TODO(eseckler): Notify consumer about the state change if necessary.
-    void ObserveDataSourceInstanceStateChange(const ProducerEndpointImpl&,
-                                              const DataSourceInstance&) {}
+    void OnDataSourceInstanceStateChange(const ProducerEndpointImpl&,
+                                         const DataSourceInstance&) {}
 
    private:
     friend class TracingServiceImpl;
