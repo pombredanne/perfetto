@@ -152,7 +152,7 @@ Field ProtoDecoder::FindField(uint32_t field_id) {
   return res;
 }
 
-void ProtoDecoderBase::ParseAllFields() {
+void TypedProtoDecoderBase::ParseAllFields() {
   const uint8_t* cur = begin_;
   ParseFieldResult res;
   for (;;) {
@@ -162,7 +162,10 @@ void ProtoDecoderBase::ParseAllFields() {
     cur = res.next;
 
     auto field_id = res.field.id();
-    Field* fld = GetFieldInternal(field_id);
+    if (PERFETTO_UNLIKELY(field_id) >= size_)
+      continue;
+
+    Field* fld = &fields_[field_id];
     if (PERFETTO_LIKELY(!fld->valid())) {
       // This is the first time we see this field.
       *fld = std::move(res.field);
@@ -170,18 +173,35 @@ void ProtoDecoderBase::ParseAllFields() {
       // Repeated field case. Append to the end of the |fields_| vector.
       // The RepeatedFieldIterator will find first the one at fields_[id] and
       // then will keep finding the other repeated fields with matching id.
-      fields_[fields_size_++] = std::move(res.field);
-      PERFETTO_CHECK(fields_size_ < fields_.size());
-      // fields_.emplace_back(std::move(res.field));
+      if (PERFETTO_UNLIKELY(size_ == capacity_)) {
+        ExpandHeapStorage();
+        PERFETTO_DCHECK(size_ < capacity_);
+      }
+      fields_[size_++] = std::move(res.field);
     }
   }
   read_ptr_ = res.next;
 }
 
+PERFETTO_ALWAYS_INLINE
 Field ProtoDecoder::ReadField() {
   ParseFieldResult res = ParseOneField(read_ptr_, end_);
   read_ptr_ = res.next;
   return res.field;
+}
+
+void TypedProtoDecoderBase::ExpandHeapStorage() {
+  uint32_t new_capacity = capacity_ * 2;
+  PERFETTO_CHECK(new_capacity > size_);
+  std::unique_ptr<Field[]> new_storage(new Field[new_capacity]);
+
+  static_assert(std::is_trivially_copyable<Field>::value,
+                "Field must be trivially copyable");
+  memcpy(&new_storage[0], fields_, sizeof(Field) * size_);
+
+  heap_storage_ = std::move(new_storage);
+  fields_ = &heap_storage_[0];
+  capacity_ = new_capacity;
 }
 
 }  // namespace protozero

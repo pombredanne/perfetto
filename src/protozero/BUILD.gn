@@ -92,7 +92,6 @@ proto_library("testing_messages_lite") {
   proto_out_dir = perfetto_root_path
 }
 
-
 perfetto_fuzzer_test("protozero_decoder_fuzzer") {
   sources = [
     "proto_decoder_fuzzer.cc",

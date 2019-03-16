@@ -110,8 +110,6 @@ source_set("daemon") {
     "heapprofd_producer.h",
     "interner.h",
     "queue_messages.h",
-    "record_reader.cc",
-    "record_reader.h",
     "system_property.cc",
     "system_property.h",
     "unwinding.cc",
@@ -156,7 +154,6 @@ source_set("unittests") {
     "client_unittest.cc",
     "interner_unittest.cc",
     "proc_utils_unittest.cc",
-    "record_reader_unittest.cc",
     "sampler_unittest.cc",
     "system_property_unittest.cc",
     "unwinding_unittest.cc",
@@ -206,24 +203,28 @@ source_set("malloc_hooks") {
 }
 
 perfetto_fuzzer_test("unwinding_fuzzer") {
+  testonly = true
   sources = [
     "unwinding_fuzzer.cc",
   ]
   deps = [
     ":daemon",
+    ":ring_buffer",
     ":wire_protocol",
     "../../../gn:default_deps",
-    "../../../src/base",
+    "../../base",
+    "../../tracing",
   ]
 }
 
 perfetto_fuzzer_test("shared_ring_buffer_fuzzer") {
+  testonly = true
   sources = [
     "shared_ring_buffer_fuzzer.cc",
   ]
   deps = [
     ":ring_buffer",
     "../../../gn:default_deps",
-    "../../../src/base",
+    "../../base",
   ]
 }

@@ -25,6 +25,7 @@
 #include "google/protobuf/io/printer.h"
 #include "google/protobuf/io/zero_copy_stream.h"
 #include "google/protobuf/stubs/strutil.h"
+
 #include "perfetto/protozero/proto_decoder.h"
 
 namespace protozero {
@@ -462,27 +463,32 @@ class GeneratorJob {
   }
 
   void GenerateParser(const Descriptor* message) {
-    constexpr int kMaxFieldId = protozero::ProtoDecoder::kMaxFieldId;
     int max_field_id = 0;
+    bool has_repeated_fields = false;
     for (int i = 0; i < message->field_count(); ++i) {
       const FieldDescriptor* field = message->field(i);
-      if (field->number() > kMaxFieldId)
+      if (field->number() > static_cast<int>(kMaxDecoderFieldId))
         continue;
       max_field_id = std::max(max_field_id, field->number());
+      if (field->is_repeated())
+        has_repeated_fields = true;
     }
 
     stub_h_->Print(
-        "class Parser : public ::protozero::ProtoDecoder2<$max$> {\n", "max",
-        std::to_string(max_field_id));
+        "class Parser : public "
+        "::protozero::TypedProtoDecoderTemplate</*MAX_FIELD_ID=*/$max$, "
+        "/*HAS_REPEATED_FIELDS=*/$rep$> {\n",
+        "max", std::to_string(max_field_id), "rep",
+        has_repeated_fields ? "true" : "false");
     stub_h_->Print(" public:\n");
     stub_h_->Indent();
     stub_h_->Print(
         "Parser(const uint8_t* data, size_t len) "
-        ": ProtoDecoder2(data, len) {}\n");
+        ": TypedProtoDecoderTemplate(data, len) {}\n");
 
     for (int i = 0; i < message->field_count(); ++i) {
       const FieldDescriptor* field = message->field(i);
-      if (field->number() > kMaxFieldId) {
+      if (field->number() > max_field_id) {
         stub_h_->Print("// field $name$ omitted because its id is too high",
                        "name", field->name());
         continue;
@@ -547,8 +553,8 @@ class GeneratorJob {
 
       if (field->is_repeated()) {
         stub_h_->Print(
-            "RepeatedFieldIterator $name$() const { return GetRepeated($id$); "
-            "}\n",
+            "::protozero::RepeatedFieldIterator $name$() const { return "
+            "GetRepeated($id$); }\n",
             "name", field->name(), "id", std::to_string(field->number()));
       } else {
         stub_h_->Print(

@@ -44,7 +44,8 @@ TEST(ProtoDecoderTest, ReadString) {
   delegate.AdjustUsedSizeOfCurrentSlice();
   auto used_range = delegate.slices()[0].GetUsedRange();
 
-  ProtoDecoder2<32> decoder(used_range.begin, used_range.size());
+  TypedProtoDecoderTemplate<32, false> decoder(used_range.begin,
+                                               used_range.size());
 
   const auto& field = decoder.GetSingle(1);
   ASSERT_EQ(field.type(), ProtoWireType::kLengthDelimited);
@@ -108,8 +109,8 @@ TEST(ProtoDecoderTest, FixedData) {
 
   for (size_t i = 0; i < perfetto::base::ArraySize(kFieldExpectations); ++i) {
     const FieldExpectation& exp = kFieldExpectations[i];
-    ProtoDecoder2<999> decoder(reinterpret_cast<const uint8_t*>(exp.encoded),
-                                exp.encoded_size);
+    TypedProtoDecoderTemplate<999, 0> decoder(
+        reinterpret_cast<const uint8_t*>(exp.encoded), exp.encoded_size);
 
     auto& field = decoder.GetSingle(exp.id);
     ASSERT_EQ(exp.type, field.type());

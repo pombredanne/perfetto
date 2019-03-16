@@ -75,11 +75,11 @@ void EventTracker::PushSchedSwitch(uint32_t cpu,
   auto* prev_slice = &pending_sched_per_cpu_[cpu];
   size_t slice_idx = prev_slice->storage_index;
   if (slice_idx < std::numeric_limits<size_t>::max()) {
-    int64_t duration = ts - slices->start_ns()[slice_idx];
-    slices->set_duration(slice_idx, duration);
-
     prev_pid_match_prev_next_pid = prev_pid == prev_slice->next_pid;
     if (PERFETTO_LIKELY(prev_pid_match_prev_next_pid)) {
+      int64_t duration = ts - slices->start_ns()[slice_idx];
+      slices->set_duration(slice_idx, duration);
+
       // We store the state as a uint16 as we only consider values up to 2048
       // when unpacking the information inside; this allows savings of 48 bits
       // per slice.
@@ -144,9 +144,12 @@ RowId EventTracker::PushCounter(int64_t timestamp,
   }
   prev_timestamp_ = timestamp;
 
-  auto* counters = context_->storage->mutable_counters();
-  size_t idx = counters->AddCounter(timestamp, name_id, value, ref, ref_type);
-  return TraceStorage::CreateRowId(TableId::kCounters,
+  auto* definitions = context_->storage->mutable_counter_definitions();
+  auto counter_row = definitions->AddCounterDefinition(name_id, ref, ref_type);
+
+  auto* counter_values = context_->storage->mutable_counter_values();
+  size_t idx = counter_values->AddCounterValue(counter_row, timestamp, value);
+  return TraceStorage::CreateRowId(TableId::kCounterValues,
                                    static_cast<uint32_t>(idx));
 }
 

@@ -456,7 +456,8 @@ void ProtoTraceParser::ParseCpuTimes(int64_t ts, TraceBlobView cpu_times) {
       cpu_times.data()[1] < 0x80) {
     raw_cpu = cpu_times.data()[1];
   } else {
-    if (auto cpu_field = decoder.FindField(protos::SysStats::CpuTimes::kCpuIdFieldNumber)) {
+    if (auto cpu_field =
+            decoder.FindField(protos::SysStats::CpuTimes::kCpuIdFieldNumber)) {
       raw_cpu = cpu_field.as_uint64();
     } else {
       PERFETTO_ELOG("CPU field not found in CpuTimes");
@@ -570,13 +571,13 @@ void ProtoTraceParser::ParseProcessStatsProcess(int64_t ts,
         pid = fld.as_uint32();
         break;
       default: {
-        bool is_counter_field = fld.id()< has_counter.size() &&
+        bool is_counter_field = fld.id() < has_counter.size() &&
                                 proc_stats_process_names_[fld.id()] != 0;
         if (is_counter_field) {
           // Memory counters are in KB, keep values in bytes in the trace
           // processor.
           counter_values[fld.id()] =
-              fld.id()== protos::ProcessStats::Process::kOomScoreAdjFieldNumber
+              fld.id() == protos::ProcessStats::Process::kOomScoreAdjFieldNumber
                   ? fld.as_int64()
                   : fld.as_int64() * 1024;
           has_counter[fld.id()] = true;
@@ -660,7 +661,8 @@ void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
                                          TraceBlobView ftrace) {
   ProtoDecoder decoder(ftrace.data(), ftrace.length());
   uint64_t raw_pid = 0;
-  if (auto pid_field = decoder.FindField(protos::FtraceEvent::kPidFieldNumber)) {
+  if (auto pid_field =
+          decoder.FindField(protos::FtraceEvent::kPidFieldNumber)) {
     raw_pid = pid_field.as_uint64();
   } else {
     PERFETTO_ELOG("Pid field not found in ftrace packet");
@@ -670,16 +672,16 @@ void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
 
   for (auto fld = decoder.ReadField(); fld.valid(); fld = decoder.ReadField()) {
     bool is_metadata_field =
-        fld.id()== protos::FtraceEvent::kPidFieldNumber ||
-        fld.id()== protos::FtraceEvent::kTimestampFieldNumber;
+        fld.id() == protos::FtraceEvent::kPidFieldNumber ||
+        fld.id() == protos::FtraceEvent::kTimestampFieldNumber;
     if (is_metadata_field)
       continue;
 
     const size_t fld_off = ftrace.offset_of(fld.data());
-    if (fld.id()== protos::FtraceEvent::kGenericFieldNumber) {
+    if (fld.id() == protos::FtraceEvent::kGenericFieldNumber) {
       ParseGenericFtrace(timestamp, cpu, pid,
                          ftrace.slice(fld_off, fld.size()));
-    } else if (fld.id()!= protos::FtraceEvent::kSchedSwitchFieldNumber) {
+    } else if (fld.id() != protos::FtraceEvent::kSchedSwitchFieldNumber) {
       ParseTypedFtraceToRaw(fld.id(), timestamp, cpu, pid,
                             ftrace.slice(fld_off, fld.size()));
     }
@@ -1111,7 +1113,7 @@ void ProtoTraceParser::ParsePrint(uint32_t,
 
   base::StringView buf{};
   for (auto fld = decoder.ReadField(); fld.valid(); fld = decoder.ReadField()) {
-    if (fld.id()== protos::PrintFtraceEvent::kBufFieldNumber) {
+    if (fld.id() == protos::PrintFtraceEvent::kBufFieldNumber) {
       buf = fld.as_string();
       break;
     }
@@ -1314,7 +1316,8 @@ void ProtoTraceParser::ParseGenericFtrace(int64_t timestamp,
   ProtoDecoder decoder(view.data(), view.length());
 
   base::StringView event_name;
-  if (auto name_field = decoder.FindField(protos::GenericFtraceEvent::kEventNameFieldNumber)) {
+  if (auto name_field = decoder.FindField(
+          protos::GenericFtraceEvent::kEventNameFieldNumber)) {
     event_name = name_field.as_string();
   } else {
     PERFETTO_ELOG("Event name not found in generic ftrace packet");
@@ -1341,7 +1344,8 @@ void ProtoTraceParser::ParseGenericFtraceField(RowId generic_row_id,
   ProtoDecoder decoder(view.data(), view.length());
 
   base::StringView field_name;
-  if (auto name_field = decoder.FindField(protos::GenericFtraceEvent::Field::kNameFieldNumber)) {
+  if (auto name_field = decoder.FindField(
+          protos::GenericFtraceEvent::Field::kNameFieldNumber)) {
     field_name = name_field.as_string();
   } else {
     PERFETTO_ELOG("Event name not found in generic ftrace packet");
@@ -1673,7 +1677,8 @@ void ProtoTraceParser::ParseTraceStats(TraceBlobView packet) {
         const size_t fld_off = packet.offset_of(fld.data());
         TraceBlobView buf_data = packet.slice(fld_off, fld.size());
         ProtoDecoder buf_d(buf_data.data(), buf_data.length());
-        for (auto fld2 = buf_d.ReadField(); fld2.id(); fld2 = buf_d.ReadField()) {
+        for (auto fld2 = buf_d.ReadField(); fld2.id();
+             fld2 = buf_d.ReadField()) {
           switch (fld2.id()) {
             case protos::TraceStats::BufferStats::kBufferSizeFieldNumber:
               storage->SetIndexedStats(stats::traced_buf_buffer_size, buf_num,
@@ -1767,7 +1772,8 @@ void ProtoTraceParser::ParseFtraceStats(TraceBlobView packet) {
   for (auto fld = decoder.ReadField(); fld.valid(); fld = decoder.ReadField()) {
     switch (fld.id()) {
       case protos::FtraceStats::kPhaseFieldNumber:
-        phase = fld.as_uint64() == protos::FtraceStats_Phase_END_OF_TRACE ? 1 : 0;
+        phase =
+            fld.as_uint64() == protos::FtraceStats_Phase_END_OF_TRACE ? 1 : 0;
 
         // This code relies on the fact that each ftrace_cpu_XXX_end event is
         // just after the corresponding ftrace_cpu_XXX_begin event.
@@ -1784,7 +1790,8 @@ void ProtoTraceParser::ParseFtraceStats(TraceBlobView packet) {
         TraceBlobView cpu_data = packet.slice(fld_off, fld.size());
         ProtoDecoder cpu_d(cpu_data.data(), cpu_data.length());
         int cpu_num = -1;
-        for (auto fld2 = cpu_d.ReadField(); fld2.id(); fld2 = cpu_d.ReadField()) {
+        for (auto fld2 = cpu_d.ReadField(); fld2.id();
+             fld2 = cpu_d.ReadField()) {
           switch (fld2.id()) {
             case protos::FtraceCpuStats::kCpuFieldNumber:
               cpu_num = fld2.as_int32();

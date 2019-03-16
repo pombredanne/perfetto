@@ -143,6 +143,9 @@ class Field {
   uint8_t type_;        // proto_utils::ProtoWireType.
 };
 
+// The Field struct is used in a lot of perf-sensitive contexts.
+static_assert(sizeof(Field) == 16, "Field struct too big");
+
 }  // namespace protozero
 
 #endif  // INCLUDE_PERFETTO_PROTOZERO_FIELD_H_

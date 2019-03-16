@@ -29,9 +29,8 @@
 #include "src/trace_processor/trace_sorter.h"
 #include "src/trace_processor/trace_storage.h"
 
-#include "perfetto/trace/trace.pb.h"
-#include "perfetto/trace/trace_packet.pb.h"
-
+#include "perfetto/trace/ftrace/ftrace_event.pbzero.h"
+#include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
 #include "perfetto/trace/trace.pbzero.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 
@@ -39,7 +38,6 @@ namespace perfetto {
 namespace trace_processor {
 
 using protozero::ProtoDecoder;
-using protozero::ProtoDecoder2;
 using protozero::proto_utils::MakeTagLengthDelimited;
 using protozero::proto_utils::MakeTagVarInt;
 using protozero::proto_utils::ParseVarInt;
@@ -63,10 +61,10 @@ bool ProtoTraceTokenizer::Parse(std::unique_ptr<uint8_t[]> owned_buf,
       size -= missing_len;
     }
 
-    // At this point we have enough data in partial_buf_ to read at least the
+    // At this point we have enough data in |partial_buf_| to read at least the
     // field header and know the size of the next TracePacket.
     constexpr uint8_t kTracePacketTag =
-        MakeTagLengthDelimited(protos::Trace::kPacketFieldNumber);
+        MakeTagLengthDelimited(protos::pbzero::Trace::kPacketFieldNumber);
     const uint8_t* pos = &partial_buf_[0];
     uint8_t proto_field_tag = *pos;
     uint64_t field_size = 0;
@@ -122,8 +120,8 @@ void ProtoTraceTokenizer::ParseInternal(std::unique_ptr<uint8_t[]> owned_buf,
 
   protos::pbzero::Trace::Parser decoder(data, size);
   for (auto it = decoder.packet(); it; ++it) {
-    size_t field_offset2 = whole_buf.offset_of(it->data());
-    ParsePacket(whole_buf.slice(field_offset2, it->size()));
+    size_t field_offset = whole_buf.offset_of(it->data());
+    ParsePacket(whole_buf.slice(field_offset, it->size()));
   }
 
   const size_t bytes_left = decoder.bytes_left();
@@ -135,18 +133,16 @@ void ProtoTraceTokenizer::ParseInternal(std::unique_ptr<uint8_t[]> owned_buf,
 }
 
 void ProtoTraceTokenizer::ParsePacket(TraceBlobView packet) {
-  constexpr auto kTimestampFieldNumber =
-      protos::TracePacket::kTimestampFieldNumber;
-  ProtoDecoder2<kTimestampFieldNumber> decoder(packet.data(), packet.length());
+  protos::pbzero::TracePacket::Parser decoder(packet.data(), packet.length());
 
-  const auto& ts_field = decoder.Get<kTimestampFieldNumber>();
-  auto timestamp = ts_field.valid() ? ts_field.as_int64() : latest_timestamp_;
+  auto timestamp = decoder.has_timestamp()
+                       ? static_cast<int64_t>(decoder.timestamp())
+                       : latest_timestamp_;
   latest_timestamp_ = std::max(timestamp, latest_timestamp_);
 
-  const auto& ftrace_field =
-      decoder.Get<protos::TracePacket::kFtraceEventsFieldNumber>();
-  if (ftrace_field.valid()) {
-    const size_t fld_off = packet.offset_of(ftrace_field.data());
+  if (decoder.has_ftrace_events()) {
+    auto ftrace_field = decoder.ftrace_events();
+    const size_t fld_off = packet.offset_of(ftrace_field.begin);
     ParseFtraceBundle(packet.slice(fld_off, ftrace_field.size()));
     return;
   }
@@ -157,41 +153,34 @@ void ProtoTraceTokenizer::ParsePacket(TraceBlobView packet) {
   PERFETTO_DCHECK(!decoder.bytes_left());
 }
 
-// PERFETTO_ALWAYS_INLINE
+PERFETTO_ALWAYS_INLINE
 void ProtoTraceTokenizer::ParseFtraceBundle(TraceBlobView bundle) {
-  const uint8_t* data = bundle.data();
-  const size_t length = bundle.length();
-  constexpr auto kEventFieldNumber =
-      protos::FtraceEventBundle::kEventFieldNumber;
-  ProtoDecoder2<kEventFieldNumber> decoder(data, length);
+  protos::pbzero::FtraceEventBundle::Parser decoder(bundle.data(),
+                                                    bundle.length());
 
-  const auto& cpu_field =
-      decoder.Get<protos::FtraceEventBundle::kCpuFieldNumber>();
-
-  if (PERFETTO_UNLIKELY(!cpu_field.valid())) {
+  if (PERFETTO_UNLIKELY(!decoder.has_cpu())) {
     PERFETTO_ELOG("CPU field not found in FtraceEventBundle");
     trace_storage_->IncrementStats(stats::ftrace_bundle_tokenizer_errors);
     return;
   }
 
-  auto cpu = cpu_field.as_uint32();
-
+  uint32_t cpu = decoder.cpu();
   if (PERFETTO_UNLIKELY(cpu > base::kMaxCpus)) {
     PERFETTO_ELOG("CPU larger than kMaxCpus (%u > %zu)", cpu, base::kMaxCpus);
     return;
   }
 
-  for (auto it = decoder.GetRepeated(kEventFieldNumber); it; ++it) {
+  for (auto it = decoder.event(); it; ++it) {
     size_t off = bundle.offset_of(it->data());
     ParseFtraceEvent(cpu, bundle.slice(off, it->size()));
   }
-  trace_sorter_->FinalizeFtraceEventBatch(static_cast<uint32_t>(cpu));
+  trace_sorter_->FinalizeFtraceEventBatch(cpu);
 }
 
 PERFETTO_ALWAYS_INLINE
 void ProtoTraceTokenizer::ParseFtraceEvent(uint32_t cpu, TraceBlobView event) {
   constexpr auto kTimestampFieldNumber =
-      protos::FtraceEvent::kTimestampFieldNumber;
+      protos::pbzero::FtraceEvent::kTimestampFieldNumber;
   const uint8_t* data = event.data();
   const size_t length = event.length();
   ProtoDecoder decoder(data, length);
@@ -225,8 +214,7 @@ void ProtoTraceTokenizer::ParseFtraceEvent(uint32_t cpu, TraceBlobView event) {
 
   // We don't need to parse this packet, just push it to be sorted with
   // the timestamp.
-  if ((false)) // DNS
-    trace_sorter_->PushFtraceEvent(cpu, timestamp, std::move(event));
+  trace_sorter_->PushFtraceEvent(cpu, timestamp, std::move(event));
 }
 
 }  // namespace trace_processor
