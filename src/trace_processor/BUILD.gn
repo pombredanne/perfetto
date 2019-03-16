@@ -132,6 +132,7 @@ source_set("lib") {
     # This one is new.
     "../../protos/perfetto/trace:zero",
     "../../protos/perfetto/trace/ftrace:lite",
+    "../../protos/perfetto/trace/ftrace:zero",
     "../../protos/perfetto/trace_processor:lite",
     "../base",
     "../protozero",
