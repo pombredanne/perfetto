@@ -34,14 +34,12 @@
 #include "src/trace_processor/slice_tracker.h"
 #include "src/trace_processor/trace_processor_context.h"
 
-// TODO remove these.
-#include "perfetto/trace/trace.pb.h"
-#include "perfetto/trace/trace_packet.pb.h"
-
+#include "perfetto/common/android_log_constants.pbzero.h"
 #include "perfetto/common/trace_stats.pbzero.h"
 #include "perfetto/trace/android/android_log.pbzero.h"
 #include "perfetto/trace/clock_snapshot.pbzero.h"
 #include "perfetto/trace/ftrace/ftrace.pbzero.h"
+#include "perfetto/trace/ftrace/ftrace_event.pbzero.h"
 #include "perfetto/trace/ftrace/ftrace_stats.pbzero.h"
 #include "perfetto/trace/ftrace/generic.pbzero.h"
 #include "perfetto/trace/ftrace/kmem.pbzero.h"
@@ -196,7 +194,7 @@ ProtoTraceParser::ProtoTraceParser(TraceProcessorContext* context)
   rss_members_.emplace_back(
       context->storage->InternString("mem.rss.unknown"));  // Keep this last.
 
-  using ProcessStats = protos::ProcessStats;
+  using ProcessStats = protos::pbzero::ProcessStats;
   proc_stats_process_names_[ProcessStats::Process::kVmSizeKbFieldNumber] =
       context->storage->InternString("mem.virt");
   proc_stats_process_names_[ProcessStats::Process::kVmRssKbFieldNumber] =
@@ -484,7 +482,7 @@ void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
   ProtoDecoder decoder(ftrace.data(), ftrace.length());
   uint64_t raw_pid = 0;
   if (auto pid_field =
-          decoder.FindField(protos::FtraceEvent::kPidFieldNumber)) {
+          decoder.FindField(protos::pbzero::FtraceEvent::kPidFieldNumber)) {
     raw_pid = pid_field.as_uint64();
   } else {
     PERFETTO_ELOG("Pid field not found in ftrace packet");
@@ -494,84 +492,85 @@ void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
 
   for (auto fld = decoder.ReadField(); fld.valid(); fld = decoder.ReadField()) {
     bool is_metadata_field =
-        fld.id() == protos::FtraceEvent::kPidFieldNumber ||
-        fld.id() == protos::FtraceEvent::kTimestampFieldNumber;
+        fld.id() == protos::pbzero::FtraceEvent::kPidFieldNumber ||
+        fld.id() == protos::pbzero::FtraceEvent::kTimestampFieldNumber;
     if (is_metadata_field)
       continue;
 
     ContiguousMemoryRange data = fld.as_bytes();
-    if (fld.id() == protos::FtraceEvent::kGenericFieldNumber) {
+    if (fld.id() == protos::pbzero::FtraceEvent::kGenericFieldNumber) {
       ParseGenericFtrace(ts, cpu, pid, data);
-    } else if (fld.id() != protos::FtraceEvent::kSchedSwitchFieldNumber) {
+    } else if (fld.id() !=
+               protos::pbzero::FtraceEvent::kSchedSwitchFieldNumber) {
       ParseTypedFtraceToRaw(fld.id(), ts, cpu, pid, data);
     }
 
     switch (fld.id()) {
-      case protos::FtraceEvent::kSchedSwitchFieldNumber: {
+      case protos::pbzero::FtraceEvent::kSchedSwitchFieldNumber: {
         ParseSchedSwitch(cpu, ts, data);
         break;
       }
-      case protos::FtraceEvent::kSchedWakeupFieldNumber: {
+      case protos::pbzero::FtraceEvent::kSchedWakeupFieldNumber: {
         ParseSchedWakeup(ts, data);
         break;
       }
-      case protos::FtraceEvent::kCpuFrequencyFieldNumber: {
+      case protos::pbzero::FtraceEvent::kCpuFrequencyFieldNumber: {
         ParseCpuFreq(ts, data);
         break;
       }
-      case protos::FtraceEvent::kCpuIdleFieldNumber: {
+      case protos::pbzero::FtraceEvent::kCpuIdleFieldNumber: {
         ParseCpuIdle(ts, data);
         break;
       }
-      case protos::FtraceEvent::kPrintFieldNumber: {
+      case protos::pbzero::FtraceEvent::kPrintFieldNumber: {
         ParsePrint(cpu, ts, pid, data);
         break;
       }
-      case protos::FtraceEvent::kRssStatFieldNumber: {
+      case protos::pbzero::FtraceEvent::kRssStatFieldNumber: {
         ParseRssStat(ts, pid, data);
         break;
       }
-      case protos::FtraceEvent::kIonHeapGrowFieldNumber: {
+      case protos::pbzero::FtraceEvent::kIonHeapGrowFieldNumber: {
         ParseIonHeapGrowOrShrink(ts, pid, data, true);
         break;
       }
-      case protos::FtraceEvent::kIonHeapShrinkFieldNumber: {
+      case protos::pbzero::FtraceEvent::kIonHeapShrinkFieldNumber: {
         ParseIonHeapGrowOrShrink(ts, pid, data, false);
         break;
       }
-      case protos::FtraceEvent::kSignalGenerateFieldNumber: {
+      case protos::pbzero::FtraceEvent::kSignalGenerateFieldNumber: {
         ParseSignalGenerate(ts, data);
         break;
       }
-      case protos::FtraceEvent::kSignalDeliverFieldNumber: {
+      case protos::pbzero::FtraceEvent::kSignalDeliverFieldNumber: {
         ParseSignalDeliver(ts, pid, data);
         break;
       }
-      case protos::FtraceEvent::kLowmemoryKillFieldNumber: {
+      case protos::pbzero::FtraceEvent::kLowmemoryKillFieldNumber: {
         ParseLowmemoryKill(ts, data);
         break;
       }
-      case protos::FtraceEvent::kOomScoreAdjUpdateFieldNumber: {
+      case protos::pbzero::FtraceEvent::kOomScoreAdjUpdateFieldNumber: {
         ParseOOMScoreAdjUpdate(ts, data);
         break;
       }
-      case protos::FtraceEvent::kMmEventRecordFieldNumber: {
+      case protos::pbzero::FtraceEvent::kMmEventRecordFieldNumber: {
         ParseMmEventRecord(ts, pid, data);
         break;
       }
-      case protos::FtraceEvent::kSysEnterFieldNumber: {
+      case protos::pbzero::FtraceEvent::kSysEnterFieldNumber: {
         ParseSysEvent(ts, pid, true, data);
         break;
       }
-      case protos::FtraceEvent::kSysExitFieldNumber: {
+      case protos::pbzero::FtraceEvent::kSysExitFieldNumber: {
         ParseSysEvent(ts, pid, false, data);
         break;
       }
-      case protos::FtraceEvent::kTaskNewtaskFieldNumber: {
+      case protos::pbzero::FtraceEvent::kTaskNewtaskFieldNumber: {
         ParseTaskNewTask(ts, pid, data);
         break;
       }
-      case protos::FtraceEvent::kTaskRenameFieldNumber: {
+      case protos::pbzero::FtraceEvent::kTaskRenameFieldNumber: {
         ParseTaskRename(ts, data);
         break;
       }
@@ -1085,7 +1084,7 @@ void ProtoTraceParser::ParseAndroidLogEvent(ContiguousMemoryRange blob) {
   }
 
   if (prio == 0)
-    prio = protos::AndroidLogPriority::PRIO_INFO;
+    prio = protos::pbzero::AndroidLogPriority::PRIO_INFO;
 
   if (arg_str != &arg_msg[0]) {
     PERFETTO_DCHECK(!msg_id);
