@@ -1122,6 +1122,12 @@ void ProtoTraceParser::ParseAndroidLogStats(ContiguousMemoryRange blob) {
 }
 
 void ProtoTraceParser::ParseTraceStats(ContiguousMemoryRange blob) {
+  // printf("\n");
+  // for(size_t i = 0; i<blob.size(); i++) {
+  //   printf("%02x-", blob.begin[i]);
+  // }
+  // printf("\n");
+
   protos::pbzero::TraceStats::Parser evt(blob.begin, blob.size());
   auto* storage = context_->storage.get();
   storage->SetStats(stats::traced_producers_connected,
@@ -1141,8 +1147,7 @@ void ProtoTraceParser::ParseTraceStats(ContiguousMemoryRange blob) {
 
   int buf_num = 0;
   for (auto it = evt.buffer_stats(); it; ++it, ++buf_num) {
-    protos::pbzero::TraceStats::BufferStats::Parser buf(blob.begin,
-                                                        blob.size());
+    protos::pbzero::TraceStats::BufferStats::Parser buf(it->data(), it->size());
     storage->SetIndexedStats(stats::traced_buf_buffer_size, buf_num,
                              static_cast<int64_t>(buf.buffer_size()));
     storage->SetIndexedStats(stats::traced_buf_bytes_written, buf_num,
@@ -1196,7 +1201,7 @@ void ProtoTraceParser::ParseFtraceStats(ContiguousMemoryRange blob) {
 
   auto* storage = context_->storage.get();
   for (auto it = evt.cpu_stats(); it; ++it) {
-    protos::pbzero::FtraceCpuStats::Parser cpu_stats(blob.begin, blob.size());
+    protos::pbzero::FtraceCpuStats::Parser cpu_stats(it->data(), it->size());
     int cpu = static_cast<int>(cpu_stats.cpu());
     storage->SetIndexedStats(stats::ftrace_cpu_entries_begin + phase, cpu,
                              static_cast<int64_t>(cpu_stats.entries()));

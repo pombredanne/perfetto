@@ -119,22 +119,35 @@ class ProtoTraceParserTest : public ::testing::Test {
     context_.proto_parser.reset(new ProtoTraceParser(&context_));
   }
 
+  void ResetTraceBuffers() {
+    heap_buf_.reset(new protozero::ScatteredHeapBuffer());
+    stream_writer_.reset(new protozero::ScatteredStreamWriter(heap_buf_.get()));
+    heap_buf_->set_writer(stream_writer_.get());
+    trace_.Reset(stream_writer_.get());
+  }
+
+  void SetUp() override { ResetTraceBuffers(); }
+
   void InitStorage() {
     storage_ = new MockTraceStorage();
     context_.storage.reset(storage_);
   }
 
-  void Tokenize(protos::pbzero::Trace* trace) {
-    trace->Finalize();
-    std::vector<uint8_t> trace_bytes = trace_buf_.StitchSlices();
+  void Tokenize() {
+    trace_.Finalize();
+    std::vector<uint8_t> trace_bytes = heap_buf_->StitchSlices();
     std::unique_ptr<uint8_t[]> raw_trace(new uint8_t[trace_bytes.size()]);
     memcpy(raw_trace.get(), trace_bytes.data(), trace_bytes.size());
     ProtoTraceTokenizer tokenizer(&context_);
     tokenizer.Parse(std::move(raw_trace), trace_bytes.size());
+
+    ResetTraceBuffers();
   }
 
  protected:
-  protozero::ScatteredHeapBuffer trace_buf_;
+  std::unique_ptr<protozero::ScatteredHeapBuffer> heap_buf_;
+  std::unique_ptr<protozero::ScatteredStreamWriter> stream_writer_;
+  protos::pbzero::Trace trace_;
   TraceProcessorContext context_;
   MockArgsTracker* args_;
   MockEventTracker* event_;
@@ -144,9 +157,7 @@ class ProtoTraceParserTest : public ::testing::Test {
 };
 
 TEST_F(ProtoTraceParserTest, LoadSingleEvent) {
-  protos::pbzero::Trace trace;
-
-  auto* bundle = trace.add_packet()->set_ftrace_events();
+  auto* bundle = trace_.add_packet()->set_ftrace_events();
   bundle->set_cpu(10);
 
   auto* event = bundle->add_event();
@@ -167,14 +178,13 @@ TEST_F(ProtoTraceParserTest, LoadSingleEvent) {
   EXPECT_CALL(*event_,
               PushSchedSwitch(10, 1000, 10, base::StringView(kProc2Name), 256,
                               32, 100, base::StringView(kProc1Name), 1024));
-  Tokenize(&trace);
+  Tokenize();
 }
 
 TEST_F(ProtoTraceParserTest, LoadEventsIntoRaw) {
   InitStorage();
-  protos::pbzero::Trace trace;
 
-  auto* bundle = trace.add_packet()->set_ftrace_events();
+  auto* bundle = trace_.add_packet()->set_ftrace_events();
   bundle->set_cpu(10);
 
   // This event is unknown and will only appear in
@@ -204,7 +214,7 @@ TEST_F(ProtoTraceParserTest, LoadEventsIntoRaw) {
   EXPECT_CALL(*storage_, InternString(base::StringView(buf_value)));
   EXPECT_CALL(*process_, UpdateThread(123, 123));
 
-  Tokenize(&trace);
+  Tokenize();
   const auto& raw = context_.storage->raw_events();
   ASSERT_EQ(raw.raw_event_count(), 2);
   const auto& args = context_.storage->args();
@@ -222,9 +232,7 @@ TEST_F(ProtoTraceParserTest, LoadEventsIntoRaw) {
 
 TEST_F(ProtoTraceParserTest, LoadGenericFtrace) {
   InitStorage();
-  protos::pbzero::Trace trace;
-
-  auto* packet = trace.add_packet();
+  auto* packet = trace_.add_packet();
   packet->set_timestamp(100);
 
   auto* bundle = packet->set_ftrace_events();
@@ -255,7 +263,7 @@ TEST_F(ProtoTraceParserTest, LoadGenericFtrace) {
   EXPECT_CALL(*storage_, InternString(base::StringView("meta2")));
   EXPECT_CALL(*storage_, InternString(base::StringView("meta3")));
 
-  Tokenize(&trace);
+  Tokenize();
 
   const auto& raw = storage_->raw_events();
 
@@ -279,9 +287,7 @@ TEST_F(ProtoTraceParserTest, LoadGenericFtrace) {
 }
 
 TEST_F(ProtoTraceParserTest, LoadMultipleEvents) {
-  protos::pbzero::Trace trace;
-
-  auto* bundle = trace.add_packet()->set_ftrace_events();
+  auto* bundle = trace_.add_packet()->set_ftrace_events();
   bundle->set_cpu(10);
 
   auto* event = bundle->add_event();
@@ -320,13 +326,11 @@ TEST_F(ProtoTraceParserTest, LoadMultipleEvents) {
               PushSchedSwitch(10, 1001, 100, base::StringView(kProcName1), 256,
                               32, 10, base::StringView(kProcName2), 512));
 
-  Tokenize(&trace);
+  Tokenize();
 }
 
 TEST_F(ProtoTraceParserTest, LoadMultiplePackets) {
-  protos::pbzero::Trace trace;
-
-  auto* bundle = trace.add_packet()->set_ftrace_events();
+  auto* bundle = trace_.add_packet()->set_ftrace_events();
   bundle->set_cpu(10);
 
   auto* event = bundle->add_event();
@@ -344,7 +348,7 @@ TEST_F(ProtoTraceParserTest, LoadMultiplePackets) {
   sched_switch->set_next_pid(100);
   sched_switch->set_next_prio(1024);
 
-  bundle = trace.add_packet()->set_ftrace_events();
+  bundle = trace_.add_packet()->set_ftrace_events();
   bundle->set_cpu(10);
 
   event = bundle->add_event();
@@ -367,12 +371,11 @@ TEST_F(ProtoTraceParserTest, LoadMultiplePackets) {
   EXPECT_CALL(*event_,
               PushSchedSwitch(10, 1001, 100, base::StringView(kProcName1), 256,
                               32, 10, base::StringView(kProcName2), 512));
-  Tokenize(&trace);
+  Tokenize();
 }
 
 TEST_F(ProtoTraceParserTest, RepeatedLoadSinglePacket) {
-  protos::pbzero::Trace trace_1;
-  auto* bundle = trace_1.add_packet()->set_ftrace_events();
+  auto* bundle = trace_.add_packet()->set_ftrace_events();
   bundle->set_cpu(10);
   auto* event = bundle->add_event();
   event->set_timestamp(1000);
@@ -387,9 +390,12 @@ TEST_F(ProtoTraceParserTest, RepeatedLoadSinglePacket) {
   sched_switch->set_next_comm(kProcName1);
   sched_switch->set_next_pid(100);
   sched_switch->set_next_prio(1024);
+  EXPECT_CALL(*event_,
+              PushSchedSwitch(10, 1000, 10, base::StringView(kProcName2), 256,
+                              32, 100, base::StringView(kProcName1), 1024));
+  Tokenize();
 
-  protos::pbzero::Trace trace_2;
-  bundle = trace_2.add_packet()->set_ftrace_events();
+  bundle = trace_.add_packet()->set_ftrace_events();
   bundle->set_cpu(10);
   event = bundle->add_event();
   event->set_timestamp(1001);
@@ -403,20 +409,15 @@ TEST_F(ProtoTraceParserTest, RepeatedLoadSinglePacket) {
   sched_switch->set_next_pid(10);
   sched_switch->set_next_prio(512);
 
-  EXPECT_CALL(*event_,
-              PushSchedSwitch(10, 1000, 10, base::StringView(kProcName2), 256,
-                              32, 100, base::StringView(kProcName1), 1024));
-  Tokenize(&trace_1);
 
   EXPECT_CALL(*event_,
               PushSchedSwitch(10, 1001, 100, base::StringView(kProcName1), 256,
                               32, 10, base::StringView(kProcName2), 512));
-  Tokenize(&trace_2);
+  Tokenize();
 }
 
 TEST_F(ProtoTraceParserTest, LoadMemInfo) {
-  protos::pbzero::Trace trace_1;
-  auto* packet = trace_1.add_packet();
+  auto* packet = trace_.add_packet();
   uint64_t ts = 1000;
   packet->set_timestamp(ts);
   auto* bundle = packet->set_sys_stats();
@@ -427,12 +428,11 @@ TEST_F(ProtoTraceParserTest, LoadMemInfo) {
 
   EXPECT_CALL(*event_, PushCounter(static_cast<int64_t>(ts), value * 1024, 0, 0,
                                    RefType::kRefNoRef));
-  Tokenize(&trace_1);
+  Tokenize();
 }
 
 TEST_F(ProtoTraceParserTest, LoadVmStats) {
-  protos::pbzero::Trace trace_1;
-  auto* packet = trace_1.add_packet();
+  auto* packet = trace_.add_packet();
   uint64_t ts = 1000;
   packet->set_timestamp(ts);
   auto* bundle = packet->set_sys_stats();
@@ -443,12 +443,11 @@ TEST_F(ProtoTraceParserTest, LoadVmStats) {
 
   EXPECT_CALL(*event_, PushCounter(static_cast<int64_t>(ts), value, 0, 0,
                                    RefType::kRefNoRef));
-  Tokenize(&trace_1);
+  Tokenize();
 }
 
 TEST_F(ProtoTraceParserTest, LoadCpuFreq) {
-  protos::pbzero::Trace trace_1;
-  auto* bundle = trace_1.add_packet()->set_ftrace_events();
+  auto* bundle = trace_.add_packet()->set_ftrace_events();
   bundle->set_cpu(12);
   auto* event = bundle->add_event();
   event->set_timestamp(1000);
@@ -458,13 +457,11 @@ TEST_F(ProtoTraceParserTest, LoadCpuFreq) {
   cpu_freq->set_state(2000);
 
   EXPECT_CALL(*event_, PushCounter(1000, 2000, 0, 10, RefType::kRefCpuId));
-  Tokenize(&trace_1);
+  Tokenize();
 }
 
 TEST_F(ProtoTraceParserTest, LoadProcessPacket) {
-  protos::pbzero::Trace trace;
-
-  auto* tree = trace.add_packet()->set_process_tree();
+  auto* tree = trace_.add_packet()->set_process_tree();
   auto* process = tree->add_processes();
   static const char kProcName1[] = "proc1";
 
@@ -474,13 +471,11 @@ TEST_F(ProtoTraceParserTest, LoadProcessPacket) {
 
   EXPECT_CALL(*process_,
               UpdateProcess(1, Eq(2u), base::StringView(kProcName1)));
-  Tokenize(&trace);
+  Tokenize();
 }
 
 TEST_F(ProtoTraceParserTest, LoadProcessPacket_FirstCmdline) {
-  protos::pbzero::Trace trace;
-
-  auto* tree = trace.add_packet()->set_process_tree();
+  auto* tree = trace_.add_packet()->set_process_tree();
   auto* process = tree->add_processes();
   static const char kProcName1[] = "proc1";
   static const char kProcName2[] = "proc2";
@@ -492,19 +487,17 @@ TEST_F(ProtoTraceParserTest, LoadProcessPacket_FirstCmdline) {
 
   EXPECT_CALL(*process_,
               UpdateProcess(1, Eq(2u), base::StringView(kProcName1)));
-  Tokenize(&trace);
+  Tokenize();
 }
 
 TEST_F(ProtoTraceParserTest, LoadThreadPacket) {
-  protos::pbzero::Trace trace;
-
-  auto* tree = trace.add_packet()->set_process_tree();
+  auto* tree = trace_.add_packet()->set_process_tree();
   auto* thread = tree->add_threads();
   thread->set_tid(1);
   thread->set_tgid(2);
 
   EXPECT_CALL(*process_, UpdateThread(1, 2));
-  Tokenize(&trace);
+  Tokenize();
 }
 
 TEST(SystraceParserTest, SystraceEvent) {
