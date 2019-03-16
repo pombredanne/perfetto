@@ -44,38 +44,38 @@ class Field {
   }
 
   inline bool as_bool() const {
-    PERFETTO_DCHECK(type() == proto_utils::ProtoWireType::kVarInt);
+    PERFETTO_DCHECK(!valid() || type() == proto_utils::ProtoWireType::kVarInt);
     return static_cast<bool>(int_value_);
   }
 
   inline uint32_t as_uint32() const {
-    PERFETTO_DCHECK(type() == proto_utils::ProtoWireType::kVarInt ||
+    PERFETTO_DCHECK(!valid() || type() == proto_utils::ProtoWireType::kVarInt ||
                     type() == proto_utils::ProtoWireType::kFixed32);
     return static_cast<uint32_t>(int_value_);
   }
 
   inline int32_t as_int32() const {
-    PERFETTO_DCHECK(type() == proto_utils::ProtoWireType::kVarInt ||
+    PERFETTO_DCHECK(!valid() || type() == proto_utils::ProtoWireType::kVarInt ||
                     type() == proto_utils::ProtoWireType::kFixed32);
     return static_cast<int32_t>(int_value_);
   }
 
   inline uint64_t as_uint64() const {
-    PERFETTO_DCHECK(type() == proto_utils::ProtoWireType::kVarInt ||
+    PERFETTO_DCHECK(!valid() || type() == proto_utils::ProtoWireType::kVarInt ||
                     type() == proto_utils::ProtoWireType::kFixed32 ||
                     type() == proto_utils::ProtoWireType::kFixed64);
     return int_value_;
   }
 
   inline int64_t as_int64() const {
-    PERFETTO_DCHECK(type() == proto_utils::ProtoWireType::kVarInt ||
+    PERFETTO_DCHECK(!valid() || type() == proto_utils::ProtoWireType::kVarInt ||
                     type() == proto_utils::ProtoWireType::kFixed32 ||
                     type() == proto_utils::ProtoWireType::kFixed64);
     return static_cast<int64_t>(int_value_);
   }
 
   inline float as_float() const {
-    PERFETTO_DCHECK(type() == proto_utils::ProtoWireType::kFixed32);
+    PERFETTO_DCHECK(!valid() || type() == proto_utils::ProtoWireType::kFixed32);
     float res;
     uint32_t value32 = static_cast<uint32_t>(int_value_);
     memcpy(&res, &value32, sizeof(res));
@@ -83,7 +83,7 @@ class Field {
   }
 
   inline double as_double() const {
-    PERFETTO_DCHECK(type() == proto_utils::ProtoWireType::kFixed64);
+    PERFETTO_DCHECK(!valid() || type() == proto_utils::ProtoWireType::kFixed64);
     double res;
     memcpy(&res, &int_value_, sizeof(res));
     return res;
@@ -92,7 +92,8 @@ class Field {
   // A relaxed version for when we are storing floats and doubles
   // as real in the raw events table.
   inline double as_real() const {
-    PERFETTO_DCHECK(type() == proto_utils::ProtoWireType::kFixed64 ||
+    PERFETTO_DCHECK(!valid() ||
+                    type() == proto_utils::ProtoWireType::kFixed64 ||
                     type() == proto_utils::ProtoWireType::kFixed32);
     double res;
     uint64_t value64 = static_cast<uint64_t>(int_value_);
@@ -101,23 +102,27 @@ class Field {
   }
 
   inline StringView as_string() const {
-    PERFETTO_DCHECK(type() == proto_utils::ProtoWireType::kLengthDelimited);
+    PERFETTO_DCHECK(!valid() ||
+                    type() == proto_utils::ProtoWireType::kLengthDelimited);
     return StringView(reinterpret_cast<const char*>(data()), size_);
   }
 
   inline ContiguousMemoryRange as_bytes() const {
-    PERFETTO_DCHECK(type() == proto_utils::ProtoWireType::kLengthDelimited);
+    PERFETTO_DCHECK(!valid() ||
+                    type() == proto_utils::ProtoWireType::kLengthDelimited);
     return ContiguousMemoryRange{const_cast<uint8_t*>(data()),
                                  const_cast<uint8_t*>(data() + size_)};
   }
 
   inline const uint8_t* data() const {
-    PERFETTO_DCHECK(type() == proto_utils::ProtoWireType::kLengthDelimited);
+    PERFETTO_DCHECK(!valid() ||
+                    type() == proto_utils::ProtoWireType::kLengthDelimited);
     return reinterpret_cast<const uint8_t*>(int_value_);
   }
 
   inline size_t size() const {
-    PERFETTO_DCHECK(type() == proto_utils::ProtoWireType::kLengthDelimited);
+    PERFETTO_DCHECK(!valid() ||
+                    type() == proto_utils::ProtoWireType::kLengthDelimited);
     return size_;
   }
 
@@ -139,7 +144,7 @@ class Field {
 
   uint64_t int_value_;  // In kLengthDelimited this contains the data() addr.
   uint32_t size_;       // Only valid when when type == kLengthDelimited.
-  uint16_t id_;         // Proto field is.
+  uint16_t id_;         // Proto field ordinal.
   uint8_t type_;        // proto_utils::ProtoWireType.
 };
 
