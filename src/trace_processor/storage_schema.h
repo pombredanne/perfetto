@@ -70,7 +70,11 @@ class StorageSchema {
     Builder& AddStringColumn(std::string column_name,
                              const std::deque<Id>* ids,
                              const std::vector<std::string>* string_map) {
-      columns_.emplace_back(new StringColumn<Id>(column_name, ids, string_map));
+      auto fn = [string_map](Id id) {
+        return NullTermStringView((*string_map)[id]);
+      };
+      columns_.emplace_back(
+          new StringColumn<Id, decltype(fn)>(column_name, ids, fn));
       return *this;
     }
 
@@ -78,7 +82,9 @@ class StorageSchema {
     Builder& AddStringColumn(std::string column_name,
                              const std::deque<Id>* ids,
                              const StringPool* pool) {
-      columns_.emplace_back(new StringColumn2<Id>(column_name, ids, pool));
+      auto fn = [pool](Id id) { return pool->Get(id); };
+      columns_.emplace_back(
+          new StringColumn<Id, decltype(fn)>(column_name, ids, fn));
       return *this;
     }
 

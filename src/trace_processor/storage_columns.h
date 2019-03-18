@@ -212,74 +212,18 @@ class NumericColumn : public StorageColumn {
   bool is_naturally_ordered_ = false;
 };
 
-template <typename Id>
+template <typename Id, typename IdToStringFn>
 class StringColumn final : public StorageColumn {
  public:
   StringColumn(std::string col_name,
                const std::deque<Id>* deque,
-               const std::vector<std::string>* string_map,
+               IdToStringFn fn,
                bool hidden = false)
-      : StorageColumn(col_name, hidden),
-        deque_(deque),
-        string_map_(string_map) {}
+      : StorageColumn(col_name, hidden), deque_(deque), fn_(fn) {}
 
   void ReportResult(sqlite3_context* ctx, uint32_t row) const override {
-    const auto& str = (*string_map_)[(*deque_)[row]];
-    if (str.empty()) {
-      sqlite3_result_null(ctx);
-    } else {
-      sqlite3_result_text(ctx, str.c_str(), -1, sqlite_utils::kSqliteStatic);
-    }
-  }
-
-  Bounds BoundFilter(int, sqlite3_value*) const override {
-    Bounds bounds;
-    bounds.max_idx = static_cast<uint32_t>(deque_->size());
-    return bounds;
-  }
-
-  void Filter(int, sqlite3_value*, FilteredRowIndex*) const override {}
-
-  Comparator Sort(const QueryConstraints::OrderBy& ob) const override {
-    if (ob.desc) {
-      return [this](uint32_t f, uint32_t s) {
-        const std::string& a = (*string_map_)[(*deque_)[f]];
-        const std::string& b = (*string_map_)[(*deque_)[s]];
-        return sqlite_utils::CompareValuesDesc(NullTermStringView(a),
-                                               NullTermStringView(b));
-      };
-    }
-    return [this](uint32_t f, uint32_t s) {
-      const std::string& a = (*string_map_)[(*deque_)[f]];
-      const std::string& b = (*string_map_)[(*deque_)[s]];
-      return sqlite_utils::CompareValuesAsc(NullTermStringView(a),
-                                            NullTermStringView(b));
-    };
-  }
-
-  Table::ColumnType GetType() const override {
-    return Table::ColumnType::kString;
-  }
-
-  bool IsNaturallyOrdered() const override { return false; }
-
- private:
-  const std::deque<Id>* deque_ = nullptr;
-  const std::vector<std::string>* string_map_ = nullptr;
-};
-
-template <typename Id>
-class StringColumn2 final : public StorageColumn {
- public:
-  StringColumn2(std::string col_name,
-                const std::deque<Id>* deque,
-                const StringPool* pool,
-                bool hidden = false)
-      : StorageColumn(col_name, hidden), deque_(deque), pool_(pool) {}
-
-  void ReportResult(sqlite3_context* ctx, uint32_t row) const override {
-    const auto& str = pool_->Get((*deque_)[row]);
-    if (str.empty()) {
+    auto str = fn_((*deque_)[row]);
+    if (str.data() == nullptr) {
       sqlite3_result_null(ctx);
     } else {
       sqlite3_result_text(ctx, str.data(), -1, sqlite_utils::kSqliteStatic);
@@ -297,14 +241,14 @@ class StringColumn2 final : public StorageColumn {
   Comparator Sort(const QueryConstraints::OrderBy& ob) const override {
     if (ob.desc) {
       return [this](uint32_t f, uint32_t s) {
-        auto a = pool_->Get((*deque_)[f]);
-        auto b = pool_->Get((*deque_)[s]);
+        auto a = fn_((*deque_)[f]);
+        auto b = fn_((*deque_)[s]);
         return sqlite_utils::CompareValuesDesc(a, b);
       };
     }
     return [this](uint32_t f, uint32_t s) {
-      auto a = pool_->Get((*deque_)[f]);
-      auto b = pool_->Get((*deque_)[s]);
+      auto a = fn_((*deque_)[f]);
+      auto b = fn_((*deque_)[s]);
       return sqlite_utils::CompareValuesAsc(a, b);
     };
   }
@@ -317,7 +261,7 @@ class StringColumn2 final : public StorageColumn {
 
  private:
   const std::deque<Id>* deque_ = nullptr;
-  const StringPool* pool_ = nullptr;
+  IdToStringFn fn_;
 };
 
 // Column which represents the "ts_end" column present in all time based
