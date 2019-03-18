@@ -276,7 +276,7 @@ class PERFETTO_EXPORT TraceConfig {
     enum TriggerMode {
       UNSPECIFIED = 0,
       START_TRACING = 1,
-      FINALIZE_TRACE = 2,
+      STOP_TRACING = 2,
     };
 
     class PERFETTO_EXPORT Trigger {
@@ -303,17 +303,13 @@ class PERFETTO_EXPORT TraceConfig {
         producer_name_ = value;
       }
 
-      uint32_t finalize_trace_delay_ms() const {
-        return finalize_trace_delay_ms_;
-      }
-      void set_finalize_trace_delay_ms(uint32_t value) {
-        finalize_trace_delay_ms_ = value;
-      }
+      uint32_t stop_delay_ms() const { return stop_delay_ms_; }
+      void set_stop_delay_ms(uint32_t value) { stop_delay_ms_ = value; }
 
      private:
       std::string name_ = {};
       std::string producer_name_ = {};
-      uint32_t finalize_trace_delay_ms_ = {};
+      uint32_t stop_delay_ms_ = {};
 
       // Allows to preserve unknown protobuf fields for compatibility
       // with future versions of .proto files.

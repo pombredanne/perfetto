@@ -3449,7 +3449,7 @@ message TraceConfig {
   // uninteresting. Triggers allow us to keep only the interesting ones such as
   // those traces during which the device temperature reached a certain
   // threshold. In this case the producer can activate a trigger to keep
-  // (FINALIZE_TRACE) the trace, otherwise it can also begin a trace
+  // (STOP_TRACING) the trace, otherwise it can also begin a trace
   // (START_TRACING) because it knows something is about to happen.
   message TriggerConfig {
     enum TriggerMode {
@@ -3458,7 +3458,7 @@ message TraceConfig {
       // When this mode is chosen, data sources are not started until one of the
       // |triggers| are received. This supports early initialization and fast
       // starting of the tracing system. On triggering, the session will then
-      // record for |finalize_trace_delay_ms|. However if no trigger is seen
+      // record for |stop_delay_ms|. However if no trigger is seen
       // after |duration_ms| (in the general trace config; must be set to a
       // positive number) the session will be stopped and no data will be
       // returned.
@@ -3468,9 +3468,9 @@ message TraceConfig {
       // EnableTracing() & StartTracing(). If no trigger is ever seen
       // the session will be stopped after |duration_ms| and no data will be
       // returned. However if triggered the trace will stop after
-      // |finalize_trace_delay_ms| and any data in the buffer will be returned
+      // |stop_delay_ms| and any data in the buffer will be returned
       // to the consumer.
-      FINALIZE_TRACE = 2;
+      STOP_TRACING = 2;
     }
     optional TriggerMode trigger_mode = 1;
 
@@ -3478,14 +3478,13 @@ message TraceConfig {
       // The producer must specify this name to activate the trigger.
       optional string name = 1;
 
-      // The producer that will send this trigger to Perfetto. This is optional.
-      // If unset all producers can activate this trigger.
+      // The producer that will send this trigger to the service. This is
+      // optional. If unset any producers can activate this trigger.
       optional string producer_name = 2;
 
-      // After a trigger is received either in START_TRACING or FINALIZE_TRACE
-      // mode then the trace will end |finalize_trace_delay_ms| after
-      // triggering.
-      optional uint32 finalize_trace_delay_ms = 3;
+      // After a trigger is received either in START_TRACING or STOP_TRACING
+      // mode then the trace will end |stop_delay_ms| after triggering.
+      optional uint32 stop_delay_ms = 3;
     }
     // A list of triggers which are related to this configuration. If ANY
     // trigger is seen then an action will be performed based on |trigger_mode|.
