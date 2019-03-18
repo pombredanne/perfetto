@@ -26,6 +26,12 @@
 
 namespace protozero {
 
+// A protobuf field decoded by the protozero proto decoders. It exposes
+// convenience accessors with minimal debug checks.
+// This class is used both by the iterator-based ProtoDecoder and by the
+// one-shot TypedProtoDecoder.
+// If the field is not valid the accessors consistently return zero-integers or
+// null strings.
 class Field {
  public:
   using StringView = ::perfetto::base::StringView;
@@ -86,18 +92,6 @@ class Field {
     PERFETTO_DCHECK(!valid() || type() == proto_utils::ProtoWireType::kFixed64);
     double res;
     memcpy(&res, &int_value_, sizeof(res));
-    return res;
-  }
-
-  // A relaxed version for when we are storing floats and doubles
-  // as real in the raw events table.
-  inline double as_real() const {
-    PERFETTO_DCHECK(!valid() ||
-                    type() == proto_utils::ProtoWireType::kFixed64 ||
-                    type() == proto_utils::ProtoWireType::kFixed32);
-    double res;
-    uint64_t value64 = static_cast<uint64_t>(int_value_);
-    memcpy(&res, &value64, sizeof(res));
     return res;
   }
 

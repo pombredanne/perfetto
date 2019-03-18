@@ -1414,10 +1414,15 @@ void ProtoTraceParser::ParseTypedFtraceToRaw(uint32_t ftrace_id,
                                        Variadic::String(value));
         break;
       }
-      case ProtoSchemaType::kDouble:
-      case ProtoSchemaType::kFloat: {
+      case ProtoSchemaType::kDouble: {
         context_->args_tracker->AddArg(raw_event_id, name_id, name_id,
-                                       Variadic::Real(fld.as_real()));
+                                       Variadic::Real(fld.as_double()));
+        break;
+      }
+      case ProtoSchemaType::kFloat: {
+        context_->args_tracker->AddArg(
+            raw_event_id, name_id, name_id,
+            Variadic::Real(static_cast<double>(fld.as_float())));
         break;
       }
       case ProtoSchemaType::kUnknown:

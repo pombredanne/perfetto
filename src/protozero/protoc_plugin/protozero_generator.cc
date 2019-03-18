@@ -26,8 +26,6 @@
 #include "google/protobuf/io/zero_copy_stream.h"
 #include "google/protobuf/stubs/strutil.h"
 
-#include "perfetto/protozero/proto_decoder.h"
-
 namespace protozero {
 
 using google::protobuf::Descriptor;  // Message descriptor.
@@ -46,6 +44,11 @@ using google::protobuf::StripSuffixString;
 using google::protobuf::UpperString;
 
 namespace {
+
+// Keep this value in sync with ProtoDecoder::kMaxDecoderFieldId. If they go out
+// of sync pbzero.h files will stop compiling, hitting the at() static_assert.
+// Not worth an extra dependency.
+constexpr int kMaxDecoderFieldId = 999;
 
 void Assert(bool condition) {
   if (!condition)
@@ -276,8 +279,8 @@ class GeneratorJob {
         "#include <stddef.h>\n"
         "#include <stdint.h>\n\n"
         "#include \"perfetto/base/export.h\"\n"
-        "#include \"perfetto/protozero/proto_decoder.h\"\n"
         "#include \"perfetto/protozero/proto_field_descriptor.h\"\n"
+        "#include \"perfetto/protozero/proto_decoder.h\"\n"
         "#include \"perfetto/protozero/message.h\"\n",
         "greeting", greeting, "guard", guard);
 
@@ -467,7 +470,7 @@ class GeneratorJob {
     bool has_repeated_fields = false;
     for (int i = 0; i < message->field_count(); ++i) {
       const FieldDescriptor* field = message->field(i);
-      if (field->number() > static_cast<int>(kMaxDecoderFieldId))
+      if (field->number() > kMaxDecoderFieldId)
         continue;
       max_field_id = std::max(max_field_id, field->number());
       if (field->is_repeated())
@@ -476,7 +479,7 @@ class GeneratorJob {
 
     stub_h_->Print(
         "class Parser : public "
-        "::protozero::TypedProtoDecoderTemplate</*MAX_FIELD_ID=*/$max$, "
+        "::protozero::TypedProtoDecoder</*MAX_FIELD_ID=*/$max$, "
         "/*HAS_REPEATED_FIELDS=*/$rep$> {\n",
         "max", std::to_string(max_field_id), "rep",
         has_repeated_fields ? "true" : "false");
@@ -484,7 +487,7 @@ class GeneratorJob {
     stub_h_->Indent();
     stub_h_->Print(
         "Parser(const uint8_t* data, size_t len) "
-        ": TypedProtoDecoderTemplate(data, len) {}\n");
+        ": TypedProtoDecoder(data, len) {}\n");
 
     for (int i = 0; i < message->field_count(); ++i) {
       const FieldDescriptor* field = message->field(i);
@@ -547,9 +550,9 @@ class GeneratorJob {
           continue;
       }
 
-      stub_h_->Print(
-          "bool has_$name$() const { return Get<$id$>().valid(); }\n", "name",
-          field->name(), "id", std::to_string(field->number()));
+      stub_h_->Print("bool has_$name$() const { return at<$id$>().valid(); }\n",
+                     "name", field->name(), "id",
+                     std::to_string(field->number()));
 
       if (field->is_repeated()) {
         stub_h_->Print(
@@ -558,7 +561,7 @@ class GeneratorJob {
             "name", field->name(), "id", std::to_string(field->number()));
       } else {
         stub_h_->Print(
-            "$cpp_type$ $name$() const { return Get<$id$>().$getter$(); }\n",
+            "$cpp_type$ $name$() const { return at<$id$>().$getter$(); }\n",
             "name", field->name(), "id", std::to_string(field->number()),
             "cpp_type", cpp_type, "getter", getter);
       }
