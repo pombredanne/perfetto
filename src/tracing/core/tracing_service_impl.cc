@@ -635,7 +635,6 @@ bool TracingServiceImpl::StartTracing(TracingSessionID tsid) {
   }
 
   tracing_session->state = TracingSession::STARTED;
-  tracing_session->session_ever_started = true;
 
   // Trigger delayed task if the trace is time limited.
   const uint32_t trace_duration_ms = tracing_session->config.duration_ms();
@@ -1260,15 +1259,18 @@ void TracingServiceImpl::ReadBuffers(TracingSessionID tsid,
     return;  // TODO(primiano): signal failure?
   }
 
-  // This can happen with |TraceConfig.deferred_start| or
-  // |START_TRACING| in the |TraceConfig.trigger_config(). In this case the
-  // trace hasn't started yet and there is nothing to read so we bail out to
-  // prevent synthetic packets like Clock snapshots being added.
-  if (!tracing_session->session_ever_started) {
+  // When a tracing session is waiting for a trigger it is considered empty. If
+  // a tracing session finishes and moves into DISABLED without ever receiving a
+  // trigger the trace should never return any data this includes the synthetic
+  // packets like TraceConfig and Clock snapshots. So we bail out early and let
+  // the consumer know there is no data.
+  if (!tracing_session->config.trigger_config().triggers().empty() &&
+      tracing_session->received_triggers.empty()) {
     if (consumer) {
       consumer->consumer_->OnTraceData({}, /* has_more = */ false);
     }
-    PERFETTO_DLOG("ReadBuffers(): tracing session is not yet started.");
+    PERFETTO_DLOG(
+        "ReadBuffers(): tracing session has not received a trigger yet.");
     return;
   }
 
@@ -2203,10 +2205,78 @@ void TracingServiceImpl::ConsumerEndpointImpl::GetTraceStats() {
   });
 }
 
+void TracingServiceImpl::ConsumerEndpointImpl::ObserveEvents(
+    uint32_t enabled_event_types) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  enabled_observable_event_types_ = enabled_event_types;
+
+  if (enabled_observable_event_types_ == ObservableEventType::kNone)
+    return;
+
+  PERFETTO_DCHECK(enabled_observable_event_types_ ==
+                  ObservableEventType::kDataSourceInstances);
+
+  TracingSession* session = service_->GetTracingSession(tracing_session_id_);
+  if (!session)
+    return;
+
+  // Issue initial states
+  for (const auto& kv : session->data_source_instances) {
+    ProducerEndpointImpl* producer = service_->GetProducer(kv.first);
+    PERFETTO_DCHECK(producer);
+    OnDataSourceInstanceStateChange(*producer, kv.second);
+  }
+}
+
+void TracingServiceImpl::ConsumerEndpointImpl::OnDataSourceInstanceStateChange(
+    const ProducerEndpointImpl& producer,
+    const DataSourceInstance& instance) {
+  if (!(enabled_observable_event_types_ &
+        ObservableEventType::kDataSourceInstances)) {
+    return;
+  }
+
+  if (instance.state != DataSourceInstance::CONFIGURED &&
+      instance.state != DataSourceInstance::STARTED &&
+      instance.state != DataSourceInstance::STOPPED) {
+    return;
+  }
+
+  auto* observable_events = AddObservableEvents();
+  auto* change = observable_events->add_instance_state_changes();
+  change->set_producer_name(producer.name_);
+  change->set_data_source_name(instance.data_source_name);
+  if (instance.state == DataSourceInstance::STARTED) {
+    change->set_state(ObservableEvents::DataSourceInstanceStateChange::
+                          DATA_SOURCE_INSTANCE_STATE_STARTED);
+  } else {
+    change->set_state(ObservableEvents::DataSourceInstanceStateChange::
+                          DATA_SOURCE_INSTANCE_STATE_STOPPED);
+  }
+}
+
 base::WeakPtr<TracingServiceImpl::ConsumerEndpointImpl>
 TracingServiceImpl::ConsumerEndpointImpl::GetWeakPtr() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   return weak_ptr_factory_.GetWeakPtr();
+}
+
+ObservableEvents*
+TracingServiceImpl::ConsumerEndpointImpl::AddObservableEvents() {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  if (!observable_events_) {
+    observable_events_.reset(new ObservableEvents());
+    auto weak_this = GetWeakPtr();
+    task_runner_->PostTask([weak_this] {
+      if (!weak_this)
+        return;
+
+      // Move into a temporary to allow reentrancy in OnObservableEvents.
+      auto observable_events = std::move(weak_this->observable_events_);
+      weak_this->consumer_->OnObservableEvents(*observable_events);
+    });
+  }
+  return observable_events_.get();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
