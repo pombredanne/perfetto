@@ -2140,8 +2140,9 @@ TracingServiceImpl::ConsumerEndpointImpl::AddObservableEvents() {
       if (!weak_this)
         return;
 
-      weak_this->consumer_->OnObservableEvents(*weak_this->observable_events_);
-      weak_this->observable_events_.reset();
+      // Move into a temporary to allow reentrancy in OnObservableEvents.
+      auto observable_events = std::move(weak_this->observable_events_);
+      weak_this->consumer_->OnObservableEvents(*observable_events);
     });
   }
   return observable_events_.get();
