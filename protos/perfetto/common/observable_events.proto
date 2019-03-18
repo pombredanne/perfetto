@@ -21,6 +21,7 @@ package perfetto.protos;
 
 message ObservableEvents {
   enum Type {
+    TYPE_UNSPECIFIED = 0;
     // State changes of data source instances associated with the consumer's
     // session. Note that not all data sources may support these notifications.
     TYPE_DATA_SOURCES_INSTANCES = 1;

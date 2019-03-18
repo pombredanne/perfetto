@@ -712,9 +712,7 @@ void PerfettoCmd::OnTraceStats(bool /*success*/,
 }
 
 void PerfettoCmd::OnObservableEvents(
-    const ObservableEvents& /*observable_events*/) {
-  // TODO(eseckler): Support ObserveEvents().
-}
+    const ObservableEvents& /*observable_events*/) {}
 
 int __attribute__((visibility("default")))
 PerfettoCmdMain(int argc, char** argv) {
