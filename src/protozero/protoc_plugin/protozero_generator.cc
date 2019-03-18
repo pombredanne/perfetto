@@ -539,12 +539,12 @@ class GeneratorJob {
           break;
         case FieldDescriptor::TYPE_STRING:
           getter = "as_string";
-          cpp_type = "::protozero::Field::StringView";
+          cpp_type = "::protozero::ConstChars";
           break;
         case FieldDescriptor::TYPE_MESSAGE:
         case FieldDescriptor::TYPE_BYTES:
           getter = "as_bytes";
-          cpp_type = "::protozero::ContiguousMemoryRange";
+          cpp_type = "::protozero::ConstBytes";
           break;
         case FieldDescriptor::TYPE_GROUP:
           continue;

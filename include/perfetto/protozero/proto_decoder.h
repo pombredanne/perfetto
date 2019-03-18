@@ -43,7 +43,7 @@ namespace protozero {
 class ProtoDecoder {
  public:
   // Creates a ProtoDecoder using the given |buffer| with size |length| bytes.
-  inline ProtoDecoder(const uint8_t* buffer, uint64_t length)
+  inline ProtoDecoder(const uint8_t* buffer, size_t length)
       : begin_(buffer), end_(buffer + length), read_ptr_(buffer) {}
 
   // Reads the next field from the buffer and advances the read cursor. If a
@@ -64,13 +64,13 @@ class ProtoDecoder {
   }
 
   // Returns the position of read cursor, relative to the start of the buffer.
-  inline uint64_t read_offset() const {
-    return static_cast<uint64_t>(read_ptr_ - begin_);
+  inline size_t read_offset() const {
+    return static_cast<size_t>(read_ptr_ - begin_);
   }
 
   inline size_t bytes_left() const {
     PERFETTO_DCHECK(read_ptr_ <= end_);
-    return static_cast<uint64_t>(end_ - read_ptr_);
+    return static_cast<size_t>(end_ - read_ptr_);
   }
 
   const uint8_t* begin() const { return begin_; }
@@ -179,7 +179,7 @@ class TypedProtoDecoderBase : public ProtoDecoder {
 template <int MAX_FIELD_ID, bool HAS_REPEATED_FIELDS>
 class TypedProtoDecoder : public TypedProtoDecoderBase {
  public:
-  TypedProtoDecoder(const uint8_t* buffer, uint64_t length)
+  TypedProtoDecoder(const uint8_t* buffer, size_t length)
       : TypedProtoDecoderBase(on_stack_storage_,
                               /*size=*/MAX_FIELD_ID + 1,
                               kCapacity,

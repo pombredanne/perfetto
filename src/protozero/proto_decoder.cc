@@ -171,7 +171,7 @@ void TypedProtoDecoderBase::ParseAllFields() {
     cur = res.next;
 
     auto field_id = res.field.id();
-    if (PERFETTO_UNLIKELY(field_id) >= size_)
+    if (PERFETTO_UNLIKELY(field_id >= size_))
       continue;
 
     Field* fld = &fields_[field_id];

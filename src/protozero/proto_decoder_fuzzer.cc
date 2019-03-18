@@ -17,6 +17,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "perfetto/base/logging.h"
 #include "perfetto/protozero/proto_decoder.h"
 
 namespace protozero {
@@ -24,13 +25,21 @@ namespace {
 
 int FuzzProtoDecoder(const uint8_t* data, size_t size) {
   volatile uint64_t value = 0;
+  TypedProtoDecoder<1, 0> typed_decoder_1(data, size);
+  TypedProtoDecoder<999, 0> typed_decoder_2(data, size);
   ProtoDecoder decoder(data, size);
   for (;;) {
     auto field = decoder.ReadField();
     if (!field.valid())
       break;
+    if (field.id() <= 999) {
+      PERFETTO_CHECK(field.type() == typed_decoder_2.Get(field.id()).type());
+      PERFETTO_CHECK(field.raw_int_value() ==
+                     typed_decoder_2.Get(field.id()).raw_int_value());
+    }
     value += field.raw_int_value();
   }
+
   return 0;
 }
 

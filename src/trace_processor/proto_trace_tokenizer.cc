@@ -142,8 +142,8 @@ void ProtoTraceTokenizer::ParsePacket(TraceBlobView packet) {
 
   if (decoder.has_ftrace_events()) {
     auto ftrace_field = decoder.ftrace_events();
-    const size_t fld_off = packet.offset_of(ftrace_field.begin);
-    ParseFtraceBundle(packet.slice(fld_off, ftrace_field.size()));
+    const size_t fld_off = packet.offset_of(ftrace_field.data);
+    ParseFtraceBundle(packet.slice(fld_off, ftrace_field.size));
     return;
   }
 

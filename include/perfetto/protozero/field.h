@@ -26,6 +26,20 @@
 
 namespace protozero {
 
+struct ConstBytes {
+  const uint8_t* data;
+  size_t size;
+};
+
+struct ConstChars {
+  const char* data;
+  size_t size;
+
+  operator ::perfetto::base::StringView() const {
+    return ::perfetto::base::StringView(data, size);
+  }
+};
+
 // A protobuf field decoded by the protozero proto decoders. It exposes
 // convenience accessors with minimal debug checks.
 // This class is used both by the iterator-based ProtoDecoder and by the
@@ -34,8 +48,6 @@ namespace protozero {
 // null strings.
 class Field {
  public:
-  using StringView = ::perfetto::base::StringView;
-
   inline bool valid() const { return id_ != 0; }
   inline uint16_t id() const { return id_; }
   explicit inline operator bool() const { return valid(); }
@@ -95,17 +107,16 @@ class Field {
     return res;
   }
 
-  inline StringView as_string() const {
+  inline ConstChars as_string() const {
     PERFETTO_DCHECK(!valid() ||
                     type() == proto_utils::ProtoWireType::kLengthDelimited);
-    return StringView(reinterpret_cast<const char*>(data()), size_);
+    return ConstChars{reinterpret_cast<const char*>(data()), size_};
   }
 
-  inline ContiguousMemoryRange as_bytes() const {
+  inline ConstBytes as_bytes() const {
     PERFETTO_DCHECK(!valid() ||
                     type() == proto_utils::ProtoWireType::kLengthDelimited);
-    return ContiguousMemoryRange{const_cast<uint8_t*>(data()),
-                                 const_cast<uint8_t*>(data() + size_)};
+    return ConstBytes{data(), size_};
   }
 
   inline const uint8_t* data() const {
