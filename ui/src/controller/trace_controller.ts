@@ -368,11 +368,14 @@ export class TraceController extends Controller<States> {
       const threadName = row.threadName;
       const processName = row.processName;
       const hasSchedEvents = !!row.totalDur;
+      const threadSched =
+          await engine.query(`select count(1) from sched where utid = ${utid}`);
+      const threadHasSched = threadSched.columns[0].longValues![0] > 0;
 
       const maxDepth = utid === null ? undefined : utidToMaxDepth.get(utid);
       if (maxDepth === undefined &&
           (upid === null || !counterUpids.has(upid)) &&
-          !counterUtids.has(utid)) {
+          !counterUtids.has(utid) && !threadHasSched) {
         continue;
       }
 
@@ -443,9 +446,7 @@ export class TraceController extends Controller<States> {
         }));
       }
 
-      const threadSched =
-          await engine.query(`select count(1) from sched where utid = ${utid}`);
-      if (threadSched.columns[0].longValues![0] > 0) {
+      if (threadHasSched) {
         addToTrackActions.push(Actions.addTrack({
           engineId: this.engineId,
           kind: THREAD_STATE_TRACK_KIND,
