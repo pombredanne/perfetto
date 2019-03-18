@@ -37,6 +37,8 @@ struct ParseFieldResult {
   Field field;
 };
 
+// Parses one field and returns the field itself and a pointer to the next
+// field to parse. If parsing fails, the returned |next| == |buffer|.
 PERFETTO_ALWAYS_INLINE ParseFieldResult
 ParseOneField(const uint8_t* const buffer, const uint8_t* const end) {
   ParseFieldResult res{buffer, Field{}};
@@ -152,6 +154,13 @@ Field ProtoDecoder::FindField(uint32_t field_id) {
   return res;
 }
 
+PERFETTO_ALWAYS_INLINE
+Field ProtoDecoder::ReadField() {
+  ParseFieldResult res = ParseOneField(read_ptr_, end_);
+  read_ptr_ = res.next;
+  return res.field;
+}
+
 void TypedProtoDecoderBase::ParseAllFields() {
   const uint8_t* cur = begin_;
   ParseFieldResult res;
@@ -162,7 +171,7 @@ void TypedProtoDecoderBase::ParseAllFields() {
     cur = res.next;
 
     auto field_id = res.field.id();
-    if (PERFETTO_UNLIKELY(field_id) >= size_)
+    if (PERFETTO_UNLIKELY(field_id >= size_))
       continue;
 
     Field* fld = &fields_[field_id];
@@ -181,13 +190,6 @@ void TypedProtoDecoderBase::ParseAllFields() {
     }
   }
   read_ptr_ = res.next;
-}
-
-PERFETTO_ALWAYS_INLINE
-Field ProtoDecoder::ReadField() {
-  ParseFieldResult res = ParseOneField(read_ptr_, end_);
-  read_ptr_ = res.next;
-  return res.field;
 }
 
 void TypedProtoDecoderBase::ExpandHeapStorage() {

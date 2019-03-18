@@ -44,10 +44,9 @@ TEST(ProtoDecoderTest, ReadString) {
   delegate.AdjustUsedSizeOfCurrentSlice();
   auto used_range = delegate.slices()[0].GetUsedRange();
 
-  TypedProtoDecoderTemplate<32, false> decoder(used_range.begin,
-                                               used_range.size());
+  TypedProtoDecoder<32, false> decoder(used_range.begin, used_range.size());
 
-  const auto& field = decoder.GetSingle(1);
+  const auto& field = decoder.Get(1);
   ASSERT_EQ(field.type(), ProtoWireType::kLengthDelimited);
   ASSERT_EQ(field.size(), sizeof(kTestString) - 1);
   for (size_t i = 0; i < sizeof(kTestString) - 1; i++) {
@@ -108,10 +107,10 @@ TEST(ProtoDecoderTest, FixedData) {
 
   for (size_t i = 0; i < perfetto::base::ArraySize(kFieldExpectations); ++i) {
     const FieldExpectation& exp = kFieldExpectations[i];
-    TypedProtoDecoderTemplate<999, 0> decoder(
+    TypedProtoDecoder<999, 0> decoder(
         reinterpret_cast<const uint8_t*>(exp.encoded), exp.encoded_size);
 
-    auto& field = decoder.GetSingle(exp.id);
+    auto& field = decoder.Get(exp.id);
     ASSERT_EQ(exp.type, field.type());
 
     if (field.type() == ProtoWireType::kLengthDelimited) {
@@ -124,6 +123,13 @@ TEST(ProtoDecoderTest, FixedData) {
       }
     }
   }
+
+  // Test float and doubles decoding.
+  const char buf[] = "\x0d\x00\x00\xa0\x3f\x11\x00\x00\x00\x00\x00\x42\x8f\xc0";
+  TypedProtoDecoder<2, 0> decoder(reinterpret_cast<const uint8_t*>(buf),
+                                  sizeof(buf));
+  EXPECT_FLOAT_EQ(decoder.Get(1).as_float(), 1.25f);
+  EXPECT_DOUBLE_EQ(decoder.Get(2).as_double(), -1000.25);
 }
 
 }  // namespace

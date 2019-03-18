@@ -286,7 +286,7 @@ ProtoTraceParser::ProtoTraceParser(TraceProcessorContext* context)
 ProtoTraceParser::~ProtoTraceParser() = default;
 
 void ProtoTraceParser::ParseTracePacket(int64_t ts, TraceBlobView blob) {
-  protos::pbzero::TracePacket::Parser packet(blob.data(), blob.length());
+  protos::pbzero::TracePacket::Decoder packet(blob.data(), blob.length());
 
   if (packet.has_process_tree())
     ParseProcessTree(packet.process_tree());
@@ -322,11 +322,11 @@ void ProtoTraceParser::ParseTracePacket(int64_t ts, TraceBlobView blob) {
   PERFETTO_DCHECK(!packet.bytes_left());
 }
 
-void ProtoTraceParser::ParseSysStats(int64_t ts, ContiguousMemoryRange blob) {
-  protos::pbzero::SysStats::Parser sys_stats(blob.begin, blob.size());
+void ProtoTraceParser::ParseSysStats(int64_t ts, ConstBytes blob) {
+  protos::pbzero::SysStats::Decoder sys_stats(blob.data, blob.size);
 
   for (auto it = sys_stats.meminfo(); it; ++it) {
-    protos::pbzero::SysStats::MeminfoValue::Parser mi(it->data(), it->size());
+    protos::pbzero::SysStats::MeminfoValue::Decoder mi(it->data(), it->size());
     auto key = static_cast<size_t>(mi.key());
     if (PERFETTO_UNLIKELY(key >= meminfo_strs_id_.size())) {
       PERFETTO_ELOG("MemInfo key %zu is not recognized.", key);
@@ -339,7 +339,7 @@ void ProtoTraceParser::ParseSysStats(int64_t ts, ContiguousMemoryRange blob) {
   }
 
   for (auto it = sys_stats.vmstat(); it; ++it) {
-    protos::pbzero::SysStats::VmstatValue::Parser vm(it->data(), it->size());
+    protos::pbzero::SysStats::VmstatValue::Decoder vm(it->data(), it->size());
     auto key = static_cast<size_t>(vm.key());
     if (PERFETTO_UNLIKELY(key >= vmstat_strs_id_.size())) {
       PERFETTO_ELOG("VmStat key %zu is not recognized.", key);
@@ -351,7 +351,7 @@ void ProtoTraceParser::ParseSysStats(int64_t ts, ContiguousMemoryRange blob) {
   }
 
   for (auto it = sys_stats.cpu_stat(); it; ++it) {
-    protos::pbzero::SysStats::CpuTimes::Parser ct(it->data(), it->size());
+    protos::pbzero::SysStats::CpuTimes::Decoder ct(it->data(), it->size());
     if (PERFETTO_UNLIKELY(!ct.has_cpu_id())) {
       PERFETTO_ELOG("CPU field not found in CpuTimes");
       context_->storage->IncrementStats(stats::invalid_cpu_times);
@@ -380,13 +380,15 @@ void ProtoTraceParser::ParseSysStats(int64_t ts, ContiguousMemoryRange blob) {
   }
 
   for (auto it = sys_stats.num_irq(); it; ++it) {
-    protos::pbzero::SysStats::InterruptCount::Parser ic(it->data(), it->size());
+    protos::pbzero::SysStats::InterruptCount::Decoder ic(it->data(),
+                                                         it->size());
     context_->event_tracker->PushCounter(ts, ic.count(), num_irq_name_id_,
                                          ic.irq(), RefType::kRefIrq);
   }
 
   for (auto it = sys_stats.num_softirq(); it; ++it) {
-    protos::pbzero::SysStats::InterruptCount::Parser ic(it->data(), it->size());
+    protos::pbzero::SysStats::InterruptCount::Decoder ic(it->data(),
+                                                         it->size());
     context_->event_tracker->PushCounter(ts, ic.count(), num_softirq_name_id_,
                                          ic.irq(), RefType::kRefSoftIrq);
   }
@@ -409,11 +411,11 @@ void ProtoTraceParser::ParseSysStats(int64_t ts, ContiguousMemoryRange blob) {
   }
 }
 
-void ProtoTraceParser::ParseProcessTree(ContiguousMemoryRange blob) {
-  protos::pbzero::ProcessTree::Parser ps(blob.begin, blob.size());
+void ProtoTraceParser::ParseProcessTree(ConstBytes blob) {
+  protos::pbzero::ProcessTree::Decoder ps(blob.data, blob.size);
 
   for (auto it = ps.processes(); it; ++it) {
-    protos::pbzero::ProcessTree::Process::Parser proc(it->data(), it->size());
+    protos::pbzero::ProcessTree::Process::Decoder proc(it->data(), it->size());
     if (!proc.has_cmdline())
       continue;
     auto pid = static_cast<uint32_t>(proc.pid());
@@ -424,16 +426,15 @@ void ProtoTraceParser::ParseProcessTree(ContiguousMemoryRange blob) {
   }
 
   for (auto it = ps.threads(); it; ++it) {
-    protos::pbzero::ProcessTree::Thread::Parser thd(it->data(), it->size());
+    protos::pbzero::ProcessTree::Thread::Decoder thd(it->data(), it->size());
     auto tid = static_cast<uint32_t>(thd.tid());
     auto tgid = static_cast<uint32_t>(thd.tgid());
     context_->process_tracker->UpdateThread(tid, tgid);
   }
 }
 
-void ProtoTraceParser::ParseProcessStats(int64_t ts,
-                                         ContiguousMemoryRange blob) {
-  protos::pbzero::ProcessStats::Parser stats(blob.begin, blob.size());
+void ProtoTraceParser::ParseProcessStats(int64_t ts, ConstBytes blob) {
+  protos::pbzero::ProcessStats::Decoder stats(blob.data, blob.size);
   const auto kOomScoreAdjFieldNumber =
       protos::pbzero::ProcessStats::Process::kOomScoreAdjFieldNumber;
   for (auto it = stats.processes(); it; ++it) {
@@ -442,7 +443,7 @@ void ProtoTraceParser::ParseProcessStats(int64_t ts,
     std::array<int64_t, kProcStatsProcessSize> counter_values{};
     std::array<bool, kProcStatsProcessSize> has_counter{};
 
-    protos::pbzero::ProcessStats::Process::Parser proc(it->data(), it->size());
+    protos::pbzero::ProcessStats::Process::Decoder proc(it->data(), it->size());
     for (auto fld = proc.ReadField(); fld.valid(); fld = proc.ReadField()) {
       bool is_counter_field = fld.id() < proc_stats_process_names_.size() &&
                               proc_stats_process_names_[fld.id()] != 0;
@@ -497,7 +498,7 @@ void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
     if (is_metadata_field)
       continue;
 
-    ContiguousMemoryRange data = fld.as_bytes();
+    ConstBytes data = fld.as_bytes();
     if (fld.id() == protos::pbzero::FtraceEvent::kGenericFieldNumber) {
       ParseGenericFtrace(ts, cpu, pid, data);
     } else if (fld.id() !=
@@ -588,8 +589,8 @@ void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
 
 void ProtoTraceParser::ParseSignalDeliver(int64_t ts,
                                           uint32_t pid,
-                                          ContiguousMemoryRange blob) {
-  protos::pbzero::SignalDeliverFtraceEvent::Parser sig(blob.begin, blob.size());
+                                          ConstBytes blob) {
+  protos::pbzero::SignalDeliverFtraceEvent::Decoder sig(blob.data, blob.size);
   auto* instants = context_->storage->mutable_instants();
   UniqueTid utid = context_->process_tracker->UpdateThread(ts, pid, 0);
   instants->AddInstantEvent(ts, signal_deliver_id_, sig.sig(), utid,
@@ -598,10 +599,8 @@ void ProtoTraceParser::ParseSignalDeliver(int64_t ts,
 
 // This event has both the pid of the thread that sent the signal and the
 // destination of the signal. Currently storing the pid of the destination.
-void ProtoTraceParser::ParseSignalGenerate(int64_t ts,
-                                           ContiguousMemoryRange blob) {
-  protos::pbzero::SignalGenerateFtraceEvent::Parser sig(blob.begin,
-                                                        blob.size());
+void ProtoTraceParser::ParseSignalGenerate(int64_t ts, ConstBytes blob) {
+  protos::pbzero::SignalGenerateFtraceEvent::Decoder sig(blob.data, blob.size);
 
   auto* instants = context_->storage->mutable_instants();
   UniqueTid utid = context_->process_tracker->UpdateThread(
@@ -610,11 +609,10 @@ void ProtoTraceParser::ParseSignalGenerate(int64_t ts,
                             RefType::kRefUtid);
 }
 
-void ProtoTraceParser::ParseLowmemoryKill(int64_t ts,
-                                          ContiguousMemoryRange blob) {
+void ProtoTraceParser::ParseLowmemoryKill(int64_t ts, ConstBytes blob) {
   // TODO(taylori): Store the pagecache_size, pagecache_limit and free fields
   // in an args table
-  protos::pbzero::LowmemoryKillFtraceEvent::Parser lmk(blob.begin, blob.size());
+  protos::pbzero::LowmemoryKillFtraceEvent::Decoder lmk(blob.data, blob.size);
 
   // Store the pid of the event that is lmk-ed.
   auto* instants = context_->storage->mutable_instants();
@@ -630,10 +628,8 @@ void ProtoTraceParser::ParseLowmemoryKill(int64_t ts,
                                  Variadic::String(comm_id));
 }
 
-void ProtoTraceParser::ParseRssStat(int64_t ts,
-                                    uint32_t pid,
-                                    ContiguousMemoryRange blob) {
-  protos::pbzero::RssStatFtraceEvent::Parser rss(blob.begin, blob.size());
+void ProtoTraceParser::ParseRssStat(int64_t ts, uint32_t pid, ConstBytes blob) {
+  protos::pbzero::RssStatFtraceEvent::Decoder rss(blob.data, blob.size);
   const auto kRssStatUnknown = static_cast<uint32_t>(rss_members_.size()) - 1;
   auto member = static_cast<uint32_t>(rss.member());
   int64_t size = rss.size();
@@ -653,9 +649,9 @@ void ProtoTraceParser::ParseRssStat(int64_t ts,
 
 void ProtoTraceParser::ParseIonHeapGrowOrShrink(int64_t ts,
                                                 uint32_t pid,
-                                                ContiguousMemoryRange blob,
+                                                ConstBytes blob,
                                                 bool grow) {
-  protos::pbzero::IonHeapGrowFtraceEvent::Parser ion(blob.begin, blob.size());
+  protos::pbzero::IonHeapGrowFtraceEvent::Decoder ion(blob.data, blob.size);
   int64_t total_bytes = ion.total_allocated();
   int64_t change_bytes = static_cast<int64_t>(ion.len()) * (grow ? 1 : -1);
   StringId global_name_id = ion_total_unknown_id_;
@@ -699,16 +695,16 @@ void ProtoTraceParser::ParseIonHeapGrowOrShrink(int64_t ts,
       "ION field mismatch");
 }
 
-void ProtoTraceParser::ParseCpuFreq(int64_t ts, ContiguousMemoryRange blob) {
-  protos::pbzero::CpuFrequencyFtraceEvent::Parser freq(blob.begin, blob.size());
+void ProtoTraceParser::ParseCpuFreq(int64_t ts, ConstBytes blob) {
+  protos::pbzero::CpuFrequencyFtraceEvent::Decoder freq(blob.data, blob.size);
   uint32_t cpu = freq.cpu_id();
   uint32_t new_freq = freq.state();
   context_->event_tracker->PushCounter(ts, new_freq, cpu_freq_name_id_, cpu,
                                        RefType::kRefCpuId);
 }
 
-void ProtoTraceParser::ParseCpuIdle(int64_t ts, ContiguousMemoryRange blob) {
-  protos::pbzero::CpuIdleFtraceEvent::Parser idle(blob.begin, blob.size());
+void ProtoTraceParser::ParseCpuIdle(int64_t ts, ConstBytes blob) {
+  protos::pbzero::CpuIdleFtraceEvent::Decoder idle(blob.data, blob.size);
   uint32_t cpu = idle.cpu_id();
   uint32_t new_state = idle.state();
   context_->event_tracker->PushCounter(ts, new_state, cpu_idle_name_id_, cpu,
@@ -718,8 +714,8 @@ void ProtoTraceParser::ParseCpuIdle(int64_t ts, ContiguousMemoryRange blob) {
 PERFETTO_ALWAYS_INLINE
 void ProtoTraceParser::ParseSchedSwitch(uint32_t cpu,
                                         int64_t ts,
-                                        ContiguousMemoryRange blob) {
-  protos::pbzero::SchedSwitchFtraceEvent::Parser ss(blob.begin, blob.size());
+                                        ConstBytes blob) {
+  protos::pbzero::SchedSwitchFtraceEvent::Decoder ss(blob.data, blob.size);
   uint32_t prev_pid = static_cast<uint32_t>(ss.prev_pid());
   uint32_t next_pid = static_cast<uint32_t>(ss.next_pid());
   context_->event_tracker->PushSchedSwitch(
@@ -727,9 +723,8 @@ void ProtoTraceParser::ParseSchedSwitch(uint32_t cpu,
       next_pid, ss.next_comm(), ss.next_prio());
 }
 
-void ProtoTraceParser::ParseSchedWakeup(int64_t ts,
-                                        ContiguousMemoryRange blob) {
-  protos::pbzero::SchedWakeupFtraceEvent::Parser sw(blob.begin, blob.size());
+void ProtoTraceParser::ParseSchedWakeup(int64_t ts, ConstBytes blob) {
+  protos::pbzero::SchedWakeupFtraceEvent::Decoder sw(blob.data, blob.size);
   uint32_t wakee_pid = static_cast<uint32_t>(sw.pid());
   StringId name_id = context_->storage->InternString(sw.comm());
   auto utid = context_->process_tracker->UpdateThread(ts, wakee_pid, name_id);
@@ -739,8 +734,8 @@ void ProtoTraceParser::ParseSchedWakeup(int64_t ts,
 
 void ProtoTraceParser::ParseTaskNewTask(int64_t ts,
                                         uint32_t source_tid,
-                                        ContiguousMemoryRange blob) {
-  protos::pbzero::TaskNewtaskFtraceEvent::Parser evt(blob.begin, blob.size());
+                                        ConstBytes blob) {
+  protos::pbzero::TaskNewtaskFtraceEvent::Decoder evt(blob.data, blob.size);
   uint32_t clone_flags = static_cast<uint32_t>(evt.clone_flags());
   uint32_t new_tid = static_cast<uint32_t>(evt.pid());
   StringId new_comm = context_->storage->InternString(evt.comm());
@@ -762,8 +757,8 @@ void ProtoTraceParser::ParseTaskNewTask(int64_t ts,
   proc_tracker->AssociateThreads(source_utid, new_utid);
 }
 
-void ProtoTraceParser::ParseTaskRename(int64_t ts, ContiguousMemoryRange blob) {
-  protos::pbzero::TaskRenameFtraceEvent::Parser evt(blob.begin, blob.size());
+void ProtoTraceParser::ParseTaskRename(int64_t ts, ConstBytes blob) {
+  protos::pbzero::TaskRenameFtraceEvent::Decoder evt(blob.data, blob.size);
   uint32_t tid = static_cast<uint32_t>(evt.pid());
   StringId comm = context_->storage->InternString(evt.newcomm());
   context_->process_tracker->UpdateThread(ts, tid, comm);
@@ -772,8 +767,8 @@ void ProtoTraceParser::ParseTaskRename(int64_t ts, ContiguousMemoryRange blob) {
 void ProtoTraceParser::ParsePrint(uint32_t,
                                   int64_t ts,
                                   uint32_t pid,
-                                  ContiguousMemoryRange blob) {
-  protos::pbzero::PrintFtraceEvent::Parser evt(blob.begin, blob.size());
+                                  ConstBytes blob) {
+  protos::pbzero::PrintFtraceEvent::Decoder evt(blob.data, blob.size);
   SystraceTracePoint point{};
   if (!ParseSystraceTracePoint(evt.buf(), &point))
     return;
@@ -818,9 +813,8 @@ void ProtoTraceParser::ParsePrint(uint32_t,
   }
 }
 
-void ProtoTraceParser::ParseBatteryCounters(int64_t ts,
-                                            ContiguousMemoryRange blob) {
-  protos::pbzero::BatteryCounters::Parser evt(blob.begin, blob.size());
+void ProtoTraceParser::ParseBatteryCounters(int64_t ts, ConstBytes blob) {
+  protos::pbzero::BatteryCounters::Decoder evt(blob.data, blob.size);
   if (evt.has_charge_counter_uah()) {
     context_->event_tracker->PushCounter(
         ts, evt.charge_counter_uah(), batt_charge_id_, 0, RefType::kRefNoRef);
@@ -840,10 +834,9 @@ void ProtoTraceParser::ParseBatteryCounters(int64_t ts,
   }
 }
 
-void ProtoTraceParser::ParseOOMScoreAdjUpdate(int64_t ts,
-                                              ContiguousMemoryRange blob) {
-  protos::pbzero::OomScoreAdjUpdateFtraceEvent::Parser evt(blob.begin,
-                                                           blob.size());
+void ProtoTraceParser::ParseOOMScoreAdjUpdate(int64_t ts, ConstBytes blob) {
+  protos::pbzero::OomScoreAdjUpdateFtraceEvent::Decoder evt(blob.data,
+                                                            blob.size);
 
   // The int16_t static cast is because older version of the on-device tracer
   // had a bug on negative varint encoding (b/120618641).
@@ -856,8 +849,8 @@ void ProtoTraceParser::ParseOOMScoreAdjUpdate(int64_t ts,
 
 void ProtoTraceParser::ParseMmEventRecord(int64_t ts,
                                           uint32_t pid,
-                                          ContiguousMemoryRange blob) {
-  protos::pbzero::MmEventRecordFtraceEvent::Parser evt(blob.begin, blob.size());
+                                          ConstBytes blob) {
+  protos::pbzero::MmEventRecordFtraceEvent::Decoder evt(blob.data, blob.size);
   uint32_t type = evt.type();
   UniqueTid utid = context_->process_tracker->UpdateThread(ts, pid, 0);
 
@@ -878,8 +871,8 @@ void ProtoTraceParser::ParseMmEventRecord(int64_t ts,
 void ProtoTraceParser::ParseSysEvent(int64_t ts,
                                      uint32_t pid,
                                      bool is_enter,
-                                     ContiguousMemoryRange blob) {
-  protos::pbzero::SysEnterFtraceEvent::Parser evt(blob.begin, blob.size());
+                                     ConstBytes blob) {
+  protos::pbzero::SysEnterFtraceEvent::Decoder evt(blob.data, blob.size);
   uint32_t syscall_num = static_cast<uint32_t>(evt.id());
   if (syscall_num >= sys_name_ids_.size()) {
     context_->storage->IncrementStats(stats::sys_unknown_syscall);
@@ -912,16 +905,16 @@ void ProtoTraceParser::ParseSysEvent(int64_t ts,
 void ProtoTraceParser::ParseGenericFtrace(int64_t ts,
                                           uint32_t cpu,
                                           uint32_t tid,
-                                          ContiguousMemoryRange blob) {
-  protos::pbzero::GenericFtraceEvent::Parser evt(blob.begin, blob.size());
+                                          ConstBytes blob) {
+  protos::pbzero::GenericFtraceEvent::Decoder evt(blob.data, blob.size);
   StringId event_id = context_->storage->InternString(evt.event_name());
   UniqueTid utid = context_->process_tracker->UpdateThread(ts, tid, 0);
   RowId row_id = context_->storage->mutable_raw_events()->AddRawEvent(
       ts, event_id, cpu, utid);
 
   for (auto it = evt.field(); it; ++it) {
-    protos::pbzero::GenericFtraceEvent::Field::Parser fld(it->data(),
-                                                          it->size());
+    protos::pbzero::GenericFtraceEvent::Field::Decoder fld(it->data(),
+                                                           it->size());
     auto field_name_id = context_->storage->InternString(fld.name());
     if (fld.has_int_value()) {
       context_->args_tracker->AddArg(row_id, field_name_id, field_name_id,
@@ -942,8 +935,8 @@ void ProtoTraceParser::ParseTypedFtraceToRaw(uint32_t ftrace_id,
                                              int64_t ts,
                                              uint32_t cpu,
                                              uint32_t tid,
-                                             ContiguousMemoryRange blob) {
-  ProtoDecoder decoder(blob.begin, blob.size());
+                                             ConstBytes blob) {
+  ProtoDecoder decoder(blob.data, blob.size);
   if (ftrace_id >= GetDescriptorsSize()) {
     PERFETTO_DLOG("Event with id: %d does not exist and cannot be parsed.",
                   ftrace_id);
@@ -982,10 +975,15 @@ void ProtoTraceParser::ParseTypedFtraceToRaw(uint32_t ftrace_id,
                                        Variadic::String(value));
         break;
       }
-      case ProtoSchemaType::kDouble:
-      case ProtoSchemaType::kFloat: {
+      case ProtoSchemaType::kDouble: {
         context_->args_tracker->AddArg(raw_event_id, name_id, name_id,
-                                       Variadic::Real(fld.as_real()));
+                                       Variadic::Real(fld.as_double()));
+        break;
+      }
+      case ProtoSchemaType::kFloat: {
+        context_->args_tracker->AddArg(
+            raw_event_id, name_id, name_id,
+            Variadic::Real(static_cast<double>(fld.as_float())));
         break;
       }
       case ProtoSchemaType::kUnknown:
@@ -998,13 +996,13 @@ void ProtoTraceParser::ParseTypedFtraceToRaw(uint32_t ftrace_id,
   }
 }
 
-void ProtoTraceParser::ParseClockSnapshot(ContiguousMemoryRange blob) {
-  protos::pbzero::ClockSnapshot::Parser evt(blob.begin, blob.size());
+void ProtoTraceParser::ParseClockSnapshot(ConstBytes blob) {
+  protos::pbzero::ClockSnapshot::Decoder evt(blob.data, blob.size);
   int64_t clock_boottime = 0;
   int64_t clock_monotonic = 0;
   int64_t clock_realtime = 0;
   for (auto it = evt.clocks(); it; ++it) {
-    protos::pbzero::ClockSnapshot::Clock::Parser clk(it->data(), it->size());
+    protos::pbzero::ClockSnapshot::Clock::Decoder clk(it->data(), it->size());
     if (clk.type() == protos::pbzero::ClockSnapshot::Clock::BOOTTIME) {
       clock_boottime = static_cast<int64_t>(clk.timestamp());
     } else if (clk.type() == protos::pbzero::ClockSnapshot::Clock::REALTIME) {
@@ -1037,8 +1035,8 @@ void ProtoTraceParser::ParseClockSnapshot(ContiguousMemoryRange blob) {
     ct->SyncClocks(ClockDomain::kRealTime, clock_realtime, clock_boottime);
 }
 
-void ProtoTraceParser::ParseAndroidLogPacket(ContiguousMemoryRange blob) {
-  protos::pbzero::AndroidLogPacket::Parser packet(blob.begin, blob.size());
+void ProtoTraceParser::ParseAndroidLogPacket(ConstBytes blob) {
+  protos::pbzero::AndroidLogPacket::Decoder packet(blob.data, blob.size);
   for (auto it = packet.events(); it; ++it)
     ParseAndroidLogEvent(it->as_bytes());
 
@@ -1046,10 +1044,9 @@ void ProtoTraceParser::ParseAndroidLogPacket(ContiguousMemoryRange blob) {
     ParseAndroidLogStats(packet.stats());
 }
 
-void ProtoTraceParser::ParseAndroidLogEvent(ContiguousMemoryRange blob) {
+void ProtoTraceParser::ParseAndroidLogEvent(ConstBytes blob) {
   // TODO(primiano): Add events and non-stringified fields to the "raw" table.
-  protos::pbzero::AndroidLogPacket::LogEvent::Parser evt(blob.begin,
-                                                         blob.size());
+  protos::pbzero::AndroidLogPacket::LogEvent::Decoder evt(blob.data, blob.size);
   int64_t ts = static_cast<int64_t>(evt.timestamp());
   uint32_t pid = static_cast<uint32_t>(evt.pid());
   uint32_t tid = static_cast<uint32_t>(evt.tid());
@@ -1064,17 +1061,17 @@ void ProtoTraceParser::ParseAndroidLogEvent(ContiguousMemoryRange blob) {
     return sizeof(arg_msg) - static_cast<size_t>(arg_str - arg_msg);
   };
   for (auto it = evt.args(); it; ++it) {
-    protos::pbzero::AndroidLogPacket::LogEvent::Arg::Parser arg(it->data(),
-                                                                it->size());
+    protos::pbzero::AndroidLogPacket::LogEvent::Arg::Decoder arg(it->data(),
+                                                                 it->size());
     if (!arg.has_name())
       continue;
-    arg_str += snprintf(arg_str, arg_avail(),
-                        " %.*s=", static_cast<int>(arg.name().size()),
-                        arg.name().data());
+    arg_str +=
+        snprintf(arg_str, arg_avail(),
+                 " %.*s=", static_cast<int>(arg.name().size), arg.name().data);
     if (arg.has_string_value()) {
       arg_str += snprintf(arg_str, arg_avail(), "\"%.*s\"",
-                          static_cast<int>(arg.string_value().size()),
-                          arg.string_value().data());
+                          static_cast<int>(arg.string_value().size),
+                          arg.string_value().data);
     } else if (arg.has_int_value()) {
       arg_str += snprintf(arg_str, arg_avail(), "%" PRId64, arg.int_value());
     } else if (arg.has_float_value()) {
@@ -1103,8 +1100,8 @@ void ProtoTraceParser::ParseAndroidLogEvent(ContiguousMemoryRange blob) {
       opt_trace_time.value(), utid, prio, tag_id, msg_id);
 }
 
-void ProtoTraceParser::ParseAndroidLogStats(ContiguousMemoryRange blob) {
-  protos::pbzero::AndroidLogPacket::Stats::Parser evt(blob.begin, blob.size());
+void ProtoTraceParser::ParseAndroidLogStats(ConstBytes blob) {
+  protos::pbzero::AndroidLogPacket::Stats::Decoder evt(blob.data, blob.size);
   if (evt.has_num_failed()) {
     context_->storage->SetStats(stats::android_log_num_failed,
                                 static_cast<int64_t>(evt.num_failed()));
@@ -1121,14 +1118,14 @@ void ProtoTraceParser::ParseAndroidLogStats(ContiguousMemoryRange blob) {
   }
 }
 
-void ProtoTraceParser::ParseTraceStats(ContiguousMemoryRange blob) {
+void ProtoTraceParser::ParseTraceStats(ConstBytes blob) {
   // printf("\n");
-  // for(size_t i = 0; i<blob.size(); i++) {
-  //   printf("%02x-", blob.begin[i]);
+  // for(size_t i = 0; i<blob.size; i++) {
+  //   printf("%02x-", blob.data[i]);
   // }
   // printf("\n");
 
-  protos::pbzero::TraceStats::Parser evt(blob.begin, blob.size());
+  protos::pbzero::TraceStats::Decoder evt(blob.data, blob.size);
   auto* storage = context_->storage.get();
   storage->SetStats(stats::traced_producers_connected,
                     static_cast<int64_t>(evt.producers_connected()));
@@ -1147,7 +1144,8 @@ void ProtoTraceParser::ParseTraceStats(ContiguousMemoryRange blob) {
 
   int buf_num = 0;
   for (auto it = evt.buffer_stats(); it; ++it, ++buf_num) {
-    protos::pbzero::TraceStats::BufferStats::Parser buf(it->data(), it->size());
+    protos::pbzero::TraceStats::BufferStats::Decoder buf(it->data(),
+                                                         it->size());
     storage->SetIndexedStats(stats::traced_buf_buffer_size, buf_num,
                              static_cast<int64_t>(buf.buffer_size()));
     storage->SetIndexedStats(stats::traced_buf_bytes_written, buf_num,
@@ -1186,8 +1184,8 @@ void ProtoTraceParser::ParseTraceStats(ContiguousMemoryRange blob) {
   }
 }
 
-void ProtoTraceParser::ParseFtraceStats(ContiguousMemoryRange blob) {
-  protos::pbzero::FtraceStats::Parser evt(blob.begin, blob.size());
+void ProtoTraceParser::ParseFtraceStats(ConstBytes blob) {
+  protos::pbzero::FtraceStats::Decoder evt(blob.data, blob.size);
   size_t phase =
       evt.phase() == protos::pbzero::FtraceStats_Phase_END_OF_TRACE ? 1 : 0;
 
@@ -1201,7 +1199,7 @@ void ProtoTraceParser::ParseFtraceStats(ContiguousMemoryRange blob) {
 
   auto* storage = context_->storage.get();
   for (auto it = evt.cpu_stats(); it; ++it) {
-    protos::pbzero::FtraceCpuStats::Parser cpu_stats(it->data(), it->size());
+    protos::pbzero::FtraceCpuStats::Decoder cpu_stats(it->data(), it->size());
     int cpu = static_cast<int>(cpu_stats.cpu());
     storage->SetIndexedStats(stats::ftrace_cpu_entries_begin + phase, cpu,
                              static_cast<int64_t>(cpu_stats.entries()));
@@ -1225,14 +1223,14 @@ void ProtoTraceParser::ParseFtraceStats(ContiguousMemoryRange blob) {
   }
 }
 
-void ProtoTraceParser::ParseProfilePacket(ContiguousMemoryRange blob) {
-  protos::pbzero::ProfilePacket::Parser packet(blob.begin, blob.size());
+void ProtoTraceParser::ParseProfilePacket(ConstBytes blob) {
+  protos::pbzero::ProfilePacket::Decoder packet(blob.data, blob.size);
   for (auto it = packet.strings(); it; ++it) {
-    protos::pbzero::ProfilePacket::InternedString::Parser entry(it->data(),
-                                                                it->size());
-    const auto* str =
-        const_cast<const char*>(reinterpret_cast<char*>(entry.str().begin));
-    context_->storage->InternString(base::StringView(str, entry.str().size()));
+    protos::pbzero::ProfilePacket::InternedString::Decoder entry(it->data(),
+                                                                 it->size());
+
+    const char* str = reinterpret_cast<const char*>(entry.str().data);
+    context_->storage->InternString(base::StringView(str, entry.str().size));
   }
 }
 

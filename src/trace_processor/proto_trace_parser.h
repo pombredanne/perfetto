@@ -23,7 +23,7 @@
 #include <memory>
 
 #include "perfetto/base/string_view.h"
-#include "perfetto/protozero/contiguous_memory_range.h"
+#include "perfetto/protozero/field.h"
 #include "src/trace_processor/ftrace_descriptors.h"
 #include "src/trace_processor/trace_blob_view.h"
 #include "src/trace_processor/trace_storage.h"
@@ -54,7 +54,7 @@ bool ParseSystraceTracePoint(base::StringView, SystraceTracePoint* out);
 
 class ProtoTraceParser {
  public:
-  using ContiguousMemoryRange = protozero::ContiguousMemoryRange;
+  using ConstBytes = protozero::ConstBytes;
   explicit ProtoTraceParser(TraceProcessorContext*);
   virtual ~ProtoTraceParser();
 
@@ -63,52 +63,44 @@ class ProtoTraceParser {
   virtual void ParseFtracePacket(uint32_t cpu,
                                  int64_t timestamp,
                                  TraceBlobView);
-  void ParseProcessTree(ContiguousMemoryRange);
-  void ParseProcessStats(int64_t timestamp, ContiguousMemoryRange);
-  void ParseSchedSwitch(uint32_t cpu, int64_t timestamp, ContiguousMemoryRange);
-  void ParseSchedWakeup(int64_t timestamp, ContiguousMemoryRange);
-  void ParseTaskNewTask(int64_t timestamp,
-                        uint32_t source_tid,
-                        ContiguousMemoryRange);
-  void ParseTaskRename(int64_t timestamp, ContiguousMemoryRange);
-  void ParseCpuFreq(int64_t timestamp, ContiguousMemoryRange);
-  void ParseCpuIdle(int64_t timestamp, ContiguousMemoryRange);
-  void ParsePrint(uint32_t cpu,
-                  int64_t timestamp,
-                  uint32_t pid,
-                  ContiguousMemoryRange);
-  void ParseSysStats(int64_t ts, ContiguousMemoryRange);
-  void ParseRssStat(int64_t ts, uint32_t pid, ContiguousMemoryRange);
+  void ParseProcessTree(ConstBytes);
+  void ParseProcessStats(int64_t timestamp, ConstBytes);
+  void ParseSchedSwitch(uint32_t cpu, int64_t timestamp, ConstBytes);
+  void ParseSchedWakeup(int64_t timestamp, ConstBytes);
+  void ParseTaskNewTask(int64_t timestamp, uint32_t source_tid, ConstBytes);
+  void ParseTaskRename(int64_t timestamp, ConstBytes);
+  void ParseCpuFreq(int64_t timestamp, ConstBytes);
+  void ParseCpuIdle(int64_t timestamp, ConstBytes);
+  void ParsePrint(uint32_t cpu, int64_t timestamp, uint32_t pid, ConstBytes);
+  void ParseSysStats(int64_t ts, ConstBytes);
+  void ParseRssStat(int64_t ts, uint32_t pid, ConstBytes);
   void ParseIonHeapGrowOrShrink(int64_t ts,
                                 uint32_t pid,
-                                ContiguousMemoryRange,
+                                ConstBytes,
                                 bool grow);
-  void ParseSignalDeliver(int64_t ts, uint32_t pid, ContiguousMemoryRange);
-  void ParseSignalGenerate(int64_t ts, ContiguousMemoryRange);
-  void ParseLowmemoryKill(int64_t ts, ContiguousMemoryRange);
-  void ParseBatteryCounters(int64_t ts, ContiguousMemoryRange);
-  void ParseOOMScoreAdjUpdate(int64_t ts, ContiguousMemoryRange);
-  void ParseMmEventRecord(int64_t ts, uint32_t pid, ContiguousMemoryRange);
-  void ParseSysEvent(int64_t ts,
-                     uint32_t pid,
-                     bool is_enter,
-                     ContiguousMemoryRange);
-  void ParseClockSnapshot(ContiguousMemoryRange);
-  void ParseAndroidLogPacket(ContiguousMemoryRange);
-  void ParseAndroidLogEvent(ContiguousMemoryRange);
-  void ParseAndroidLogStats(ContiguousMemoryRange);
+  void ParseSignalDeliver(int64_t ts, uint32_t pid, ConstBytes);
+  void ParseSignalGenerate(int64_t ts, ConstBytes);
+  void ParseLowmemoryKill(int64_t ts, ConstBytes);
+  void ParseBatteryCounters(int64_t ts, ConstBytes);
+  void ParseOOMScoreAdjUpdate(int64_t ts, ConstBytes);
+  void ParseMmEventRecord(int64_t ts, uint32_t pid, ConstBytes);
+  void ParseSysEvent(int64_t ts, uint32_t pid, bool is_enter, ConstBytes);
+  void ParseClockSnapshot(ConstBytes);
+  void ParseAndroidLogPacket(ConstBytes);
+  void ParseAndroidLogEvent(ConstBytes);
+  void ParseAndroidLogStats(ConstBytes);
   void ParseGenericFtrace(int64_t timestamp,
                           uint32_t cpu,
                           uint32_t pid,
-                          ContiguousMemoryRange view);
+                          ConstBytes view);
   void ParseTypedFtraceToRaw(uint32_t ftrace_id,
                              int64_t timestamp,
                              uint32_t cpu,
                              uint32_t pid,
-                             ContiguousMemoryRange view);
-  void ParseTraceStats(ContiguousMemoryRange);
-  void ParseFtraceStats(ContiguousMemoryRange);
-  void ParseProfilePacket(ContiguousMemoryRange);
+                             ConstBytes view);
+  void ParseTraceStats(ConstBytes);
+  void ParseFtraceStats(ConstBytes);
+  void ParseProfilePacket(ConstBytes);
 
  private:
   TraceProcessorContext* context_;

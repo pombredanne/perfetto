@@ -20,7 +20,6 @@ if (current_toolchain == host_toolchain) {
       "protozero_plugin.cc",
     ]
     deps = [
-      "..",
       "../../../gn:default_deps",
       "../../../gn:protoc_lib_deps",
     ]

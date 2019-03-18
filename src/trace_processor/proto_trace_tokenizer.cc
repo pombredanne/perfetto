@@ -118,7 +118,7 @@ void ProtoTraceTokenizer::ParseInternal(std::unique_ptr<uint8_t[]> owned_buf,
   const size_t data_off = static_cast<size_t>(data - start);
   TraceBlobView whole_buf(std::move(owned_buf), data_off, size);
 
-  protos::pbzero::Trace::Parser decoder(data, size);
+  protos::pbzero::Trace::Decoder decoder(data, size);
   for (auto it = decoder.packet(); it; ++it) {
     size_t field_offset = whole_buf.offset_of(it->data());
     ParsePacket(whole_buf.slice(field_offset, it->size()));
@@ -133,7 +133,7 @@ void ProtoTraceTokenizer::ParseInternal(std::unique_ptr<uint8_t[]> owned_buf,
 }
 
 void ProtoTraceTokenizer::ParsePacket(TraceBlobView packet) {
-  protos::pbzero::TracePacket::Parser decoder(packet.data(), packet.length());
+  protos::pbzero::TracePacket::Decoder decoder(packet.data(), packet.length());
 
   auto timestamp = decoder.has_timestamp()
                        ? static_cast<int64_t>(decoder.timestamp())
@@ -142,8 +142,8 @@ void ProtoTraceTokenizer::ParsePacket(TraceBlobView packet) {
 
   if (decoder.has_ftrace_events()) {
     auto ftrace_field = decoder.ftrace_events();
-    const size_t fld_off = packet.offset_of(ftrace_field.begin);
-    ParseFtraceBundle(packet.slice(fld_off, ftrace_field.size()));
+    const size_t fld_off = packet.offset_of(ftrace_field.data);
+    ParseFtraceBundle(packet.slice(fld_off, ftrace_field.size));
     return;
   }
 
@@ -155,8 +155,8 @@ void ProtoTraceTokenizer::ParsePacket(TraceBlobView packet) {
 
 PERFETTO_ALWAYS_INLINE
 void ProtoTraceTokenizer::ParseFtraceBundle(TraceBlobView bundle) {
-  protos::pbzero::FtraceEventBundle::Parser decoder(bundle.data(),
-                                                    bundle.length());
+  protos::pbzero::FtraceEventBundle::Decoder decoder(bundle.data(),
+                                                     bundle.length());
 
   if (PERFETTO_UNLIKELY(!decoder.has_cpu())) {
     PERFETTO_ELOG("CPU field not found in FtraceEventBundle");
