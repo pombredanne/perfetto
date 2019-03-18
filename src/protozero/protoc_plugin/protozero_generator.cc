@@ -465,7 +465,7 @@ class GeneratorJob {
         action, "inner_class", inner_class);
   }
 
-  void GenerateParser(const Descriptor* message) {
+  void GenerateDecoder(const Descriptor* message) {
     int max_field_id = 0;
     bool has_repeated_fields = false;
     for (int i = 0; i < message->field_count(); ++i) {
@@ -478,7 +478,7 @@ class GeneratorJob {
     }
 
     stub_h_->Print(
-        "class Parser : public "
+        "class Decoder : public "
         "::protozero::TypedProtoDecoder</*MAX_FIELD_ID=*/$max$, "
         "/*HAS_REPEATED_FIELDS=*/$rep$> {\n",
         "max", std::to_string(max_field_id), "rep",
@@ -486,7 +486,7 @@ class GeneratorJob {
     stub_h_->Print(" public:\n");
     stub_h_->Indent();
     stub_h_->Print(
-        "Parser(const uint8_t* data, size_t len) "
+        "Decoder(const uint8_t* data, size_t len) "
         ": TypedProtoDecoder(data, len) {}\n");
 
     for (int i = 0; i < message->field_count(); ++i) {
@@ -638,7 +638,7 @@ class GeneratorJob {
     stub_h_->Indent();
 
     GenerateReflectionForMessageFields(message);
-    GenerateParser(message);
+    GenerateDecoder(message);
 
     // Using statements for nested messages.
     for (int i = 0; i < message->nested_type_count(); ++i) {
