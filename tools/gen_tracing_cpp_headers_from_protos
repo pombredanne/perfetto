@@ -18,7 +18,6 @@ import subprocess
 import sys
 
 PROTOS = (
-  'perfetto/common/activate_triggers_request.proto',
   'perfetto/common/android_log_constants.proto',
   'perfetto/common/commit_data_request.proto',
   'perfetto/common/sys_stats_counters.proto',

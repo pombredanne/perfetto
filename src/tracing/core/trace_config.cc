@@ -531,7 +531,8 @@ TraceConfig::TriggerConfig& TraceConfig::TriggerConfig::operator=(
 bool TraceConfig::TriggerConfig::operator==(
     const TraceConfig::TriggerConfig& other) const {
   return (trigger_mode_ == other.trigger_mode_) &&
-         (triggers_ == other.triggers_);
+         (triggers_ == other.triggers_) &&
+         (trigger_timeout_ms_ == other.trigger_timeout_ms_);
 }
 #pragma GCC diagnostic pop
 
@@ -546,6 +547,12 @@ void TraceConfig::TriggerConfig::FromProto(
     triggers_.emplace_back();
     triggers_.back().FromProto(field);
   }
+
+  static_assert(
+      sizeof(trigger_timeout_ms_) == sizeof(proto.trigger_timeout_ms()),
+      "size mismatch");
+  trigger_timeout_ms_ =
+      static_cast<decltype(trigger_timeout_ms_)>(proto.trigger_timeout_ms());
   unknown_fields_ = proto.unknown_fields();
 }
 
@@ -562,6 +569,12 @@ void TraceConfig::TriggerConfig::ToProto(
     auto* entry = proto->add_triggers();
     it.ToProto(entry);
   }
+
+  static_assert(
+      sizeof(trigger_timeout_ms_) == sizeof(proto->trigger_timeout_ms()),
+      "size mismatch");
+  proto->set_trigger_timeout_ms(
+      static_cast<decltype(proto->trigger_timeout_ms())>(trigger_timeout_ms_));
   *(proto->mutable_unknown_fields()) = unknown_fields_;
 }
 
@@ -581,7 +594,7 @@ operator=(TraceConfig::TriggerConfig::Trigger&&) = default;
 bool TraceConfig::TriggerConfig::Trigger::operator==(
     const TraceConfig::TriggerConfig::Trigger& other) const {
   return (name_ == other.name_) && (producer_name_ == other.producer_name_) &&
-         (finalize_trace_delay_ms_ == other.finalize_trace_delay_ms_);
+         (stop_delay_ms_ == other.stop_delay_ms_);
 }
 #pragma GCC diagnostic pop
 
@@ -594,11 +607,9 @@ void TraceConfig::TriggerConfig::Trigger::FromProto(
                 "size mismatch");
   producer_name_ = static_cast<decltype(producer_name_)>(proto.producer_name());
 
-  static_assert(sizeof(finalize_trace_delay_ms_) ==
-                    sizeof(proto.finalize_trace_delay_ms()),
+  static_assert(sizeof(stop_delay_ms_) == sizeof(proto.stop_delay_ms()),
                 "size mismatch");
-  finalize_trace_delay_ms_ = static_cast<decltype(finalize_trace_delay_ms_)>(
-      proto.finalize_trace_delay_ms());
+  stop_delay_ms_ = static_cast<decltype(stop_delay_ms_)>(proto.stop_delay_ms());
   unknown_fields_ = proto.unknown_fields();
 }
 
@@ -614,12 +625,10 @@ void TraceConfig::TriggerConfig::Trigger::ToProto(
   proto->set_producer_name(
       static_cast<decltype(proto->producer_name())>(producer_name_));
 
-  static_assert(sizeof(finalize_trace_delay_ms_) ==
-                    sizeof(proto->finalize_trace_delay_ms()),
+  static_assert(sizeof(stop_delay_ms_) == sizeof(proto->stop_delay_ms()),
                 "size mismatch");
-  proto->set_finalize_trace_delay_ms(
-      static_cast<decltype(proto->finalize_trace_delay_ms())>(
-          finalize_trace_delay_ms_));
+  proto->set_stop_delay_ms(
+      static_cast<decltype(proto->stop_delay_ms())>(stop_delay_ms_));
   *(proto->mutable_unknown_fields()) = unknown_fields_;
 }
 

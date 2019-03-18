@@ -32,7 +32,6 @@ source_set("tracing") {
     "../protozero",
   ]
   sources = [
-    "core/activate_triggers_request.cc",
     "core/android_log_config.cc",
     "core/android_power_config.cc",
     "core/chrome_config.cc",

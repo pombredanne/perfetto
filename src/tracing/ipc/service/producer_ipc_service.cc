@@ -21,7 +21,6 @@
 #include "perfetto/base/logging.h"
 #include "perfetto/base/task_runner.h"
 #include "perfetto/ipc/host.h"
-#include "perfetto/tracing/core/activate_triggers_request.h"
 #include "perfetto/tracing/core/commit_data_request.h"
 #include "perfetto/tracing/core/data_source_config.h"
 #include "perfetto/tracing/core/data_source_descriptor.h"
@@ -213,6 +212,28 @@ void ProducerIPCService::CommitData(const protos::CommitDataRequest& proto_req,
   producer->service_endpoint->CommitData(req, callback);
 }
 
+void ProducerIPCService::NotifyDataSourceStarted(
+    const protos::NotifyDataSourceStartedRequest& request,
+    DeferredNotifyDataSourceStartedResponse response) {
+  RemoteProducer* producer = GetProducerForCurrentRequest();
+  if (!producer) {
+    PERFETTO_DLOG(
+        "Producer invoked NotifyDataSourceStarted() before "
+        "InitializeConnection()");
+    if (response.IsBound())
+      response.Reject();
+    return;
+  }
+  producer->service_endpoint->NotifyDataSourceStarted(request.data_source_id());
+
+  // NotifyDataSourceStopped shouldn't expect any meaningful response, avoid
+  // a useless IPC in that case.
+  if (response.IsBound()) {
+    response.Resolve(
+        ipc::AsyncResult<protos::NotifyDataSourceStartedResponse>::Create());
+  }
+}
+
 void ProducerIPCService::NotifyDataSourceStopped(
     const protos::NotifyDataSourceStoppedRequest& request,
     DeferredNotifyDataSourceStoppedResponse response) {
@@ -246,9 +267,11 @@ void ProducerIPCService::ActivateTriggers(
       resp.Reject();
     return;
   }
-  ActivateTriggersRequest req;
-  req.FromProto(proto_req);
-  producer->service_endpoint->ActivateTriggers(req);
+  std::vector<std::string> triggers;
+  for (const auto& name : proto_req.trigger_names()) {
+    triggers.push_back(name);
+  }
+  producer->service_endpoint->ActivateTriggers(triggers);
   // ActivateTriggers shouldn't expect any meaningful response, avoid
   // a useless IPC in that case.
   if (resp.IsBound()) {

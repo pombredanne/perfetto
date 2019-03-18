@@ -34,7 +34,6 @@ namespace base {
 class TaskRunner;
 }  // namespace base
 
-class ActivateTriggersRequest;
 class CommitDataRequest;
 class Consumer;
 class DataSourceDescriptor;
@@ -120,6 +119,11 @@ class PERFETTO_EXPORT TracingService {
     // for the flush request has been committed.
     virtual void NotifyFlushComplete(FlushRequestID) = 0;
 
+    // Called in response to one or more Producer::StartDataSource(),
+    // if the data source registered setting the flag
+    // DataSourceDescriptor.will_notify_on_start.
+    virtual void NotifyDataSourceStarted(DataSourceInstanceID) = 0;
+
     // Called in response to one or more Producer::StopDataSource(),
     // if the data source registered setting the flag
     // DataSourceDescriptor.will_notify_on_stop.
@@ -127,7 +131,7 @@ class PERFETTO_EXPORT TracingService {
 
     // This informs the service to activate any of these triggers if the service
     // was waiting for them.
-    virtual void ActivateTriggers(const ActivateTriggersRequest&) = 0;
+    virtual void ActivateTriggers(const std::vector<std::string>&) = 0;
   };  // class ProducerEndpoint.
 
   // The API for the Consumer port of the Service.

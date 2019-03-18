@@ -19,7 +19,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "perfetto/base/utils.h"
-#include "perfetto/tracing/core/activate_triggers_request.h"
 #include "perfetto/tracing/core/basic_types.h"
 #include "perfetto/tracing/core/commit_data_request.h"
 #include "perfetto/tracing/core/shared_memory_abi.h"
@@ -40,8 +39,9 @@ class MockProducerEndpoint : public TracingService::ProducerEndpoint {
   void RegisterDataSource(const DataSourceDescriptor&) override {}
   void UnregisterDataSource(const std::string&) override {}
   void NotifyFlushComplete(FlushRequestID) override {}
+  void NotifyDataSourceStarted(DataSourceInstanceID) override {}
   void NotifyDataSourceStopped(DataSourceInstanceID) override {}
-  void ActivateTriggers(const ActivateTriggersRequest&) {}
+  void ActivateTriggers(const std::vector<std::string>&) {}
   SharedMemory* shared_memory() const override { return nullptr; }
   size_t shared_buffer_page_size_kb() const override { return 0; }
   std::unique_ptr<TraceWriter> CreateTraceWriter(BufferID) override {
