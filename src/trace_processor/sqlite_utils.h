@@ -459,13 +459,13 @@ int CompareValuesDesc(const T& f, const T& s) {
   return -CompareValuesAsc(f, s);
 }
 
-inline int CompareValuesAsc(const base::StringView& f,
-                            const base::StringView& s) {
-  return memcmp(f.data(), s.data(), std::min(f.size(), s.size()));
+inline int CompareValuesAsc(const NullTermStringView& f,
+                            const NullTermStringView& s) {
+  return strcmp(f.data(), s.data());
 }
 
-inline int CompareValuesDesc(const base::StringView& f,
-                             const base::StringView& s) {
+inline int CompareValuesDesc(const NullTermStringView& f,
+                             const NullTermStringView& s) {
   return -CompareValuesAsc(f, s);
 }
 

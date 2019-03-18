@@ -196,6 +196,7 @@ source_set("unittests") {
     "slice_tracker_unittest.cc",
     "span_join_operator_table_unittest.cc",
     "sqlite3_str_split_unittest.cc",
+    "string_pool_unittest.cc",
     "thread_table_unittest.cc",
     "trace_processor_impl_unittest.cc",
     "trace_sorter_unittest.cc",

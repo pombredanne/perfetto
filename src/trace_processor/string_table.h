@@ -20,6 +20,7 @@
 #include <limits>
 #include <memory>
 
+#include "src/trace_processor/string_pool.h"
 #include "src/trace_processor/table.h"
 
 namespace perfetto {
@@ -59,9 +60,8 @@ class StringTable : public Table {
     int Column(sqlite3_context*, int N) override;
 
    private:
-    size_t row_ = 0;
-    size_t num_rows_ = 0;
-    const TraceStorage* const storage_;
+    StringPool::Iterator iterator_;
+    bool eof_ = false;
   };
 
   const TraceStorage* const storage_;

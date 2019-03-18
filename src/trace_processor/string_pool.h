@@ -32,6 +32,22 @@ class StringPool {
  public:
   using Id = uint32_t;
 
+  // Iterator over the strings in the pool.
+  class Iterator {
+   public:
+    Iterator(const StringPool*);
+
+    bool Next();
+    NullTermStringView StringView();
+    Id Id();
+
+   private:
+    const StringPool* pool_ = nullptr;
+    bool first_ = true;
+    uint32_t block_id_ = 0;
+    uint32_t block_offset_ = 0;
+  };
+
   StringPool();
   ~StringPool() = default;
 
@@ -46,19 +62,12 @@ class StringPool {
   Id InternString(base::StringView);
 
   PERFETTO_ALWAYS_INLINE NullTermStringView Get(Id id) const {
-    uint8_t* ptr;
-    if (sizeof(uint8_t*) == 8) {
-      PERFETTO_DCHECK(blocks_.size() == 1);
-      ptr = blocks_.back().Get(id);
-    } else {
-      ptr = reinterpret_cast<uint8_t*>(id);
-    }
-    // First two bytes hold the length of the string (little endian order).
-    uint16_t lsb = ptr[0];
-    uint16_t msb = ptr[1];
-    uint16_t size = static_cast<uint16_t>(msb << 8u | lsb);
-    return NullTermStringView(reinterpret_cast<char*>(ptr) + 2, size);
+    if (id == 0)
+      return NullTermStringView();
+    return GetFromPtr(IdToPtr(id));
   }
+
+  Iterator CreateIterator() { return Iterator(this); }
 
   size_t size() const { return string_index_.size(); }
 
@@ -92,6 +101,8 @@ class StringPool {
       return static_cast<uint32_t>(ptr - Get(0));
     }
 
+    uint32_t pos() const { return pos_; }
+
    private:
     static size_t BlockSize() {
       if (sizeof(uint8_t*) == 8)
@@ -102,6 +113,37 @@ class StringPool {
     base::PagedMemory inner_;
     uint32_t pos_ = 0;
   };
+
+  friend class Iterator;
+
+  // Number of bytes to reserve for size and null terminator.
+  static constexpr uint8_t kMetadataSize = 3;
+
+  PERFETTO_ALWAYS_INLINE Id PtrToId(uint8_t* ptr) const {
+    if (sizeof(uint8_t*) == 8)
+      return blocks_.back().OffsetOf(ptr);
+
+    // Double cast needed because, on 64 arches, the compiler complains that we
+    // are losing information.
+    return static_cast<Id>(reinterpret_cast<uint64_t>(ptr));
+  }
+
+  PERFETTO_ALWAYS_INLINE uint8_t* IdToPtr(Id id) const {
+    if (sizeof(uint8_t*) == 8) {
+      PERFETTO_DCHECK(blocks_.size() == 1);
+      return blocks_.back().Get(id);
+    }
+    return reinterpret_cast<uint8_t*>(id);
+  }
+
+  PERFETTO_ALWAYS_INLINE static uint16_t GetSize(uint8_t* ptr) {
+    // First two bytes hold the length of the string (little endian order).
+    return static_cast<uint16_t>(ptr[1] << 8u | ptr[0]);
+  }
+
+  PERFETTO_ALWAYS_INLINE static NullTermStringView GetFromPtr(uint8_t* ptr) {
+    return NullTermStringView(reinterpret_cast<char*>(&ptr[2]), GetSize(ptr));
+  }
 
   // The actual memory storing the strings.
   std::vector<Block> blocks_;

@@ -245,15 +245,15 @@ class StringColumn final : public StorageColumn {
       return [this](uint32_t f, uint32_t s) {
         const std::string& a = (*string_map_)[(*deque_)[f]];
         const std::string& b = (*string_map_)[(*deque_)[s]];
-        return sqlite_utils::CompareValuesDesc(base::StringView(a),
-                                               base::StringView(b));
+        return sqlite_utils::CompareValuesDesc(NullTermStringView(a),
+                                               NullTermStringView(b));
       };
     }
     return [this](uint32_t f, uint32_t s) {
       const std::string& a = (*string_map_)[(*deque_)[f]];
       const std::string& b = (*string_map_)[(*deque_)[s]];
-      return sqlite_utils::CompareValuesAsc(base::StringView(a),
-                                            base::StringView(b));
+      return sqlite_utils::CompareValuesAsc(NullTermStringView(a),
+                                            NullTermStringView(b));
     };
   }
 
@@ -297,14 +297,14 @@ class StringColumn2 final : public StorageColumn {
   Comparator Sort(const QueryConstraints::OrderBy& ob) const override {
     if (ob.desc) {
       return [this](uint32_t f, uint32_t s) {
-        base::StringView a = pool_->Get((*deque_)[f]);
-        base::StringView b = pool_->Get((*deque_)[s]);
+        auto a = pool_->Get((*deque_)[f]);
+        auto b = pool_->Get((*deque_)[s]);
         return sqlite_utils::CompareValuesDesc(a, b);
       };
     }
     return [this](uint32_t f, uint32_t s) {
-      base::StringView a = pool_->Get((*deque_)[f]);
-      base::StringView b = pool_->Get((*deque_)[s]);
+      auto a = pool_->Get((*deque_)[f]);
+      auto b = pool_->Get((*deque_)[s]);
       return sqlite_utils::CompareValuesAsc(a, b);
     };
   }

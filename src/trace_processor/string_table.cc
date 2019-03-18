@@ -57,29 +57,30 @@ int StringTable::BestIndex(const QueryConstraints&, BestIndexInfo* info) {
   return SQLITE_OK;
 }
 
-StringTable::Cursor::Cursor(const TraceStorage* storage) : storage_(storage) {
-  num_rows_ = storage->string_count();
+StringTable::Cursor::Cursor(const TraceStorage* storage)
+    : iterator_(&storage->string_pool()) {
+  // Call Next() so we have primed the iterator.
+  Next();
 }
 
 StringTable::Cursor::~Cursor() = default;
 
 int StringTable::Cursor::Next() {
-  row_++;
+  eof_ = !iterator_.Next();
   return SQLITE_OK;
 }
 
 int StringTable::Cursor::Eof() {
-  return row_ >= num_rows_;
+  return eof_;
 }
 
 int StringTable::Cursor::Column(sqlite3_context* context, int col) {
-  StringId string_id = static_cast<StringId>(row_);
   switch (col) {
     case Column::kStringId:
-      sqlite3_result_int64(context, static_cast<sqlite3_int64>(row_));
+      sqlite3_result_int64(context, static_cast<sqlite3_int64>(iterator_.Id()));
       break;
     case Column::kString:
-      sqlite3_result_text(context, storage_->GetString(string_id).data(), -1,
+      sqlite3_result_text(context, iterator_.StringView().data(), -1,
                           sqlite_utils::kSqliteStatic);
       break;
   }

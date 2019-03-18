@@ -16,6 +16,8 @@
 
 #include "src/trace_processor/string_pool.h"
 
+#include "perfetto/base/logging.h"
+
 namespace perfetto {
 namespace trace_processor {
 
@@ -38,12 +40,10 @@ StringPool::Id StringPool::InternString(base::StringView str) {
     return id_it->second;
   }
 
-  // Number of bytes to reserve for size and null terminator.
-  constexpr uint8_t kMetadataSize = 3;
   uint32_t str_size = static_cast<uint32_t>(str.size());
   auto* ptr = blocks_.back().Reserve(kMetadataSize + str_size);
   if (PERFETTO_UNLIKELY(!ptr)) {
-    PERFETTO_DCHECK(sizeof(uint8_t*) == 4);
+    PERFETTO_CHECK(sizeof(uint8_t*) == 4);
     blocks_.emplace_back();
 
     ptr = blocks_.back().Reserve(kMetadataSize + str_size);
@@ -58,17 +58,57 @@ StringPool::Id StringPool::InternString(base::StringView str) {
   memcpy(&ptr[2], str.data(), str_size);
   ptr[2 + str_size] = '\0';
 
-  Id string_id;
-  if (sizeof(uint8_t*) == 8) {
-    string_id = blocks_.back().OffsetOf(ptr);
-  } else {
-    // Double cast needed because on 64 archs, we get complaint that we are
-    // losing information.
-    string_id = static_cast<Id>(reinterpret_cast<uint64_t>(ptr));
-  }
-
+  Id string_id = PtrToId(ptr);
   string_index_.emplace(hash, string_id);
   return string_id;
+}
+
+StringPool::Iterator::Iterator(const StringPool* pool) : pool_(pool) {}
+
+bool StringPool::Iterator::Next() {
+  PERFETTO_DCHECK(block_id_ < pool_->blocks_.size());
+
+  // On the first call to next, always return true as we always have the null
+  // string.
+  if (PERFETTO_UNLIKELY(first_)) {
+    first_ = false;
+    return true;
+  }
+
+  // Otherwise, try and go to the next string in the current block.
+  const auto& block = pool_->blocks_[block_id_];
+  if (PERFETTO_UNLIKELY(block_id_ == 0 && block_offset_ == 0)) {
+    block_offset_ = 1;
+  } else {
+    auto size = GetSize(block.Get(block_offset_));
+    block_offset_ += kMetadataSize + size;
+  }
+
+  // If we're out of bounds for this block, go the the start of the next block.
+  if (block.pos() <= block_offset_) {
+    block_id_++;
+    block_offset_ = 0;
+    return block_id_ < pool_->blocks_.size();
+  }
+  return true;
+}
+
+NullTermStringView StringPool::Iterator::StringView() {
+  PERFETTO_DCHECK(block_id_ < pool_->blocks_.size());
+  PERFETTO_DCHECK(block_offset_ < pool_->blocks_[block_id_].pos());
+
+  if (block_id_ == 0 && block_offset_ == 0)
+    return NullTermStringView();
+  return GetFromPtr(pool_->blocks_[block_id_].Get(block_offset_));
+}
+
+StringPool::Id StringPool::Iterator::Id() {
+  PERFETTO_DCHECK(block_id_ < pool_->blocks_.size());
+  PERFETTO_DCHECK(block_offset_ < pool_->blocks_[block_id_].pos());
+
+  if (block_id_ == 0 && block_offset_ == 0)
+    return 0;
+  return pool_->PtrToId(pool_->blocks_[block_id_].Get(block_offset_));
 }
 
 }  // namespace trace_processor
