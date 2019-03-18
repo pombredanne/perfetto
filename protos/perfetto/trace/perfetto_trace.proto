@@ -3459,17 +3459,16 @@ message TraceConfig {
       // |triggers| are received. This supports early initialization and fast
       // starting of the tracing system. On triggering, the session will then
       // record for |stop_delay_ms|. However if no trigger is seen
-      // after |duration_ms| (in the general trace config; must be set to a
-      // positive number) the session will be stopped and no data will be
-      // returned.
+      // after |trigger_timeout_ms| the session will be stopped and no data will
+      // be returned.
       START_TRACING = 1;
 
       // When this mode is chosen, the session will be started via the normal
       // EnableTracing() & StartTracing(). If no trigger is ever seen
-      // the session will be stopped after |duration_ms| and no data will be
-      // returned. However if triggered the trace will stop after
-      // |stop_delay_ms| and any data in the buffer will be returned
-      // to the consumer.
+      // the session will be stopped after |trigger_timeout_ms| and no data will
+      // be returned. However if triggered the trace will stop after
+      // |stop_delay_ms| and any data in the buffer will be returned to the
+      // consumer.
       STOP_TRACING = 2;
     }
     optional TriggerMode trigger_mode = 1;
@@ -3489,6 +3488,12 @@ message TraceConfig {
     // A list of triggers which are related to this configuration. If ANY
     // trigger is seen then an action will be performed based on |trigger_mode|.
     repeated Trigger triggers = 2;
+
+    // Required and must be positive if a TriggerConfig is specified. This is
+    // how long this TraceConfig should wait for a trigger to arrive. After this
+    // period of time if no trigger is seen the TracingSession will be cleaned
+    // up.
+    optional uint32 trigger_timeout_ms = 3;
   }
   optional TriggerConfig trigger_config = 17;
 }

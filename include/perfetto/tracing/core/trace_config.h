@@ -343,9 +343,13 @@ class PERFETTO_EXPORT TraceConfig {
       return &triggers_.back();
     }
 
+    uint32_t trigger_timeout_ms() const { return trigger_timeout_ms_; }
+    void set_trigger_timeout_ms(uint32_t value) { trigger_timeout_ms_ = value; }
+
    private:
     TriggerMode trigger_mode_ = {};
     std::vector<Trigger> triggers_;
+    uint32_t trigger_timeout_ms_ = {};
 
     // Allows to preserve unknown protobuf fields for compatibility
     // with future versions of .proto files.

@@ -531,7 +531,8 @@ TraceConfig::TriggerConfig& TraceConfig::TriggerConfig::operator=(
 bool TraceConfig::TriggerConfig::operator==(
     const TraceConfig::TriggerConfig& other) const {
   return (trigger_mode_ == other.trigger_mode_) &&
-         (triggers_ == other.triggers_);
+         (triggers_ == other.triggers_) &&
+         (trigger_timeout_ms_ == other.trigger_timeout_ms_);
 }
 #pragma GCC diagnostic pop
 
@@ -546,6 +547,12 @@ void TraceConfig::TriggerConfig::FromProto(
     triggers_.emplace_back();
     triggers_.back().FromProto(field);
   }
+
+  static_assert(
+      sizeof(trigger_timeout_ms_) == sizeof(proto.trigger_timeout_ms()),
+      "size mismatch");
+  trigger_timeout_ms_ =
+      static_cast<decltype(trigger_timeout_ms_)>(proto.trigger_timeout_ms());
   unknown_fields_ = proto.unknown_fields();
 }
 
@@ -562,6 +569,12 @@ void TraceConfig::TriggerConfig::ToProto(
     auto* entry = proto->add_triggers();
     it.ToProto(entry);
   }
+
+  static_assert(
+      sizeof(trigger_timeout_ms_) == sizeof(proto->trigger_timeout_ms()),
+      "size mismatch");
+  proto->set_trigger_timeout_ms(
+      static_cast<decltype(proto->trigger_timeout_ms())>(trigger_timeout_ms_));
   *(proto->mutable_unknown_fields()) = unknown_fields_;
 }
 
