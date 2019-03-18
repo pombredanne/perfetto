@@ -39,7 +39,7 @@ class StringPool {
 
     bool Next();
     NullTermStringView StringView();
-    Id Id();
+    Id StringId();
 
    private:
     const StringPool* pool_ = nullptr;

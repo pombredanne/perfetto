@@ -102,7 +102,7 @@ NullTermStringView StringPool::Iterator::StringView() {
   return GetFromPtr(pool_->blocks_[block_id_].Get(block_offset_));
 }
 
-StringPool::Id StringPool::Iterator::Id() {
+StringPool::Id StringPool::Iterator::StringId() {
   PERFETTO_DCHECK(block_id_ < pool_->blocks_.size());
   PERFETTO_DCHECK(block_offset_ < pool_->blocks_[block_id_].pos());
 

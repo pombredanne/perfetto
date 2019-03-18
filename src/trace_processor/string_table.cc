@@ -77,7 +77,8 @@ int StringTable::Cursor::Eof() {
 int StringTable::Cursor::Column(sqlite3_context* context, int col) {
   switch (col) {
     case Column::kStringId:
-      sqlite3_result_int64(context, static_cast<sqlite3_int64>(iterator_.Id()));
+      sqlite3_result_int64(context,
+                           static_cast<sqlite3_int64>(iterator_.StringId()));
       break;
     case Column::kString:
       sqlite3_result_text(context, iterator_.StringView().data(), -1,
