@@ -330,9 +330,7 @@ bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   std::unordered_set<std::string> triggers;
   for (const auto& trigger : cfg.trigger_config().triggers()) {
     if (!triggers.insert(trigger.name()).second) {
-      PERFETTO_ELOG(
-          "Trigger names should be unique inside of a config. Saw \"%s\" twice",
-          trigger.name().c_str());
+      PERFETTO_ELOG("Duplicate trigger name: %s", trigger.name().c_str());
       return false;
     }
   }
@@ -498,7 +496,8 @@ bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
 
   // Start the data sources, unless this is a case of early setup + fast
   // triggering, either through TraceConfig.deferred_start or
-  // TraceConfig.trigger_config().
+  // TraceConfig.trigger_config(). If both are specified which ever one occurs
+  // first will initiate the trace.
   if (!cfg.deferred_start() && !has_start_trigger) {
     return StartTracing(tsid);
   }
@@ -853,6 +852,8 @@ void TracingServiceImpl::ActivateTriggers(
     ProducerID producer_id,
     const std::vector<std::string>& triggers) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
+  auto* producer = GetProducer(producer_id);
+  PERFETTO_DCHECK(producer);
   for (const auto& trigger_name : triggers) {
     for (auto& id_and_tracing_session : tracing_sessions_) {
       auto& tracing_session = id_and_tracing_session.second;
@@ -865,8 +866,6 @@ void TracingServiceImpl::ActivateTriggers(
       if (iter == tracing_session.config.trigger_config().triggers().end()) {
         continue;
       }
-      auto* producer = GetProducer(producer_id);
-      PERFETTO_DCHECK(producer);
 
       // If this trigger requires a certain producer to have sent it
       // (non-empty producer_name()) ensure the producer who sent this trigger
@@ -1511,7 +1510,6 @@ void TracingServiceImpl::FreeBuffers(TracingSessionID tsid) {
     buffers_.erase(buffer_id);
   }
   bool notify_traceur = tracing_session->config.notify_traceur();
-
   tracing_sessions_.erase(tsid);
   UpdateMemoryGuardrail();
 

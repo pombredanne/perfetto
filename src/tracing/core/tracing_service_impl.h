@@ -446,11 +446,6 @@ class TracingServiceImpl : public TracingService {
     uint64_t bytes_written_into_file = 0;
   };
 
-  struct TriggerInfo {
-    TracingSessionID session;
-    const TraceConfig::TriggerConfig::Trigger* trigger;
-  };
-
   TracingServiceImpl(const TracingServiceImpl&) = delete;
   TracingServiceImpl& operator=(const TracingServiceImpl&) = delete;
 
