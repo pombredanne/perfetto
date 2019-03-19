@@ -70,19 +70,19 @@ class TracingServiceImplTest : public testing::Test {
     auto shm_factory =
         std::unique_ptr<SharedMemory::Factory>(new TestSharedMemory::Factory());
     svc.reset(static_cast<TracingServiceImpl*>(
-        TracingService::CreateInstance(std::move(shm_factory), &task_runner_)
+        TracingService::CreateInstance(std::move(shm_factory), &task_runner)
             .release()));
     svc->min_write_period_ms_ = 1;
   }
 
   std::unique_ptr<MockProducer> CreateMockProducer() {
     return std::unique_ptr<MockProducer>(
-        new StrictMock<MockProducer>(&task_runner_));
+        new StrictMock<MockProducer>(&task_runner));
   }
 
   std::unique_ptr<MockConsumer> CreateMockConsumer() {
     return std::unique_ptr<MockConsumer>(
-        new StrictMock<MockConsumer>(&task_runner_));
+        new StrictMock<MockConsumer>(&task_runner));
   }
 
   ProducerID* last_producer_id() { return &svc->last_producer_id_; }
@@ -127,9 +127,9 @@ class TracingServiceImplTest : public testing::Test {
     static int attempt = 0;
     while (tracing_session()->last_snapshot_time == base::TimeMillis(0)) {
       auto checkpoint_name = "wait_snapshot_" + std::to_string(attempt++);
-      auto timer_expired = task_runner_.CreateCheckpoint(checkpoint_name);
-      task_runner_.PostDelayedTask([timer_expired] { timer_expired(); }, 1);
-      task_runner_.RunUntilCheckpoint(checkpoint_name);
+      auto timer_expired = task_runner.CreateCheckpoint(checkpoint_name);
+      task_runner.PostDelayedTask([timer_expired] { timer_expired(); }, 1);
+      task_runner.RunUntilCheckpoint(checkpoint_name);
     }
   }
 
@@ -137,7 +137,7 @@ class TracingServiceImplTest : public testing::Test {
     static int i = 0;
     auto checkpoint_name = "writers_changed_" + std::to_string(producer_id) +
                            "_" + std::to_string(i++);
-    auto writers_changed = task_runner_.CreateCheckpoint(checkpoint_name);
+    auto writers_changed = task_runner.CreateCheckpoint(checkpoint_name);
     auto writers = GetWriters(producer_id);
     std::function<void()> task;
     task = [&task, writers, writers_changed, producer_id, this]() {
@@ -145,10 +145,10 @@ class TracingServiceImplTest : public testing::Test {
         writers_changed();
         return;
       }
-      task_runner_.PostDelayedTask(task, 1);
+      task_runner.PostDelayedTask(task, 1);
     };
-    task_runner_.PostDelayedTask(task, 1);
-    task_runner_.RunUntilCheckpoint(checkpoint_name);
+    task_runner.PostDelayedTask(task, 1);
+    task_runner.RunUntilCheckpoint(checkpoint_name);
   }
 
   DataSourceInstanceState GetDataSourceInstanceState(const std::string& name) {
@@ -160,7 +160,7 @@ class TracingServiceImplTest : public testing::Test {
                    name.c_str());
   }
 
-  base::TestTaskRunner task_runner_;
+  base::TestTaskRunner task_runner;
   std::unique_ptr<TracingServiceImpl> svc;
 };
 
@@ -240,9 +240,9 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerDeferredStart) {
   trigger_config->set_trigger_mode(TraceConfig::TriggerConfig::START_TRACING);
   auto* trigger = trigger_config->add_triggers();
   trigger->set_name("trigger_name");
-  trigger->set_stop_delay_ms(30);
+  trigger->set_stop_delay_ms(1);
 
-  trigger_config->set_trigger_timeout_ms(100);
+  trigger_config->set_trigger_timeout_ms(30000);
 
   consumer->EnableTracing(trace_config);
   producer->WaitForTracingSetup();
@@ -250,12 +250,13 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerDeferredStart) {
   producer->WaitForDataSourceSetup("ds_1");
 
   // Make sure we don't get unexpected DataSourceStart() notifications yet.
-  task_runner_.RunUntilIdle();
+  task_runner.RunUntilIdle();
 
   // The trace won't start until we send the trigger. since we have a
   // START_TRACING trigger defined.
   std::vector<std::string> req;
   req.push_back("trigger_name");
+  auto start_time = base::GetBootTimeNs().count();
   producer->endpoint()->ActivateTriggers(req);
 
   producer->WaitForDataSourceStart("ds_1");
@@ -263,6 +264,10 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerDeferredStart) {
   auto writer1 = producer->CreateTraceWriter("ds_1");
   producer->WaitForFlush(writer1.get());
 
+  producer->WaitForDataSourceStop("ds_1");
+  consumer->WaitForTracingDisabled();
+
+  EXPECT_NEAR(base::GetBootTimeNs().count() - start_time, 1e+6, 1e+6);
   ASSERT_EQ(1u, tracing_session()->received_triggers.size());
   // Just expect tht time is within one second of now to prevent flakyness.
   EXPECT_NEAR(tracing_session()->received_triggers[0].first,
@@ -270,8 +275,6 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerDeferredStart) {
   EXPECT_EQ("trigger_name",
             tracing_session()->received_triggers[0].second.name());
 
-  producer->WaitForDataSourceStop("ds_1");
-  consumer->WaitForTracingDisabled();
   EXPECT_THAT(
       consumer->ReadBuffers(),
       Contains(Property(
@@ -303,17 +306,18 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerTimeOut) {
   trigger_config->set_trigger_mode(TraceConfig::TriggerConfig::START_TRACING);
   auto* trigger = trigger_config->add_triggers();
   trigger->set_name("trigger_name");
-  trigger->set_stop_delay_ms(30);
+  trigger->set_stop_delay_ms(30000);
 
-  trigger_config->set_trigger_timeout_ms(50);
+  trigger_config->set_trigger_timeout_ms(1);
 
+  auto start_time = base::GetBootTimeNs().count();
   consumer->EnableTracing(trace_config);
   producer->WaitForTracingSetup();
 
   producer->WaitForDataSourceSetup("ds_1");
 
   // Make sure we don't get unexpected DataSourceStart() notifications yet.
-  task_runner_.RunUntilIdle();
+  task_runner.RunUntilIdle();
 
   // The trace won't start until we send the trigger. since we have a
   // START_TRACING trigger defined. This is where we'd expect to have an
@@ -321,6 +325,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerTimeOut) {
 
   producer->WaitForDataSourceStop("ds_1");
   consumer->WaitForTracingDisabled();
+  EXPECT_NEAR(base::GetBootTimeNs().count() - start_time, 1e+6, 1e+6);
   EXPECT_THAT(consumer->ReadBuffers(), ::testing::IsEmpty());
 }
 
@@ -345,10 +350,10 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerDifferentProducer) {
   trigger_config->set_trigger_mode(TraceConfig::TriggerConfig::START_TRACING);
   auto* trigger = trigger_config->add_triggers();
   trigger->set_name("trigger_name");
-  trigger->set_stop_delay_ms(30);
+  trigger->set_stop_delay_ms(30000);
   trigger->set_producer_name("correct_name");
 
-  trigger_config->set_trigger_timeout_ms(50);
+  trigger_config->set_trigger_timeout_ms(1);
 
   consumer->EnableTracing(trace_config);
   producer->WaitForTracingSetup();
@@ -356,7 +361,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerDifferentProducer) {
   producer->WaitForDataSourceSetup("ds_1");
 
   // Make sure we don't get unexpected DataSourceStart() notifications yet.
-  task_runner_.RunUntilIdle();
+  task_runner.RunUntilIdle();
 
   // The trace won't start until we send the trigger called "trigger_name"
   // coming from a producer called "correct_name", since we have a
@@ -391,10 +396,10 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerCorrectProducer) {
   trigger_config->set_trigger_mode(TraceConfig::TriggerConfig::START_TRACING);
   auto* trigger = trigger_config->add_triggers();
   trigger->set_name("trigger_name");
-  trigger->set_stop_delay_ms(30);
+  trigger->set_stop_delay_ms(1);
   trigger->set_producer_name("mock_producer");
 
-  trigger_config->set_trigger_timeout_ms(50);
+  trigger_config->set_trigger_timeout_ms(30000);
 
   consumer->EnableTracing(trace_config);
   producer->WaitForTracingSetup();
@@ -402,7 +407,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerCorrectProducer) {
   producer->WaitForDataSourceSetup("ds_1");
 
   // Make sure we don't get unexpected DataSourceStart() notifications yet.
-  task_runner_.RunUntilIdle();
+  task_runner.RunUntilIdle();
 
   // Start the trace at this point with ActivateTriggers.
   std::vector<std::string> req;
@@ -438,9 +443,9 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerDifferentTrigger) {
   trigger_config->set_trigger_mode(TraceConfig::TriggerConfig::START_TRACING);
   auto* trigger = trigger_config->add_triggers();
   trigger->set_name("trigger_name");
-  trigger->set_stop_delay_ms(30);
+  trigger->set_stop_delay_ms(30000);
 
-  trigger_config->set_trigger_timeout_ms(50);
+  trigger_config->set_trigger_timeout_ms(1);
 
   consumer->EnableTracing(trace_config);
   producer->WaitForTracingSetup();
@@ -448,7 +453,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerDifferentTrigger) {
   producer->WaitForDataSourceSetup("ds_1");
 
   // Make sure we don't get unexpected DataSourceStart() notifications yet.
-  task_runner_.RunUntilIdle();
+  task_runner.RunUntilIdle();
 
   // The trace won't start until we send the trigger called "trigger_name",
   // since we have a START_TRACING trigger defined. This is where we'd expect to
@@ -482,9 +487,9 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerMultipleTriggers) {
   trigger_config->set_trigger_mode(TraceConfig::TriggerConfig::START_TRACING);
   auto* trigger = trigger_config->add_triggers();
   trigger->set_name("trigger_name");
-  trigger->set_stop_delay_ms(30);
+  trigger->set_stop_delay_ms(1);
 
-  trigger_config->set_trigger_timeout_ms(50);
+  trigger_config->set_trigger_timeout_ms(30000);
 
   consumer->EnableTracing(trace_config);
   producer->WaitForTracingSetup();
@@ -492,7 +497,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerMultipleTriggers) {
   producer->WaitForDataSourceSetup("ds_1");
 
   // Make sure we don't get unexpected DataSourceStart() notifications yet.
-  task_runner_.RunUntilIdle();
+  task_runner.RunUntilIdle();
 
   std::vector<std::string> req;
   req.push_back("not_correct_trigger");
@@ -531,9 +536,9 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerMultipleTraces) {
   trigger_config->set_trigger_mode(TraceConfig::TriggerConfig::START_TRACING);
   auto* trigger = trigger_config->add_triggers();
   trigger->set_name("trigger_name");
-  trigger->set_stop_delay_ms(30);
+  trigger->set_stop_delay_ms(1);
 
-  trigger_config->set_trigger_timeout_ms(50);
+  trigger_config->set_trigger_timeout_ms(30000);
 
   consumer_1->EnableTracing(trace_config);
   producer->WaitForTracingSetup();
@@ -542,13 +547,13 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerMultipleTraces) {
 
   // Make sure we don't get unexpected DataSourceStart() notifications yet from
   // consumer_1.
-  task_runner_.RunUntilIdle();
+  task_runner.RunUntilIdle();
   auto tracing_session_1_id = GetTracingSessionID();
 
   (*trace_config.mutable_data_sources())[0].mutable_config()->set_name("ds_2");
   trigger = trace_config.mutable_trigger_config()->add_triggers();
   trigger->set_name("trigger_name_2");
-  trigger->set_stop_delay_ms(40);
+  trigger->set_stop_delay_ms(30000);
 
   consumer_2->EnableTracing(trace_config);
 
@@ -556,7 +561,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerMultipleTraces) {
 
   // Make sure we don't get unexpected DataSourceStart() notifications yet from
   // consumer_2.
-  task_runner_.RunUntilIdle();
+  task_runner.RunUntilIdle();
   auto tracing_session_2_id = GetTracingSessionID();
   EXPECT_NE(tracing_session_1_id, tracing_session_2_id);
 
@@ -570,7 +575,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerMultipleTraces) {
   producer->endpoint()->ActivateTriggers(req);
 
   // The order has to be the same as the triggers or else we're incorrectly wait
-  // on the wrong checkpoint in the |task_runner_|.
+  // on the wrong checkpoint in the |task_runner|.
   producer->WaitForDataSourceStart("ds_1");
   producer->WaitForDataSourceStart("ds_2");
 
@@ -593,12 +598,13 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerMultipleTraces) {
   EXPECT_LT(first_trigger_ns, second_trigger_ns);
   EXPECT_EQ("trigger_name",
             tracing_session_2->received_triggers[0].second.name());
-  EXPECT_EQ(30, tracing_session_2->received_triggers[0].second.stop_delay_ms());
+  EXPECT_EQ(1, tracing_session_2->received_triggers[0].second.stop_delay_ms());
 
   EXPECT_LT(second_trigger_ns, tracing_session_2->received_triggers[1].first);
   EXPECT_EQ("trigger_name_2",
             tracing_session_2->received_triggers[1].second.name());
-  EXPECT_EQ(40, tracing_session_2->received_triggers[1].second.stop_delay_ms());
+  EXPECT_EQ(30000,
+            tracing_session_2->received_triggers[1].second.stop_delay_ms());
 
   auto writer1 = producer->CreateTraceWriter("ds_1");
   auto writer2 = producer->CreateTraceWriter("ds_2");
@@ -626,7 +632,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerMultipleTraces) {
       .WillOnce(Invoke(flush_correct_writer));
 
   auto checkpoint_name = "on_tracing_disabled_consumer_1_and_2";
-  auto on_tracing_disabled = task_runner_.CreateCheckpoint(checkpoint_name);
+  auto on_tracing_disabled = task_runner.CreateCheckpoint(checkpoint_name);
   std::atomic<size_t> counter(0);
   EXPECT_CALL(*consumer_1, OnTracingDisabled()).WillOnce(Invoke([&]() {
     if (++counter == 2u) {
@@ -642,7 +648,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerMultipleTraces) {
   EXPECT_CALL(*producer, StopDataSource(id1));
   EXPECT_CALL(*producer, StopDataSource(id2));
 
-  task_runner_.RunUntilCheckpoint(checkpoint_name, 1000);
+  task_runner.RunUntilCheckpoint(checkpoint_name, 1000);
 
   EXPECT_TRUE(flushed_writer_1);
   EXPECT_TRUE(flushed_writer_2);
@@ -672,7 +678,7 @@ TEST_F(TracingServiceImplTest, LockdownMode) {
   auto x = svc->ConnectProducer(producer_otheruid.get(), geteuid() + 1,
                                 "mock_producer_ouid");
   EXPECT_CALL(*producer_otheruid, OnConnect()).Times(0);
-  task_runner_.RunUntilIdle();
+  task_runner.RunUntilIdle();
   Mock::VerifyAndClearExpectations(producer_otheruid.get());
 
   consumer->DisableTracing();
@@ -727,7 +733,7 @@ TEST_F(TracingServiceImplTest, ProducerNameFilterChange) {
 
   EXPECT_CALL(*producer2, OnConnect()).Times(0);
   EXPECT_CALL(*producer3, OnConnect()).Times(0);
-  task_runner_.RunUntilIdle();
+  task_runner.RunUntilIdle();
   Mock::VerifyAndClearExpectations(producer2.get());
   Mock::VerifyAndClearExpectations(producer3.get());
 
@@ -754,7 +760,7 @@ TEST_F(TracingServiceImplTest, ProducerNameFilterChange) {
   producer3->WaitForTracingSetup();
   EXPECT_CALL(*producer3, SetupDataSource(_, _)).Times(1);
   EXPECT_CALL(*producer3, StartDataSource(_, _)).Times(1);
-  task_runner_.RunUntilIdle();
+  task_runner.RunUntilIdle();
   Mock::VerifyAndClearExpectations(producer3.get());
 
   consumer->DisableTracing();
@@ -766,7 +772,7 @@ TEST_F(TracingServiceImplTest, ProducerNameFilterChange) {
 
   consumer->WaitForTracingDisabled();
 
-  task_runner_.RunUntilIdle();
+  task_runner.RunUntilIdle();
   Mock::VerifyAndClearExpectations(producer3.get());
 }
 
@@ -1148,7 +1154,7 @@ TEST_F(TracingServiceImplTest, PeriodicFlush) {
       producer->CreateTraceWriter("data_source");
 
   const int kNumFlushes = 3;
-  auto checkpoint = task_runner_.CreateCheckpoint("all_flushes_done");
+  auto checkpoint = task_runner.CreateCheckpoint("all_flushes_done");
   int flushes_seen = 0;
   EXPECT_CALL(*producer, Flush(_, _, _))
       .WillRepeatedly(Invoke([&producer, &writer, &flushes_seen, checkpoint](
@@ -1165,7 +1171,7 @@ TEST_F(TracingServiceImplTest, PeriodicFlush) {
         if (++flushes_seen == kNumFlushes)
           checkpoint();
       }));
-  task_runner_.RunUntilCheckpoint("all_flushes_done");
+  task_runner.RunUntilCheckpoint("all_flushes_done");
 
   consumer->DisableTracing();
   producer->WaitForDataSourceStop("data_source");
@@ -1487,7 +1493,7 @@ TEST_F(TracingServiceImplTest, DeferredStart) {
   producer->WaitForDataSourceSetup("ds_1");
 
   // Make sure we don't get unexpected DataSourceStart() notifications yet.
-  task_runner_.RunUntilIdle();
+  task_runner.RunUntilIdle();
 
   consumer->StartTracing();
 
