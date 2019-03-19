@@ -298,9 +298,11 @@ class PERFETTO_EXPORT TraceConfig {
       const std::string& name() const { return name_; }
       void set_name(const std::string& value) { name_ = value; }
 
-      const std::string& producer_name() const { return producer_name_; }
-      void set_producer_name(const std::string& value) {
-        producer_name_ = value;
+      const std::string& producer_name_regex() const {
+        return producer_name_regex_;
+      }
+      void set_producer_name_regex(const std::string& value) {
+        producer_name_regex_ = value;
       }
 
       uint32_t stop_delay_ms() const { return stop_delay_ms_; }
@@ -308,7 +310,7 @@ class PERFETTO_EXPORT TraceConfig {
 
      private:
       std::string name_ = {};
-      std::string producer_name_ = {};
+      std::string producer_name_regex_ = {};
       uint32_t stop_delay_ms_ = {};
 
       // Allows to preserve unknown protobuf fields for compatibility
