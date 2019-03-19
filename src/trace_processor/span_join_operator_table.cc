@@ -505,12 +505,13 @@ SpanJoinOperatorTable::Query::StepToNextPartition() {
 }
 
 SpanJoinOperatorTable::Query::StepRet
-SpanJoinOperatorTable::Query::StepToPartition(int64_t partition) {
-  PERFETTO_DCHECK(partition_ <= partition);
+SpanJoinOperatorTable::Query::StepToPartition(int64_t target_partition) {
+  PERFETTO_DCHECK(partition_ <= target_partition);
   if (defn_->IsPartitioned()) {
-    while (partition_ < partition) {
-      if (IsFullPartitionShadowSlice() && partition < CursorPartition()) {
-        partition_ = partition;
+    while (partition_ < target_partition) {
+      if (IsFullPartitionShadowSlice() &&
+          target_partition < CursorPartition()) {
+        partition_ = target_partition;
         return StepRet(StepRet::Code::kRow);
       }
 
@@ -518,11 +519,11 @@ SpanJoinOperatorTable::Query::StepToPartition(int64_t partition) {
       if (!res.is_row())
         return res;
     }
-  } else if (/* !defn_->IsPartitioned() && */ partition_ < partition) {
+  } else if (/* !defn_->IsPartitioned() && */ partition_ < target_partition) {
     int res = PrepareRawStmt();
     if (res != SQLITE_OK)
       return StepRet(StepRet::Code::kError, res);
-    partition_ = partition;
+    partition_ = target_partition;
   }
   return StepRet(StepRet::Code::kRow);
 }

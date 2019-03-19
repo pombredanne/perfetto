@@ -163,7 +163,7 @@ class SpanJoinOperatorTable : public Table {
 
     StepRet Step();
     StepRet StepToNextPartition();
-    StepRet StepToPartition(int64_t partition);
+    StepRet StepToPartition(int64_t target_partition);
     StepRet StepUntil(int64_t timestamp);
 
     void ReportSqliteResult(sqlite3_context* context, size_t index);
