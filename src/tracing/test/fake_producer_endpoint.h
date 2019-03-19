@@ -17,9 +17,6 @@
 #ifndef SRC_TRACING_TEST_FAKE_PRODUCER_ENDPOINT_H_
 #define SRC_TRACING_TEST_FAKE_PRODUCER_ENDPOINT_H_
 
-#include <string>
-#include <vector>
-
 #include "perfetto/tracing/core/commit_data_request.h"
 #include "perfetto/tracing/core/tracing_service.h"
 

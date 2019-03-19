@@ -325,9 +325,7 @@ bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   std::unordered_set<std::string> triggers;
   for (const auto& trigger : cfg.trigger_config().triggers()) {
     if (!triggers.insert(trigger.name()).second) {
-      PERFETTO_ELOG(
-          "Trigger names should be unique inside of a config. Saw \"%s\" twice",
-          trigger.name().c_str());
+      PERFETTO_ELOG("Duplicate trigger name: %s", trigger.name().c_str());
       return false;
     }
   }
@@ -509,7 +507,8 @@ bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
 
   // Start the data sources, unless this is a case of early setup + fast
   // triggering, either through TraceConfig.deferred_start or
-  // TraceConfig.trigger_config().
+  // TraceConfig.trigger_config(). If both are specified which ever one occurs
+  // first will initiate the trace.
   if (!cfg.deferred_start() && !has_start_trigger) {
     return StartTracing(tsid);
   }
@@ -881,6 +880,8 @@ void TracingServiceImpl::ActivateTriggers(
     ProducerID producer_id,
     const std::vector<std::string>& triggers) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
+  auto* producer = GetProducer(producer_id);
+  PERFETTO_DCHECK(producer);
   for (const auto& trigger_name : triggers) {
     for (auto& id_and_tracing_session : tracing_sessions_) {
       auto& tracing_session = id_and_tracing_session.second;
@@ -894,8 +895,6 @@ void TracingServiceImpl::ActivateTriggers(
       if (iter == tracing_session.config.trigger_config().triggers().end()) {
         continue;
       }
-      auto* producer = GetProducer(producer_id);
-      PERFETTO_DCHECK(producer);
 
       // If this trigger requires a certain producer to have sent it
       // (non-empty producer_name()) ensure the producer who sent this trigger
@@ -918,18 +917,25 @@ void TracingServiceImpl::ActivateTriggers(
           // CONFIGURED then we don't need to repeat StartTracing. This would
           // work fine (StartTracing would return false) but would add error
           // logs.
-          if (tracing_session.state == TracingSession::CONFIGURED) {
-            PERFETTO_DLOG("Triggering '%s' on tracing session %" PRIu64
-                          " with duration of %" PRIu32 "ms.",
-                          iter->name().c_str(), tsid, iter->stop_delay_ms());
-            // We override the trace duration to be the trigger's requested
-            // value, this ensures that the trace will end after this amount
-            // of time has passed.
-            tracing_session.config.set_duration_ms(iter->stop_delay_ms());
-            StartTracing(tsid);
+          if (tracing_session.state != TracingSession::CONFIGURED) {
+            break;
           }
+          PERFETTO_DLOG("Triggering '%s' on tracing session %" PRIu64
+                        " with duration of %" PRIu32 "ms.",
+                        iter->name().c_str(), tsid, iter->stop_delay_ms());
+          // We override the trace duration to be the trigger's requested
+          // value, this ensures that the trace will end after this amount
+          // of time has passed.
+          tracing_session.config.set_duration_ms(iter->stop_delay_ms());
+          StartTracing(tsid);
           break;
         case TraceConfig::TriggerConfig::STOP_TRACING:
+          if (tracing_session.received_triggers.size() != 1) {
+            // We add the trigger above if this isn't the first one then avoid
+            // disabling the trace twice to prevent future confusing log
+            // messages.
+            break;
+          }
           // Now that we've seen a trigger we need to stop, flush, and disable
           // this session after the configured |stop_delay_ms|.
           task_runner_->PostDelayedTask(
@@ -1554,7 +1560,6 @@ void TracingServiceImpl::FreeBuffers(TracingSessionID tsid) {
     buffers_.erase(buffer_id);
   }
   bool notify_traceur = tracing_session->config.notify_traceur();
-
   tracing_sessions_.erase(tsid);
   UpdateMemoryGuardrail();
 
