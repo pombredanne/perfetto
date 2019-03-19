@@ -75,12 +75,14 @@ class StringView {
 
   StringView substr(size_t pos, size_t count = npos) const {
     if (pos >= size_)
-      return StringView();
+      return StringView("", 0);
     size_t rcount = std::min(count, size_ - pos);
     return StringView(data_ + pos, rcount);
   }
 
-  std::string ToStdString() const { return std::string(data_, size_); }
+  std::string ToStdString() const {
+    return data_ == nullptr ? "" : std::string(data_, size_);
+  }
 
   uint64_t Hash() const {
     base::Hash hasher;
@@ -101,6 +103,24 @@ inline bool operator==(const StringView& x, const StringView& y) {
 
 inline bool operator!=(const StringView& x, const StringView& y) {
   return !(x == y);
+}
+
+inline bool operator<(const StringView& x, const StringView& y) {
+  int result = memcmp(x.data(), y.data(), std::min(x.size(), y.size()));
+  return result < 0 || (result == 0 && x.size() < y.size());
+}
+
+inline bool operator<=(const StringView& x, const StringView& y) {
+  int result = memcmp(x.data(), y.data(), std::min(x.size(), y.size()));
+  return result < 0 || (result == 0 && x.size() <= y.size());
+}
+
+inline bool operator>(const StringView& x, const StringView& y) {
+  return !(x <= y);
+}
+
+inline bool operator>=(const StringView& x, const StringView& y) {
+  return !(x < y);
 }
 
 }  // namespace base

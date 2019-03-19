@@ -29,35 +29,44 @@ StringPool::StringPool() {
   PERFETTO_CHECK(blocks_.back().Reserve(1));
 }
 
-StringPool::Id StringPool::InternString(base::StringView str) {
-  if (str.data() == nullptr)
-    return 0;
+StringPool::~StringPool() = default;
 
-  auto hash = str.Hash();
-  auto id_it = string_index_.find(hash);
-  if (id_it != string_index_.end()) {
-    PERFETTO_DCHECK(Get(id_it->second) == str);
-    return id_it->second;
-  }
+StringPool::StringPool(StringPool&&) = default;
+StringPool& StringPool::operator=(StringPool&&) = default;
 
-  uint32_t str_size = static_cast<uint32_t>(str.size());
+StringPool::Id StringPool::InsertString(base::StringView str, uint64_t hash) {
+  // We shouldn't be writing string with more than 2^16 characters to the pool.
+  PERFETTO_DCHECK(str.size() < std::numeric_limits<uint16_t>::max());
+  uint16_t str_size = static_cast<uint16_t>(str.size());
+
+  // Try and find enough space in the current block for the string and the
+  // metadata (the size of the string + the null terminator + 2 bytes to encode
+  // the size itself).
   auto* ptr = blocks_.back().Reserve(kMetadataSize + str_size);
   if (PERFETTO_UNLIKELY(!ptr)) {
+    // This means the block did not have enough space. This should only happen
+    // on 32-bit platforms as we allocate a 4GB mmap on 64 bit.
     PERFETTO_CHECK(sizeof(uint8_t*) == 4);
+
+    // Add a new block to store the data.
     blocks_.emplace_back();
 
+    // Try and reserve space again - this time we should definitely succeed.
     ptr = blocks_.back().Reserve(kMetadataSize + str_size);
     PERFETTO_CHECK(ptr);
   }
 
-  // Write the size of the string (in little endian), followed by the string
-  // itself finished by a null terminator.
-  PERFETTO_DCHECK(str_size < std::numeric_limits<uint16_t>::max());
-  ptr[0] = str_size & 0xFF;
-  ptr[1] = (str_size & 0xFF00) >> 8;
+  // First memcpy the size of the string into the buffer.
+  memcpy(ptr, &str_size, sizeof(str_size));
+
+  // Next the string itself which starts at offset 2.
   memcpy(&ptr[2], str.data(), str_size);
+
+  // Finally add a null terminator.
   ptr[2 + str_size] = '\0';
 
+  // Finish by computing the id of the pointer and adding a mapping from the
+  // hash to the string_id.
   Id string_id = PtrToId(ptr);
   string_index_.emplace(hash, string_id);
   return string_id;
@@ -78,10 +87,14 @@ bool StringPool::Iterator::Next() {
   // Otherwise, try and go to the next string in the current block.
   const auto& block = pool_->blocks_[block_id_];
   if (PERFETTO_UNLIKELY(block_id_ == 0 && block_offset_ == 0)) {
+    // The null string is at (0, 0). The next string is simply the same block
+    // at offset 1.
     block_offset_ = 1;
   } else {
-    auto size = GetSize(block.Get(block_offset_));
-    block_offset_ += kMetadataSize + size;
+    // Otherwise, find the size of the string at the current offset in the block
+    // and increment the offset by that size.
+    auto str_size = GetSize(block.Get(block_offset_));
+    block_offset_ += kMetadataSize + str_size;
   }
 
   // If we're out of bounds for this block, go the the start of the next block.
@@ -97,6 +110,7 @@ NullTermStringView StringPool::Iterator::StringView() {
   PERFETTO_DCHECK(block_id_ < pool_->blocks_.size());
   PERFETTO_DCHECK(block_offset_ < pool_->blocks_[block_id_].pos());
 
+  // If we're at (0, 0), we have the null string.
   if (block_id_ == 0 && block_offset_ == 0)
     return NullTermStringView();
   return GetFromPtr(pool_->blocks_[block_id_].Get(block_offset_));
@@ -106,6 +120,7 @@ StringPool::Id StringPool::Iterator::StringId() {
   PERFETTO_DCHECK(block_id_ < pool_->blocks_.size());
   PERFETTO_DCHECK(block_offset_ < pool_->blocks_[block_id_].pos());
 
+  // If we're at (0, 0), we have the null string which has id 0.
   if (block_id_ == 0 && block_offset_ == 0)
     return 0;
   return pool_->PtrToId(pool_->blocks_[block_id_].Get(block_offset_));

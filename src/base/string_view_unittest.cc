@@ -78,6 +78,30 @@ TEST(StringViewTest, BasicCases) {
   EXPECT_EQ(StringView("xyz").substr(0).ToStdString(), "xyz");
   EXPECT_EQ(StringView("xyz").substr(2).ToStdString(), "z");
   EXPECT_EQ(StringView("xyz").substr(3).ToStdString(), "");
+
+  // Test the < operator.
+  EXPECT_FALSE(StringView("foo") < StringView("foo"));
+  EXPECT_TRUE(StringView("foo") < StringView("fooo"));
+  EXPECT_FALSE(StringView("fooo") < StringView("foo"));
+  EXPECT_TRUE(StringView("bar") < StringView("foo"));
+
+  // Test the <= operator.
+  EXPECT_TRUE(StringView("foo") <= StringView("foo"));
+  EXPECT_TRUE(StringView("foo") <= StringView("fooo"));
+  EXPECT_FALSE(StringView("fooo") <= StringView("foo"));
+  EXPECT_TRUE(StringView("bar") <= StringView("foo"));
+
+  // Test the > operator.
+  EXPECT_FALSE(StringView("foo") > StringView("foo"));
+  EXPECT_FALSE(StringView("foo") > StringView("fooo"));
+  EXPECT_TRUE(StringView("fooo") > StringView("foo"));
+  EXPECT_FALSE(StringView("bar") > StringView("foo"));
+
+  // Test the >= operator.
+  EXPECT_TRUE(StringView("foo") >= StringView("foo"));
+  EXPECT_FALSE(StringView("foo") >= StringView("fooo"));
+  EXPECT_TRUE(StringView("fooo") >= StringView("foo"));
+  EXPECT_FALSE(StringView("bar") >= StringView("foo"));
 }
 
 TEST(StringViewTest, HashCollisions) {

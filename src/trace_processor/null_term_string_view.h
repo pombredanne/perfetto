@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +29,10 @@ class NullTermStringView : public base::StringView {
   // Creates an empty view.
   NullTermStringView() : StringView() {}
 
+  // Make the view copy constructible.
+  NullTermStringView(const NullTermStringView&) = default;
+  NullTermStringView& operator=(const NullTermStringView&) = default;
+
   // Creates a NullTermStringView from a null-terminated C string.
   // Deliberately not "explicit".
   NullTermStringView(const char* cstr) : StringView(cstr) {}
@@ -44,9 +48,6 @@ class NullTermStringView : public base::StringView {
   // This instead has to be explicit, as creating a NullTermStringView out of a
   // std::string can be subtle.
   explicit NullTermStringView(const std::string& str) : StringView(str) {}
-
-  NullTermStringView(const NullTermStringView&) = default;
-  NullTermStringView& operator=(const NullTermStringView&) = default;
 
   // Returns the null terminated C-string backing this string view. The same
   // pointer as |data()| is returned.

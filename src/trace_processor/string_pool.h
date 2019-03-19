@@ -27,7 +27,7 @@ namespace perfetto {
 namespace trace_processor {
 
 // Interns strings in a string pool and hands out compact StringIds which can
-// be used to retrieve the string.
+// be used to retrieve the string in O(1).
 class StringPool {
  public:
   using Id = uint32_t;
@@ -49,17 +49,28 @@ class StringPool {
   };
 
   StringPool();
-  ~StringPool() = default;
+  ~StringPool();
 
   // Allow std::move().
-  StringPool(StringPool&&) noexcept = default;
-  StringPool& operator=(StringPool&&) = default;
+  StringPool(StringPool&&) noexcept;
+  StringPool& operator=(StringPool&&);
 
   // Disable implicit copy.
   StringPool(const StringPool&) = delete;
   StringPool& operator=(const StringPool&) = delete;
 
-  Id InternString(base::StringView);
+  Id InternString(base::StringView str) {
+    if (str.data() == nullptr)
+      return 0;
+
+    auto hash = str.Hash();
+    auto id_it = string_index_.find(hash);
+    if (id_it != string_index_.end()) {
+      PERFETTO_DCHECK(Get(id_it->second) == str);
+      return id_it->second;
+    }
+    return InsertString(str, hash);
+  }
 
   PERFETTO_ALWAYS_INLINE NullTermStringView Get(Id id) const {
     if (id == 0)
@@ -74,7 +85,7 @@ class StringPool {
  private:
   using StringHash = uint64_t;
   struct Block {
-    Block() : inner_(base::PagedMemory::Allocate(BlockSize())) {}
+    Block() : inner_(base::PagedMemory::Allocate(kBlockSize)) {}
     ~Block() = default;
 
     // Allow std::move().
@@ -90,7 +101,7 @@ class StringPool {
     }
 
     uint8_t* Reserve(uint32_t size) {
-      if (pos_ + size >= BlockSize())
+      if (static_cast<uint64_t>(pos_) + size >= kBlockSize)
         return nullptr;
       uint32_t start = pos_;
       pos_ += size;
@@ -104,11 +115,9 @@ class StringPool {
     uint32_t pos() const { return pos_; }
 
    private:
-    static size_t BlockSize() {
-      if (sizeof(uint8_t*) == 8)
-        return 4ull * 1024ull * 1024ull * 1024ull;  // 4GB
-      return 32ull * 1024ull * 1024ull;             // 32MB
-    }
+    static constexpr size_t kBlockSize =
+        sizeof(void*) == 8 ? 4ull * 1024ull * 1024ull * 1024ull /* 4GB */
+                           : 32ull * 1024ull * 1024ull /* 32MB */;
 
     base::PagedMemory inner_;
     uint32_t pos_ = 0;
@@ -119,29 +128,45 @@ class StringPool {
   // Number of bytes to reserve for size and null terminator.
   static constexpr uint8_t kMetadataSize = 3;
 
-  PERFETTO_ALWAYS_INLINE Id PtrToId(uint8_t* ptr) const {
-    if (sizeof(uint8_t*) == 8)
-      return blocks_.back().OffsetOf(ptr);
+  // Inserts the string with the given hash into the pool
+  Id InsertString(base::StringView, uint64_t hash);
 
+  Id PtrToId(uint8_t* ptr) const {
+    // For a 64 bit architecture, the id is the offset of the pointer inside
+    // the one and only 4GB block.
+    if (sizeof(void*) == 8) {
+      PERFETTO_DCHECK(blocks_.size() == 1);
+      return blocks_.back().OffsetOf(ptr);
+    }
+
+    // On 32 bit architectures, the size of the pointer is 32-bit so we simply
+    // use the pointer itself as the id.
     // Double cast needed because, on 64 arches, the compiler complains that we
     // are losing information.
-    return static_cast<Id>(reinterpret_cast<uint64_t>(ptr));
+    return static_cast<Id>(reinterpret_cast<uintptr_t>(ptr));
   }
 
-  PERFETTO_ALWAYS_INLINE uint8_t* IdToPtr(Id id) const {
-    if (sizeof(uint8_t*) == 8) {
+  uint8_t* IdToPtr(Id id) const {
+    // For a 64 bit architecture, the pointer is simply the found by taking
+    // the base of the 4GB block and adding the offset given by |id|.
+    if (sizeof(void*) == 8) {
       PERFETTO_DCHECK(blocks_.size() == 1);
       return blocks_.back().Get(id);
     }
+    // On a 32 bit architecture, the pointer is the same as the id.
     return reinterpret_cast<uint8_t*>(id);
   }
 
-  PERFETTO_ALWAYS_INLINE static uint16_t GetSize(uint8_t* ptr) {
-    // First two bytes hold the length of the string (little endian order).
-    return static_cast<uint16_t>(ptr[1] << 8u | ptr[0]);
+  static uint16_t GetSize(uint8_t* ptr) {
+    // The size is simply memcpyed into the byte buffer when writing.
+    uint16_t size;
+    memcpy(&size, ptr, sizeof(uint16_t));
+    return size;
   }
 
   PERFETTO_ALWAYS_INLINE static NullTermStringView GetFromPtr(uint8_t* ptr) {
+    // With the first two bytes being used for the size, the string starts from
+    // byte 3.
     return NullTermStringView(reinterpret_cast<char*>(&ptr[2]), GetSize(ptr));
   }
 
