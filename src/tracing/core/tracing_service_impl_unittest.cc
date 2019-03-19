@@ -256,7 +256,6 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerDeferredStart) {
   // START_TRACING trigger defined.
   std::vector<std::string> req;
   req.push_back("trigger_name");
-  auto start_time = base::GetBootTimeNs().count();
   producer->endpoint()->ActivateTriggers(req);
 
   producer->WaitForDataSourceStart("ds_1");
@@ -306,7 +305,6 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerTimeOut) {
 
   trigger_config->set_trigger_timeout_ms(1);
 
-  auto start_time = base::GetBootTimeNs().count();
   consumer->EnableTracing(trace_config);
   producer->WaitForTracingSetup();
 
@@ -411,8 +409,8 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerCorrectProducer) {
 
   producer->WaitForDataSourceStart("ds_1");
 
-  auto writer1 = producer->CreateTraceWriter("ds_1");
-  producer->WaitForFlush(writer1.get());
+  auto writer = producer->CreateTraceWriter("ds_1");
+  producer->WaitForFlush(writer.get());
 
   producer->WaitForDataSourceStop("ds_1");
   consumer->WaitForTracingDisabled();
@@ -501,8 +499,8 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerMultipleTriggers) {
 
   producer->WaitForDataSourceStart("ds_1");
 
-  auto writer1 = producer->CreateTraceWriter("ds_1");
-  producer->WaitForFlush(writer1.get());
+  auto writer = producer->CreateTraceWriter("ds_1");
+  producer->WaitForFlush(writer.get());
 
   producer->WaitForDataSourceStop("ds_1");
   consumer->WaitForTracingDisabled();
@@ -1488,8 +1486,8 @@ TEST_F(TracingServiceImplTest, DeferredStart) {
 
   producer->WaitForDataSourceStart("ds_1");
 
-  auto writer1 = producer->CreateTraceWriter("ds_1");
-  producer->WaitForFlush(writer1.get());
+  auto writer = producer->CreateTraceWriter("ds_1");
+  producer->WaitForFlush(writer.get());
 
   producer->WaitForDataSourceStop("ds_1");
   consumer->WaitForTracingDisabled();
