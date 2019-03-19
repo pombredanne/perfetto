@@ -488,6 +488,13 @@ bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
             PERFETTO_DLOG("Disabling TracingSession %" PRIu64
                           " no triggers activated.",
                           tsid);
+            // No data should be returned from ReadBuffers() regardless of if we
+            // call FreeBuffers() or DisableTracing(). This is because in
+            // STOP_TRACING we need this promise in either case, and using
+            // DisableTracing() allows a graceful shutdown. Consumers can follow
+            // their normal path and check the buffers through ReadBuffers() and
+            // the code won't hang because the tracing session will still be
+            // alive just disabled.
             weak_this->DisableTracing(tsid);
           }
         },

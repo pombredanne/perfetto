@@ -267,11 +267,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerDeferredStart) {
   producer->WaitForDataSourceStop("ds_1");
   consumer->WaitForTracingDisabled();
 
-  EXPECT_NEAR(base::GetBootTimeNs().count() - start_time, 1e+6, 1e+6);
   ASSERT_EQ(1u, tracing_session()->received_triggers.size());
-  // Just expect tht time is within one second of now to prevent flakyness.
-  EXPECT_NEAR(tracing_session()->received_triggers[0].first,
-              base::GetBootTimeNs().count(), 1e+9);
   EXPECT_EQ("trigger_name",
             tracing_session()->received_triggers[0].second.name());
 
@@ -325,7 +321,6 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerTimeOut) {
 
   producer->WaitForDataSourceStop("ds_1");
   consumer->WaitForTracingDisabled();
-  EXPECT_NEAR(base::GetBootTimeNs().count() - start_time, 1e+6, 1e+6);
   EXPECT_THAT(consumer->ReadBuffers(), ::testing::IsEmpty());
 }
 
@@ -582,9 +577,6 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerMultipleTraces) {
   // Now that they've started we can check the triggers they've seen.
   auto* tracing_session_1 = GetTracingSession(tracing_session_1_id);
   ASSERT_EQ(1u, tracing_session_1->received_triggers.size());
-  uint64_t first_trigger_ns = tracing_session_1->received_triggers[0].first;
-  // Just expect tht time is within one second of now to prevent flakyness.
-  EXPECT_NEAR(first_trigger_ns, base::GetBootTimeNs().count(), 1e+9);
   EXPECT_EQ("trigger_name",
             tracing_session_1->received_triggers[0].second.name());
 
@@ -594,13 +586,10 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerMultipleTraces) {
   auto* tracing_session_2 = GetTracingSession(tracing_session_2_id);
   ASSERT_EQ(2u, tracing_session_2->received_triggers.size());
 
-  uint64_t second_trigger_ns = tracing_session_2->received_triggers[0].first;
-  EXPECT_LT(first_trigger_ns, second_trigger_ns);
   EXPECT_EQ("trigger_name",
             tracing_session_2->received_triggers[0].second.name());
   EXPECT_EQ(1, tracing_session_2->received_triggers[0].second.stop_delay_ms());
 
-  EXPECT_LT(second_trigger_ns, tracing_session_2->received_triggers[1].first);
   EXPECT_EQ("trigger_name_2",
             tracing_session_2->received_triggers[1].second.name());
   EXPECT_EQ(30000,
