@@ -268,7 +268,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerDeferredStart) {
 
   ASSERT_EQ(1u, tracing_session()->received_triggers.size());
   EXPECT_EQ("trigger_name",
-            tracing_session()->received_triggers[0].second.name());
+            tracing_session()->received_triggers[0].trigger.name());
 
   EXPECT_THAT(
       consumer->ReadBuffers(),
@@ -344,7 +344,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerDifferentProducer) {
   auto* trigger = trigger_config->add_triggers();
   trigger->set_name("trigger_name");
   trigger->set_stop_delay_ms(30000);
-  trigger->set_producer_name("correct_name");
+  trigger->set_producer_name_regex("correct_name");
 
   trigger_config->set_trigger_timeout_ms(1);
 
@@ -390,7 +390,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerCorrectProducer) {
   auto* trigger = trigger_config->add_triggers();
   trigger->set_name("trigger_name");
   trigger->set_stop_delay_ms(1);
-  trigger->set_producer_name("mock_producer");
+  trigger->set_producer_name_regex("mock_produc[e-r]+");
 
   trigger_config->set_trigger_timeout_ms(30000);
 
@@ -573,7 +573,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerMultipleTraces) {
   auto* tracing_session_1 = GetTracingSession(tracing_session_1_id);
   ASSERT_EQ(1u, tracing_session_1->received_triggers.size());
   EXPECT_EQ("trigger_name",
-            tracing_session_1->received_triggers[0].second.name());
+            tracing_session_1->received_triggers[0].trigger.name());
 
   // This is actually dependent on the order in which the triggers were received
   // but there isn't really a better way than iteration order so probably not to
@@ -582,13 +582,13 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerMultipleTraces) {
   ASSERT_EQ(2u, tracing_session_2->received_triggers.size());
 
   EXPECT_EQ("trigger_name",
-            tracing_session_2->received_triggers[0].second.name());
-  EXPECT_EQ(1, tracing_session_2->received_triggers[0].second.stop_delay_ms());
+            tracing_session_2->received_triggers[0].trigger.name());
+  EXPECT_EQ(1, tracing_session_2->received_triggers[0].trigger.stop_delay_ms());
 
   EXPECT_EQ("trigger_name_2",
-            tracing_session_2->received_triggers[1].second.name());
+            tracing_session_2->received_triggers[1].trigger.name());
   EXPECT_EQ(30000,
-            tracing_session_2->received_triggers[1].second.stop_delay_ms());
+            tracing_session_2->received_triggers[1].trigger.stop_delay_ms());
 
   auto writer1 = producer->CreateTraceWriter("ds_1");
   auto writer2 = producer->CreateTraceWriter("ds_2");
@@ -659,6 +659,7 @@ TEST_F(TracingServiceImplTest, EmitReceivedTriggersStartTracingTrigger) {
   auto* trigger = trigger_config->add_triggers();
   trigger->set_name("trigger_name");
   trigger->set_stop_delay_ms(30);
+  trigger->set_producer_name_regex("mock_produc[e-r]+");
 
   trigger_config->set_trigger_timeout_ms(100);
 
@@ -669,7 +670,7 @@ TEST_F(TracingServiceImplTest, EmitReceivedTriggersStartTracingTrigger) {
   // Just ensure the system is fully set up.
   task_runner.RunUntilIdle();
 
-  // The trace won't start until we send the trigger. since we have a
+  // The trace won't start until we send the trigger since we have a
   // START_TRACING trigger defined.
   std::vector<std::string> req;
   req.push_back("trigger_name");
@@ -684,11 +685,8 @@ TEST_F(TracingServiceImplTest, EmitReceivedTriggersStartTracingTrigger) {
   consumer->WaitForTracingDisabled();
 
   ASSERT_EQ(1u, tracing_session()->received_triggers.size());
-  // Just expect tht time is within one second of now to prevent flakyness.
-  EXPECT_NEAR(tracing_session()->received_triggers[0].first,
-              base::GetBootTimeNs().count(), 1e+9);
   EXPECT_EQ("trigger_name",
-            tracing_session()->received_triggers[0].second.name());
+            tracing_session()->received_triggers[0].trigger.name());
 
   auto buffers = consumer->ReadBuffers();
   EXPECT_THAT(
@@ -715,8 +713,6 @@ TEST_F(TracingServiceImplTest, EmitReceivedTriggersStartTracingTrigger) {
               ::testing::Not(expect_received_trigger("trigger_name_2")));
   EXPECT_THAT(buffers,
               ::testing::Not(expect_received_trigger("trigger_name_3")));
-  // This was not a restricted trigger so producer_name was unset, ensure it is
-  // properly updated by the calling producer.
   EXPECT_THAT(buffers,
               Contains(Property(
                   &protos::TracePacket::received_triggers,
@@ -724,8 +720,15 @@ TEST_F(TracingServiceImplTest, EmitReceivedTriggersStartTracingTrigger) {
                            Contains(Property(
                                &protos::ReceivedTrigger::trigger,
                                Property(&protos::TraceConfig::TriggerConfig::
-                                            Trigger::producer_name,
-                                        Eq("mock_producer"))))))));
+                                            Trigger::producer_name_regex,
+                                        Eq("mock_produc[e-r]+"))))))));
+  EXPECT_THAT(
+      buffers,
+      Contains(Property(
+          &protos::TracePacket::received_triggers,
+          Property(&protos::ReceivedTriggers::triggers,
+                   Contains(Property(&protos::ReceivedTrigger::producer_name,
+                                     Eq("mock_producer")))))));
 }
 
 // Creates a tracing session with a START_TRACING trigger and checks that the
@@ -777,13 +780,10 @@ TEST_F(TracingServiceImplTest, EmitReceivedTriggersStopTracingTrigger) {
   consumer->WaitForTracingDisabled();
 
   ASSERT_EQ(2u, tracing_session()->received_triggers.size());
-  // Just expect the time is within one second of now to prevent flakyness.
-  EXPECT_NEAR(tracing_session()->received_triggers[0].first,
-              base::GetBootTimeNs().count(), 1e+9);
   EXPECT_EQ("trigger_name",
-            tracing_session()->received_triggers[0].second.name());
+            tracing_session()->received_triggers[0].trigger.name());
   EXPECT_EQ("trigger_name_3",
-            tracing_session()->received_triggers[1].second.name());
+            tracing_session()->received_triggers[1].trigger.name());
 
   auto buffers = consumer->ReadBuffers();
   EXPECT_THAT(
@@ -925,7 +925,7 @@ TEST_F(TracingServiceImplTest, StopTracingTriggerRingBuffer) {
 
   ASSERT_EQ(1u, tracing_session()->received_triggers.size());
   EXPECT_EQ("trigger_name",
-            tracing_session()->received_triggers[0].second.name());
+            tracing_session()->received_triggers[0].trigger.name());
 
   producer->WaitForDataSourceStop("ds_1");
   consumer->WaitForTracingDisabled();
@@ -1007,13 +1007,10 @@ TEST_F(TracingServiceImplTest, StopTracingTriggerMultipleTriggers) {
   producer->WaitForFlush(writer.get());
 
   ASSERT_EQ(2u, tracing_session()->received_triggers.size());
-  // Just expect tht time is within one second of now to prevent flakyness.
-  EXPECT_NEAR(tracing_session()->received_triggers[0].first,
-              base::GetBootTimeNs().count(), 1e+9);
   EXPECT_EQ("trigger_name",
-            tracing_session()->received_triggers[0].second.name());
+            tracing_session()->received_triggers[0].trigger.name());
   EXPECT_EQ("trigger_name_2",
-            tracing_session()->received_triggers[1].second.name());
+            tracing_session()->received_triggers[1].trigger.name());
 
   producer->WaitForDataSourceStop("ds_1");
   consumer->WaitForTracingDisabled();

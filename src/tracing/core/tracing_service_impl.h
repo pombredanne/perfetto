@@ -397,8 +397,12 @@ class TracingServiceImpl : public TracingService {
     // were received at. This is used to insert 'fake' packets back to the
     // consumer so they can tell when some event happened. The order matches the
     // order they were received.
-    std::vector<std::pair<uint64_t, TraceConfig::TriggerConfig::Trigger>>
-        received_triggers;
+    struct TriggerInfo {
+      uint64_t boot_time_ns;
+      TraceConfig::TriggerConfig::Trigger trigger;
+      std::string producer_name;
+    };
+    std::vector<TriggerInfo> received_triggers;
 
     // The trace config provided by the Consumer when calling
     // EnableTracing(), plus any updates performed by ChangeTraceConfig.

@@ -22,6 +22,7 @@
 #include <inttypes.h>
 #include <limits.h>
 #include <string.h>
+#include <regex>
 #include <unordered_set>
 
 #if !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
@@ -899,8 +900,9 @@ void TracingServiceImpl::ActivateTriggers(
       // If this trigger requires a certain producer to have sent it
       // (non-empty producer_name()) ensure the producer who sent this trigger
       // matches.
-      if (!iter->producer_name().empty() &&
-          iter->producer_name() != producer->name_) {
+      if (!iter->producer_name_regex().empty() &&
+          !std::regex_match(producer->name_,
+                            std::regex(iter->producer_name_regex()))) {
         continue;
       }
 
@@ -908,13 +910,9 @@ void TracingServiceImpl::ActivateTriggers(
       // return them inside ReadBuffers. In a followup CL add this
       // functionality. Ensure that there is no race condition between
       // future triggers being added and ReadBuffers processing this vector.
-      tracing_session.received_triggers.push_back(std::make_pair(
-          static_cast<uint64_t>(base::GetBootTimeNs().count()), *iter));
-      // Override the producer name to the producer that actually called this.
-      // This allows the trace UI to tell which producer sent this trigger if it
-      // isn't restricted to a certain producer.
-      tracing_session.received_triggers.back().second.set_producer_name(
-          producer->name_);
+      tracing_session.received_triggers.push_back(
+          {static_cast<uint64_t>(base::GetBootTimeNs().count()), *iter,
+           producer->name_});
       auto weak_this = weak_ptr_factory_.GetWeakPtr();
       switch (tracing_session.config.trigger_config().trigger_mode()) {
         case TraceConfig::TriggerConfig::START_TRACING:
@@ -2132,14 +2130,16 @@ void TracingServiceImpl::MaybeEmitReceivedTriggers(
   // call.
   tracing_session->did_emit_received_triggers = true;
   if (tracing_session->config.trigger_config().trigger_mode() ==
-      TraceConfig::TriggerConfig::UNSPECIFIED)
+      TraceConfig::TriggerConfig::UNSPECIFIED) {
     return;
+  }
   protos::TrustedPacket packet;
   protos::ReceivedTriggers* triggers = packet.mutable_received_triggers();
-  for (const auto& time_and_trigger : tracing_session->received_triggers) {
+  for (const auto& info : tracing_session->received_triggers) {
     auto* trigger = triggers->add_triggers();
-    trigger->set_boot_time_ns(time_and_trigger.first);
-    time_and_trigger.second.ToProto(trigger->mutable_trigger());
+    trigger->set_boot_time_ns(info.boot_time_ns);
+    info.trigger.ToProto(trigger->mutable_trigger());
+    trigger->set_producer_name(info.producer_name);
   }
   packet.set_trusted_uid(static_cast<int32_t>(uid_));
   packet.set_trusted_packet_sequence_id(kServicePacketSequenceID);

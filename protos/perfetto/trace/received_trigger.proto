@@ -21,11 +21,15 @@ import "perfetto/config/trace_config.proto";
 package perfetto.protos;
 
 // When a TracingSession receives a trigger it records the boot time nanoseconds
-// of when it received it and a copy of the trigger. We emit this pair filtering
-// can be done on triggers received.
+// of when it received it and a copy of the trigger. We emit this pair so that
+// filtering can be done on triggers received in the trace.
 message ReceivedTrigger {
+  // The time that |trigger| was received by the service.
   optional uint64 boot_time_ns = 1;
+  // The trigger configuration.
   optional TraceConfig.TriggerConfig.Trigger trigger = 2;
+  // The actual producer that activated |trigger|.
+  optional string producer_name = 3;
 }
 
 // This is needed to allow the TrustedPacket message to have a single field (and
