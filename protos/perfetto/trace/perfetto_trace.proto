@@ -3344,7 +3344,9 @@ message TraceConfig {
   }
   repeated DataSource data_sources = 2;
 
-  // The length of this Trace. Ignored if |trigger_config| is set.
+  // If specified, the trace will be stopped |duration_ms| after starting.
+  // However in case of traces with triggers, see
+  // TriggerConfig.trigger_timeout_ms instead.
   optional uint32 duration_ms = 3;
 
   // This is set when --dropbox is passed to the Perfetto command line client
