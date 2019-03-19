@@ -244,13 +244,13 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerDeferredStart) {
 
   trigger_config->set_trigger_timeout_ms(30000);
 
+  // Make sure we don't get unexpected DataSourceStart() notifications yet.
+  EXPECT_CALL(*producer, StartDataSource(_, _)).Times(0);
+
   consumer->EnableTracing(trace_config);
   producer->WaitForTracingSetup();
 
   producer->WaitForDataSourceSetup("ds_1");
-
-  // Make sure we don't get unexpected DataSourceStart() notifications yet.
-  task_runner.RunUntilIdle();
 
   // The trace won't start until we send the trigger. since we have a
   // START_TRACING trigger defined.
@@ -305,13 +305,13 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerTimeOut) {
 
   trigger_config->set_trigger_timeout_ms(1);
 
+  // Make sure we don't get unexpected DataSourceStart() notifications yet.
+  EXPECT_CALL(*producer, StartDataSource(_, _)).Times(0);
+
   consumer->EnableTracing(trace_config);
   producer->WaitForTracingSetup();
 
   producer->WaitForDataSourceSetup("ds_1");
-
-  // Make sure we don't get unexpected DataSourceStart() notifications yet.
-  task_runner.RunUntilIdle();
 
   // The trace won't start until we send the trigger. since we have a
   // START_TRACING trigger defined. This is where we'd expect to have an
@@ -348,13 +348,13 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerDifferentProducer) {
 
   trigger_config->set_trigger_timeout_ms(1);
 
+  // Make sure we don't get unexpected DataSourceStart() notifications yet.
+  EXPECT_CALL(*producer, StartDataSource(_, _)).Times(0);
+
   consumer->EnableTracing(trace_config);
   producer->WaitForTracingSetup();
 
   producer->WaitForDataSourceSetup("ds_1");
-
-  // Make sure we don't get unexpected DataSourceStart() notifications yet.
-  task_runner.RunUntilIdle();
 
   // The trace won't start until we send the trigger called "trigger_name"
   // coming from a producer called "correct_name", since we have a
@@ -399,9 +399,6 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerCorrectProducer) {
 
   producer->WaitForDataSourceSetup("ds_1");
 
-  // Make sure we don't get unexpected DataSourceStart() notifications yet.
-  task_runner.RunUntilIdle();
-
   // Start the trace at this point with ActivateTriggers.
   std::vector<std::string> req;
   req.push_back("trigger_name");
@@ -440,13 +437,13 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerDifferentTrigger) {
 
   trigger_config->set_trigger_timeout_ms(1);
 
+  // Make sure we don't get unexpected DataSourceStart() notifications yet.
+  EXPECT_CALL(*producer, StartDataSource(_, _)).Times(0);
+
   consumer->EnableTracing(trace_config);
   producer->WaitForTracingSetup();
 
   producer->WaitForDataSourceSetup("ds_1");
-
-  // Make sure we don't get unexpected DataSourceStart() notifications yet.
-  task_runner.RunUntilIdle();
 
   // The trace won't start until we send the trigger called "trigger_name",
   // since we have a START_TRACING trigger defined. This is where we'd expect to
