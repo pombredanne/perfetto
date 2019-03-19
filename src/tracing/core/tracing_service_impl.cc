@@ -2121,9 +2121,10 @@ void TracingServiceImpl::MaybeEmitReceivedTriggers(
   if (tracing_session->did_emit_received_triggers) {
     return;
   }
-  // Ideally received triggers would see if we've received any new triggers
-  // since we last emitted, but due to the difficultly in determining time
-  // ordering we just emit whatever we have on the first ReadBuffers() call.
+  // Ideally MaybeEmitReceivedTriggers() would see if we've received any new
+  // triggers since we last emitted, but due to the difficultly in determining
+  // time ordering we just emit whatever we have on the first ReadBuffers()
+  // call.
   tracing_session->did_emit_received_triggers = true;
   if (tracing_session->config.trigger_config().trigger_mode() ==
       TraceConfig::TriggerConfig::UNSPECIFIED)
