@@ -117,8 +117,8 @@ int ThreadTable::Cursor::Column(sqlite3_context* context, int N) {
       break;
     }
     case Column::kName: {
-      auto name = storage_->GetString(thread.name_id);
-      sqlite3_result_text(context, name.data(), -1, kSqliteStatic);
+      const auto& name = storage_->GetString(thread.name_id);
+      sqlite3_result_text(context, name.c_str(), -1, kSqliteStatic);
       break;
     }
     case Column::kTid: {

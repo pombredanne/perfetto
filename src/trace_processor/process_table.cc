@@ -107,7 +107,7 @@ int ProcessTable::Cursor::Column(sqlite3_context* context, int N) {
     }
     case Column::kName: {
       const auto& process = storage_->GetProcess(current);
-      auto name = storage_->GetString(process.name_id);
+      const auto& name = storage_->GetString(process.name_id);
       sqlite3_result_text(context, name.c_str(), -1, kSqliteStatic);
       break;
     }
