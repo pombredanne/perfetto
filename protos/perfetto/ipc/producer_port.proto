@@ -49,9 +49,9 @@ service ProducerPort {
   rpc GetAsyncCommand(GetAsyncCommandRequest)
       returns (stream GetAsyncCommandResponse) {}
 
-  ////////////////////////////////////////////////////////////
+  // ----------------------------------------------------
   // All methods below have been introduced in Android Q.
-  ////////////////////////////////////////////////////////////
+  // ----------------------------------------------------
 
   // Associates a trace writer with its target buffer.
   rpc RegisterTraceWriter(RegisterTraceWriterRequest)

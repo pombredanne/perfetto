@@ -910,6 +910,11 @@ void TracingServiceImpl::ActivateTriggers(
       // future triggers being added and ReadBuffers processing this vector.
       tracing_session.received_triggers.push_back(std::make_pair(
           static_cast<uint64_t>(base::GetBootTimeNs().count()), *iter));
+      // Override the producer name to the producer that actually called this.
+      // This allows the trace UI to tell which producer sent this trigger if it
+      // isn't restricted to a certain producer.
+      tracing_session.received_triggers.back().second.set_producer_name(
+          producer->name_);
       auto weak_this = weak_ptr_factory_.GetWeakPtr();
       switch (tracing_session.config.trigger_config().trigger_mode()) {
         case TraceConfig::TriggerConfig::START_TRACING:
