@@ -22,6 +22,7 @@
 #include <inttypes.h>
 #include <limits.h>
 #include <string.h>
+#include <regex>
 #include <unordered_set>
 
 #if !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
@@ -877,8 +878,9 @@ void TracingServiceImpl::ActivateTriggers(
       // If this trigger requires a certain producer to have sent it
       // (non-empty producer_name()) ensure the producer who sent this trigger
       // matches.
-      if (!iter->producer_name().empty() &&
-          iter->producer_name() != producer->name_) {
+      if (!iter->producer_name_regex().empty() &&
+          !std::regex_match(producer->name_,
+                            std::regex(iter->producer_name_regex()))) {
         continue;
       }
 
