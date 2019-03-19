@@ -593,7 +593,8 @@ operator=(TraceConfig::TriggerConfig::Trigger&&) = default;
 #pragma GCC diagnostic ignored "-Wfloat-equal"
 bool TraceConfig::TriggerConfig::Trigger::operator==(
     const TraceConfig::TriggerConfig::Trigger& other) const {
-  return (name_ == other.name_) && (producer_name_ == other.producer_name_) &&
+  return (name_ == other.name_) &&
+         (producer_name_regex_ == other.producer_name_regex_) &&
          (stop_delay_ms_ == other.stop_delay_ms_);
 }
 #pragma GCC diagnostic pop
@@ -603,9 +604,11 @@ void TraceConfig::TriggerConfig::Trigger::FromProto(
   static_assert(sizeof(name_) == sizeof(proto.name()), "size mismatch");
   name_ = static_cast<decltype(name_)>(proto.name());
 
-  static_assert(sizeof(producer_name_) == sizeof(proto.producer_name()),
-                "size mismatch");
-  producer_name_ = static_cast<decltype(producer_name_)>(proto.producer_name());
+  static_assert(
+      sizeof(producer_name_regex_) == sizeof(proto.producer_name_regex()),
+      "size mismatch");
+  producer_name_regex_ =
+      static_cast<decltype(producer_name_regex_)>(proto.producer_name_regex());
 
   static_assert(sizeof(stop_delay_ms_) == sizeof(proto.stop_delay_ms()),
                 "size mismatch");
@@ -620,10 +623,12 @@ void TraceConfig::TriggerConfig::Trigger::ToProto(
   static_assert(sizeof(name_) == sizeof(proto->name()), "size mismatch");
   proto->set_name(static_cast<decltype(proto->name())>(name_));
 
-  static_assert(sizeof(producer_name_) == sizeof(proto->producer_name()),
-                "size mismatch");
-  proto->set_producer_name(
-      static_cast<decltype(proto->producer_name())>(producer_name_));
+  static_assert(
+      sizeof(producer_name_regex_) == sizeof(proto->producer_name_regex()),
+      "size mismatch");
+  proto->set_producer_name_regex(
+      static_cast<decltype(proto->producer_name_regex())>(
+          producer_name_regex_));
 
   static_assert(sizeof(stop_delay_ms_) == sizeof(proto->stop_delay_ms()),
                 "size mismatch");

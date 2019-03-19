@@ -209,9 +209,10 @@ message TraceConfig {
       // The producer must specify this name to activate the trigger.
       optional string name = 1;
 
-      // The producer that will send this trigger to the service. This is
-      // optional. If unset any producers can activate this trigger.
-      optional string producer_name = 2;
+      // The a std::regex that will match the producer that can activate this
+      // trigger. This is optional. If unset any producers can activate this
+      // trigger.
+      optional string producer_name_regex = 2;
 
       // After a trigger is received either in START_TRACING or STOP_TRACING
       // mode then the trace will end |stop_delay_ms| after triggering.

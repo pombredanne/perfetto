@@ -344,7 +344,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerDifferentProducer) {
   auto* trigger = trigger_config->add_triggers();
   trigger->set_name("trigger_name");
   trigger->set_stop_delay_ms(30000);
-  trigger->set_producer_name("correct_name");
+  trigger->set_producer_name_regex("correct_name");
 
   trigger_config->set_trigger_timeout_ms(1);
 
@@ -390,7 +390,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerCorrectProducer) {
   auto* trigger = trigger_config->add_triggers();
   trigger->set_name("trigger_name");
   trigger->set_stop_delay_ms(1);
-  trigger->set_producer_name("mock_producer");
+  trigger->set_producer_name_regex("mock_produc[e-r]+");
 
   trigger_config->set_trigger_timeout_ms(30000);
 
