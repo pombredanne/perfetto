@@ -47,6 +47,10 @@ class NullTermStringView : public base::StringView {
 
   NullTermStringView(const NullTermStringView&) = default;
   NullTermStringView& operator=(const NullTermStringView&) = default;
+
+  // Returns the null terminated C-string backing this string view. The same
+  // pointer as |data()| is returned.
+  const char* c_str() const { return data(); }
 };
 
 }  // namespace trace_processor

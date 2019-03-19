@@ -27,7 +27,7 @@ TEST(StringPoolTest, InternAndRetrieve) {
 
   static char kString[] = "Test String";
   auto id = pool.InternString(kString);
-  ASSERT_STREQ(pool.Get(id).data(), kString);
+  ASSERT_STREQ(pool.Get(id).c_str(), kString);
   ASSERT_EQ(pool.Get(id), kString);
 }
 
@@ -43,7 +43,7 @@ TEST(StringPoolTest, NullPointerHandling) {
   StringPool pool;
 
   auto id = pool.InternString(nullptr);
-  ASSERT_EQ(pool.Get(id).data(), nullptr);
+  ASSERT_EQ(pool.Get(id).c_str(), nullptr);
 }
 
 TEST(StringPoolTest, Iterator) {
@@ -51,7 +51,7 @@ TEST(StringPoolTest, Iterator) {
 
   auto it = pool.CreateIterator();
   ASSERT_TRUE(it.Next());
-  ASSERT_EQ(it.StringView().data(), nullptr);
+  ASSERT_EQ(it.StringView().c_str(), nullptr);
   ASSERT_FALSE(it.Next());
 
   static char kString[] = "Test String";
@@ -60,7 +60,7 @@ TEST(StringPoolTest, Iterator) {
   it = pool.CreateIterator();
   ASSERT_TRUE(it.Next());
   ASSERT_TRUE(it.Next());
-  ASSERT_STREQ(it.StringView().data(), kString);
+  ASSERT_STREQ(it.StringView().c_str(), kString);
 }
 
 }  // namespace

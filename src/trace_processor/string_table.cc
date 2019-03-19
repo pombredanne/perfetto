@@ -81,7 +81,7 @@ int StringTable::Cursor::Column(sqlite3_context* context, int col) {
                            static_cast<sqlite3_int64>(iterator_.StringId()));
       break;
     case Column::kString:
-      sqlite3_result_text(context, iterator_.StringView().data(), -1,
+      sqlite3_result_text(context, iterator_.StringView().c_str(), -1,
                           sqlite_utils::kSqliteStatic);
       break;
   }

@@ -83,7 +83,7 @@ void ArgsTable::ValueColumn::ReportResult(sqlite3_context* ctx,
       sqlite_utils::ReportSqliteResult(ctx, value.real_value);
       break;
     case VariadicType::kString: {
-      const char* str = storage_->GetString(value.string_value).data();
+      const char* str = storage_->GetString(value.string_value).c_str();
       sqlite3_result_text(ctx, str, -1, sqlite_utils::kSqliteStatic);
       break;
     }
@@ -126,7 +126,7 @@ void ArgsTable::ValueColumn::Filter(int op,
                          &predicate](uint32_t row) PERFETTO_ALWAYS_INLINE {
         const auto& arg = storage_->args().arg_values()[row];
         return arg.type == type_
-                   ? predicate(storage_->GetString(arg.string_value).data())
+                   ? predicate(storage_->GetString(arg.string_value).c_str())
                    : predicate(nullptr);
       });
       break;

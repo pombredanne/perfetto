@@ -192,9 +192,9 @@ inline std::function<bool(NullTermStringView)> CreateStringPredicate(
     sqlite3_value* value) {
   switch (op) {
     case SQLITE_INDEX_CONSTRAINT_ISNULL:
-      return [](NullTermStringView f) { return f.data() == nullptr; };
+      return [](NullTermStringView f) { return f.c_str() == nullptr; };
     case SQLITE_INDEX_CONSTRAINT_ISNOTNULL:
-      return [](NullTermStringView f) { return f.data() != nullptr; };
+      return [](NullTermStringView f) { return f.c_str() != nullptr; };
   }
 
   const char* val = reinterpret_cast<const char*>(sqlite3_value_text(value));
@@ -211,43 +211,43 @@ inline std::function<bool(NullTermStringView)> CreateStringPredicate(
     case SQLITE_INDEX_CONSTRAINT_EQ:
     case SQLITE_INDEX_CONSTRAINT_IS:
       return [val](NullTermStringView sv) {
-        auto* str = sv.data();
+        auto* str = sv.c_str();
         return str != nullptr && strcmp(str, val) == 0;
       };
     case SQLITE_INDEX_CONSTRAINT_NE:
     case SQLITE_INDEX_CONSTRAINT_ISNOT:
       return [val](NullTermStringView sv) {
-        auto* str = sv.data();
+        auto* str = sv.c_str();
         return str != nullptr && strcmp(str, val) != 0;
       };
     case SQLITE_INDEX_CONSTRAINT_GE:
       return [val](NullTermStringView sv) {
-        auto* str = sv.data();
+        auto* str = sv.c_str();
         return str != nullptr && strcmp(str, val) >= 0;
       };
     case SQLITE_INDEX_CONSTRAINT_GT:
       return [val](NullTermStringView sv) {
-        auto* str = sv.data();
+        auto* str = sv.c_str();
         return str != nullptr && strcmp(str, val) > 0;
       };
     case SQLITE_INDEX_CONSTRAINT_LE:
       return [val](NullTermStringView sv) {
-        auto* str = sv.data();
+        auto* str = sv.c_str();
         return str != nullptr && strcmp(str, val) <= 0;
       };
     case SQLITE_INDEX_CONSTRAINT_LT:
       return [val](NullTermStringView sv) {
-        auto* str = sv.data();
+        auto* str = sv.c_str();
         return str != nullptr && strcmp(str, val) < 0;
       };
     case SQLITE_INDEX_CONSTRAINT_LIKE:
       return [val](NullTermStringView sv) {
-        auto* str = sv.data();
+        auto* str = sv.c_str();
         return str != nullptr && sqlite3_strlike(val, str, 0) == 0;
       };
     case SQLITE_INDEX_CONSTRAINT_GLOB:
       return [val](NullTermStringView sv) {
-        auto* str = sv.data();
+        auto* str = sv.c_str();
         return str != nullptr && sqlite3_strglob(val, str) == 0;
       };
     default:
@@ -461,7 +461,7 @@ int CompareValuesDesc(const T& f, const T& s) {
 
 inline int CompareValuesAsc(const NullTermStringView& f,
                             const NullTermStringView& s) {
-  return strcmp(f.data(), s.data());
+  return strcmp(f.c_str(), s.c_str());
 }
 
 inline int CompareValuesDesc(const NullTermStringView& f,

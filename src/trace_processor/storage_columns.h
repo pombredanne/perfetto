@@ -223,10 +223,10 @@ class StringColumn final : public StorageColumn {
 
   void ReportResult(sqlite3_context* ctx, uint32_t row) const override {
     auto str = fn_((*deque_)[row]);
-    if (str.data() == nullptr) {
+    if (str.c_str() == nullptr) {
       sqlite3_result_null(ctx);
     } else {
-      sqlite3_result_text(ctx, str.data(), -1, sqlite_utils::kSqliteStatic);
+      sqlite3_result_text(ctx, str.c_str(), -1, sqlite_utils::kSqliteStatic);
     }
   }
 
