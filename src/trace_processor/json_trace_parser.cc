@@ -139,9 +139,9 @@ JsonTraceParser::~JsonTraceParser() = default;
 
 bool JsonTraceParser::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
   buffer_.insert(buffer_.end(), data.get(), data.get() + size);
-  const auto* buf = buffer_.begin();
-  const auto* next = buf;
-  const auto* end = buffer_.end();
+  const char* buf = buffer_.data();
+  const char* next = buf;
+  const char* end = buf + buffer_.size();
 
   if (offset_ == 0) {
     // Trace could begin in any of these ways:
