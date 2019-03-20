@@ -444,8 +444,13 @@ void ProtoTraceParser::ParseProcessStats(int64_t ts, ConstBytes blob) {
     std::array<int64_t, kProcStatsProcessSize> counter_values{};
     std::array<bool, kProcStatsProcessSize> has_counter{};
 
-    protos::pbzero::ProcessStats::Process::Decoder proc(it->data(), it->size());
+    ProtoDecoder proc(it->data(), it->size());
+    uint32_t pid = 0;
     for (auto fld = proc.ReadField(); fld.valid(); fld = proc.ReadField()) {
+      if (fld.id() == protos::pbzero::ProcessStats::Process::kPidFieldNumber) {
+        pid = fld.as_uint32();
+        continue;
+      }
       bool is_counter_field = fld.id() < proc_stats_process_names_.size() &&
                               proc_stats_process_names_[fld.id()] != 0;
       if (is_counter_field) {
@@ -469,8 +474,6 @@ void ProtoTraceParser::ParseProcessStats(int64_t ts, ConstBytes blob) {
       // pre-cached |proc_stats_process_names_| map.
       StringId name = proc_stats_process_names_[field_id];
       int64_t value = counter_values[field_id];
-
-      uint32_t pid = static_cast<uint32_t>(proc.pid());
       UniquePid upid = context_->process_tracker->UpdateProcess(pid);
       context_->event_tracker->PushCounter(ts, value, name, upid,
                                            RefType::kRefUpid);
@@ -843,7 +846,6 @@ void ProtoTraceParser::ParseBatteryCounters(int64_t ts, ConstBytes blob) {
 void ProtoTraceParser::ParseOOMScoreAdjUpdate(int64_t ts, ConstBytes blob) {
   protos::pbzero::OomScoreAdjUpdateFtraceEvent::Decoder evt(blob.data,
                                                             blob.size);
-
   // The int16_t static cast is because older version of the on-device tracer
   // had a bug on negative varint encoding (b/120618641).
   int16_t oom_adj = static_cast<int16_t>(evt.oom_score_adj());
@@ -903,9 +905,10 @@ void ProtoTraceParser::ParseSysEvent(int64_t ts,
   // We are reusing the same function for sys_enter and sys_exit.
   // It is fine as the arguments are the same, but we need to be sure that the
   // protobuf field id for both are the same.
-  static_assert(protos::pbzero::SysEnterFtraceEvent::kIdFieldNumber ==
-                    protos::pbzero::SysExitFtraceEvent::kIdFieldNumber,
-                "field mismatch");
+  static_assert(
+      static_cast<int>(protos::pbzero::SysEnterFtraceEvent::kIdFieldNumber) ==
+          static_cast<int>(protos::pbzero::SysExitFtraceEvent::kIdFieldNumber),
+      "field mismatch");
 }
 
 void ProtoTraceParser::ParseGenericFtrace(int64_t ts,
@@ -1131,12 +1134,6 @@ void ProtoTraceParser::ParseAndroidLogStats(ConstBytes blob) {
 }
 
 void ProtoTraceParser::ParseTraceStats(ConstBytes blob) {
-  // printf("\n");
-  // for(size_t i = 0; i<blob.size; i++) {
-  //   printf("%02x-", blob.data[i]);
-  // }
-  // printf("\n");
-
   protos::pbzero::TraceStats::Decoder evt(blob.data, blob.size);
   auto* storage = context_->storage.get();
   storage->SetStats(stats::traced_producers_connected,
