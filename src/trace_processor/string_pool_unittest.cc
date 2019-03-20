@@ -73,13 +73,13 @@ TEST(StringPoolTest, Iterator) {
 TEST(StringPoolTest, StressTest) {
   // First create a buffer with 128MB of random characters.
   constexpr size_t kBufferSize = 128 * 1024 * 1024;
+  std::minstd_rand0 rnd_engine(0);
   std::unique_ptr<char[]> buffer(new char[kBufferSize]);
   for (size_t i = 0; i < kBufferSize; i++)
-    buffer.get()[i] = 'A' + (random() % 26);
+    buffer.get()[i] = 'A' + (rnd_engine() % 26);
 
   // Next create strings of length 0 to 16k in length from this buffer and
   // intern them, storing their ids.
-  std::minstd_rand0 rnd_engine(0);
   StringPool pool;
   std::multimap<StringPool::Id, base::StringView> string_map;
   constexpr uint16_t kMaxStrSize = 16u * 1024u - 1;
