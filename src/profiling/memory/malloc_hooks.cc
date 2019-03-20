@@ -422,7 +422,7 @@ void* HEAPPROFD_ADD_PREFIX(_realloc)(void* pointer, size_t size) {
   std::shared_ptr<perfetto::profiling::Client> client;
   {
     ScopedSpinlock s(&g_client_lock, ScopedSpinlock::Mode::Try);
-    if (PERFETTO_UNLIKELY(!s.locked()) {
+    if (PERFETTO_UNLIKELY(!s.locked())) {
       PERFETTO_ELOG("Failed to acquire spinlock.");
     } else if (g_client) {
       client = g_client;  // owning copy
