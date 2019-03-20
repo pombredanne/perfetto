@@ -201,12 +201,12 @@ TEST_F(ProcessStatsDataSourceTest, ProcessStats) {
 
 TEST_F(ProcessStatsDataSourceTest, CacheProcessStats) {
   DataSourceConfig cfg;
-  cfg.mutable_process_stats_config()->set_proc_stats_poll_ms(125);
+  cfg.mutable_process_stats_config()->set_proc_stats_poll_ms(105);
   *(cfg.mutable_process_stats_config()->add_quirks()) =
       perfetto::ProcessStatsConfig::DISABLE_ON_DEMAND;
   auto data_source = GetProcessStatsDataSource(cfg);
 
-  data_source->set_process_stats_cache_clear_ms_for_testing(300);
+  data_source->set_process_stats_cache_clear_ms_for_testing(220);
 
   // Populate a fake /proc/ directory.
   auto fake_proc = base::TempDir::Create();
@@ -251,9 +251,9 @@ TEST_F(ProcessStatsDataSourceTest, CacheProcessStats) {
   ASSERT_EQ(ps_stats.processes_size(), 2);
 
   // We should get two counter events because:
-  // a) emissions happen at 0ms, 125ms, 250ms, 375ms
-  // b) clear events happen at 300ms, 600ms...
-  // Therefore, we should see the emissions at 0ms and 375ms.
+  // a) emissions happen at 0ms, 105ms, 210ms, 315ms
+  // b) clear events happen at 220ms, 440ms...
+  // Therefore, we should see the emissions at 0ms and 315ms.
   for (const auto& proc_counters : ps_stats.processes()) {
     ASSERT_EQ(proc_counters.pid(), kPid);
     ASSERT_EQ(proc_counters.vm_size_kb(), kPid * 100 + 1);
