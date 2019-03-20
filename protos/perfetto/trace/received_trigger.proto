@@ -30,10 +30,11 @@ message ReceivedTrigger {
   optional TraceConfig.TriggerConfig.Trigger trigger = 2;
   // The actual producer that activated |trigger|.
   optional string producer_name = 3;
+  // The verified UID of the producer.
+  optional int32 producer_uid = 4;
 }
 
-// This is needed to allow the TrustedPacket message to have a single field (and
-// not a repeated field) to point to when casting the packet type.
+// Contains a list of ReceivedTrigger. This is needed for oneof in TracePacket.
 message ReceivedTriggers {
   repeated ReceivedTrigger triggers = 1;
 }
