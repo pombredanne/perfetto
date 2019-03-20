@@ -328,6 +328,12 @@ bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
     return false;
   }
 
+  if (has_start_trigger && cfg.duration_ms() != 0) {
+    PERFETTO_ELOG(
+        "duration_ms was set, this field is ignored for traces with triggers.");
+    return false;
+  }
+
   std::unordered_set<std::string> triggers;
   for (const auto& trigger : cfg.trigger_config().triggers()) {
     if (!triggers.insert(trigger.name()).second) {
@@ -471,35 +477,8 @@ bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   // For traces which use START_TRACE triggers we need to ensure that the
   // tracing session will be cleaned up when it times out.
   if (has_start_trigger) {
-    auto weak_this = weak_ptr_factory_.GetWeakPtr();
-    task_runner_->PostDelayedTask(
-        [weak_this, tsid] {
-          // Skip entirely the flush if the trace session doesn't exist anymore.
-          // This is to prevent misleading error messages to be logged.
-          //
-          // In addition if the trace has started from the trigger we rely on
-          // the |stop_delay_ms| from the trigger so don't flush and
-          // disable if we've moved beyond a CONFIGURED state.
-          if (!weak_this) {
-            return;
-          }
-          auto* tracing_session_ptr = weak_this->GetTracingSession(tsid);
-          if (tracing_session_ptr &&
-              tracing_session_ptr->state == TracingSession::CONFIGURED) {
-            PERFETTO_DLOG("Disabling TracingSession %" PRIu64
-                          " no triggers activated.",
-                          tsid);
-            // No data should be returned from ReadBuffers() regardless of if we
-            // call FreeBuffers() or DisableTracing(). This is because in
-            // STOP_TRACING we need this promise in either case, and using
-            // DisableTracing() allows a graceful shutdown. Consumers can follow
-            // their normal path and check the buffers through ReadBuffers() and
-            // the code won't hang because the tracing session will still be
-            // alive just disabled.
-            weak_this->DisableTracing(tsid);
-          }
-        },
-        cfg.trigger_config().trigger_timeout_ms());
+    CleanUpStartTracingTriggerSession(
+        tsid, cfg.trigger_config().trigger_timeout_ms());
   }
 
   // Start the data sources, unless this is a case of early setup + fast
@@ -1269,7 +1248,7 @@ void TracingServiceImpl::ReadBuffers(TracingSessionID tsid,
 
   // When a tracing session is waiting for a trigger it is considered empty. If
   // a tracing session finishes and moves into DISABLED without ever receiving a
-  // trigger the trace should never return any data this includes the synthetic
+  // trigger the trace should never return any data. This includes the synthetic
   // packets like TraceConfig and Clock snapshots. So we bail out early and let
   // the consumer know there is no data.
   if (!tracing_session->config.trigger_config().triggers().empty() &&
@@ -1887,6 +1866,40 @@ TraceBuffer* TracingServiceImpl::GetBufferByID(BufferID buffer_id) {
   if (buf_iter == buffers_.end())
     return nullptr;
   return &*buf_iter->second;
+}
+
+void TracingServiceImpl::CleanUpStartTracingTriggerSession(
+    TracingSessionID tsid,
+    uint32_t timeout) {
+  auto weak_this = weak_ptr_factory_.GetWeakPtr();
+  task_runner_->PostDelayedTask(
+      [weak_this, tsid] {
+        // Skip entirely the flush if the trace session doesn't exist anymore.
+        // This is to prevent misleading error messages to be logged.
+        //
+        // In addition if the trace has started from the trigger we rely on
+        // the |stop_delay_ms| from the trigger so don't flush and
+        // disable if we've moved beyond a CONFIGURED state.
+        if (!weak_this) {
+          return;
+        }
+        auto* tracing_session_ptr = weak_this->GetTracingSession(tsid);
+        if (tracing_session_ptr &&
+            tracing_session_ptr->state == TracingSession::CONFIGURED) {
+          PERFETTO_DLOG("Disabling TracingSession %" PRIu64
+                        " since no triggers activated.",
+                        tsid);
+          // No data should be returned from ReadBuffers() regardless of if we
+          // call FreeBuffers() or DisableTracing(). This is because in
+          // STOP_TRACING we need this promise in either case, and using
+          // DisableTracing() allows a graceful shutdown. Consumers can follow
+          // their normal path and check the buffers through ReadBuffers() and
+          // the code won't hang because the tracing session will still be
+          // alive just disabled.
+          weak_this->DisableTracing(tsid);
+        }
+      },
+      timeout);
 }
 
 void TracingServiceImpl::UpdateMemoryGuardrail() {
