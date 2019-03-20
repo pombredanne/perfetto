@@ -279,7 +279,6 @@ class GeneratorJob {
         "#include <stddef.h>\n"
         "#include <stdint.h>\n\n"
         "#include \"perfetto/base/export.h\"\n"
-        "#include \"perfetto/protozero/proto_field_descriptor.h\"\n"
         "#include \"perfetto/protozero/proto_decoder.h\"\n"
         "#include \"perfetto/protozero/message.h\"\n",
         "greeting", greeting, "guard", guard);
@@ -491,6 +490,11 @@ class GeneratorJob {
 
     for (int i = 0; i < message->field_count(); ++i) {
       const FieldDescriptor* field = message->field(i);
+      if (field->is_packed()) {
+        Abort("Packed repeated fields are not supported.");
+        return;
+      }
+
       if (field->number() > max_field_id) {
         stub_h_->Print("// field $name$ omitted because its id is too high",
                        "name", field->name());
@@ -570,7 +574,7 @@ class GeneratorJob {
     stub_h_->Print("};\n");
   }
 
-  void GenerateReflectionForMessageFields(const Descriptor* message) {
+  void GenerateConstantsForMessageFields(const Descriptor* message) {
     const bool has_fields = (message->field_count() > 0);
 
     // Field number constants.
@@ -587,47 +591,6 @@ class GeneratorJob {
       stub_h_->Outdent();
       stub_h_->Print("};\n");
     }
-
-    // Fields reflection table.
-    std::string class_name = GetCppClassName(message);
-
-    // Fields reflection getter.
-    stub_h_->Print(
-        "static const ::protozero::ProtoFieldDescriptor "
-        "GetFieldDescriptor(uint32_t field_id) {\n");
-    stub_h_->Indent();
-    if (has_fields) {
-      stub_h_->Print("switch (field_id) {\n");
-      stub_h_->Indent();
-      for (int i = 0; i < message->field_count(); ++i) {
-        const FieldDescriptor* field = message->field(i);
-        std::string type_const =
-            std::string("TYPE_") + FieldDescriptor::TypeName(field->type());
-        UpperString(&type_const);
-        stub_h_->Print(
-            "case $field$:\n"
-            "  return {\"$name$\", "
-            "::protozero::ProtoFieldDescriptor::Type::$type$, $number$, "
-            "$is_repeated$};\n",
-            "class", class_name, "field",
-            GetFieldNumberConstant(message->field(i)), "id", std::to_string(i),
-            "name", field->name(), "type", type_const, "number",
-            std::to_string(field->number()), "is_repeated",
-            std::to_string(field->is_repeated()));
-      }
-      stub_h_->Print(
-          "default:\n"
-          "  return "
-          "*::protozero::ProtoFieldDescriptor::GetInvalidInstance();\n");
-      stub_h_->Outdent();
-      stub_h_->Print("}\n");
-    } else {
-      stub_h_->Print(
-          "(void)(field_id);\n"
-          "return *::protozero::ProtoFieldDescriptor::GetInvalidInstance();\n");
-    }
-    stub_h_->Outdent();
-    stub_h_->Print("}\n\n");
   }
 
   void GenerateMessageDescriptor(const Descriptor* message) {
@@ -637,7 +600,7 @@ class GeneratorJob {
         "name", GetCppClassName(message));
     stub_h_->Indent();
 
-    GenerateReflectionForMessageFields(message);
+    GenerateConstantsForMessageFields(message);
     GenerateDecoder(message);
 
     // Using statements for nested messages.

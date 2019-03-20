@@ -200,7 +200,7 @@ class TypedProtoDecoder : public TypedProtoDecoderBase {
   // id we are able to decode. This is to limit the on-stack storage.
   // In the case of repeated fields, this constant defines the max number of
   // repeated fields that we'll be able to store before falling back on the
-  // heap. Keep this value in sync with the omonim in protozero_generator.cc.
+  // heap. Keep this value in sync with the one in protozero_generator.cc.
   static constexpr size_t kMaxDecoderFieldId = 999;
 
   // If we the message has no repeated fields we need at most N Field entries
