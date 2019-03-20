@@ -130,12 +130,21 @@ const MallocDispatch* GetDispatch() {
   return g_dispatch.load(std::memory_order_relaxed);
 }
 
+void SpinlockFailed() {
+  // This is damage control. If we are stuck on the spinlock something is very
+  // wrong. Uninstall hooks and leak the client to avoid slowing down every
+  // malloc for 10ms trying to aquire the spinlock.
+  PERFETTO_ELOG("Failed to acquire spinlock.");
+  if (!android_mallopt(M_RESET_HOOKS, nullptr, 0))
+    PERFETTO_PLOG("Unpatching heapprofd hooks failed.");
+}
+
 // Note: android_mallopt(M_RESET_HOOKS) is mutually exclusive with initialize
 // (concurrent calls get discarded).
 void ShutdownLazy() {
   ScopedSpinlock s(&g_client_lock, ScopedSpinlock::Mode::Try);
   if (PERFETTO_UNLIKELY(!s.locked())) {
-    PERFETTO_ELOG("Failed to acquire spinlock.");
+    SpinlockFailed();
     return;
   }
   if (!g_client)  // other invocation already initiated shutdown
@@ -283,7 +292,7 @@ bool HEAPPROFD_ADD_PREFIX(_initialize)(const MallocDispatch* malloc_dispatch,
 
   ScopedSpinlock s(&g_client_lock, ScopedSpinlock::Mode::Try);
   if (PERFETTO_UNLIKELY(!s.locked())) {
-    PERFETTO_ELOG("Failed to acquire spinlock.");
+    SpinlockFailed();
     return false;
   }
 
@@ -330,7 +339,7 @@ static void MaybeSampleAllocation(size_t size, void* addr) {
   {
     ScopedSpinlock s(&g_client_lock, ScopedSpinlock::Mode::Try);
     if (PERFETTO_UNLIKELY(!s.locked())) {
-      PERFETTO_ELOG("Failed to acquire spinlock.");
+      SpinlockFailed();
       return;
     }
     if (!g_client)  // no active client (most likely shutting down)
@@ -400,7 +409,7 @@ void HEAPPROFD_ADD_PREFIX(_free)(void* pointer) {
     if (PERFETTO_LIKELY(s.locked()))
       client = g_client;  // owning copy (or empty)
     else
-      PERFETTO_ELOG("Failed to acquire spinlock.");
+      SpinlockFailed();
   }
 
   if (client) {
@@ -426,7 +435,7 @@ void* HEAPPROFD_ADD_PREFIX(_realloc)(void* pointer, size_t size) {
   {
     ScopedSpinlock s(&g_client_lock, ScopedSpinlock::Mode::Try);
     if (PERFETTO_UNLIKELY(!s.locked())) {
-      PERFETTO_ELOG("Failed to acquire spinlock.");
+      SpinlockFailed();
     } else if (g_client) {
       client = g_client;  // owning copy
       sampled_alloc_sz = g_client->GetSampleSizeLocked(size);
