@@ -406,10 +406,10 @@ void HEAPPROFD_ADD_PREFIX(_free)(void* pointer) {
   std::shared_ptr<perfetto::profiling::Client> client;
   {
     ScopedSpinlock s(&g_client_lock, ScopedSpinlock::Mode::Try);
-    if (PERFETTO_LIKELY(s.locked()))
-      client = g_client;  // owning copy (or empty)
-    else
+    if (PERFETTO_ULIKELY(!s.locked()))
       SpinlockFailed();
+    else
+      client = g_client;  // owning copy (or empty)
   }
 
   if (client) {
