@@ -291,7 +291,7 @@ void ProtoTraceParser::ParseTracePacket(int64_t ts, TraceBlobView packet) {
       }
       case protos::TracePacket::kPowerRailsFieldNumber: {
         const size_t fld_off = packet.offset_of(fld.data());
-        ParsePowerRails(ts, packet.slice(fld_off, fld.size()));
+        ParsePowerRails(packet.slice(fld_off, fld.size()));
         break;
       }
       case protos::TracePacket::kTraceStatsFieldNumber: {
@@ -1247,7 +1247,7 @@ void ProtoTraceParser::ParsePowerRailsData(TraceBlobView data) {
   int64_t ts = 0;
   int64_t energy = 0;
   for (auto fld = decoder.ReadField(); fld.valid(); fld = decoder.ReadField()) {
-    switch (fld.valid()) {
+    switch (fld.id()) {
       case protos::PowerRails::EnergyData::kIndexFieldNumber:
         idx = fld.as_uint32();
         break;
