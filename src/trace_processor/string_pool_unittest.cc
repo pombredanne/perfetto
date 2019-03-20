@@ -16,6 +16,8 @@
 
 #include "src/trace_processor/string_pool.h"
 
+#include <random>
+
 #include "gtest/gtest.h"
 
 namespace perfetto {
@@ -77,11 +79,12 @@ TEST(StringPoolTest, StressTest) {
 
   // Next create strings of length 0 to 16k in length from this buffer and
   // intern them, storing their ids.
+  std::minstd_rand0 rnd_engine(0);
   StringPool pool;
   std::multimap<StringPool::Id, base::StringView> string_map;
   constexpr uint16_t kMaxStrSize = 16u * 1024u - 1;
   for (size_t i = 0;;) {
-    size_t length = static_cast<uint64_t>(random()) % (kMaxStrSize + 1);
+    size_t length = static_cast<uint64_t>(rnd_engine()) % (kMaxStrSize + 1);
     if (i + length > kBufferSize)
       break;
 

@@ -108,7 +108,8 @@ class StringPool {
     uint8_t* TryInsert(base::StringView str);
 
     uint32_t OffsetOf(uint8_t* ptr) const {
-      PERFETTO_DCHECK(Get(0) < ptr && ptr < Get(kBlockSize));
+      PERFETTO_DCHECK(Get(0) < ptr &&
+                      ptr < Get(static_cast<size_t>(kBlockSize)));
       return static_cast<uint32_t>(ptr - Get(0));
     }
 
@@ -116,8 +117,9 @@ class StringPool {
 
    private:
     static constexpr size_t kBlockSize =
-        sizeof(void*) == 8 ? 4ull * 1024ull * 1024ull * 1024ull /* 4GB */
-                           : 32ull * 1024ull * 1024ull /* 32MB */;
+        sizeof(void*) == 8
+            ? static_cast<size_t>(4ull * 1024ull * 1024ull * 1024ull) /* 4GB */
+            : 32ull * 1024ull * 1024ull /* 32MB */;
 
     base::PagedMemory mem_;
     uint32_t pos_ = 0;
