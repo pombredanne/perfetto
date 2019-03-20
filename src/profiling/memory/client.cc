@@ -168,6 +168,8 @@ Client::Client(base::Optional<base::UnixSocketRaw> sock)
     return;
   }
 
+  sock_.SetBlocking(false);
+
   auto shmem = SharedRingBuffer::Attach(std::move(shmem_fd));
   if (!shmem || !shmem->is_valid()) {
     PERFETTO_DFATAL("Failed to attach to shmem.");
@@ -245,7 +247,10 @@ bool Client::RecordMalloc(uint64_t alloc_size,
     Shutdown();
     return false;
   }
-  if (sock_.Send(kSingleByte, sizeof(kSingleByte)) == -1) {
+
+  PERFETTO_DCHECK(!sock_.IsBlocking());
+  if (sock_.Send(kSingleByte, sizeof(kSingleByte)) == -1 && errno != EAGAIN &&
+      errno != EWOULDBLOCK) {
     PERFETTO_PLOG("Failed to send wire message.");
     Shutdown();
     return false;
@@ -304,6 +309,8 @@ void Client::Shutdown() {
 }
 
 bool Client::IsConnected() {
+  PERFETTO_DCHECK(!sock_.IsBlocking());
+
   char buf[1];
   ssize_t recv_bytes =
       PERFETTO_EINTR(sock_.Receive(buf, sizeof(buf), nullptr, 0));
