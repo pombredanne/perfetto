@@ -658,18 +658,18 @@ TEST_F(TracingServiceImplTest, StopTracingTriggerTimeout) {
   trigger_config->set_trigger_mode(TraceConfig::TriggerConfig::STOP_TRACING);
   auto* trigger = trigger_config->add_triggers();
   trigger->set_name("trigger_name");
-  trigger->set_stop_delay_ms(100);
+  trigger->set_stop_delay_ms(30000);
 
-  trigger_config->set_trigger_timeout_ms(30);
+  trigger_config->set_trigger_timeout_ms(1);
 
-  auto start_ns = base::GetBootTimeNs().count();
+  // Make sure we don't get unexpected DataSourceStart() notifications yet.
+  EXPECT_CALL(*producer, StartDataSource(_, _)).Times(0);
+
   consumer->EnableTracing(trace_config);
   producer->WaitForTracingSetup();
 
   producer->WaitForDataSourceSetup("ds_1");
   producer->WaitForDataSourceStart("ds_1");
-
-  task_runner.RunUntilIdle();
 
   // The trace won't return data until unless we send a trigger at this point.
   EXPECT_THAT(consumer->ReadBuffers(), ::testing::IsEmpty());
@@ -681,8 +681,6 @@ TEST_F(TracingServiceImplTest, StopTracingTriggerTimeout) {
 
   producer->WaitForDataSourceStop("ds_1");
   consumer->WaitForTracingDisabled();
-  EXPECT_NEAR(base::GetBootTimeNs().count() - start_ns, 3e+7 /* 30ms */,
-              /* 10ms */ 1e+7);
   EXPECT_THAT(consumer->ReadBuffers(), ::testing::IsEmpty());
 }
 
@@ -707,11 +705,10 @@ TEST_F(TracingServiceImplTest, StopTracingTriggerRingBuffer) {
   trigger_config->set_trigger_mode(TraceConfig::TriggerConfig::STOP_TRACING);
   auto* trigger = trigger_config->add_triggers();
   trigger->set_name("trigger_name");
-  trigger->set_stop_delay_ms(100);
+  trigger->set_stop_delay_ms(1);
 
-  trigger_config->set_trigger_timeout_ms(30);
+  trigger_config->set_trigger_timeout_ms(30000);
 
-  auto start_ns = base::GetBootTimeNs().count();
   consumer->EnableTracing(trace_config);
   producer->WaitForTracingSetup();
 
@@ -759,20 +756,16 @@ TEST_F(TracingServiceImplTest, StopTracingTriggerRingBuffer) {
 
   producer->WaitForDataSourceStop("ds_1");
   consumer->WaitForTracingDisabled();
-  // In this trace we received a trigger so we should finish the trace after the
-  // |stop_delay_ms| (100ms) not the |trigger_timeout_ms| which is 30ms.
-  EXPECT_NEAR(base::GetBootTimeNs().count() - start_ns, 1e+8 /* 100ms */,
-              /* 10ms */ 1e+7);
   // There are 5 preample packets plus the kNumTestPackets we wrote out. The
   // large_payload one should be overwritten.
   static const int kNumPreamblePackets = 5;
-  auto buffers = consumer->ReadBuffers();
-  EXPECT_EQ(kNumTestPackets + kNumPreamblePackets, buffers.size());
+  auto packets = consumer->ReadBuffers();
+  EXPECT_EQ(kNumTestPackets + kNumPreamblePackets, packets.size());
   // We expect for the TraceConfig preamble packet to be there correctly and
   // then we expect each payload to be there, but not the |large_payload|
   // packet.
   EXPECT_THAT(
-      buffers,
+      packets,
       Contains(Property(
           &protos::TracePacket::trace_config,
           Property(
@@ -783,14 +776,14 @@ TEST_F(TracingServiceImplTest, StopTracingTriggerRingBuffer) {
   for (int i = 0; i < kNumTestPackets; i++) {
     std::string payload = kPayload;
     payload += std::to_string(i);
-    EXPECT_THAT(buffers, Contains(Property(
+    EXPECT_THAT(packets, Contains(Property(
                              &protos::TracePacket::for_testing,
                              Property(&protos::TestEvent::str, Eq(payload)))));
   }
 
   // The large payload was overwritten before we trigger and ReadBuffers so it
   // should not be in the returned data.
-  EXPECT_THAT(buffers,
+  EXPECT_THAT(packets,
               ::testing::Not(Contains(Property(
                   &protos::TracePacket::for_testing,
                   Property(&protos::TestEvent::str, Eq(large_payload))))));
