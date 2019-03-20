@@ -287,7 +287,10 @@ bool HEAPPROFD_ADD_PREFIX(_initialize)(const MallocDispatch* malloc_dispatch,
     return false;
   }
 
-  if (g_client) {
+  // In case we failed to grab the spinlock in LazyShutdown, we can have a stale
+  // client. We check if heapprofd has disconnected to determine that this has
+  // happened.
+  if (g_client && g_client->IsConnected()) {
     PERFETTO_LOG("Rejecting concurrent profiling initialization.");
     return true;  // success as we're in a valid state
   }

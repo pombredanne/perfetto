@@ -303,5 +303,16 @@ void Client::Shutdown() {
   inited_.store(false, std::memory_order_release);
 }
 
+bool Client::IsConnected() {
+  char buf[1];
+  ssize_t recv_bytes =
+      PERFETTO_EINTR(sock_.Receive(buf, sizeof(buf), nullptr, 0));
+  if (recv_bytes == 0)
+    return false;
+  else if (recv_bytes > 0)
+    return true;
+  return errno == EAGAIN || errno == EWOULDBLOCK;
+}
+
 }  // namespace profiling
 }  // namespace perfetto

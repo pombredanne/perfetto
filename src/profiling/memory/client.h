@@ -67,6 +67,7 @@ class Client {
 
   ClientConfiguration client_config_for_testing() { return client_config_; }
   bool inited() { return inited_; }
+  bool IsConnected();
 
  private:
   const char* GetStackBase();
