@@ -20,7 +20,6 @@
 #include <stdint.h>
 
 #include "perfetto/base/logging.h"
-#include "perfetto/base/string_view.h"
 #include "perfetto/protozero/contiguous_memory_range.h"
 #include "perfetto/protozero/proto_utils.h"
 
@@ -32,12 +31,12 @@ struct ConstBytes {
 };
 
 struct ConstChars {
+  // Allow implicit conversion to perfetto's base::StringView without depending
+  // on perfetto/base or viceversa.
+  static constexpr bool kConvertibleToStringView = true;
+
   const char* data;
   size_t size;
-
-  operator ::perfetto::base::StringView() const {
-    return ::perfetto::base::StringView(data, size);
-  }
 };
 
 // A protobuf field decoded by the protozero proto decoders. It exposes
