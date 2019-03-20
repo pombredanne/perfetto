@@ -16,6 +16,7 @@
 
 #include "src/trace_processor/proto_trace_parser.h"
 
+#include <inttypes.h>
 #include <string.h>
 
 #include <string>
@@ -685,13 +686,18 @@ void ProtoTraceParser::ParseIonHeapGrowOrShrink(int64_t ts,
   // It is fine as the arguments are the same, but we need to be sure that the
   // protobuf field id for both are the same.
   static_assert(
-      protos::pbzero::IonHeapGrowFtraceEvent::kTotalAllocatedFieldNumber ==
-              protos::pbzero::IonHeapShrinkFtraceEvent::
-                  kTotalAllocatedFieldNumber &&
-          protos::pbzero::IonHeapGrowFtraceEvent::kLenFieldNumber ==
-              protos::pbzero::IonHeapShrinkFtraceEvent::kLenFieldNumber &&
-          protos::pbzero::IonHeapGrowFtraceEvent::kHeapNameFieldNumber ==
-              protos::pbzero::IonHeapShrinkFtraceEvent::kHeapNameFieldNumber,
+      static_cast<int>(
+          protos::pbzero::IonHeapGrowFtraceEvent::kTotalAllocatedFieldNumber) ==
+              static_cast<int>(protos::pbzero::IonHeapShrinkFtraceEvent::
+                                   kTotalAllocatedFieldNumber) &&
+          static_cast<int>(
+              protos::pbzero::IonHeapGrowFtraceEvent::kLenFieldNumber) ==
+              static_cast<int>(
+                  protos::pbzero::IonHeapShrinkFtraceEvent::kLenFieldNumber) &&
+          static_cast<int>(
+              protos::pbzero::IonHeapGrowFtraceEvent::kHeapNameFieldNumber) ==
+              static_cast<int>(protos::pbzero::IonHeapShrinkFtraceEvent::
+                                   kHeapNameFieldNumber),
       "ION field mismatch");
 }
 
@@ -949,6 +955,12 @@ void ProtoTraceParser::ParseTypedFtraceToRaw(uint32_t ftrace_id,
   RowId raw_event_id = context_->storage->mutable_raw_events()->AddRawEvent(
       ts, message_strings.message_name_id, cpu, utid);
   for (auto fld = decoder.ReadField(); fld.valid(); fld = decoder.ReadField()) {
+    if (PERFETTO_UNLIKELY(fld.id() >= kMaxFtraceEventFields)) {
+      PERFETTO_DLOG(
+          "Skipping ftrace arg - proto field id is too large (%" PRIu16 ")",
+          fld.id());
+      continue;
+    }
     ProtoSchemaType type = m->fields[fld.id()].type;
     StringId name_id = message_strings.field_name_ids[fld.id()];
     switch (type) {
