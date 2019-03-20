@@ -28,6 +28,10 @@ namespace trace_processor {
 
 // Interns strings in a string pool and hands out compact StringIds which can
 // be used to retrieve the string in O(1).
+// On 64-bit platforms, the string pool is implemented as a mmaped buffer
+// of 4GB with the id being equal ot the offset into this buffer of the string.
+// On 32-bit platforms instead, the implementation allocates 32MB blocks of
+// mmaped memory with the pointer being directly converted to the id.
 class StringPool {
  public:
   using Id = uint32_t;
@@ -37,13 +41,14 @@ class StringPool {
    public:
     Iterator(const StringPool*);
 
-    bool Next();
+    explicit operator bool() const;
+    Iterator& operator++();
+
     NullTermStringView StringView();
     Id StringId();
 
    private:
     const StringPool* pool_ = nullptr;
-    bool first_ = true;
     uint32_t block_id_ = 0;
     uint32_t block_offset_ = 0;
   };
@@ -72,7 +77,7 @@ class StringPool {
     return InsertString(str, hash);
   }
 
-  PERFETTO_ALWAYS_INLINE NullTermStringView Get(Id id) const {
+  NullTermStringView Get(Id id) const {
     if (id == 0)
       return NullTermStringView();
     return GetFromPtr(IdToPtr(id));
@@ -85,7 +90,7 @@ class StringPool {
  private:
   using StringHash = uint64_t;
   struct Block {
-    Block() : inner_(base::PagedMemory::Allocate(kBlockSize)) {}
+    Block() : mem_(base::PagedMemory::Allocate(kBlockSize)) {}
     ~Block() = default;
 
     // Allow std::move().
@@ -97,18 +102,13 @@ class StringPool {
     Block& operator=(const Block&) = delete;
 
     uint8_t* Get(uint32_t offset) const {
-      return static_cast<uint8_t*>(inner_.Get()) + offset;
+      return static_cast<uint8_t*>(mem_.Get()) + offset;
     }
 
-    uint8_t* Reserve(uint32_t size) {
-      if (static_cast<uint64_t>(pos_) + size >= kBlockSize)
-        return nullptr;
-      uint32_t start = pos_;
-      pos_ += size;
-      return Get(start);
-    }
+    uint8_t* TryInsert(base::StringView str);
 
     uint32_t OffsetOf(uint8_t* ptr) const {
+      PERFETTO_DCHECK(Get(0) < ptr && ptr < Get(kBlockSize));
       return static_cast<uint32_t>(ptr - Get(0));
     }
 
@@ -119,7 +119,7 @@ class StringPool {
         sizeof(void*) == 8 ? 4ull * 1024ull * 1024ull * 1024ull /* 4GB */
                            : 32ull * 1024ull * 1024ull /* 32MB */;
 
-    base::PagedMemory inner_;
+    base::PagedMemory mem_;
     uint32_t pos_ = 0;
   };
 
@@ -141,7 +141,7 @@ class StringPool {
 
     // On 32 bit architectures, the size of the pointer is 32-bit so we simply
     // use the pointer itself as the id.
-    // Double cast needed because, on 64 arches, the compiler complains that we
+    // Double cast needed because, on 64 archs, the compiler complains that we
     // are losing information.
     return static_cast<Id>(reinterpret_cast<uintptr_t>(ptr));
   }
@@ -164,7 +164,7 @@ class StringPool {
     return size;
   }
 
-  PERFETTO_ALWAYS_INLINE static NullTermStringView GetFromPtr(uint8_t* ptr) {
+  static NullTermStringView GetFromPtr(uint8_t* ptr) {
     // With the first two bytes being used for the size, the string starts from
     // byte 3.
     return NullTermStringView(reinterpret_cast<char*>(&ptr[2]), GetSize(ptr));
@@ -174,6 +174,8 @@ class StringPool {
   std::vector<Block> blocks_;
 
   // Maps hashes of strings to the Id in the string pool.
+  // TODO(lalitm): At some point we should benchmark just using a static
+  // hashtable of 1M elements, we can afford paying a fixed 8MB here
   std::unordered_map<StringHash, Id> string_index_;
 };
 

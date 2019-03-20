@@ -37,7 +37,9 @@ class StringView {
   StringView() : data_(nullptr), size_(0) {}
   StringView(const StringView&) = default;
   StringView& operator=(const StringView&) = default;
-  StringView(const char* data, size_t size) : data_(data), size_(size) {}
+  StringView(const char* data, size_t size) : data_(data), size_(size) {
+    PERFETTO_DCHECK(data != nullptr || size_ == 0);
+  }
 
   // Creates a StringView from a null-terminated C string.
   // Deliberately not "explicit".
@@ -98,6 +100,8 @@ class StringView {
 inline bool operator==(const StringView& x, const StringView& y) {
   if (x.size() != y.size())
     return false;
+  if (x.size() == 0)
+    return true;
   return memcmp(x.data(), y.data(), x.size()) == 0;
 }
 
@@ -106,21 +110,23 @@ inline bool operator!=(const StringView& x, const StringView& y) {
 }
 
 inline bool operator<(const StringView& x, const StringView& y) {
-  int result = memcmp(x.data(), y.data(), std::min(x.size(), y.size()));
+  auto size = std::min(x.size(), y.size());
+  if (size == 0)
+    return x.size() < y.size();
+  int result = memcmp(x.data(), y.data(), size);
   return result < 0 || (result == 0 && x.size() < y.size());
-}
-
-inline bool operator<=(const StringView& x, const StringView& y) {
-  int result = memcmp(x.data(), y.data(), std::min(x.size(), y.size()));
-  return result < 0 || (result == 0 && x.size() <= y.size());
-}
-
-inline bool operator>(const StringView& x, const StringView& y) {
-  return !(x <= y);
 }
 
 inline bool operator>=(const StringView& x, const StringView& y) {
   return !(x < y);
+}
+
+inline bool operator>(const StringView& x, const StringView& y) {
+  return y < x;
+}
+
+inline bool operator<=(const StringView& x, const StringView& y) {
+  return !(y < x);
 }
 
 }  // namespace base

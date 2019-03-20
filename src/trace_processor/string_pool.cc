@@ -24,9 +24,8 @@ namespace trace_processor {
 StringPool::StringPool() {
   blocks_.emplace_back();
 
-  // Reserve one byte for the null string. This prevents any other string
-  // being given id 0.
-  PERFETTO_CHECK(blocks_.back().Reserve(1));
+  // Reserve a slot for the null string.
+  PERFETTO_CHECK(blocks_.back().TryInsert(nullptr));
 }
 
 StringPool::~StringPool() = default;
@@ -36,13 +35,12 @@ StringPool& StringPool::operator=(StringPool&&) = default;
 
 StringPool::Id StringPool::InsertString(base::StringView str, uint64_t hash) {
   // We shouldn't be writing string with more than 2^16 characters to the pool.
-  PERFETTO_DCHECK(str.size() < std::numeric_limits<uint16_t>::max());
-  uint16_t str_size = static_cast<uint16_t>(str.size());
+  PERFETTO_CHECK(str.size() < std::numeric_limits<uint16_t>::max());
 
   // Try and find enough space in the current block for the string and the
   // metadata (the size of the string + the null terminator + 2 bytes to encode
   // the size itself).
-  auto* ptr = blocks_.back().Reserve(kMetadataSize + str_size);
+  auto* ptr = blocks_.back().TryInsert(str);
   if (PERFETTO_UNLIKELY(!ptr)) {
     // This means the block did not have enough space. This should only happen
     // on 32-bit platforms as we allocate a 4GB mmap on 64 bit.
@@ -52,18 +50,9 @@ StringPool::Id StringPool::InsertString(base::StringView str, uint64_t hash) {
     blocks_.emplace_back();
 
     // Try and reserve space again - this time we should definitely succeed.
-    ptr = blocks_.back().Reserve(kMetadataSize + str_size);
+    ptr = blocks_.back().TryInsert(str);
     PERFETTO_CHECK(ptr);
   }
-
-  // First memcpy the size of the string into the buffer.
-  memcpy(ptr, &str_size, sizeof(str_size));
-
-  // Next the string itself which starts at offset 2.
-  memcpy(&ptr[2], str.data(), str_size);
-
-  // Finally add a null terminator.
-  ptr[2 + str_size] = '\0';
 
   // Finish by computing the id of the pointer and adding a mapping from the
   // hash to the string_id.
@@ -72,38 +61,54 @@ StringPool::Id StringPool::InsertString(base::StringView str, uint64_t hash) {
   return string_id;
 }
 
+uint8_t* StringPool::Block::TryInsert(base::StringView str) {
+  auto str_size = str.size();
+  auto size = str_size + kMetadataSize;
+  if (static_cast<uint64_t>(pos_) + size >= kBlockSize)
+    return nullptr;
+
+  // Get where we should start writing this string.
+  uint8_t* ptr = Get(pos_);
+
+  // First memcpy the size of the string into the buffer.
+  memcpy(ptr, &str_size, sizeof(str_size));
+
+  // Next the string itself which starts at offset 2.
+  if (PERFETTO_LIKELY(str_size > 0))
+    memcpy(&ptr[2], str.data(), str_size);
+
+  // Finally add a null terminator.
+  ptr[2 + str_size] = '\0';
+
+  // Update the end of the block and return the pointer to the string.
+  pos_ += size;
+  return ptr;
+}
+
 StringPool::Iterator::Iterator(const StringPool* pool) : pool_(pool) {}
 
-bool StringPool::Iterator::Next() {
+StringPool::Iterator& StringPool::Iterator::operator++() {
   PERFETTO_DCHECK(block_id_ < pool_->blocks_.size());
-
-  // On the first call to next, always return true as we always have the null
-  // string.
-  if (PERFETTO_UNLIKELY(first_)) {
-    first_ = false;
-    return true;
-  }
 
   // Otherwise, try and go to the next string in the current block.
   const auto& block = pool_->blocks_[block_id_];
-  if (PERFETTO_UNLIKELY(block_id_ == 0 && block_offset_ == 0)) {
-    // The null string is at (0, 0). The next string is simply the same block
-    // at offset 1.
-    block_offset_ = 1;
-  } else {
-    // Otherwise, find the size of the string at the current offset in the block
-    // and increment the offset by that size.
-    auto str_size = GetSize(block.Get(block_offset_));
-    block_offset_ += kMetadataSize + str_size;
-  }
+
+  // Find the size of the string at the current offset in the block
+  // and increment the offset by that size.
+  auto str_size = GetSize(block.Get(block_offset_));
+  block_offset_ += kMetadataSize + str_size;
 
   // If we're out of bounds for this block, go the the start of the next block.
   if (block.pos() <= block_offset_) {
     block_id_++;
     block_offset_ = 0;
-    return block_id_ < pool_->blocks_.size();
+    return *this;
   }
-  return true;
+  return *this;
+}
+
+StringPool::Iterator::operator bool() const {
+  return block_id_ < pool_->blocks_.size();
 }
 
 NullTermStringView StringPool::Iterator::StringView() {

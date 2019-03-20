@@ -22,6 +22,17 @@ namespace perfetto {
 namespace trace_processor {
 namespace {
 
+TEST(StringPoolTest, EmptyPool) {
+  StringPool pool;
+
+  ASSERT_EQ(pool.Get(0), nullptr);
+
+  auto it = pool.CreateIterator();
+  ASSERT_TRUE(it);
+  ASSERT_EQ(it.StringView().c_str(), nullptr);
+  ASSERT_FALSE(++it);
+}
+
 TEST(StringPoolTest, InternAndRetrieve) {
   StringPool pool;
 
@@ -29,20 +40,14 @@ TEST(StringPoolTest, InternAndRetrieve) {
   auto id = pool.InternString(kString);
   ASSERT_STREQ(pool.Get(id).c_str(), kString);
   ASSERT_EQ(pool.Get(id), kString);
-}
-
-TEST(StringPoolTest, InternTwiceGivesSameId) {
-  StringPool pool;
-
-  static char kString[] = "Test String";
-  auto first_id = pool.InternString(kString);
-  ASSERT_EQ(first_id, pool.InternString(kString));
+  ASSERT_EQ(id, pool.InternString(kString));
 }
 
 TEST(StringPoolTest, NullPointerHandling) {
   StringPool pool;
 
   auto id = pool.InternString(nullptr);
+  ASSERT_EQ(id, 0);
   ASSERT_EQ(pool.Get(id).c_str(), nullptr);
 }
 
@@ -50,17 +55,54 @@ TEST(StringPoolTest, Iterator) {
   StringPool pool;
 
   auto it = pool.CreateIterator();
-  ASSERT_TRUE(it.Next());
+  ASSERT_TRUE(it);
   ASSERT_EQ(it.StringView().c_str(), nullptr);
-  ASSERT_FALSE(it.Next());
+  ASSERT_FALSE(++it);
 
   static char kString[] = "Test String";
   pool.InternString(kString);
 
   it = pool.CreateIterator();
-  ASSERT_TRUE(it.Next());
-  ASSERT_TRUE(it.Next());
+  ASSERT_TRUE(++it);
   ASSERT_STREQ(it.StringView().c_str(), kString);
+  ASSERT_FALSE(++it);
+}
+
+TEST(StringPoolTest, StressTest) {
+  // First create a buffer with 128MB of random characters.
+  constexpr size_t kBufferSize = 128 * 1024 * 1024;
+  std::unique_ptr<char[]> buffer(new char[kBufferSize]);
+  for (size_t i = 0; i < kBufferSize; i++)
+    buffer.get()[i] = 'A' + (random() % 26);
+
+  // Next create strings of length 0 to 16k in length from this buffer and
+  // intern them, storing their ids.
+  StringPool pool;
+  std::multimap<StringPool::Id, base::StringView> string_map;
+  constexpr uint16_t kMaxStrSize = 16u * 1024u - 1;
+  for (size_t i = 0;;) {
+    size_t length = static_cast<uint64_t>(random()) % (kMaxStrSize + 1);
+    if (i + length > kBufferSize)
+      break;
+
+    auto str = base::StringView(&buffer.get()[i], length);
+    string_map.emplace(pool.InternString(str), str);
+    i += length;
+  }
+
+  // Finally, iterate through each string in the string pool, check that all ids
+  // that match in the multimap are equal, and finish by checking we've removed
+  // every item in the multimap.
+  for (auto it = pool.CreateIterator(); it; ++it) {
+    ASSERT_EQ(it.StringView(), pool.Get(it.StringId()));
+
+    auto it_pair = string_map.equal_range(it.StringId());
+    for (auto in_it = it_pair.first; in_it != it_pair.second; ++in_it) {
+      ASSERT_EQ(it.StringView(), in_it->second);
+    }
+    string_map.erase(it_pair.first, it_pair.second);
+  }
+  ASSERT_EQ(string_map.size(), 0);
 }
 
 }  // namespace
