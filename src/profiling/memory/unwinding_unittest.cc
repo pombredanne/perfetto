@@ -74,7 +74,7 @@ TEST(UnwindingTest, FileDescriptorMapsParse) {
 // underrun.
 void __attribute__((noinline))
 UnsafeMemcpy(void* dst, const void* src, size_t n)
-    __attribute__((no_sanitize("address", "hwaddress"))) {
+    __attribute__((no_sanitize("address"))) {
   const uint8_t* from = reinterpret_cast<const uint8_t*>(src);
   uint8_t* to = reinterpret_cast<uint8_t*>(dst);
   for (size_t i = 0; i < n; ++i)

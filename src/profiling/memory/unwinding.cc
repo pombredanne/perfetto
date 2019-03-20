@@ -160,10 +160,8 @@ bool FileDescriptorMaps::Parse() {
             strncmp(name + 5, "ashmem/", 7) != 0) {
           flags |= unwindstack::MAPS_FLAGS_DEVICE_MAP;
         }
-        unwindstack::MapInfo* prev_map =
-            maps_.empty() ? nullptr : maps_.back().get();
         maps_.emplace_back(
-            new unwindstack::MapInfo(prev_map, start, end, pgoff, flags, name));
+            new unwindstack::MapInfo(nullptr, start, end, pgoff, flags, name));
       });
 }
 
@@ -247,6 +245,8 @@ void UnwindingWorker::OnDisconnect(base::UnixSocket* self) {
   DataSourceInstanceID ds_id = client_data.data_source_instance_id;
   pid_t peer_pid = self->peer_pid();
   client_data_.erase(it);
+  // The erase invalidates the self pointer.
+  self = nullptr;
   delegate_->PostSocketDisconnected(ds_id, peer_pid);
 }
 
