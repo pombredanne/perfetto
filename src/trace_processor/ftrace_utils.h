@@ -54,7 +54,7 @@ class TaskState {
     // The difficult thing is that in newer kernels a task_new state is added
     // and kMaxState increases to 4096. Without the kernel version and the
     // mapping of this to the correct version of this enum we cannot be
-    // accurate. Since task_new is rare we ignoring it for now.
+    // accurate. Since task_new is rare we ignore it for now.
     kTaskNewOrMaxState = 2048,
     kMaxState = 4096,
     kValid = 0x8000,
