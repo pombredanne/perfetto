@@ -688,7 +688,7 @@ TEST_F(TracingServiceImplTest, StopTracingTriggerTimeout) {
   trigger_config->set_trigger_mode(TraceConfig::TriggerConfig::STOP_TRACING);
   auto* trigger = trigger_config->add_triggers();
   trigger->set_name("trigger_name");
-  trigger->set_stop_delay_ms(30000);
+  trigger->set_stop_delay_ms(8.64e+7);
 
   trigger_config->set_trigger_timeout_ms(1);
 
@@ -704,8 +704,8 @@ TEST_F(TracingServiceImplTest, StopTracingTriggerTimeout) {
   // The trace won't return data until unless we send a trigger at this point.
   EXPECT_THAT(consumer->ReadBuffers(), ::testing::IsEmpty());
 
-  auto writer1 = producer->CreateTraceWriter("ds_1");
-  producer->WaitForFlush(writer1.get());
+  auto writer = producer->CreateTraceWriter("ds_1");
+  producer->WaitForFlush(writer.get());
 
   ASSERT_EQ(0u, tracing_session()->received_triggers.size());
 
@@ -737,7 +737,7 @@ TEST_F(TracingServiceImplTest, StopTracingTriggerRingBuffer) {
   trigger->set_name("trigger_name");
   trigger->set_stop_delay_ms(1);
 
-  trigger_config->set_trigger_timeout_ms(30000);
+  trigger_config->set_trigger_timeout_ms(8.64e+7);
 
   consumer->EnableTracing(trace_config);
   producer->WaitForTracingSetup();
@@ -794,15 +794,8 @@ TEST_F(TracingServiceImplTest, StopTracingTriggerRingBuffer) {
   // We expect for the TraceConfig preamble packet to be there correctly and
   // then we expect each payload to be there, but not the |large_payload|
   // packet.
-  EXPECT_THAT(
-      packets,
-      Contains(Property(
-          &protos::TracePacket::trace_config,
-          Property(
-              &protos::TraceConfig::trigger_config,
-              Property(
-                  &protos::TraceConfig::TriggerConfig::trigger_mode,
-                  Eq(protos::TraceConfig::TriggerConfig::STOP_TRACING))))));
+  EXPECT_THAT(packets,
+              HasTriggerMode(protos::TraceConfig::TriggerConfig::STOP_TRACING));
   for (int i = 0; i < kNumTestPackets; i++) {
     std::string payload = kPayload;
     payload += std::to_string(i);
@@ -839,12 +832,12 @@ TEST_F(TracingServiceImplTest, StopTracingTriggerMultipleTriggers) {
   trigger_config->set_trigger_mode(TraceConfig::TriggerConfig::STOP_TRACING);
   auto* trigger = trigger_config->add_triggers();
   trigger->set_name("trigger_name");
-  trigger->set_stop_delay_ms(100);
+  trigger->set_stop_delay_ms(1);
   trigger = trigger_config->add_triggers();
   trigger->set_name("trigger_name_2");
-  trigger->set_stop_delay_ms(100);
+  trigger->set_stop_delay_ms(8.64e+7);
 
-  trigger_config->set_trigger_timeout_ms(30);
+  trigger_config->set_trigger_timeout_ms(8.64e+7);
 
   consumer->EnableTracing(trace_config);
   producer->WaitForTracingSetup();
@@ -874,15 +867,8 @@ TEST_F(TracingServiceImplTest, StopTracingTriggerMultipleTriggers) {
 
   producer->WaitForDataSourceStop("ds_1");
   consumer->WaitForTracingDisabled();
-  EXPECT_THAT(
-      consumer->ReadBuffers(),
-      Contains(Property(
-          &protos::TracePacket::trace_config,
-          Property(
-              &protos::TraceConfig::trigger_config,
-              Property(
-                  &protos::TraceConfig::TriggerConfig::trigger_mode,
-                  Eq(protos::TraceConfig::TriggerConfig::STOP_TRACING))))));
+  EXPECT_THAT(consumer->ReadBuffers(),
+              HasTriggerMode(protos::TraceConfig::TriggerConfig::STOP_TRACING));
 }
 
 TEST_F(TracingServiceImplTest, LockdownMode) {
