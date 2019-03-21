@@ -38,17 +38,21 @@ class StringView {
   StringView(const StringView&) = default;
   StringView& operator=(const StringView&) = default;
   StringView(const char* data, size_t size) : data_(data), size_(size) {
-    PERFETTO_DCHECK(data != nullptr || size_ == 0);
+    PERFETTO_DCHECK(data != nullptr);
   }
 
   // Allow implicit conversion from any class that has a |data| and |size| field
   // and has the kConvertibleToStringView trait (e.g., protozero::ConstChars).
   template <typename T, typename = std::enable_if<T::kConvertibleToStringView>>
-  StringView(const T& x) : StringView(x.data, x.size) {}
+  StringView(const T& x) : StringView(x.data, x.size) {
+    PERFETTO_DCHECK(x.data != nullptr);
+  }
 
   // Creates a StringView from a null-terminated C string.
   // Deliberately not "explicit".
-  StringView(const char* cstr) : data_(cstr), size_(cstr ? strlen(cstr) : 0) {}
+  StringView(const char* cstr) : data_(cstr), size_(strlen(cstr)) {
+    PERFETTO_DCHECK(cstr != nullptr);
+  }
 
   // This instead has to be explicit, as creating a StringView out of a
   // std::string can be subtle.

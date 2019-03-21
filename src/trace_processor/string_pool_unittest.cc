@@ -27,7 +27,7 @@ namespace {
 TEST(StringPoolTest, EmptyPool) {
   StringPool pool;
 
-  ASSERT_EQ(pool.Get(0), nullptr);
+  ASSERT_EQ(pool.Get(0).c_str(), nullptr);
 
   auto it = pool.CreateIterator();
   ASSERT_TRUE(it);
@@ -48,7 +48,7 @@ TEST(StringPoolTest, InternAndRetrieve) {
 TEST(StringPoolTest, NullPointerHandling) {
   StringPool pool;
 
-  auto id = pool.InternString(nullptr);
+  auto id = pool.InternString(NullTermStringView());
   ASSERT_EQ(id, 0);
   ASSERT_EQ(pool.Get(id).c_str(), nullptr);
 }

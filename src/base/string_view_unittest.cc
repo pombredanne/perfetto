@@ -29,8 +29,6 @@ namespace {
 
 TEST(StringViewTest, BasicCases) {
   EXPECT_EQ(StringView(), StringView(""));
-  EXPECT_EQ(StringView(nullptr), StringView(""));
-  EXPECT_EQ(StringView(nullptr), StringView(nullptr, 0));
   EXPECT_EQ(StringView(""), StringView(""));
   EXPECT_EQ(StringView(""), StringView("", 0));
   EXPECT_EQ(StringView("ab"), StringView("ab", 2));
@@ -41,6 +39,8 @@ TEST(StringViewTest, BasicCases) {
   EXPECT_TRUE(StringView("x") != StringView(""));
   EXPECT_TRUE(StringView("") != StringView("y"));
   EXPECT_TRUE(StringView("a") != StringView("b"));
+  EXPECT_EQ(StringView().size(), 0ul);
+  EXPECT_EQ(StringView().data(), nullptr);
   EXPECT_EQ(StringView("").size(), 0ul);
   EXPECT_NE(StringView("").data(), nullptr);
   EXPECT_TRUE(StringView("").empty());

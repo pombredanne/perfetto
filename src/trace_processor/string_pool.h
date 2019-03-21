@@ -133,6 +133,8 @@ class StringPool {
   // Inserts the string with the given hash into the pool
   Id InsertString(base::StringView, uint64_t hash);
 
+  // |ptr| should point to the start of the string metadata (i.e. the first byte
+  // of the size).
   Id PtrToId(uint8_t* ptr) const {
     // For a 64 bit architecture, the id is the offset of the pointer inside
     // the one and only 4GB block.
@@ -148,6 +150,8 @@ class StringPool {
     return static_cast<Id>(reinterpret_cast<uintptr_t>(ptr));
   }
 
+  // THe returned pointer points to the start of the string metadata (i.e. the
+  // first byte of the size).
   uint8_t* IdToPtr(Id id) const {
     // For a 64 bit architecture, the pointer is simply the found by taking
     // the base of the 4GB block and adding the offset given by |id|.
@@ -159,6 +163,8 @@ class StringPool {
     return reinterpret_cast<uint8_t*>(id);
   }
 
+  // |ptr| should point to the start of the string metadata (i.e. the first byte
+  // of the size).
   static uint16_t GetSize(uint8_t* ptr) {
     // The size is simply memcpyed into the byte buffer when writing.
     uint16_t size;
@@ -166,6 +172,8 @@ class StringPool {
     return size;
   }
 
+  // |ptr| should point to the start of the string metadata (i.e. the first byte
+  // of the size).
   static NullTermStringView GetFromPtr(uint8_t* ptr) {
     // With the first two bytes being used for the size, the string starts from
     // byte 3.

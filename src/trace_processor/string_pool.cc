@@ -25,7 +25,7 @@ StringPool::StringPool() {
   blocks_.emplace_back();
 
   // Reserve a slot for the null string.
-  PERFETTO_CHECK(blocks_.back().TryInsert(nullptr));
+  PERFETTO_CHECK(blocks_.back().TryInsert(NullTermStringView()));
 }
 
 StringPool::~StringPool() = default;
@@ -90,7 +90,7 @@ StringPool::Iterator::Iterator(const StringPool* pool) : pool_(pool) {}
 StringPool::Iterator& StringPool::Iterator::operator++() {
   PERFETTO_DCHECK(block_id_ < pool_->blocks_.size());
 
-  // Otherwise, try and go to the next string in the current block.
+  // Try and go to the next string in the current block.
   const auto& block = pool_->blocks_[block_id_];
 
   // Find the size of the string at the current offset in the block
@@ -102,7 +102,6 @@ StringPool::Iterator& StringPool::Iterator::operator++() {
   if (block.pos() <= block_offset_) {
     block_id_++;
     block_offset_ = 0;
-    return *this;
   }
   return *this;
 }

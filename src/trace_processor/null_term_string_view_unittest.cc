@@ -25,44 +25,44 @@ namespace {
 
 TEST(NullTermStringViewTest, Comparisions) {
   // Test the < operator.
-  EXPECT_FALSE(NullTermStringView(nullptr) < NullTermStringView(nullptr));
-  EXPECT_FALSE(NullTermStringView(nullptr) < NullTermStringView(""));
-  EXPECT_TRUE(NullTermStringView(nullptr) < NullTermStringView("foo"));
+  EXPECT_FALSE(NullTermStringView() < NullTermStringView());
+  EXPECT_FALSE(NullTermStringView() < NullTermStringView(""));
+  EXPECT_TRUE(NullTermStringView() < NullTermStringView("foo"));
   EXPECT_TRUE(NullTermStringView("") < NullTermStringView("foo"));
-  EXPECT_FALSE(NullTermStringView(nullptr) < NullTermStringView("foo", 0));
+  EXPECT_FALSE(NullTermStringView() < NullTermStringView("foo", 0));
   EXPECT_FALSE(NullTermStringView("foo") < NullTermStringView("foo"));
   EXPECT_TRUE(NullTermStringView("foo") < NullTermStringView("fooo"));
   EXPECT_FALSE(NullTermStringView("fooo") < NullTermStringView("foo"));
   EXPECT_TRUE(NullTermStringView("bar") < NullTermStringView("foo"));
 
   // Test the <= operator.
-  EXPECT_TRUE(NullTermStringView(nullptr) <= NullTermStringView(nullptr));
-  EXPECT_TRUE(NullTermStringView(nullptr) <= NullTermStringView(""));
-  EXPECT_TRUE(NullTermStringView(nullptr) <= NullTermStringView("foo"));
+  EXPECT_TRUE(NullTermStringView() <= NullTermStringView());
+  EXPECT_TRUE(NullTermStringView() <= NullTermStringView(""));
+  EXPECT_TRUE(NullTermStringView() <= NullTermStringView("foo"));
   EXPECT_TRUE(NullTermStringView("") <= NullTermStringView("foo"));
-  EXPECT_TRUE(NullTermStringView(nullptr) <= NullTermStringView("foo", 0));
+  EXPECT_TRUE(NullTermStringView() <= NullTermStringView("foo", 0));
   EXPECT_TRUE(NullTermStringView("foo") <= NullTermStringView("foo"));
   EXPECT_TRUE(NullTermStringView("foo") <= NullTermStringView("fooo"));
   EXPECT_FALSE(NullTermStringView("fooo") <= NullTermStringView("foo"));
   EXPECT_TRUE(NullTermStringView("bar") <= NullTermStringView("foo"));
 
   // Test the > operator.
-  EXPECT_FALSE(NullTermStringView(nullptr) > NullTermStringView(nullptr));
-  EXPECT_FALSE(NullTermStringView(nullptr) > NullTermStringView(""));
-  EXPECT_FALSE(NullTermStringView(nullptr) > NullTermStringView("foo"));
+  EXPECT_FALSE(NullTermStringView() > NullTermStringView());
+  EXPECT_FALSE(NullTermStringView() > NullTermStringView(""));
+  EXPECT_FALSE(NullTermStringView() > NullTermStringView("foo"));
   EXPECT_FALSE(NullTermStringView("") > NullTermStringView("foo"));
-  EXPECT_FALSE(NullTermStringView(nullptr) > NullTermStringView("foo", 0));
+  EXPECT_FALSE(NullTermStringView() > NullTermStringView("foo", 0));
   EXPECT_FALSE(NullTermStringView("foo") > NullTermStringView("foo"));
   EXPECT_FALSE(NullTermStringView("foo") > NullTermStringView("fooo"));
   EXPECT_TRUE(NullTermStringView("fooo") > NullTermStringView("foo"));
   EXPECT_FALSE(NullTermStringView("bar") > NullTermStringView("foo"));
 
   // Test the >= operator.
-  EXPECT_TRUE(NullTermStringView(nullptr) >= NullTermStringView(nullptr));
-  EXPECT_TRUE(NullTermStringView(nullptr) >= NullTermStringView(""));
-  EXPECT_FALSE(NullTermStringView(nullptr) >= NullTermStringView("foo"));
+  EXPECT_TRUE(NullTermStringView() >= NullTermStringView());
+  EXPECT_TRUE(NullTermStringView() >= NullTermStringView(""));
+  EXPECT_FALSE(NullTermStringView() >= NullTermStringView("foo"));
   EXPECT_FALSE(NullTermStringView("") >= NullTermStringView("foo"));
-  EXPECT_TRUE(NullTermStringView(nullptr) >= NullTermStringView("foo", 0));
+  EXPECT_TRUE(NullTermStringView() >= NullTermStringView("foo", 0));
   EXPECT_TRUE(NullTermStringView("foo") >= NullTermStringView("foo"));
   EXPECT_FALSE(NullTermStringView("foo") >= NullTermStringView("fooo"));
   EXPECT_TRUE(NullTermStringView("fooo") >= NullTermStringView("foo"));
