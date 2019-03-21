@@ -259,8 +259,8 @@ int SpanJoinOperatorTable::Cursor::Initialize(const QueryConstraints& qc,
   if (table_->partitioning_ == PartitioningType::kMixedPartitioning) {
     PERFETTO_DCHECK(step_now->IsPartitioned());
 
-    // If we emit shadow slices, we need to clear out from the full partition
-    // shadow slice.
+    // If we emit shadow slices, we need to step because the first slice will
+    // be a full partition shadow slice that we need to skip.
     if (step_now->definition()->emit_shadow_slices()) {
       res = step_now->StepToNextPartition();
       if (PERFETTO_UNLIKELY(res.is_err()))
