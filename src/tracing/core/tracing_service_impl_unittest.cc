@@ -59,6 +59,28 @@ namespace perfetto {
 namespace {
 constexpr size_t kDefaultShmSizeKb = TracingServiceImpl::kDefaultShmSize / 1024;
 constexpr size_t kMaxShmSizeKb = TracingServiceImpl::kMaxShmSize / 1024;
+
+::testing::AssertionResult HasTriggerModeInternal(
+    const std::vector<protos::TracePacket>& packets,
+    protos::TraceConfig::TriggerConfig::TriggerMode mode) {
+  ::testing::StringMatchResultListener matcher_result_string;
+  bool contains = ::testing::ExplainMatchResult(
+      Contains(Property(
+          &protos::TracePacket::trace_config,
+          Property(&protos::TraceConfig::trigger_config,
+                   Property(&protos::TraceConfig::TriggerConfig::trigger_mode,
+                            Eq(mode))))),
+      packets, &matcher_result_string);
+  if (contains) {
+    return ::testing::AssertionSuccess();
+  }
+  return ::testing::AssertionFailure() << matcher_result_string.str();
+}
+
+MATCHER_P(HasTriggerMode, mode, "") {
+  return HasTriggerModeInternal(arg, mode);
+}
+
 }  // namespace
 
 class TracingServiceImplTest : public testing::Test {
@@ -242,7 +264,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerDeferredStart) {
   trigger->set_name("trigger_name");
   trigger->set_stop_delay_ms(1);
 
-  trigger_config->set_trigger_timeout_ms(30000);
+  trigger_config->set_trigger_timeout_ms(8.64e+7);
 
   // Make sure we don't get unexpected DataSourceStart() notifications yet.
   EXPECT_CALL(*producer, StartDataSource(_, _)).Times(0);
@@ -272,13 +294,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerDeferredStart) {
 
   EXPECT_THAT(
       consumer->ReadBuffers(),
-      Contains(Property(
-          &protos::TracePacket::trace_config,
-          Property(
-              &protos::TraceConfig::trigger_config,
-              Property(
-                  &protos::TraceConfig::TriggerConfig::trigger_mode,
-                  Eq(protos::TraceConfig::TriggerConfig::START_TRACING))))));
+      HasTriggerMode(protos::TraceConfig::TriggerConfig::START_TRACING));
 }
 
 // Creates a tracing session with a START_TRACING trigger and checks that the
@@ -301,7 +317,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerTimeOut) {
   trigger_config->set_trigger_mode(TraceConfig::TriggerConfig::START_TRACING);
   auto* trigger = trigger_config->add_triggers();
   trigger->set_name("trigger_name");
-  trigger->set_stop_delay_ms(30000);
+  trigger->set_stop_delay_ms(8.64e+7);
 
   trigger_config->set_trigger_timeout_ms(1);
 
@@ -343,7 +359,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerDifferentProducer) {
   trigger_config->set_trigger_mode(TraceConfig::TriggerConfig::START_TRACING);
   auto* trigger = trigger_config->add_triggers();
   trigger->set_name("trigger_name");
-  trigger->set_stop_delay_ms(30000);
+  trigger->set_stop_delay_ms(8.64e+7);
   trigger->set_producer_name_regex("correct_name");
 
   trigger_config->set_trigger_timeout_ms(1);
@@ -367,6 +383,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerDifferentProducer) {
 
   producer->WaitForDataSourceStop("ds_1");
   consumer->WaitForTracingDisabled();
+  EXPECT_THAT(consumer->ReadBuffers(), ::testing::IsEmpty());
 }
 
 // Creates a tracing session with a START_TRACING trigger and checks that the
@@ -392,7 +409,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerCorrectProducer) {
   trigger->set_stop_delay_ms(1);
   trigger->set_producer_name_regex("mock_produc[e-r]+");
 
-  trigger_config->set_trigger_timeout_ms(30000);
+  trigger_config->set_trigger_timeout_ms(8.64e+7);
 
   consumer->EnableTracing(trace_config);
   producer->WaitForTracingSetup();
@@ -411,6 +428,9 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerCorrectProducer) {
 
   producer->WaitForDataSourceStop("ds_1");
   consumer->WaitForTracingDisabled();
+  EXPECT_THAT(
+      consumer->ReadBuffers(),
+      HasTriggerMode(protos::TraceConfig::TriggerConfig::START_TRACING));
 }
 
 // Creates a tracing session with a START_TRACING trigger and checks that the
@@ -433,7 +453,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerDifferentTrigger) {
   trigger_config->set_trigger_mode(TraceConfig::TriggerConfig::START_TRACING);
   auto* trigger = trigger_config->add_triggers();
   trigger->set_name("trigger_name");
-  trigger->set_stop_delay_ms(30000);
+  trigger->set_stop_delay_ms(8.64e+7);
 
   trigger_config->set_trigger_timeout_ms(1);
 
@@ -455,6 +475,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerDifferentTrigger) {
 
   producer->WaitForDataSourceStop("ds_1");
   consumer->WaitForTracingDisabled();
+  EXPECT_THAT(consumer->ReadBuffers(), ::testing::IsEmpty());
 }
 
 // Creates a tracing session with a START_TRACING trigger and checks that any
@@ -479,7 +500,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerMultipleTriggers) {
   trigger->set_name("trigger_name");
   trigger->set_stop_delay_ms(1);
 
-  trigger_config->set_trigger_timeout_ms(30000);
+  trigger_config->set_trigger_timeout_ms(8.64e+7);
 
   consumer->EnableTracing(trace_config);
   producer->WaitForTracingSetup();
@@ -501,6 +522,9 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerMultipleTriggers) {
 
   producer->WaitForDataSourceStop("ds_1");
   consumer->WaitForTracingDisabled();
+  EXPECT_THAT(
+      consumer->ReadBuffers(),
+      HasTriggerMode(protos::TraceConfig::TriggerConfig::START_TRACING));
 }
 
 // Creates two tracing sessions with a START_TRACING trigger and checks that
@@ -528,7 +552,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerMultipleTraces) {
   trigger->set_name("trigger_name");
   trigger->set_stop_delay_ms(1);
 
-  trigger_config->set_trigger_timeout_ms(30000);
+  trigger_config->set_trigger_timeout_ms(8.64e+7);
 
   consumer_1->EnableTracing(trace_config);
   producer->WaitForTracingSetup();
@@ -543,7 +567,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerMultipleTraces) {
   (*trace_config.mutable_data_sources())[0].mutable_config()->set_name("ds_2");
   trigger = trace_config.mutable_trigger_config()->add_triggers();
   trigger->set_name("trigger_name_2");
-  trigger->set_stop_delay_ms(30000);
+  trigger->set_stop_delay_ms(8.64e+7);
 
   consumer_2->EnableTracing(trace_config);
 
@@ -587,7 +611,7 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerMultipleTraces) {
 
   EXPECT_EQ("trigger_name_2",
             tracing_session_2->received_triggers[1].second.name());
-  EXPECT_EQ(30000,
+  EXPECT_EQ(8.64e+7,
             tracing_session_2->received_triggers[1].second.stop_delay_ms());
 
   auto writer1 = producer->CreateTraceWriter("ds_1");
@@ -636,6 +660,12 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerMultipleTraces) {
 
   EXPECT_TRUE(flushed_writer_1);
   EXPECT_TRUE(flushed_writer_2);
+  EXPECT_THAT(
+      consumer_1->ReadBuffers(),
+      HasTriggerMode(protos::TraceConfig::TriggerConfig::START_TRACING));
+  EXPECT_THAT(
+      consumer_2->ReadBuffers(),
+      HasTriggerMode(protos::TraceConfig::TriggerConfig::START_TRACING));
 }
 
 TEST_F(TracingServiceImplTest, LockdownMode) {

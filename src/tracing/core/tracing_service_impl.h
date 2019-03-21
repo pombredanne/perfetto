@@ -489,8 +489,7 @@ class TracingServiceImpl : public TracingService {
   void ScrapeSharedMemoryBuffers(TracingSession* tracing_session,
                                  ProducerEndpointImpl* producer);
   TraceBuffer* GetBufferByID(BufferID);
-  void CleanUpStartTracingTriggerSession(TracingSessionID tsid,
-                                         uint32_t timeout);
+  void OnStartTriggersTimeout(TracingSessionID tsid);
 
   base::TaskRunner* const task_runner_;
   std::unique_ptr<SharedMemory::Factory> shm_factory_;
