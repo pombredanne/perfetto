@@ -107,7 +107,9 @@ class RepeatedFieldIterator {
 
   inline const Field* operator->() const { return &*iter_; }
   inline const Field& operator*() const { return *iter_; }
-  inline explicit operator bool() const { return iter_ < end_; }
+  inline explicit operator bool() const {
+    return iter_ != end_;
+  }
 
   RepeatedFieldIterator& operator++() {
     PERFETTO_DCHECK(iter_ != end_);
@@ -115,10 +117,7 @@ class RepeatedFieldIterator {
       iter_ = end_;
       return *this;
     }
-    if (++iter_ == end_) {
-      iter_ = last_;
-      return *this;
-    }
+    ++iter_;
     FindNextMatchingId();
     return *this;
   }
@@ -130,7 +129,7 @@ class RepeatedFieldIterator {
       if (iter_->id() == field_id_)
         return;
     }
-    iter_ = last_;
+    iter_ = last_->valid() ? last_ : end_;
   }
 
   uint32_t field_id_;
@@ -171,14 +170,14 @@ class TypedProtoDecoderBase : public ProtoDecoder {
 
  protected:
   TypedProtoDecoderBase(Field* storage,
-                        uint32_t size,
+                        uint32_t num_fields,
                         uint32_t capacity,
                         const uint8_t* buffer,
                         size_t length)
       : ProtoDecoder(buffer, length),
         fields_(storage),
-        num_fields_(size),
-        size_(size),
+        num_fields_(num_fields),
+        size_(num_fields),
         capacity_(capacity) {
     // The reason why Field needs to be trivially de/constructible is to avoid
     // implicit initializers on all the ~1000 entries. We need it to initialize
@@ -203,8 +202,9 @@ class TypedProtoDecoderBase : public ProtoDecoder {
   // case of a large number of repeated fields.
   Field* fields_;
 
-  // Number of fields without accounting repeated storage. This value is always
-  // <= size_ (and hence <= capacity);
+  // Number of fields without accounting repeated storage. This is equal to
+  // MAX_FIELD_ID + 1 (to account for the invalid 0th field).
+  // This value is always <= size_ (and hence <= capacity);
   uint32_t num_fields_;
 
   // Number of active |fields_| entries. This is initially equal to the highest
@@ -225,7 +225,7 @@ class TypedProtoDecoder : public TypedProtoDecoderBase {
  public:
   TypedProtoDecoder(const uint8_t* buffer, size_t length)
       : TypedProtoDecoderBase(on_stack_storage_,
-                              /*size=*/MAX_FIELD_ID + 1,
+                              /*num_fields=*/MAX_FIELD_ID + 1,
                               kCapacity,
                               buffer,
                               length) {

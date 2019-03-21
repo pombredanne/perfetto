@@ -168,6 +168,7 @@ void TypedProtoDecoderBase::ParseAllFields() {
     res = ParseOneField(cur, end_);
     if (res.next == cur)
       break;
+    PERFETTO_DCHECK(res.field.valid());
     cur = res.next;
 
     auto field_id = res.field.id();

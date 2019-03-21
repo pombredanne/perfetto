@@ -74,6 +74,32 @@ TEST(ProtoDecoderTest, VeryLargeField) {
   ASSERT_EQ(0u, decoder.bytes_left());
 }
 
+
+TEST(ProtoDecoderTest, SingleRepeatedField) {
+  Message message;
+  ScatteredHeapBuffer delegate(512, 512);
+  ScatteredStreamWriter writer(&delegate);
+  delegate.set_writer(&writer);
+  message.Reset(&writer);
+  message.AppendVarInt(/*field_id=*/2, 10);
+  delegate.AdjustUsedSizeOfCurrentSlice();
+  auto used_range = delegate.slices()[0].GetUsedRange();
+
+  TypedProtoDecoder<2, true> tpd(used_range.begin, used_range.size());
+  auto it = tpd.GetRepeated(/*field_id=*/2);
+  EXPECT_TRUE(it);
+  EXPECT_EQ(it->as_int32(), 10);
+  EXPECT_FALSE(++it);
+}
+
+TEST(ProtoDecoderTest, NoRepeatedField) {
+  uint8_t buf[] = { 0x01 };
+  TypedProtoDecoder<2, true> tpd(buf, 1);
+  auto it = tpd.GetRepeated(/*field_id=*/1);
+  EXPECT_FALSE(it);
+  EXPECT_FALSE(tpd.Get(2).valid());
+}
+
 TEST(ProtoDecoderTest, RepeatedFields) {
   Message message;
   ScatteredHeapBuffer delegate(512, 512);
