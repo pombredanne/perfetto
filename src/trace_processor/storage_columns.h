@@ -136,9 +136,7 @@ class NumericColumn : public StorageColumn {
   using NumericType = typename Accessor::NumericType;
 
   NumericColumn(std::string col_name, bool hidden, Accessor accessor)
-      : StorageColumn(col_name, hidden), accessor_(accessor) {
-    // TODO(lalitm): add a static asssert.
-  }
+      : StorageColumn(col_name, hidden), accessor_(accessor) {}
   ~NumericColumn() override = default;
 
   void ReportResult(sqlite3_context* ctx, uint32_t row) const override {
@@ -237,14 +235,24 @@ class NumericColumn : public StorageColumn {
   NumericType kTMin = std::numeric_limits<NumericType>::lowest();
   NumericType kTMax = std::numeric_limits<NumericType>::max();
 
-  template <typename C>
+  // Filters the rows of this column by creating the predicate from the sqlite
+  // value using type |UpcastNumericType| and casting data from the column
+  // to also be this type.
+  // Note: We cast here to make numeric comparisions as accurate as possible.
+  // For example, suppose NumericType == uint32_t and the sqlite value has
+  // an integer. Then UpcastNumericType == int64_t because uint32_t can be
+  // upcast to an int64_t and it's the most generic type we can compare using.
+  // Alternatively if either the column or sqlite value is real, we will always
+  // cast to a double before comparing.
+  template <typename UpcastNumericType>
   void FilterWithCast(int op,
                       sqlite3_value* value,
                       FilteredRowIndex* index) const {
-    auto predicate = sqlite_utils::CreateNumericPredicate<C>(op, value);
+    auto predicate =
+        sqlite_utils::CreateNumericPredicate<UpcastNumericType>(op, value);
     auto cast_predicate = [this,
                            predicate](uint32_t row) PERFETTO_ALWAYS_INLINE {
-      return predicate(static_cast<C>(accessor_.Get(row)));
+      return predicate(static_cast<UpcastNumericType>(accessor_.Get(row)));
     };
     index->FilterRows(cast_predicate);
   }
