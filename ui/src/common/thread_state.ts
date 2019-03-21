@@ -12,55 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+const states: {[key: string]: string} = {
+  'R': 'Runnable',
+  'S': 'Interruptible Sleep',
+  'D': 'Uninterruptible (Disk) Sleep',
+  'T': 'Stopped',
+  't': 'Traced',
+  'X': 'Exit (Dead)',
+  'Z': 'Exit (Zombie)',
+  'x': 'Task Dead',
+  'K': 'Wake Kill',
+  'W': 'Waking',
+  'P': 'Parked',
+  'N': 'No Load',
+  '+': '(Preempted)'
+};
+
 export function translateState(state: string|undefined) {
-  let result = '';
-  if (state === undefined) return result;
-  if (state.length > 2) return state;
-  switch (state[0]) {
-    case 'R':
-      result = 'Runnable';
-      break;
-    case 'S':
-      result = 'Interruptable Sleep';
-      break;
-    case 'D':
-      result = 'Uninterruptible (Disk) Sleep';
-      break;
-    case 'T':
-      result = 'Stopped';
-      break;
-    case 't':
-      result = 'Traced';
-      break;
-    case 'X':
-      result = 'Exit (dead)';
-      break;
-    case 'Z':
-      result = 'Exit (zombie)';
-      break;
-    case 'x':
-      result = 'Task Dead';
-      break;
-    case 'K':
-      result = 'Wake Kill';
-      break;
-    case 'W':
-      result = 'Waking';
-      break;
-    case 'P':
-      result = 'Parked';
-      break;
-    case 'N':
-      result = 'No Load';
-      break;
-    case 'n':
-      result = 'New Task';
-      break;
-    default:
-      return state;
-  }
-  if (state[1] === '+') {
-    result += ' (preempted)';
+  if (state === undefined) return '';
+  if (state === 'Running' || state === 'Runnable') return state;
+  let result = states[state[0]];
+  for (let i = 1; i < state.length; i++) {
+    result += state[i] === '+' ? ' ' : ' + ';
+    result += states[state[i]];
   }
   return result;
 }

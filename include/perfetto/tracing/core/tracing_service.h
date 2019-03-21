@@ -119,6 +119,11 @@ class PERFETTO_EXPORT TracingService {
     // for the flush request has been committed.
     virtual void NotifyFlushComplete(FlushRequestID) = 0;
 
+    // Called in response to one or more Producer::StartDataSource(),
+    // if the data source registered setting the flag
+    // DataSourceDescriptor.will_notify_on_start.
+    virtual void NotifyDataSourceStarted(DataSourceInstanceID) = 0;
+
     // Called in response to one or more Producer::StopDataSource(),
     // if the data source registered setting the flag
     // DataSourceDescriptor.will_notify_on_stop.
@@ -183,6 +188,20 @@ class PERFETTO_EXPORT TracingService {
 
     // Will call OnTraceStats().
     virtual void GetTraceStats() = 0;
+
+    enum ObservableEventType : uint32_t {
+      kNone = 0,
+      kDataSourceInstances = 1 << 0
+    };
+
+    // Start or stop observing events of selected types. |enabled_event_types|
+    // specifies the types of events to observe in a bitmask (see
+    // ObservableEventType enum). To disable observing, pass
+    // ObservableEventType::kNone. Will call OnObservableEvents() repeatedly
+    // whenever an event of an enabled ObservableEventType occurs.
+    //
+    // TODO(eseckler): Extend this to support producers & data sources.
+    virtual void ObserveEvents(uint32_t enabled_event_types) = 0;
   };  // class ConsumerEndpoint.
 
   // Implemented in src/core/tracing_service_impl.cc .
