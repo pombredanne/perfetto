@@ -262,6 +262,7 @@ int SpanJoinOperatorTable::Cursor::Initialize(const QueryConstraints& qc,
     // If we emit shadow slices, we need to step because the first slice will
     // be a full partition shadow slice that we need to skip.
     if (step_now->definition()->emit_shadow_slices()) {
+      PERFETTO_DCHECK(step_now->IsFullPartitionShadowSlice());
       res = step_now->StepToNextPartition();
       if (PERFETTO_UNLIKELY(res.is_err()))
         return res.err_code;

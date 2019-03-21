@@ -178,6 +178,11 @@ class SpanJoinOperatorTable : public Table {
     bool IsPartitioned() const { return defn_->IsPartitioned(); }
     bool IsRealSlice() const { return mode_ == Mode::kRealSlice; }
 
+    bool IsFullPartitionShadowSlice() const {
+      return mode_ == Mode::kShadowSlice && ts_start_ == 0 &&
+             ts_end_ == std::numeric_limits<int64_t>::max();
+    }
+
    private:
     enum Mode {
       kRealSlice,
@@ -201,11 +206,6 @@ class SpanJoinOperatorTable : public Table {
       PERFETTO_DCHECK(defn_->IsPartitioned());
       auto partition_idx = static_cast<int>(defn_->partition_idx());
       return sqlite3_column_int64(stmt_.get(), partition_idx);
-    }
-
-    bool IsFullPartitionShadowSlice() const {
-      return mode_ == Mode::kShadowSlice && ts_start_ == 0 &&
-             ts_end_ == std::numeric_limits<int64_t>::max();
     }
 
     std::string sql_query_;
