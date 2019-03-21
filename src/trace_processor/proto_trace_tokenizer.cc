@@ -157,7 +157,6 @@ PERFETTO_ALWAYS_INLINE
 void ProtoTraceTokenizer::ParseFtraceBundle(TraceBlobView bundle) {
   protos::pbzero::FtraceEventBundle::Decoder decoder(bundle.data(),
                                                      bundle.length());
-
   if (PERFETTO_UNLIKELY(!decoder.has_cpu())) {
     PERFETTO_ELOG("CPU field not found in FtraceEventBundle");
     trace_storage_->IncrementStats(stats::ftrace_bundle_tokenizer_errors);

@@ -74,6 +74,60 @@ TEST(ProtoDecoderTest, VeryLargeField) {
   ASSERT_EQ(0u, decoder.bytes_left());
 }
 
+TEST(ProtoDecoderTest, RepeatedFields) {
+  Message message;
+  ScatteredHeapBuffer delegate(512, 512);
+  ScatteredStreamWriter writer(&delegate);
+  delegate.set_writer(&writer);
+  message.Reset(&writer);
+
+  message.AppendVarInt(1, 10);
+  message.AppendVarInt(2, 20);
+  message.AppendVarInt(3, 30);
+
+  message.AppendVarInt(1, 11);
+  message.AppendVarInt(2, 21);
+  message.AppendVarInt(2, 22);
+
+  delegate.AdjustUsedSizeOfCurrentSlice();
+  auto used_range = delegate.slices()[0].GetUsedRange();
+
+  // When iterating with the simple decoder we should just see fields in parsing
+  // order.
+  ProtoDecoder decoder(used_range.begin, used_range.size());
+  std::string fields_seen;
+  for (auto fld = decoder.ReadField(); fld.valid(); fld = decoder.ReadField()) {
+    fields_seen +=
+        std::to_string(fld.id()) + ":" + std::to_string(fld.as_int32()) + ";";
+  }
+  EXPECT_EQ(fields_seen, "1:10;2:20;3:30;1:11;2:21;2:22;");
+
+  TypedProtoDecoder<4, true> tpd(used_range.begin, used_range.size());
+
+  // When parsing with the one-shot decoder and querying the single field id, we
+  // should see the last value for each of them, not the first one. This is the
+  // current behavior of Google protobuf's parser.
+  EXPECT_EQ(tpd.Get(1).as_int32(), 11);
+  EXPECT_EQ(tpd.Get(2).as_int32(), 22);
+  EXPECT_EQ(tpd.Get(3).as_int32(), 30);
+
+  // But when iterating we should see values in the original order.
+  auto it = tpd.GetRepeated(1);
+  EXPECT_EQ(it->as_int32(), 10);
+  EXPECT_EQ((++it)->as_int32(), 11);
+  EXPECT_FALSE(++it);
+
+  it = tpd.GetRepeated(2);
+  EXPECT_EQ(it->as_int32(), 20);
+  EXPECT_EQ((++it)->as_int32(), 21);
+  EXPECT_EQ((++it)->as_int32(), 22);
+  EXPECT_FALSE(++it);
+
+  it = tpd.GetRepeated(3);
+  EXPECT_EQ(it->as_int32(), 30);
+  EXPECT_FALSE(++it);
+}
+
 TEST(ProtoDecoderTest, FixedData) {
   struct FieldExpectation {
     const char* encoded;
