@@ -54,4 +54,9 @@ message ProcessStatsConfig {
   // entry of /proc/pid/cmdline).
   // TODO(primiano): implement this feature.
   // repeated string proc_stats_filter = 5;
+
+  // If > 0 clears the cache of the process counters used to reduce duplicate
+  // emissions every X ms.
+  // This is required to be either = 0 or > |proc_stats_poll_ms|.
+  optional uint32 proc_stats_duplicate_cache_clear_ms = 6;
 }

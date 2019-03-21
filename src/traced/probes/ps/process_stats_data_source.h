@@ -17,6 +17,7 @@
 #ifndef SRC_TRACED_PROBES_PS_PROCESS_STATS_DATA_SOURCE_H_
 #define SRC_TRACED_PROBES_PS_PROCESS_STATS_DATA_SOURCE_H_
 
+#include <limits>
 #include <memory>
 #include <set>
 #include <unordered_map>
@@ -67,11 +68,6 @@ class ProcessStatsDataSource : public ProbesDataSource {
   virtual base::ScopedDir OpenProcDir();
   virtual std::string ReadProcPidFile(int32_t pid, const std::string& file);
 
-  void set_process_stats_cache_clear_ms_for_testing(
-      uint32_t process_stats_cache_clear_ms) {
-    process_stats_cache_clear_ms_ = process_stats_cache_clear_ms;
-  }
-
  private:
   struct CachedProcessStats {
     uint32_t vm_size_kb = std::numeric_limits<uint32_t>::max();
@@ -107,7 +103,7 @@ class ProcessStatsDataSource : public ProbesDataSource {
   bool WriteMemCounters(int32_t pid, const std::string& proc_status);
 
   // Function to periodically clear the process stats cache.
-  static void TickClearCache(base::WeakPtr<ProcessStatsDataSource>);
+  static void ClearCache(base::WeakPtr<ProcessStatsDataSource>);
 
   // Common fields used for both process/tree relationships and stats/counters.
   base::TaskRunner* const task_runner_;
@@ -133,7 +129,7 @@ class ProcessStatsDataSource : public ProbesDataSource {
 
   // Cached process stats per process. Cleared every
   // |process_stats_cache_clear_ms_|.
-  uint32_t process_stats_cache_clear_ms_ = 30 * 1000;  // 30s
+  uint32_t process_stats_cache_clear_ms_ = 0;
   std::unordered_map<int32_t, CachedProcessStats> process_stats_cache_;
 
   base::WeakPtrFactory<ProcessStatsDataSource> weak_factory_;  // Keep last.

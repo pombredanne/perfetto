@@ -202,11 +202,11 @@ TEST_F(ProcessStatsDataSourceTest, ProcessStats) {
 TEST_F(ProcessStatsDataSourceTest, CacheProcessStats) {
   DataSourceConfig cfg;
   cfg.mutable_process_stats_config()->set_proc_stats_poll_ms(105);
+  cfg.mutable_process_stats_config()->set_proc_stats_duplicate_cache_clear_ms(
+      220);
   *(cfg.mutable_process_stats_config()->add_quirks()) =
       perfetto::ProcessStatsConfig::DISABLE_ON_DEMAND;
   auto data_source = GetProcessStatsDataSource(cfg);
-
-  data_source->set_process_stats_cache_clear_ms_for_testing(220);
 
   // Populate a fake /proc/ directory.
   auto fake_proc = base::TempDir::Create();
@@ -260,8 +260,6 @@ TEST_F(ProcessStatsDataSourceTest, CacheProcessStats) {
     ASSERT_EQ(proc_counters.vm_rss_kb(), kPid * 100 + 2);
     ASSERT_EQ(proc_counters.oom_score_adj(), kPid * 100);
   }
-
-  task_runner_.RunUntilIdle();
 
   // Cleanup |fake_proc|. TempDir checks that the directory is empty.
   rmdir(path);

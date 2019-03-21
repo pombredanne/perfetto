@@ -108,6 +108,17 @@ ProcessStatsDataSource::ProcessStatsDataSource(
                   poll_period_ms_);
     poll_period_ms_ = 100;
   }
+
+  process_stats_cache_clear_ms_ =
+      ps_config.proc_stats_duplicate_cache_clear_ms();
+  if (process_stats_cache_clear_ms_ > 0 &&
+      process_stats_cache_clear_ms_ < poll_period_ms_) {
+    PERFETTO_ILOG("process_stats_cache_clear_ms_ %" PRIu32
+                  " is less than minimum of %ums. Increasing to %ums.",
+                  process_stats_cache_clear_ms_, poll_period_ms_,
+                  poll_period_ms_);
+    process_stats_cache_clear_ms_ = poll_period_ms_;
+  }
 }
 
 ProcessStatsDataSource::~ProcessStatsDataSource() = default;
@@ -116,11 +127,14 @@ void ProcessStatsDataSource::Start() {
   if (dump_all_procs_on_start_)
     WriteAllProcesses();
 
+  auto weak_this = GetWeakPtr();
   if (poll_period_ms_) {
-    auto weak_this = GetWeakPtr();
     task_runner_->PostTask(std::bind(&ProcessStatsDataSource::Tick, weak_this));
+  }
+
+  if (process_stats_cache_clear_ms_) {
     task_runner_->PostDelayedTask(
-        std::bind(&ProcessStatsDataSource::TickClearCache, weak_this),
+        std::bind(&ProcessStatsDataSource::ClearCache, weak_this),
         process_stats_cache_clear_ms_);
   }
 }
@@ -479,7 +493,7 @@ bool ProcessStatsDataSource::WriteMemCounters(int32_t pid,
 }
 
 // static
-void ProcessStatsDataSource::TickClearCache(
+void ProcessStatsDataSource::ClearCache(
     base::WeakPtr<ProcessStatsDataSource> weak_this) {
   if (!weak_this)
     return;
