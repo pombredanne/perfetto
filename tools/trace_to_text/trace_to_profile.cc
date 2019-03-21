@@ -280,7 +280,8 @@ int TraceToProfile(std::istream* input, std::ostream* output) {
   });
 
   if (!rolling_profile_packets.empty())
-    *output << "Truncated heap dump." << std::endl;
+    *output << "WARNING: Truncated heap dump. Not generating profile."
+            << std::endl;
 
   *output << "Wrote profiles to " << temp_dir << std::endl;
 
