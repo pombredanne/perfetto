@@ -22,13 +22,6 @@
 #include <unwindstack/Maps.h>
 #include <unwindstack/Unwinder.h>
 
-#if 0
-#if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
-#include <unwindstack/DexFiles.h>
-#include <unwindstack/JitDebug.h>
-#endif
-#endif
-
 #include "perfetto/base/scoped_file.h"
 #include "perfetto/base/thread_task_runner.h"
 #include "perfetto/tracing/core/basic_types.h"
