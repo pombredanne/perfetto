@@ -627,6 +627,24 @@ TEST_F(HeapprofdEndToEnd, ReInit_Fork) {
   ReInit();
 }
 
+TEST_F(HeapprofdEndToEnd, ConcurrentSession_Central) {
+  if (IsCuttlefish())
+    return;
+
+  ASSERT_EQ(ReadProperty(kHeapprofdModeProperty, ""), "");
+  ConcurrentSession();
+}
+
+TEST_F(HeapprofdEndToEnd, ConcurrentSession_Fork) {
+  if (IsCuttlefish())
+    return;
+
+  // RAII handle that resets to central mode when out of scope.
+  auto prop = EnableFork();
+  ASSERT_EQ(ReadProperty(kHeapprofdModeProperty, ""), "fork");
+  ConcurrentSession();
+}
+
 }  // namespace
 }  // namespace profiling
 }  // namespace perfetto
