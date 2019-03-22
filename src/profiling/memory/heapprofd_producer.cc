@@ -177,12 +177,29 @@ void HeapprofdProducer::SetupDataSource(DataSourceInstanceID id,
     return;
   }
 
-  // Child mode is only interested in data sources matching the
+  // Child mode is only interested in the first data source matching the
   // already-connected process.
-  if (mode_ == HeapprofdMode::kChild &&
-      (!data_sources_.empty() || !SourceMatchesTarget(heapprofd_config))) {
-    PERFETTO_DLOG("Child mode skipping setup of unrelated data source.");
-    return;
+  if (mode_ == HeapprofdMode::kChild) {
+    if (!SourceMatchesTarget(heapprofd_config)) {
+      PERFETTO_DLOG("Child mode skipping setup of unrelated data source.");
+      return;
+    }
+
+    if (!data_sources_.empty()) {
+      PERFETTO_LOG("Child mode skipping concurrent data source.");
+
+      // Manually write one ProfilePacket about the rejected session.
+      auto buffer_id = static_cast<BufferID>(cfg.target_buffer());
+      auto trace_writer = endpoint_->CreateTraceWriter(buffer_id);
+      auto trace_packet = trace_writer->NewTracePacket();
+      auto profile_packet = trace_packet->set_profile_packet();
+      auto process_dump = profile_packet->add_process_dumps();
+      process_dump->set_pid(static_cast<uint64_t>(target_pid_));
+      process_dump->set_rejected_concurrent(true);
+      trace_packet->Finalize();
+      trace_writer->Flush();
+      return;
+    }
   }
 
   auto it = data_sources_.find(id);

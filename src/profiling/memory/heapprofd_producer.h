@@ -193,7 +193,7 @@ class HeapprofdProducer : public Producer, public UnwindingWorker::Delegate {
   // state specific to mode_ == kChild
   pid_t target_pid_ = base::kInvalidPid;
   std::string target_cmdline_;
-  // This is a valid FD between SetTargetProcess and UseTargetProcessSocket
+  // This is a valid FD between SetTargetProcess and AdoptTargetProcessSocket
   // only.
   base::ScopedFile inherited_fd_;
 
