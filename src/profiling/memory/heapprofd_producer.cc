@@ -180,7 +180,7 @@ void HeapprofdProducer::SetupDataSource(DataSourceInstanceID id,
   // Child mode is only interested in data sources matching the
   // already-connected process.
   if (mode_ == HeapprofdMode::kChild &&
-      !SourceMatchesTarget(heapprofd_config)) {
+      (!data_sources_.empty() || !SourceMatchesTarget(heapprofd_config))) {
     PERFETTO_DLOG("Child mode skipping setup of unrelated data source.");
     return;
   }
@@ -608,7 +608,7 @@ HeapprofdProducer::DataSource* HeapprofdProducer::GetDataSourceForProcess(
       }
     }
   }
-  return nullptr;
+  return match;
 }
 
 void HeapprofdProducer::HandleClientConnection(

@@ -240,7 +240,7 @@ class HeapprofdEndToEnd : public ::testing::Test {
     }
   }
 
-  void ValidateAny(TestHelper* helper, uint64_t pid) {
+  void ValidateHasSamples(TestHelper* helper, uint64_t pid) {
     const auto& packets = helper->trace();
     ASSERT_GT(packets.size(), 0u);
     size_t profile_packets = 0;
@@ -266,12 +266,15 @@ class HeapprofdEndToEnd : public ::testing::Test {
   }
 
   void ValidateOnlyPID(TestHelper* helper, uint64_t pid) {
+    size_t dumps = 0;
     const auto& packets = helper->trace();
     for (const protos::TracePacket& packet : packets) {
       for (const auto& dump : packet.profile_packet().process_dumps()) {
         EXPECT_EQ(dump.pid(), pid);
+        dumps++;
       }
     }
+    EXPECT_GT(dumps, 0);
   }
 
 #if PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
@@ -305,7 +308,7 @@ class HeapprofdEndToEnd : public ::testing::Test {
         100);
 
     auto helper = Trace(trace_config);
-    ValidateAny(helper.get(), static_cast<uint64_t>(pid));
+    ValidateHasSamples(helper.get(), static_cast<uint64_t>(pid));
     ValidateOnlyPID(helper.get(), static_cast<uint64_t>(pid));
     ValidateMultiple(helper.get(), static_cast<uint64_t>(pid), kAllocSize);
 
@@ -333,7 +336,7 @@ class HeapprofdEndToEnd : public ::testing::Test {
     heapprofd_config->set_all(false);
 
     auto helper = Trace(trace_config);
-    ValidateAny(helper.get(), static_cast<uint64_t>(pid));
+    ValidateHasSamples(helper.get(), static_cast<uint64_t>(pid));
     ValidateOnlyPID(helper.get(), static_cast<uint64_t>(pid));
     ValidateMultiple(helper.get(), static_cast<uint64_t>(pid), kAllocSize);
 
@@ -474,7 +477,7 @@ class HeapprofdEndToEnd : public ::testing::Test {
     heapprofd_config->set_all(false);
 
     auto helper = Trace(trace_config);
-    ValidateAny(helper.get(), static_cast<uint64_t>(pid));
+    ValidateHasSamples(helper.get(), static_cast<uint64_t>(pid));
     ValidateOnlyPID(helper.get(), static_cast<uint64_t>(pid));
     ValidateMultiple(helper.get(), static_cast<uint64_t>(pid),
                      kFirstIterationBytes);
@@ -491,7 +494,7 @@ class HeapprofdEndToEnd : public ::testing::Test {
 
     PERFETTO_LOG("HeapprofdEndToEnd::Reinit: Starting second");
     helper = Trace(trace_config);
-    ValidateAny(helper.get(), static_cast<uint64_t>(pid));
+    ValidateHasSamples(helper.get(), static_cast<uint64_t>(pid));
     ValidateOnlyPID(helper.get(), static_cast<uint64_t>(pid));
     ValidateMultiple(helper.get(), static_cast<uint64_t>(pid),
                      kSecondIterationBytes);
@@ -531,7 +534,7 @@ class HeapprofdEndToEnd : public ::testing::Test {
     helper->WaitForTracingDisabled(20000);
     helper->ReadData();
     helper->WaitForReadData();
-    ValidateAny(helper.get(), static_cast<uint64_t>(pid));
+    ValidateHasSamples(helper.get(), static_cast<uint64_t>(pid));
     ValidateOnlyPID(helper.get(), static_cast<uint64_t>(pid));
     ValidateMultiple(helper.get(), static_cast<uint64_t>(pid), kAllocSize);
     ValidateRejectedConcurrent(helper_concurrent.get(),
@@ -540,7 +543,7 @@ class HeapprofdEndToEnd : public ::testing::Test {
     helper_concurrent->WaitForTracingDisabled(20000);
     helper_concurrent->ReadData();
     helper_concurrent->WaitForReadData();
-    ValidateOnlyPID(helper.get(), static_cast<uint64_t>(pid));
+    ValidateOnlyPID(helper_concurrent.get(), static_cast<uint64_t>(pid));
     ValidateRejectedConcurrent(helper_concurrent.get(),
                                static_cast<uint64_t>(pid), true);
 
@@ -635,6 +638,7 @@ TEST_F(HeapprofdEndToEnd, ConcurrentSession_Central) {
   ConcurrentSession();
 }
 
+// TODO(fmayer): This crashes fork heapprofd. Fix.
 TEST_F(HeapprofdEndToEnd, ConcurrentSession_Fork) {
   if (IsCuttlefish())
     return;
