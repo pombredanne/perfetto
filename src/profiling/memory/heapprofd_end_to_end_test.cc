@@ -187,9 +187,7 @@ class HeapprofdEndToEnd : public ::testing::Test {
  protected:
   base::TestTaskRunner task_runner;
 
-  void TraceAndValidate(const TraceConfig& trace_config,
-                        pid_t pid,
-                        uint64_t alloc_size) {
+  std::unique_ptr<TestHelper> Trace(const TraceConfig& trace_config) {
     auto helper = GetHelper(&task_runner);
 
     helper->StartTracing(trace_config);
@@ -197,7 +195,52 @@ class HeapprofdEndToEnd : public ::testing::Test {
 
     helper->ReadData();
     helper->WaitForReadData();
+    return helper;
+  }
 
+  void ValidateMultiple(TestHelper* helper, uint64_t pid, uint64_t alloc_size) {
+    const auto& packets = helper->trace();
+    for (const protos::TracePacket& packet : packets) {
+      for (const auto& dump : packet.profile_packet().process_dumps()) {
+        if (dump.pid() != pid)
+          continue;
+        for (const auto& sample : dump.samples()) {
+          EXPECT_EQ(sample.self_allocated() % alloc_size, 0);
+          EXPECT_EQ(sample.self_freed() % alloc_size, 0);
+          EXPECT_THAT(sample.self_allocated() - sample.self_freed(),
+                      AnyOf(Eq(0), Eq(alloc_size)));
+        }
+      }
+    }
+  }
+
+  void ValidateFromStartup(TestHelper* helper,
+                           uint64_t pid,
+                           bool from_startup) {
+    const auto& packets = helper->trace();
+    for (const protos::TracePacket& packet : packets) {
+      for (const auto& dump : packet.profile_packet().process_dumps()) {
+        if (dump.pid() != pid)
+          continue;
+        EXPECT_EQ(dump.from_startup(), from_startup);
+      }
+    }
+  }
+
+  void ValidateRejectedConcurrent(TestHelper* helper,
+                                  uint64_t pid,
+                                  bool rejected_concurrent) {
+    const auto& packets = helper->trace();
+    for (const protos::TracePacket& packet : packets) {
+      for (const auto& dump : packet.profile_packet().process_dumps()) {
+        if (dump.pid() != pid)
+          continue;
+        EXPECT_EQ(dump.rejected_concurrent(), rejected_concurrent);
+      }
+    }
+  }
+
+  void ValidateAny(TestHelper* helper, uint64_t pid) {
     const auto& packets = helper->trace();
     ASSERT_GT(packets.size(), 0u);
     size_t profile_packets = 0;
@@ -205,20 +248,13 @@ class HeapprofdEndToEnd : public ::testing::Test {
     uint64_t last_allocated = 0;
     uint64_t last_freed = 0;
     for (const protos::TracePacket& packet : packets) {
-      if (packet.has_profile_packet() &&
-          packet.profile_packet().process_dumps().size() > 0) {
-        const auto& dumps = packet.profile_packet().process_dumps();
-        ASSERT_EQ(dumps.size(), 1);
-        const protos::ProfilePacket_ProcessHeapSamples& dump = dumps.Get(0);
-        EXPECT_EQ(dump.pid(), pid);
+      for (const auto& dump : packet.profile_packet().process_dumps()) {
+        if (dump.pid() != pid)
+          continue;
         for (const auto& sample : dump.samples()) {
-          samples++;
-          EXPECT_EQ(sample.self_allocated() % alloc_size, 0);
-          EXPECT_EQ(sample.self_freed() % alloc_size, 0);
           last_allocated = sample.self_allocated();
           last_freed = sample.self_freed();
-          EXPECT_THAT(sample.self_allocated() - sample.self_freed(),
-                      AnyOf(Eq(0), Eq(alloc_size)));
+          samples++;
         }
         profile_packets++;
       }
@@ -227,6 +263,15 @@ class HeapprofdEndToEnd : public ::testing::Test {
     EXPECT_GT(samples, 0);
     EXPECT_GT(last_allocated, 0);
     EXPECT_GT(last_freed, 0);
+  }
+
+  void ValidateOnlyPID(TestHelper* helper, uint64_t pid) {
+    const auto& packets = helper->trace();
+    for (const protos::TracePacket& packet : packets) {
+      for (const auto& dump : packet.profile_packet().process_dumps()) {
+        EXPECT_EQ(dump.pid(), pid);
+      }
+    }
   }
 
 #if PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
@@ -259,7 +304,10 @@ class HeapprofdEndToEnd : public ::testing::Test {
     heapprofd_config->mutable_continuous_dump_config()->set_dump_interval_ms(
         100);
 
-    TraceAndValidate(trace_config, pid, kAllocSize);
+    auto helper = Trace(trace_config);
+    ValidateAny(helper.get(), static_cast<uint64_t>(pid));
+    ValidateOnlyPID(helper.get(), static_cast<uint64_t>(pid));
+    ValidateMultiple(helper.get(), static_cast<uint64_t>(pid), kAllocSize);
 
     PERFETTO_CHECK(kill(pid, SIGKILL) == 0);
     PERFETTO_CHECK(waitpid(pid, nullptr, 0) == pid);
@@ -284,7 +332,10 @@ class HeapprofdEndToEnd : public ::testing::Test {
     *heapprofd_config->add_pid() = static_cast<uint64_t>(pid);
     heapprofd_config->set_all(false);
 
-    TraceAndValidate(trace_config, pid, kAllocSize);
+    auto helper = Trace(trace_config);
+    ValidateAny(helper.get(), static_cast<uint64_t>(pid));
+    ValidateOnlyPID(helper.get(), static_cast<uint64_t>(pid));
+    ValidateMultiple(helper.get(), static_cast<uint64_t>(pid), kAllocSize);
 
     PERFETTO_CHECK(kill(pid, SIGKILL) == 0);
     PERFETTO_CHECK(waitpid(pid, nullptr, 0) == pid);
@@ -422,7 +473,11 @@ class HeapprofdEndToEnd : public ::testing::Test {
     *heapprofd_config->add_pid() = static_cast<uint64_t>(pid);
     heapprofd_config->set_all(false);
 
-    TraceAndValidate(trace_config, pid, kFirstIterationBytes);
+    auto helper = Trace(trace_config);
+    ValidateAny(helper.get(), static_cast<uint64_t>(pid));
+    ValidateOnlyPID(helper.get(), static_cast<uint64_t>(pid));
+    ValidateMultiple(helper.get(), static_cast<uint64_t>(pid),
+                     kFirstIterationBytes);
 
     signal_pipe.wr.reset();
     char buf[1];
@@ -435,7 +490,11 @@ class HeapprofdEndToEnd : public ::testing::Test {
     usleep(100 * kMsToUs);
 
     PERFETTO_LOG("HeapprofdEndToEnd::Reinit: Starting second");
-    TraceAndValidate(trace_config, pid, kSecondIterationBytes);
+    helper = Trace(trace_config);
+    ValidateAny(helper.get(), static_cast<uint64_t>(pid));
+    ValidateOnlyPID(helper.get(), static_cast<uint64_t>(pid));
+    ValidateMultiple(helper.get(), static_cast<uint64_t>(pid),
+                     kSecondIterationBytes);
 
     PERFETTO_CHECK(kill(pid, SIGKILL) == 0);
     PERFETTO_CHECK(waitpid(pid, nullptr, 0) == pid);
