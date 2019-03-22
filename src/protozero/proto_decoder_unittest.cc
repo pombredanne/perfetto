@@ -74,7 +74,6 @@ TEST(ProtoDecoderTest, VeryLargeField) {
   ASSERT_EQ(0u, decoder.bytes_left());
 }
 
-
 TEST(ProtoDecoderTest, SingleRepeatedField) {
   Message message;
   ScatteredHeapBuffer delegate(512, 512);
@@ -93,7 +92,7 @@ TEST(ProtoDecoderTest, SingleRepeatedField) {
 }
 
 TEST(ProtoDecoderTest, NoRepeatedField) {
-  uint8_t buf[] = { 0x01 };
+  uint8_t buf[] = {0x01};
   TypedProtoDecoder<2, true> tpd(buf, 1);
   auto it = tpd.GetRepeated(/*field_id=*/1);
   EXPECT_FALSE(it);

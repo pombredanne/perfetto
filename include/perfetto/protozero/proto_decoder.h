@@ -83,7 +83,7 @@ class ProtoDecoder {
 };
 
 // An iterator-like class used to iterate through repeated fields. Used by
-// TypedProtoDecoder. The iteration sequence is a bit contra-intuitive due to
+// TypedProtoDecoder. The iteration sequence is a bit counter-intuitive due to
 // the fact that fields_[field_id] holds the *last* value of the field, not the
 // first, but the remaining storage holds repeated fields in FIFO order.
 // Assume that we push the 10,11,12 into a repeated field with ID=1.
@@ -107,9 +107,7 @@ class RepeatedFieldIterator {
 
   inline const Field* operator->() const { return &*iter_; }
   inline const Field& operator*() const { return *iter_; }
-  inline explicit operator bool() const {
-    return iter_ != end_;
-  }
+  inline explicit operator bool() const { return iter_ != end_; }
 
   RepeatedFieldIterator& operator++() {
     PERFETTO_DCHECK(iter_ != end_);
@@ -163,6 +161,9 @@ class TypedProtoDecoderBase : public ProtoDecoder {
     return PERFETTO_LIKELY(id < num_fields_) ? fields_[id] : fields_[0];
   }
 
+  // Returns an object that allows to iterate over all instances of a repeated
+  // field given its id. Example usage:
+  // for (auto it = decoder.GetRepeated(N); it; ++it) { ... }
   inline RepeatedFieldIterator GetRepeated(uint32_t field_id) const {
     return RepeatedFieldIterator(field_id, &fields_[num_fields_],
                                  &fields_[size_], &fields_[field_id]);
@@ -191,6 +192,9 @@ class TypedProtoDecoderBase : public ProtoDecoder {
   }
 
   void ParseAllFields();
+
+  // Called when the default on-stack storage is exhausted and new repeated
+  // fields need to be pushed.
   void ExpandHeapStorage();
 
   // Used only in presence of a large number of repeated fields, when the
@@ -214,7 +218,8 @@ class TypedProtoDecoderBase : public ProtoDecoder {
 
   // Initially equal to kFieldsCapacity of the TypedProtoDecoder
   // specialization. Can grow when falling back on heap-based storage, in which
-  // case it represents the size (#Fields) of the |heap_storage_| array.
+  // case it represents the size (#fields with each entry of a repeated field
+  // counted individually) of the |heap_storage_| array.
   uint32_t capacity_;
 };
 
