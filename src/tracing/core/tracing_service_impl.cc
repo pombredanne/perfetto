@@ -477,12 +477,8 @@ bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
       has_start_trigger = true;
       task_runner_->PostDelayedTask(
           [weak_this, tsid]() {
-            // Skip entirely the flush if the trace session doesn't exist
-            // anymore. This is to prevent misleading error messages to be
-            // logged.
-            if (weak_this) {
+            if (weak_this)
               weak_this->OnStartTriggersTimeout(tsid);
-            }
           },
           cfg.trigger_config().trigger_timeout_ms());
       break;
@@ -509,9 +505,8 @@ bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   // triggering, either through TraceConfig.deferred_start or
   // TraceConfig.trigger_config(). If both are specified which ever one occurs
   // first will initiate the trace.
-  if (!cfg.deferred_start() && !has_start_trigger) {
+  if (!cfg.deferred_start() && !has_start_trigger)
     return StartTracing(tsid);
-  }
 
   return true;
 }
@@ -913,9 +908,9 @@ void TracingServiceImpl::ActivateTriggers(
           // CONFIGURED then we don't need to repeat StartTracing. This would
           // work fine (StartTracing would return false) but would add error
           // logs.
-          if (tracing_session.state != TracingSession::CONFIGURED) {
+          if (tracing_session.state != TracingSession::CONFIGURED)
             break;
-          }
+
           PERFETTO_DLOG("Triggering '%s' on tracing session %" PRIu64
                         " with duration of %" PRIu32 "ms.",
                         iter->name().c_str(), tsid, iter->stop_delay_ms());
@@ -930,9 +925,9 @@ void TracingServiceImpl::ActivateTriggers(
           // when we've already hit the first trigger we've already Posted the
           // task to FlushAndDisable. So all future triggers will just break
           // out.
-          if (triggers_already_received) {
+          if (triggers_already_received)
             break;
-          }
+
           PERFETTO_DLOG("Triggering '%s' on tracing session %" PRIu64
                         " with duration of %" PRIu32 "ms.",
                         iter->name().c_str(), tsid, iter->stop_delay_ms());
@@ -943,9 +938,8 @@ void TracingServiceImpl::ActivateTriggers(
                 // Skip entirely the flush if the trace session doesn't exist
                 // anymore. This is to prevent misleading error messages to be
                 // logged.
-                if (weak_this && weak_this->GetTracingSession(tsid)) {
+                if (weak_this && weak_this->GetTracingSession(tsid))
                   weak_this->FlushAndDisableTracing(tsid);
-                }
               },
               // If this trigger is zero this will immediately executable and
               // will happen shortly.
@@ -1315,9 +1309,8 @@ void TracingServiceImpl::ReadBuffers(TracingSessionID tsid,
   // the consumer know there is no data.
   if (!tracing_session->config.trigger_config().triggers().empty() &&
       tracing_session->received_triggers.empty()) {
-    if (consumer) {
+    if (consumer)
       consumer->consumer_->OnTraceData({}, /* has_more = */ false);
-    }
     PERFETTO_DLOG(
         "ReadBuffers(): tracing session has not received a trigger yet.");
     return;
@@ -1932,6 +1925,9 @@ TraceBuffer* TracingServiceImpl::GetBufferByID(BufferID buffer_id) {
 }
 
 void TracingServiceImpl::OnStartTriggersTimeout(TracingSessionID tsid) {
+  // Skip entirely the flush if the trace session doesn't exist anymore.
+  // This is to prevent misleading error messages to be logged.
+  //
   // if the trace has started from the trigger we rely on
   // the |stop_delay_ms| from the trigger so don't flush and
   // disable if we've moved beyond a CONFIGURED state
