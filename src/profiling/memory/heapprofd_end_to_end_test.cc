@@ -638,7 +638,6 @@ TEST_F(HeapprofdEndToEnd, ConcurrentSession_Central) {
   ConcurrentSession();
 }
 
-// TODO(fmayer): This crashes fork heapprofd. Fix.
 TEST_F(HeapprofdEndToEnd, ConcurrentSession_Fork) {
   if (IsCuttlefish())
     return;
