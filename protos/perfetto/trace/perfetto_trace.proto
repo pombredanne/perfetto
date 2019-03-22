@@ -2655,7 +2655,7 @@ message TracePacket {
     PowerRails power_rails = 40;
     AndroidLogPacket android_log = 39;
     SystemInfo system_info = 45;
-    // removed field with id 46
+    Triggers triggers = 46;
 
     // Only used by TrackEvent.
     ProcessDescriptor process_descriptor = 43;
@@ -2997,6 +2997,29 @@ message LegacyEventName {
 }
 
 // End of protos/perfetto/trace/track_event/track_event.proto
+
+// Begin of protos/perfetto/trace/trigger.proto
+
+// When a TracingSession receives a trigger it records the boot time nanoseconds
+// of when it received it and a copy of the trigger. We emit this pair so that
+// filtering can be done on triggers received in the trace.
+message Trigger {
+  // The time that |trigger| was received by the service.
+  optional uint64 boot_time_ns = 1;
+  // Name of the trigger which was received.
+  optional string trigger_name = 2;
+  // The actual producer that activated |trigger|.
+  optional string producer_name = 3;
+  // The verified UID of the producer.
+  optional int32 producer_uid = 4;
+}
+
+// Contains a list of Trigger. This is needed for oneof in TracePacket.
+message Triggers {
+  repeated Trigger triggers = 1;
+}
+
+// End of protos/perfetto/trace/trigger.proto
 
 // Begin of protos/perfetto/config/android/android_log_config.proto
 

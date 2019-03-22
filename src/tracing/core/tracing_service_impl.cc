@@ -315,10 +315,12 @@ bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
 
   const bool has_trigger_config = cfg.trigger_config().trigger_mode() !=
                                   TraceConfig::TriggerConfig::UNSPECIFIED;
-  if (has_trigger_config && cfg.trigger_config().trigger_timeout_ms() <= 0) {
+  if (has_trigger_config && (cfg.trigger_config().trigger_timeout_ms() == 0 ||
+                             cfg.trigger_config().trigger_timeout_ms() >
+                                 kGuardrailsMaxTracingDurationMillis)) {
     PERFETTO_ELOG(
-        "Traces with triggers must provide a trigger_timeout_ms "
-        "> 0 (received %" PRIu32 "ms)",
+        "Traces with START_TRACING triggers must provide a positive "
+        "trigger_timeout_ms < 7 days (received %" PRIu32 "ms)",
         cfg.trigger_config().trigger_timeout_ms());
     return false;
   }
@@ -473,13 +475,24 @@ bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
       // For traces which use START_TRACE triggers we need to ensure that the
       // tracing session will be cleaned up when it times out.
       has_start_trigger = true;
-      CleanUpStartTracingTriggerSession(
-          tsid, cfg.trigger_config().trigger_timeout_ms());
+      task_runner_->PostDelayedTask(
+          [weak_this, tsid]() {
+            // Skip entirely the flush if the trace session doesn't exist
+            // anymore. This is to prevent misleading error messages to be
+            // logged.
+            if (weak_this) {
+              weak_this->OnStartTriggersTimeout(tsid);
+            }
+          },
+          cfg.trigger_config().trigger_timeout_ms());
       break;
     case TraceConfig::TriggerConfig::STOP_TRACING:
       // Update the tracing_session's duration_ms to ensure that if no trigger
       // is received the session will end and be cleaned up equal to the
       // timeout.
+      //
+      // TODO(nuskos): Refactor this so that rather then modifying the config we
+      // have a field we look at on the tracing_session.
       tracing_session->config.set_duration_ms(
           cfg.trigger_config().trigger_timeout_ms());
       break;
@@ -641,25 +654,21 @@ bool TracingServiceImpl::StartTracing(TracingSessionID tsid) {
         [weak_this, tsid] {
           // Skip entirely the flush if the trace session doesn't exist anymore.
           // This is to prevent misleading error messages to be logged.
-          if (!weak_this) {
+          if (!weak_this)
             return;
-          }
           auto* tracing_session_ptr = weak_this->GetTracingSession(tsid);
-          switch (tracing_session_ptr->config.trigger_config().trigger_mode()) {
-            case TraceConfig::TriggerConfig::STOP_TRACING:
-              // If this trace was using STOP_TRACING triggers and we've seen
-              // one, then the trigger overrides the normal timeout. In this
-              // case we just return and let the other task clean up this trace.
-              if (!tracing_session_ptr->received_triggers.empty()) {
-                return;
-              }
-              GOOGLE_FALLTHROUGH_INTENDED;
-            case TraceConfig::TriggerConfig::START_TRACING:
-            case TraceConfig::TriggerConfig::UNSPECIFIED:
-              // In all other cases (START_TRACING or no triggers) we flush
-              // after |trace_duration_ms| unconditionally.
-              weak_this->FlushAndDisableTracing(tsid);
-          }
+          if (!tracing_session_ptr)
+            return;
+          // If this trace was using STOP_TRACING triggers and we've seen
+          // one, then the trigger overrides the normal timeout. In this
+          // case we just return and let the other task clean up this trace.
+          if (tracing_session_ptr->config.trigger_config().trigger_mode() ==
+                  TraceConfig::TriggerConfig::STOP_TRACING &&
+              !tracing_session_ptr->received_triggers.empty())
+            return;
+          // In all other cases (START_TRACING or no triggers) we flush
+          // after |trace_duration_ms| unconditionally.
+          weak_this->FlushAndDisableTracing(tsid);
         },
         trace_duration_ms);
   }
@@ -892,8 +901,10 @@ void TracingServiceImpl::ActivateTriggers(
         continue;
       }
 
+      const bool triggers_already_received =
+          !tracing_session.received_triggers.empty();
       tracing_session.received_triggers.push_back(
-          {static_cast<uint64_t>(base::GetBootTimeNs().count()), *iter,
+          {static_cast<uint64_t>(base::GetBootTimeNs().count()), iter->name(),
            producer->name_, producer->uid_});
       auto weak_this = weak_ptr_factory_.GetWeakPtr();
       switch (tracing_session.config.trigger_config().trigger_mode()) {
@@ -915,12 +926,16 @@ void TracingServiceImpl::ActivateTriggers(
           StartTracing(tsid);
           break;
         case TraceConfig::TriggerConfig::STOP_TRACING:
-          if (tracing_session.received_triggers.size() != 1) {
-            // Only stop the trace once to avoid confusing log messages. I.E.
-            // when we've inserted the first trigger (size is 1) we will set up
-            // the FlushAndDisable but future triggers will just break out.
+          // Only stop the trace once to avoid confusing log messages. I.E.
+          // when we've already hit the first trigger we've already Posted the
+          // task to FlushAndDisable. So all future triggers will just break
+          // out.
+          if (triggers_already_received) {
             break;
           }
+          PERFETTO_DLOG("Triggering '%s' on tracing session %" PRIu64
+                        " with duration of %" PRIu32 "ms.",
+                        iter->name().c_str(), tsid, iter->stop_delay_ms());
           // Now that we've seen a trigger we need to stop, flush, and disable
           // this session after the configured |stop_delay_ms|.
           task_runner_->PostDelayedTask(
@@ -929,9 +944,6 @@ void TracingServiceImpl::ActivateTriggers(
                 // anymore. This is to prevent misleading error messages to be
                 // logged.
                 if (weak_this && weak_this->GetTracingSession(tsid)) {
-                  PERFETTO_DLOG("Disabling STOP_TRACING TracingSession %" PRIu64
-                                " no triggers activated.",
-                                tsid);
                   weak_this->FlushAndDisableTracing(tsid);
                 }
               },
@@ -1919,38 +1931,25 @@ TraceBuffer* TracingServiceImpl::GetBufferByID(BufferID buffer_id) {
   return &*buf_iter->second;
 }
 
-void TracingServiceImpl::CleanUpStartTracingTriggerSession(
-    TracingSessionID tsid,
-    uint32_t timeout) {
-  auto weak_this = weak_ptr_factory_.GetWeakPtr();
-  task_runner_->PostDelayedTask(
-      [weak_this, tsid] {
-        // Skip entirely the flush if the trace session doesn't exist anymore.
-        // This is to prevent misleading error messages to be logged.
-        //
-        // In addition if the trace has started from the trigger we rely on
-        // the |stop_delay_ms| from the trigger so don't flush and
-        // disable if we've moved beyond a CONFIGURED state.
-        if (!weak_this) {
-          return;
-        }
-        auto* tracing_session_ptr = weak_this->GetTracingSession(tsid);
-        if (tracing_session_ptr &&
-            tracing_session_ptr->state == TracingSession::CONFIGURED) {
-          PERFETTO_DLOG("Disabling TracingSession %" PRIu64
-                        " since no triggers activated.",
-                        tsid);
-          // No data should be returned from ReadBuffers() regardless of if we
-          // call FreeBuffers() or DisableTracing(). This is because in
-          // STOP_TRACING we need this promise in either case, and using
-          // DisableTracing() allows a graceful shutdown. Consumers can follow
-          // their normal path and check the buffers through ReadBuffers() and
-          // the code won't hang because the tracing session will still be
-          // alive just disabled.
-          weak_this->DisableTracing(tsid);
-        }
-      },
-      timeout);
+void TracingServiceImpl::OnStartTriggersTimeout(TracingSessionID tsid) {
+  // if the trace has started from the trigger we rely on
+  // the |stop_delay_ms| from the trigger so don't flush and
+  // disable if we've moved beyond a CONFIGURED state
+  auto* tracing_session_ptr = GetTracingSession(tsid);
+  if (tracing_session_ptr &&
+      tracing_session_ptr->state == TracingSession::CONFIGURED) {
+    PERFETTO_DLOG("Disabling TracingSession %" PRIu64
+                  " since no triggers activated.",
+                  tsid);
+    // No data should be returned from ReadBuffers() regardless of if we
+    // call FreeBuffers() or DisableTracing(). This is because in
+    // STOP_TRACING we need this promise in either case, and using
+    // DisableTracing() allows a graceful shutdown. Consumers can follow
+    // their normal path and check the buffers through ReadBuffers() and
+    // the code won't hang because the tracing session will still be
+    // alive just disabled.
+    DisableTracing(tsid);
+  }
 }
 
 void TracingServiceImpl::UpdateMemoryGuardrail() {
@@ -2140,22 +2139,22 @@ void TracingServiceImpl::MaybeEmitSystemInfo(
 void TracingServiceImpl::MaybeEmitReceivedTriggers(
     TracingSession* tracing_session,
     std::vector<TracePacket>* packets) {
-  if (tracing_session->num_emited_received_triggers ==
+  if (tracing_session->num_emitted_received_triggers ==
       tracing_session->received_triggers.size()) {
     return;
   }
   protos::TrustedPacket packet;
-  protos::ReceivedTriggers* triggers = packet.mutable_received_triggers();
-  for (size_t i = tracing_session->num_emited_received_triggers;
+  protos::Triggers* triggers = packet.mutable_triggers();
+  for (size_t i = tracing_session->num_emitted_received_triggers;
        i < tracing_session->received_triggers.size(); ++i) {
     const auto& info = tracing_session->received_triggers[i];
     auto* trigger = triggers->add_triggers();
     trigger->set_boot_time_ns(info.boot_time_ns);
-    info.trigger.ToProto(trigger->mutable_trigger());
+    trigger->set_trigger_name(info.trigger_name);
     trigger->set_producer_name(info.producer_name);
     trigger->set_producer_uid(static_cast<int32_t>(info.producer_uid));
   }
-  tracing_session->num_emited_received_triggers =
+  tracing_session->num_emitted_received_triggers =
       tracing_session->received_triggers.size();
   packet.set_trusted_uid(static_cast<int32_t>(uid_));
   packet.set_trusted_packet_sequence_id(kServicePacketSequenceID);

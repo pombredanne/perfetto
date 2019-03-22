@@ -399,7 +399,7 @@ class TracingServiceImpl : public TracingService {
     // order they were received.
     struct TriggerInfo {
       uint64_t boot_time_ns;
-      TraceConfig::TriggerConfig::Trigger trigger;
+      std::string trigger_name;
       std::string producer_name;
       uid_t producer_uid;
     };
@@ -437,7 +437,7 @@ class TracingServiceImpl : public TracingService {
     bool did_emit_system_info = false;
 
     // The number of received triggers we've emitted into the trace output.
-    size_t num_emited_received_triggers = 0;
+    size_t num_emitted_received_triggers = 0;
 
     State state = DISABLED;
 
@@ -498,8 +498,7 @@ class TracingServiceImpl : public TracingService {
   void ScrapeSharedMemoryBuffers(TracingSession* tracing_session,
                                  ProducerEndpointImpl* producer);
   TraceBuffer* GetBufferByID(BufferID);
-  void CleanUpStartTracingTriggerSession(TracingSessionID tsid,
-                                         uint32_t timeout);
+  void OnStartTriggersTimeout(TracingSessionID tsid);
 
   base::TaskRunner* const task_runner_;
   std::unique_ptr<SharedMemory::Factory> shm_factory_;
