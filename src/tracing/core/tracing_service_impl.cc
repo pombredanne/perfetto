@@ -911,9 +911,9 @@ void TracingServiceImpl::ActivateTriggers(
           // CONFIGURED then we don't need to repeat StartTracing. This would
           // work fine (StartTracing would return false) but would add error
           // logs.
-          if (tracing_session.state != TracingSession::CONFIGURED) {
+          if (tracing_session.state != TracingSession::CONFIGURED)
             break;
-          }
+
           PERFETTO_DLOG("Triggering '%s' on tracing session %" PRIu64
                         " with duration of %" PRIu32 "ms.",
                         iter->name().c_str(), tsid, iter->stop_delay_ms());
@@ -928,9 +928,9 @@ void TracingServiceImpl::ActivateTriggers(
           // when we've already hit the first trigger we've already Posted the
           // task to FlushAndDisable. So all future triggers will just break
           // out.
-          if (triggers_already_received) {
+          if (triggers_already_received)
             break;
-          }
+
           PERFETTO_DLOG("Triggering '%s' on tracing session %" PRIu64
                         " with duration of %" PRIu32 "ms.",
                         iter->name().c_str(), tsid, iter->stop_delay_ms());
@@ -941,9 +941,8 @@ void TracingServiceImpl::ActivateTriggers(
                 // Skip entirely the flush if the trace session doesn't exist
                 // anymore. This is to prevent misleading error messages to be
                 // logged.
-                if (weak_this && weak_this->GetTracingSession(tsid)) {
+                if (weak_this && weak_this->GetTracingSession(tsid))
                   weak_this->FlushAndDisableTracing(tsid);
-                }
               },
               // If this trigger is zero this will immediately executable and
               // will happen shortly.
