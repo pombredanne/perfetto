@@ -106,6 +106,7 @@ export interface ThreadStateSelection {
   kind: 'THREAD_STATE';
   utid: number;
   ts: number;
+  dur: number;
   state: string;
 }
 

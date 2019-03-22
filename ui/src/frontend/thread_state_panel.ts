@@ -23,6 +23,7 @@ import {Panel, PanelSize} from './panel';
 interface ThreadStateDetailsAttr {
   utid: number;
   ts: number;
+  dur: number;
   state: string;
 }
 
@@ -40,6 +41,7 @@ export class ThreadStatePanel extends Panel<ThreadStateDetailsAttr> {
                   `${
                      timeToCode(attrs.ts - globals.state.traceTime.startSec)
                    }`)),
+              m('tr', m('td', `Duration`), m('td', `${timeToCode(attrs.dur)}`)),
               m('tr',
                 m('td', `State`),
                 m('td', `${translateState(attrs.state)}`)),

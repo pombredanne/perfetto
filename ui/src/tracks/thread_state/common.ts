@@ -20,8 +20,8 @@ export interface Data {
   resolution: number;
 
   strings: string[];
-  startNs: Float64Array;
-  endNs: Float64Array;
+  starts: Float64Array;
+  ends: Float64Array;
   state: Uint16Array;  // Index into |strings|.
 }
 

@@ -293,6 +293,7 @@ class TraceViewer implements m.ClassComponent {
           detailsPanels.push(m(ThreadStatePanel, {
             key: 'thread_state',
             ts: curSelection.ts,
+            dur: curSelection.dur,
             utid: curSelection.utid,
             state: curSelection.state
           }));

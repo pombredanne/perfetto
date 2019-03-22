@@ -59,9 +59,9 @@ class ThreadStateTrack extends Track<Config, Data> {
     }
     if (data === undefined) return;  // Can't possibly draw anything.
 
-    for (let i = 0; i < data.startNs.length; i++) {
-      const tStart = data.startNs[i];
-      const tEnd = data.endNs[i];
+    for (let i = 0; i < data.starts.length; i++) {
+      const tStart = data.starts[i];
+      const tEnd = data.ends[i];
       const state = data.strings[data.state[i]];
       if (tEnd <= visibleWindowTime.start || tStart >= visibleWindowTime.end) {
         continue;
@@ -69,8 +69,6 @@ class ThreadStateTrack extends Track<Config, Data> {
       if (tStart && tEnd) {
         const rectStart = timeScale.timeToPx(tStart);
         const rectEnd = timeScale.timeToPx(tEnd);
-        const rectWidth = rectEnd - rectStart;
-        if (rectWidth < 0.3) continue;
         const color = colorForState(state);
         ctx.fillStyle = `hsl(${color.h},${color.s}%,${color.l}%)`;
         ctx.fillRect(rectStart, MARGIN_TOP, rectEnd - rectStart, RECT_HEIGHT);
@@ -80,10 +78,10 @@ class ThreadStateTrack extends Track<Config, Data> {
     const selection = globals.state.currentSelection;
     if (selection !== null && selection.kind === 'THREAD_STATE' &&
         selection.utid === this.config.utid) {
-      const index = searchEq(data.startNs, selection.ts);
+      const index = searchEq(data.starts, selection.ts);
       if (index[0] !== index[1]) {
-        const tStart = data.startNs[index[0]];
-        const tEnd = data.endNs[index[0]];
+        const tStart = data.starts[index[0]];
+        const tEnd = data.ends[index[0]];
         const state = data.strings[data.state[index[0]]];
         const rectStart = timeScale.timeToPx(tStart);
         const rectEnd = timeScale.timeToPx(tEnd);
@@ -107,12 +105,14 @@ class ThreadStateTrack extends Track<Config, Data> {
     if (data === undefined) return false;
     const {timeScale} = globals.frontendLocalState;
     const time = timeScale.pxToTime(x);
-    const index = search(data.startNs, time);
-    const ts = index === -1 ? undefined : data.startNs[index];
+    const index = search(data.starts, time);
+    const ts = index === -1 ? undefined : data.starts[index];
+    const tsEnd = index === -1 ? undefined : data.ends[index];
     const state = index === -1 ? undefined : data.strings[data.state[index]];
     const utid = this.config.utid;
-    if (ts && state) {
-      globals.dispatch(Actions.selectThreadState({utid, ts, state}));
+    if (ts && state && tsEnd) {
+      globals.dispatch(
+          Actions.selectThreadState({utid, ts, dur: tsEnd - ts, state}));
       return true;
     }
     return false;

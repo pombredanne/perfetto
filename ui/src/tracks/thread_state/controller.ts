@@ -58,8 +58,9 @@ class ThreadStateTrackController extends TrackController<Config, Data> {
       // Create an entry from start_ts to either the first sched_wakeup
       // or to the end if there are no sched wakeups. This means
       // we will show all information we have even with no sched_wakeup events.
-      // TODO(taylori): This can all be simplified once span_left_join can
-      // handle mixed partitioning and once span_outer_join exists.
+      // TODO(taylori): Once span outer join exists I should simplify this
+      // by outer joining sched_wakeup and sched and then left joining with
+      // window.
       await this.query(`create view ${this.tableName('fill')} AS
         select
         (select start_ts from trace_bounds) as ts,
@@ -121,8 +122,8 @@ class ThreadStateTrackController extends TrackController<Config, Data> {
       start,
       end,
       resolution,
-      startNs: new Float64Array(numRows),
-      endNs: new Float64Array(numRows),
+      starts: new Float64Array(numRows),
+      ends: new Float64Array(numRows),
       strings: [],
       state: new Uint16Array(numRows)
     };
@@ -140,8 +141,8 @@ class ThreadStateTrackController extends TrackController<Config, Data> {
     for (let row = 0; row < numRows; row++) {
       const cols = result.columns;
       const start = fromNs(+cols[0].longValues![row]);
-      summary.startNs[row] = start;
-      summary.endNs[row] = start + fromNs(+cols[1].doubleValues![row]);
+      summary.starts[row] = start;
+      summary.ends[row] = start + fromNs(+cols[1].doubleValues![row]);
       summary.state[row] = internString(cols[3].stringValues![row]);
     }
 
