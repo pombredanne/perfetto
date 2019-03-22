@@ -499,6 +499,53 @@ class HeapprofdEndToEnd : public ::testing::Test {
     PERFETTO_CHECK(kill(pid, SIGKILL) == 0);
     PERFETTO_CHECK(waitpid(pid, nullptr, 0) == pid);
   }
+
+  void ConcurrentSession() {
+    constexpr size_t kAllocSize = 1024;
+
+    pid_t pid = ForkContinuousMalloc(kAllocSize);
+
+    TraceConfig trace_config;
+    trace_config.add_buffers()->set_size_kb(10 * 1024);
+    trace_config.set_duration_ms(5000);
+    trace_config.set_flush_timeout_ms(10000);
+
+    auto* ds_config = trace_config.add_data_sources()->mutable_config();
+    ds_config->set_name("android.heapprofd");
+    ds_config->set_target_buffer(0);
+
+    auto* heapprofd_config = ds_config->mutable_heapprofd_config();
+    heapprofd_config->set_sampling_interval_bytes(1);
+    *heapprofd_config->add_pid() = static_cast<uint64_t>(pid);
+    heapprofd_config->set_all(false);
+    heapprofd_config->mutable_continuous_dump_config()->set_dump_phase_ms(0);
+    heapprofd_config->mutable_continuous_dump_config()->set_dump_interval_ms(
+        100);
+
+    auto helper = GetHelper(&task_runner);
+    helper->StartTracing(trace_config);
+    sleep(1);
+    auto helper_concurrent = GetHelper(&task_runner);
+    helper_concurrent->StartTracing(trace_config);
+
+    helper->WaitForTracingDisabled(20000);
+    helper->ReadData();
+    helper->WaitForReadData();
+    ValidateAny(helper.get(), static_cast<uint64_t>(pid));
+    ValidateOnlyPID(helper.get(), static_cast<uint64_t>(pid));
+    ValidateMultiple(helper.get(), static_cast<uint64_t>(pid), kAllocSize);
+    ValidateRejectedConcurrent(helper_concurrent.get(),
+                               static_cast<uint64_t>(pid), false);
+
+    helper_concurrent->WaitForTracingDisabled(20000);
+    helper_concurrent->ReadData();
+    helper_concurrent->WaitForReadData();
+    ValidateRejectedConcurrent(helper_concurrent.get(),
+                               static_cast<uint64_t>(pid), true);
+
+    PERFETTO_CHECK(kill(pid, SIGKILL) == 0);
+    PERFETTO_CHECK(waitpid(pid, nullptr, 0) == pid);
+  }
 };
 
 // TODO(b/118428762): stop pretending the tests pass on cuttlefish
