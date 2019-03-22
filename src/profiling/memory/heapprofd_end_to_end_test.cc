@@ -540,6 +540,7 @@ class HeapprofdEndToEnd : public ::testing::Test {
     helper_concurrent->WaitForTracingDisabled(20000);
     helper_concurrent->ReadData();
     helper_concurrent->WaitForReadData();
+    ValidateOnlyPID(helper.get(), static_cast<uint64_t>(pid));
     ValidateRejectedConcurrent(helper_concurrent.get(),
                                static_cast<uint64_t>(pid), true);
 
