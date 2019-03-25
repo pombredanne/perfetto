@@ -241,6 +241,7 @@ SharedRingBuffer::Buffer SharedRingBuffer::BeginRead() {
         ", read_avail=%zu, rd=%" PRIu64 ", wr=%" PRIu64,
         size, avail_read, pos.read_pos, pos.write_pos);
     meta_->stats.num_reads_corrupt++;
+    errno = EBADF;
     return Buffer();
   }
 
