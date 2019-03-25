@@ -191,6 +191,8 @@ void TypedProtoDecoderBase::ParseAllFields() {
       // order, see comments on RepeatedFieldIterator.
       if (PERFETTO_UNLIKELY(size_ >= capacity_)) {
         ExpandHeapStorage();
+        // ExpandHeapStorage moves fields_ so we need to update the ptr to fld:
+        fld = &fields_[field_id];
         PERFETTO_DCHECK(size_ < capacity_);
       }
       fields_[size_++] = *fld;

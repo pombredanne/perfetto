@@ -91,6 +91,28 @@ TEST(ProtoDecoderTest, SingleRepeatedField) {
   EXPECT_FALSE(++it);
 }
 
+TEST(ProtoDecoderTest, SingleRepeatedFieldWithExpansion) {
+  Message message;
+  ScatteredHeapBuffer delegate(512, 512);
+  ScatteredStreamWriter writer(&delegate);
+  delegate.set_writer(&writer);
+  message.Reset(&writer);
+  for (int i = 0; i < 2000; i++) {
+    message.AppendVarInt(/*field_id=*/2, i);
+  }
+  std::vector<uint8_t> data = delegate.StitchSlices();
+
+  TypedProtoDecoder<2, true> tpd(data.data(), data.size());
+  auto it = tpd.GetRepeated(/*field_id=*/2);
+  for (int i = 0; i < 2000; i++) {
+    EXPECT_TRUE(it);
+    EXPECT_EQ(it->as_int32(), i);
+    PERFETTO_ELOG("%d", i);
+    ++it;
+  }
+  EXPECT_FALSE(it);
+}
+
 TEST(ProtoDecoderTest, NoRepeatedField) {
   uint8_t buf[] = {0x01};
   TypedProtoDecoder<2, true> tpd(buf, 1);
@@ -195,10 +217,10 @@ TEST(ProtoDecoderTest, FixedData) {
     if (field.type() == ProtoWireType::kLengthDelimited) {
       ASSERT_EQ(exp.int_value, field.size());
     } else {
-      ASSERT_EQ(exp.int_value, field.as_int64());
+      ASSERT_EQ(int64_t(exp.int_value), field.as_int64());
       // Proto encodes booleans as varints of 0 or 1.
       if (exp.int_value == 0 || exp.int_value == 1) {
-        ASSERT_EQ(exp.int_value, field.as_bool());
+        ASSERT_EQ(int64_t(exp.int_value), field.as_bool());
       }
     }
   }
