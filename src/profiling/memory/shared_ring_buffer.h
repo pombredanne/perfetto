@@ -72,6 +72,7 @@ class SharedRingBuffer {
   };
 
   struct Stats {
+    uint64_t bytes_written;
     uint64_t num_writes_succeeded;
     uint64_t num_writes_corrupt;
     uint64_t num_writes_overflow;
@@ -128,7 +129,6 @@ class SharedRingBuffer {
     uint64_t write_pos;
 
     std::atomic<uint64_t> failed_spinlocks;
-    std::atomic<uint64_t> bytes_written;
     Stats stats;
   };
 

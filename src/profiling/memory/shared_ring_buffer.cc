@@ -187,7 +187,7 @@ SharedRingBuffer::Buffer SharedRingBuffer::BeginWrite(
   result.size = size;
   result.data = wr_ptr + kHeaderSize;
   meta_->write_pos += size_with_header;
-  meta_->bytes_written.fetch_add(size, std::memory_order_relaxed);
+  meta_->stats.bytes_written += size;
   meta_->stats.num_writes_succeeded++;
   // By making this a release store, we can save grabbing the spinlock in
   // EndWrite.
