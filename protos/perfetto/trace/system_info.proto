@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,14 +14,18 @@
  * limitations under the License.
  */
 
-#include "perfetto/protozero/proto_field_descriptor.h"
+syntax = "proto2";
+option optimize_for = LITE_RUNTIME;
 
-namespace protozero {
+package perfetto.protos;
 
-// static
-const ProtoFieldDescriptor* ProtoFieldDescriptor::GetInvalidInstance() {
-  static ProtoFieldDescriptor instance("", Type::TYPE_INVALID, 0, false);
-  return &instance;
+message Utsname {
+  optional string sysname = 1;
+  optional string version = 2;
+  optional string release = 3;
+  optional string machine = 4;
 }
 
-}  // namespace protozero
+message SystemInfo {
+  optional Utsname utsname = 1;
+}

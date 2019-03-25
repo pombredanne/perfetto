@@ -19,6 +19,7 @@
 #include <atomic>
 #include <type_traits>
 
+#include <errno.h>
 #include <inttypes.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -166,14 +167,17 @@ SharedRingBuffer::Buffer SharedRingBuffer::BeginWrite(
   Buffer result;
 
   base::Optional<PointerPositions> opt_pos = GetPointerPositions(spinlock);
-  if (!opt_pos)
+  if (!opt_pos) {
+    errno = EBADF;
     return result;
+  }
   auto pos = opt_pos.value();
 
   const uint64_t size_with_header =
       base::AlignUp<kAlignment>(size + kHeaderSize);
   if (size_with_header > write_avail(pos)) {
-    meta_->num_writes_failed++;
+    errno = EAGAIN;
+    meta_->num_writes_failed.fetch_add(1, std::memory_order_relaxed);
     return result;
   }
 
@@ -182,8 +186,8 @@ SharedRingBuffer::Buffer SharedRingBuffer::BeginWrite(
   result.size = size;
   result.data = wr_ptr + kHeaderSize;
   meta_->write_pos += size_with_header;
-  meta_->bytes_written += size;
-  meta_->num_writes_succeeded++;
+  meta_->bytes_written.fetch_add(size, std::memory_order_relaxed);
+  meta_->num_writes_succeeded.fetch_add(1, std::memory_order_relaxed);
   // By making this a release store, we can save grabbing the spinlock in
   // EndWrite.
   reinterpret_cast<std::atomic<uint32_t>*>(wr_ptr)->store(
@@ -192,6 +196,8 @@ SharedRingBuffer::Buffer SharedRingBuffer::BeginWrite(
 }
 
 void SharedRingBuffer::EndWrite(Buffer buf) {
+  if (!buf)
+    return;
   uint8_t* wr_ptr = buf.data - kHeaderSize;
   PERFETTO_DCHECK(reinterpret_cast<uintptr_t>(wr_ptr) % kAlignment == 0);
   reinterpret_cast<std::atomic<uint32_t>*>(wr_ptr)->store(
@@ -224,7 +230,7 @@ SharedRingBuffer::Buffer SharedRingBuffer::BeginRead() {
         "Corrupted header detected, size=%zu"
         ", read_avail=%zu, rd=%" PRIu64 ", wr=%" PRIu64,
         size, avail_read, pos.read_pos, pos.write_pos);
-    meta_->num_reads_failed++;
+    meta_->num_reads_failed.fetch_add(1, std::memory_order_relaxed);
     return Buffer();
   }
 

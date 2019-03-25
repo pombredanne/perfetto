@@ -46,29 +46,24 @@ namespace perfetto {
 namespace profiling {
 namespace {
 
+const char kSingleByte[1] = {'x'};
 constexpr std::chrono::seconds kLockTimeout{1};
 
-std::vector<base::UnixSocketRaw> ConnectPool(const std::string& sock_name,
-                                             size_t n) {
-  std::vector<base::UnixSocketRaw> res;
-  res.reserve(n);
-  for (size_t i = 0; i < n; ++i) {
-    auto sock = base::UnixSocketRaw::CreateMayFail(base::SockType::kStream);
-    if (!sock || !sock.Connect(sock_name)) {
-      PERFETTO_PLOG("Failed to connect to %s", sock_name.c_str());
-      continue;
-    }
-    if (!sock.SetTxTimeout(kClientSockTimeoutMs)) {
-      PERFETTO_PLOG("Failed to set send timeout for %s", sock_name.c_str());
-      continue;
-    }
-    if (!sock.SetRxTimeout(kClientSockTimeoutMs)) {
-      PERFETTO_PLOG("Failed to set receive timeout for %s", sock_name.c_str());
-      continue;
-    }
-    res.emplace_back(std::move(sock));
+base::Optional<base::UnixSocketRaw> Connect(const std::string& sock_name) {
+  auto sock = base::UnixSocketRaw::CreateMayFail(base::SockType::kStream);
+  if (!sock || !sock.Connect(sock_name)) {
+    PERFETTO_PLOG("Failed to connect to %s", sock_name.c_str());
+    return base::nullopt;
   }
-  return res;
+  if (!sock.SetTxTimeout(kClientSockTimeoutMs)) {
+    PERFETTO_PLOG("Failed to set send timeout for %s", sock_name.c_str());
+    return base::nullopt;
+  }
+  if (!sock.SetRxTimeout(kClientSockTimeoutMs)) {
+    PERFETTO_PLOG("Failed to set receive timeout for %s", sock_name.c_str());
+    return base::nullopt;
+  }
+  return std::move(sock);
 }
 
 inline bool IsMainThread() {
@@ -103,91 +98,6 @@ int UnsetDumpable(int) {
 
 }  // namespace
 
-bool FreePage::Add(const uint64_t addr,
-                   const uint64_t sequence_number,
-                   SocketPool* pool) {
-  std::unique_lock<std::timed_mutex> l(mutex_, kLockTimeout);
-  if (!l.owns_lock())
-    return false;
-  if (offset_ == kFreePageSize) {
-    if (!FlushLocked(pool))
-      return false;
-    // Now that we have flushed, reset to after the header.
-    offset_ = 0;
-  }
-  FreePageEntry& current_entry = free_page_.entries[offset_++];
-  current_entry.sequence_number = sequence_number;
-  current_entry.addr = addr;
-  return true;
-}
-
-bool FreePage::FlushLocked(SocketPool* pool) {
-  WireMessage msg = {};
-  msg.record_type = RecordType::Free;
-  free_page_.num_entries = offset_;
-  msg.free_header = &free_page_;
-  BorrowedSocket sock(pool->Borrow());
-  if (!sock || !SendWireMessage(sock.get(), msg)) {
-    PERFETTO_PLOG("Failed to send wire message");
-    sock.Shutdown();
-    return false;
-  }
-  return true;
-}
-
-SocketPool::SocketPool(std::vector<base::UnixSocketRaw> sockets)
-    : sockets_(std::move(sockets)), available_sockets_(sockets_.size()) {}
-
-BorrowedSocket SocketPool::Borrow() {
-  std::unique_lock<std::timed_mutex> l(mutex_, kLockTimeout);
-  if (!l.owns_lock())
-    return {base::UnixSocketRaw(), nullptr};
-  cv_.wait(l, [this] {
-    return available_sockets_ > 0 || dead_sockets_ == sockets_.size() ||
-           shutdown_;
-  });
-
-  if (dead_sockets_ == sockets_.size() || shutdown_) {
-    return {base::UnixSocketRaw(), nullptr};
-  }
-
-  PERFETTO_CHECK(available_sockets_ > 0);
-  return {std::move(sockets_[--available_sockets_]), this};
-}
-
-void SocketPool::Return(base::UnixSocketRaw sock) {
-  std::unique_lock<std::timed_mutex> l(mutex_, kLockTimeout);
-  if (!l.owns_lock())
-    return;
-  PERFETTO_CHECK(dead_sockets_ + available_sockets_ < sockets_.size());
-  if (sock && !shutdown_) {
-    PERFETTO_CHECK(available_sockets_ < sockets_.size());
-    sockets_[available_sockets_++] = std::move(sock);
-    l.unlock();
-    cv_.notify_one();
-  } else {
-    dead_sockets_++;
-    if (dead_sockets_ == sockets_.size()) {
-      l.unlock();
-      cv_.notify_all();
-    }
-  }
-}
-
-void SocketPool::Shutdown() {
-  {
-    std::unique_lock<std::timed_mutex> l(mutex_, kLockTimeout);
-    if (!l.owns_lock())
-      return;
-    for (size_t i = 0; i < available_sockets_; ++i)
-      sockets_[i].Shutdown();
-    dead_sockets_ += available_sockets_;
-    available_sockets_ = 0;
-    shutdown_ = true;
-  }
-  cv_.notify_all();
-}
-
 const char* GetThreadStackBase() {
   pthread_attr_t attr;
   if (pthread_getattr_np(pthread_self(), &attr) != 0)
@@ -203,14 +113,15 @@ const char* GetThreadStackBase() {
   return stackaddr + stacksize;
 }
 
-std::atomic<uint64_t> Client::max_generation_{0};
-
-Client::Client(std::vector<base::UnixSocketRaw> socks)
-    : generation_(++max_generation_),
-      sampler_(8192),  // placeholder until we receive the config (within ctor)
-      socket_pool_(std::move(socks)),
-      free_page_(generation_),
+Client::Client(base::Optional<base::UnixSocketRaw> sock)
+    : sampler_(8192),  // placeholder until we receive the config (within ctor)
       main_thread_stack_base_(FindMainThreadStack()) {
+  if (!sock || !sock.value()) {
+    PERFETTO_DFATAL("Socket not connected.");
+    return;
+  }
+  sock_ = std::move(sock.value());
+
   // We might be running in a process that is not dumpable (such as app
   // processes on user builds), in which case the /proc/self/mem will be chown'd
   // to root:root, and will not be accessible even to the process itself (see
@@ -238,24 +149,32 @@ Client::Client(std::vector<base::UnixSocketRaw> socks)
   // Restore original dumpability value if we overrode it.
   unset_dumpable.reset();
 
-  int fds[2];
-  fds[0] = *maps;
-  fds[1] = *mem;
-  auto sock = socket_pool_.Borrow();
-  if (!sock)
-    return;
+  int fds[kHandshakeSize];
+  fds[kHandshakeMaps] = *maps;
+  fds[kHandshakeMem] = *mem;
+
   // Send an empty record to transfer fds for /proc/self/maps and
   // /proc/self/mem.
-  uint64_t size = 0;
-  if (sock->Send(&size, sizeof(size), fds, 2) != sizeof(size)) {
+  if (sock_.Send(kSingleByte, sizeof(kSingleByte), fds, kHandshakeSize) !=
+      sizeof(kSingleByte)) {
     PERFETTO_DFATAL("Failed to send file descriptors.");
     return;
   }
-  if (sock->Receive(&client_config_, sizeof(client_config_)) !=
+
+  base::ScopedFile shmem_fd;
+  if (sock_.Receive(&client_config_, sizeof(client_config_), &shmem_fd, 1) !=
       sizeof(client_config_)) {
     PERFETTO_DFATAL("Failed to receive client config.");
     return;
   }
+
+  auto shmem = SharedRingBuffer::Attach(std::move(shmem_fd));
+  if (!shmem || !shmem->is_valid()) {
+    PERFETTO_DFATAL("Failed to attach to shmem.");
+    return;
+  }
+  shmem_ = std::move(shmem.value());
+
   PERFETTO_DCHECK(client_config_.interval >= 1);
   sampler_ = Sampler(client_config_.interval);
 
@@ -263,8 +182,7 @@ Client::Client(std::vector<base::UnixSocketRaw> socks)
   inited_.store(true, std::memory_order_release);
 }
 
-Client::Client(const std::string& sock_name, size_t conns)
-    : Client(ConnectPool(sock_name, conns)) {}
+Client::Client(const std::string& sock_name) : Client(Connect(sock_name)) {}
 
 const char* Client::GetStackBase() {
   if (IsMainThread()) {
@@ -307,7 +225,6 @@ bool Client::RecordMalloc(uint64_t alloc_size,
   }
 
   uint64_t stack_size = static_cast<uint64_t>(stackbase - stacktop);
-  metadata.client_generation = generation_;
   metadata.total_size = total_size;
   metadata.alloc_size = alloc_size;
   metadata.alloc_address = alloc_address;
@@ -323,30 +240,66 @@ bool Client::RecordMalloc(uint64_t alloc_size,
   msg.payload = const_cast<char*>(stacktop);
   msg.payload_size = static_cast<size_t>(stack_size);
 
-  BorrowedSocket sock = socket_pool_.Borrow();
-  if (!sock || !SendWireMessage(sock.get(), msg)) {
+  if (!SendWireMessage(&shmem_, msg)) {
     PERFETTO_PLOG("Failed to send wire message.");
-    sock.Shutdown();
+    Shutdown();
+    return false;
+  }
+  if (sock_.Send(kSingleByte, sizeof(kSingleByte)) == -1) {
+    PERFETTO_PLOG("Failed to send wire message.");
     Shutdown();
     return false;
   }
   return true;
 }
 
-bool Client::RecordFree(uint64_t alloc_address) {
+bool Client::RecordFree(const uint64_t alloc_address) {
   if (!inited_.load(std::memory_order_acquire))
     return false;
-  bool success = free_page_.Add(
+  bool success = AddFreeToBatch(
       alloc_address,
-      1 + sequence_number_.fetch_add(1, std::memory_order_acq_rel),
-      &socket_pool_);
+      1 + sequence_number_.fetch_add(1, std::memory_order_acq_rel));
   if (!success)
     Shutdown();
   return success;
 }
 
+// TODO(rsavitski): consider inlining into RecordFree.
+bool Client::AddFreeToBatch(const uint64_t addr,
+                            const uint64_t sequence_number) {
+  std::unique_lock<std::timed_mutex> l(free_batch_lock_, kLockTimeout);
+  if (!l.owns_lock())
+    return false;
+  if (free_batch_.num_entries == kFreeBatchSize) {
+    if (!FlushFreesLocked())
+      return false;
+    // Flushed the contents of the buffer, reset it for reuse.
+    free_batch_.num_entries = 0;
+  }
+  FreeBatchEntry& current_entry =
+      free_batch_.entries[free_batch_.num_entries++];
+  current_entry.sequence_number = sequence_number;
+  current_entry.addr = addr;
+  return true;
+}
+
+bool Client::FlushFreesLocked() {
+  WireMessage msg = {};
+  msg.record_type = RecordType::Free;
+  msg.free_header = &free_batch_;
+  if (!SendWireMessage(&shmem_, msg)) {
+    PERFETTO_PLOG("Failed to send wire message");
+    Shutdown();
+    return false;
+  }
+  if (sock_.Send(kSingleByte, sizeof(kSingleByte)) == -1) {
+    Shutdown();
+    return false;
+  }
+  return true;
+}
+
 void Client::Shutdown() {
-  socket_pool_.Shutdown();
   inited_.store(false, std::memory_order_release);
 }
 
