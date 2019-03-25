@@ -79,31 +79,33 @@ class StackOverlayMemory : public unwindstack::Memory {
                      uint64_t sp,
                      uint8_t* stack,
                      size_t size);
+  StackOverlayMemory(std::shared_ptr<unwindstack::Memory> mem)
+      : StackOverlayMemory(std::move(mem), 0u, nullptr, 0u) {}
+
   size_t Read(uint64_t addr, void* dst, size_t size) override;
+
+  void SetStack(uint64_t sp, uint8_t* stack, size_t size);
 
  private:
   std::shared_ptr<unwindstack::Memory> mem_;
-  uint64_t sp_;
-  uint64_t stack_end_;
-  uint8_t* stack_;
+  uint64_t sp_ = 0;
+  uint64_t stack_end_ = 0;
+  uint8_t* stack_ = nullptr;
 };
 
 struct UnwindingMetadata {
-  UnwindingMetadata(pid_t p, base::ScopedFile maps_fd, base::ScopedFile mem)
-      : pid(p),
-        maps(std::move(maps_fd)),
-        fd_mem(std::make_shared<FDMemory>(std::move(mem)))
-  {
-    PERFETTO_CHECK(maps.Parse());
-  }
+  UnwindingMetadata(pid_t p, base::ScopedFile maps_fd, base::ScopedFile mem);
+
   void ReparseMaps() {
-    maps.Reset();
-    maps.Parse();
+    maps->Reset();
+    maps->Parse();
   }
+
   pid_t pid;
-  FileDescriptorMaps maps;
+  std::unique_ptr<FileDescriptorMaps> maps;
   // The API of libunwindstack expects shared_ptr for Memory.
-  std::shared_ptr<unwindstack::Memory> fd_mem;
+  std::shared_ptr<StackOverlayMemory> fd_mem;
+  unwindstack::Unwinder unwinder;
 };
 
 bool DoUnwind(WireMessage*, UnwindingMetadata* metadata, AllocRecord* out);
