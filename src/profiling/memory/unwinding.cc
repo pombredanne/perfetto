@@ -188,6 +188,12 @@ UnwindingMetadata::UnwindingMetadata(pid_t p,
   PERFETTO_CHECK(maps->Parse());
 }
 
+void UnwindingMetadata::ReparseMaps() {
+  maps->Reset();
+  maps->Parse();
+  unwinder = unwindstack::Unwinder(kMaxFrames, maps.get(), fd_mem);
+}
+
 bool DoUnwind(WireMessage* msg, UnwindingMetadata* metadata, AllocRecord* out) {
   AllocMetadata* alloc_metadata = msg->alloc_header;
   std::unique_ptr<unwindstack::Regs> regs(

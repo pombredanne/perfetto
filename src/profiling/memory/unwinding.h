@@ -96,10 +96,7 @@ class StackOverlayMemory : public unwindstack::Memory {
 struct UnwindingMetadata {
   UnwindingMetadata(pid_t p, base::ScopedFile maps_fd, base::ScopedFile mem);
 
-  void ReparseMaps() {
-    maps->Reset();
-    maps->Parse();
-  }
+  void ReparseMaps();
 
   pid_t pid;
   std::unique_ptr<FileDescriptorMaps> maps;
