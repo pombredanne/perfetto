@@ -163,6 +163,11 @@ class ThreadStateTrackController extends TrackController<Config, Data> {
     if (this.setup) {
       this.query(`drop table ${this.tableName('window')}`);
       this.query(`drop table ${this.tableName('span')}`);
+      this.query(`drop table ${this.tableName('current')}`);
+      this.query(`drop view ${this.tableName('sched_wakeup')}`);
+      this.query(`drop view ${this.tableName('fill')}`);
+      this.query(`drop view ${this.tableName('full_sched_wakeup')}`);
+      this.query(`drop view ${this.tableName('span_view')}`);
       this.setup = false;
     }
   }

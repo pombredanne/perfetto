@@ -78,23 +78,19 @@ class ThreadStateTrack extends Track<Config, Data> {
     const selection = globals.state.currentSelection;
     if (selection !== null && selection.kind === 'THREAD_STATE' &&
         selection.utid === this.config.utid) {
-      const index = searchEq(data.starts, selection.ts);
-      if (index[0] !== index[1]) {
-        const tStart = data.starts[index[0]];
-        const tEnd = data.ends[index[0]];
-        const state = data.strings[data.state[index[0]]];
+      const [startIndex, endIndex] = searchEq(data.starts, selection.ts);
+      if (startIndex !== endIndex) {
+        const tStart = data.starts[startIndex];
+        const tEnd = data.ends[startIndex];
+        const state = data.strings[data.state[startIndex]];
         const rectStart = timeScale.timeToPx(tStart);
         const rectEnd = timeScale.timeToPx(tEnd);
         const color = colorForState(state);
         ctx.strokeStyle = `hsl(${color.h},${color.s}%,${color.l * 0.7}%)`;
         ctx.beginPath();
         ctx.lineWidth = 3;
-        ctx.moveTo(rectStart, MARGIN_TOP - 1.5);
-        ctx.lineTo(rectEnd, MARGIN_TOP - 1.5);
-        ctx.lineTo(rectEnd, MARGIN_TOP + RECT_HEIGHT + 1.5);
-        ctx.lineTo(rectStart, MARGIN_TOP + RECT_HEIGHT + 1.5);
-        ctx.lineTo(rectStart, MARGIN_TOP - 1.5);
-        ctx.stroke();
+        ctx.strokeRect(
+            rectStart, MARGIN_TOP - 1.5, rectEnd - rectStart, RECT_HEIGHT + 3);
         ctx.closePath();
       }
     }
