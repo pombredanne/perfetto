@@ -26,7 +26,7 @@ namespace {
   constexpr size_t kMaxNumCategories = 64;
 }
 
-struct AtraceHalWrapper::DynamicLibLoader { 
+struct AtraceHalWrapper::DynamicLibLoader {
 
   using ScopedDlHandle = base::ScopedResource<void*, dlclose, nullptr>;
 
@@ -71,17 +71,17 @@ AtraceHalWrapper::AtraceHalWrapper() {
 
 AtraceHalWrapper::~AtraceHalWrapper() = default;
 
-std::vector<AtraceHalWrapper::TracingVendorCategory> 
+std::vector<AtraceHalWrapper::TracingVendorCategory>
   AtraceHalWrapper::GetAvailableCategories() {
-  auto details =  lib_->GetCategories();
-  std::vector<AtraceHalWrapper::TracingVendorCategory> result;
-  for (size_t i = 0; i < details.size(); i++) {
-    AtraceHalWrapper::TracingVendorCategory cat;
-    cat.name = details[i].name;
-    cat.description = details[i].description;
-    result.emplace_back(cat);
-  }
-  return result;
+    auto details =  lib_->GetCategories();
+    std::vector<AtraceHalWrapper::TracingVendorCategory> result;
+    for (size_t i = 0; i < details.size(); i++) {
+      AtraceHalWrapper::TracingVendorCategory cat;
+      cat.name = details[i].name;
+      cat.description = details[i].description;
+      result.emplace_back(cat);
+    }
+    return result;
 }
 
 }
