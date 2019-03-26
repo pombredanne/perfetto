@@ -139,7 +139,7 @@ Usage: %s
   --no-guardrails         : Ignore guardrails triggered when using --dropbox (for testing).
   --txt                   : Parse config as pbtxt. Not a stable API. Not for production use.
   --reset-guardrails      : Resets the state of the guardails and exits (for testing).
-  --activate-trigger      : A trigger_name to activate on to the service. If specified multiple times will activate them all.
+  --activate-trigger      : A trigger_name to activate on to the service. If specified multiple times will activate them all. Cannot be used with --config or configuration flags.
   --help           -h
 
 
@@ -310,9 +310,6 @@ int PerfettoCmd::Main(int argc, char** argv) {
     }
 
     if (option == OPT_ACTIVATE_TRIGGER) {
-      if (!optarg) {
-        PERFETTO_FATAL("optarg is null");
-      }
       triggers_to_activate.push_back(std::string(optarg));
       continue;
     }
@@ -394,8 +391,9 @@ int PerfettoCmd::Main(int argc, char** argv) {
   // 1) A proto-encoded file/stdin (-c ...).
   // 2) A proto-text file/stdin (-c ... --txt).
   // 3) A set of option arguments (-t 10s -s 10m).
-  // The only case in which a trace config is not expected is --attach. In this
-  // case we are just re-attaching to an already started session.
+  // The only cases in which a trace config is not expected is --attach or
+  // --activate-trigger. For both of these we are just acting on already
+  // existing sessions.
   perfetto::protos::TraceConfig trace_config_proto;
   bool parsed = false;
   if (is_attach()) {
@@ -407,6 +405,11 @@ int PerfettoCmd::Main(int argc, char** argv) {
       PERFETTO_ELOG("Cannot specify triggers to activate with --attach");
       return 1;
     }
+  } else if (!triggers_to_activate.empty()) {
+    if (!trace_config_raw.empty() || has_config_options) {
+      PERFETTO_ELOG("Cannot specify a trace config with --activate-trigger");
+      return 1;
+    }
   } else if (has_config_options) {
     if (!trace_config_raw.empty()) {
       PERFETTO_ELOG(
@@ -416,11 +419,10 @@ int PerfettoCmd::Main(int argc, char** argv) {
     }
     parsed = CreateConfigFromOptions(config_options, &trace_config_proto);
   } else {
-    if (trace_config_raw.empty() && triggers_to_activate.empty()) {
+    if (trace_config_raw.empty()) {
       PERFETTO_ELOG("The TraceConfig is empty");
       return 1;
     }
-
     PERFETTO_DLOG("Parsing TraceConfig, %zu bytes", trace_config_raw.size());
     if (parse_as_pbtxt) {
       parsed = ParseTraceConfigPbtxt(config_file_name, trace_config_raw,
@@ -435,7 +437,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
     *trace_config_proto.mutable_statsd_metadata() = std::move(statsd_metadata);
     trace_config_->FromProto(trace_config_proto);
     trace_config_raw.clear();
-  } else if (!is_attach()) {
+  } else if (!is_attach() && triggers_to_activate.empty()) {
     PERFETTO_ELOG("The trace config is invalid, bailing out.");
     return 1;
   }
@@ -498,12 +500,6 @@ int PerfettoCmd::Main(int argc, char** argv) {
   }
 
   if (!trace_config_->activate_triggers().empty()) {
-    if (!triggers_to_activate.empty()) {
-      PERFETTO_ELOG(
-          "--activate-trigger and trace config both trying to activate "
-          "triggers. Should only use --activate-trigger");
-      return 1;
-    }
     for (const auto& trigger : trace_config_->activate_triggers()) {
       triggers_to_activate.push_back(trigger);
     }
@@ -513,14 +509,6 @@ int PerfettoCmd::Main(int argc, char** argv) {
   // connect as a consumer or run the trace. So bail out after processing all
   // the options.
   if (!triggers_to_activate.empty()) {
-    if (!trace_config_->activate_triggers().empty()) {
-      PERFETTO_ILOG(
-          "Using triggers from trace config. This is deprecated post Q.");
-    } else if (has_config_options || !trace_config_raw.empty()) {
-      PERFETTO_ELOG(
-          "--activate-trigger and trace config cannot be used together.");
-      return 1;
-    }
     bool success = false;
     auto producer =
         ActivateTriggers(triggers_to_activate, &task_runner_, &success);
