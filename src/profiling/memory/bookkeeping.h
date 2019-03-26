@@ -248,7 +248,7 @@ class HeapTracker {
                     uint64_t sequence_number);
   void Dump(
       std::function<void(protos::pbzero::ProfilePacket::ProcessHeapSamples*)>
-          new_heapsamples,
+          fill_process_header,
       DumpState* dump_state);
   void RecordFree(uint64_t address, uint64_t sequence_number) {
     RecordOperation(sequence_number, address);

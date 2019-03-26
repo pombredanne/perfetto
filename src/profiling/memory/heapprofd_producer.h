@@ -137,7 +137,6 @@ class HeapprofdProducer : public Producer, public UnwindingWorker::Delegate {
 
   // functionality specific to mode_ == kChild
   void TerminateProcess(int exit_status);
-  bool SourceMatchesTarget(const HeapprofdConfig& cfg);
 
   // Valid only if mode_ == kChild. Adopts the (connected) sockets inherited
   // from the target process, invoking the on-connection callback.
@@ -171,9 +170,8 @@ class HeapprofdProducer : public Producer, public UnwindingWorker::Delegate {
 
   bool IsPidProfiled(pid_t);
   DataSource* GetDataSourceForProcess(const Process& proc);
-  bool DataSourceTargetsProcess(HeapprofdProducer::DataSource& ds,
-                                const Process& proc);
-  void RejectOtherDataSources(DataSource* active_ds, const Process& proc);
+  bool ConfigTargetsProcess(const HeapprofdConfig& cfg, const Process& proc);
+  void RecordOtherSourcesAsRejected(DataSource* active_ds, const Process& proc);
 
   std::map<DataSourceInstanceID, DataSource> data_sources_;
   std::map<FlushRequestID, size_t> flushes_in_progress_;
@@ -190,8 +188,7 @@ class HeapprofdProducer : public Producer, public UnwindingWorker::Delegate {
   SystemProperties properties_;
 
   // state specific to mode_ == kChild
-  pid_t target_pid_ = base::kInvalidPid;
-  std::string target_cmdline_;
+  Process target_process_{base::kInvalidPid, ""};
   // This is a valid FD between SetTargetProcess and AdoptTargetProcessSocket
   // only.
   base::ScopedFile inherited_fd_;

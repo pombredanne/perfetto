@@ -70,7 +70,6 @@ HeapprofdProducer::HeapprofdProducer(HeapprofdMode mode,
     : mode_(mode),
       task_runner_(task_runner),
       unwinding_workers_(MakeUnwindingWorkers(this, kUnwinderThreads)),
-      target_pid_(base::kInvalidPid),
       socket_delegate_(this),
       weak_factory_(this) {
   if (mode == HeapprofdMode::kCentral) {
@@ -89,36 +88,18 @@ HeapprofdProducer::~HeapprofdProducer() {
 void HeapprofdProducer::SetTargetProcess(pid_t target_pid,
                                          std::string target_cmdline,
                                          base::ScopedFile inherited_socket) {
-  target_pid_ = target_pid;
-  target_cmdline_ = target_cmdline;
+  target_process_.pid = target_pid;
+  target_process_.cmdline = target_cmdline;
   inherited_fd_ = std::move(inherited_socket);
-}
-
-bool HeapprofdProducer::SourceMatchesTarget(const HeapprofdConfig& cfg) {
-  if (cfg.all())
-    return true;
-  if (target_pid_ != base::kInvalidPid &&
-      std::find(cfg.pid().cbegin(), cfg.pid().cend(),
-                static_cast<uint64_t>(target_pid_)) != cfg.pid().cend()) {
-    return true;
-  }
-  if (!target_cmdline_.empty() &&
-      std::find(cfg.process_cmdline().cbegin(), cfg.process_cmdline().cend(),
-                target_cmdline_) != cfg.process_cmdline().cend()) {
-    return true;
-  }
-
-  return false;
 }
 
 void HeapprofdProducer::AdoptTargetProcessSocket() {
   PERFETTO_DCHECK(mode_ == HeapprofdMode::kChild);
-  Process process{target_pid_, target_cmdline_};
   auto socket = base::UnixSocket::AdoptConnected(
       std::move(inherited_fd_), &socket_delegate_, task_runner_,
       base::SockType::kStream);
 
-  HandleClientConnection(std::move(socket), std::move(process));
+  HandleClientConnection(std::move(socket), target_process_);
 }
 
 // TODO(fmayer): Delete once we have generic reconnect logic.
@@ -187,7 +168,7 @@ void HeapprofdProducer::SetupDataSource(DataSourceInstanceID id,
   // Child mode is only interested in the first data source matching the
   // already-connected process.
   if (mode_ == HeapprofdMode::kChild) {
-    if (!SourceMatchesTarget(heapprofd_config)) {
+    if (!ConfigTargetsProcess(heapprofd_config, target_process_)) {
       PERFETTO_DLOG("Child mode skipping setup of unrelated data source.");
       return;
     }
@@ -201,7 +182,7 @@ void HeapprofdProducer::SetupDataSource(DataSourceInstanceID id,
       auto trace_packet = trace_writer->NewTracePacket();
       auto profile_packet = trace_packet->set_profile_packet();
       auto process_dump = profile_packet->add_process_dumps();
-      process_dump->set_pid(static_cast<uint64_t>(target_pid_));
+      process_dump->set_pid(static_cast<uint64_t>(target_process_.pid));
       process_dump->set_rejected_concurrent(true);
       trace_packet->Finalize();
       trace_writer->Flush();
@@ -282,11 +263,13 @@ void HeapprofdProducer::StartDataSource(DataSourceInstanceID id,
     if (!heapprofd_config.process_cmdline().empty())
       FindPidsForCmdlines(heapprofd_config.process_cmdline(), &pids);
 
-    for (pid_t pid : pids) {
+    for (auto pid_it = pids.cbegin(); pid_it != pids.cend();) {
+      pid_t pid = *pid_it;
       if (IsPidProfiled(pid)) {
         PERFETTO_LOG("Rejecting concurrent session for %" PRIdMAX,
                      static_cast<intmax_t>(pid));
         data_source.rejected_pids.emplace(pid);
+        pid_it = pids.erase(pid_it);
         continue;
       }
 
@@ -294,6 +277,7 @@ void HeapprofdProducer::StartDataSource(DataSourceInstanceID id,
       if (kill(pid, kHeapprofdSignal) != 0) {
         PERFETTO_DPLOG("kill");
       }
+      ++pid_it;
     }
     data_source.signaled_pids = std::move(pids);
   }
@@ -594,19 +578,18 @@ void HeapprofdProducer::SocketDelegate::OnDataAvailable(
   }
 }
 
-bool HeapprofdProducer::DataSourceTargetsProcess(
-    HeapprofdProducer::DataSource& ds,
-    const Process& proc) {
-  if (ds.config.all())
+bool HeapprofdProducer::ConfigTargetsProcess(const HeapprofdConfig& cfg,
+                                             const Process& proc) {
+  if (cfg.all())
     return true;
 
-  const auto& pids = ds.config.pid();
+  const auto& pids = cfg.pid();
   if (std::find(pids.cbegin(), pids.cend(), static_cast<uint64_t>(proc.pid)) !=
       pids.cend()) {
     return true;
   }
 
-  const auto& cmdlines = ds.config.process_cmdline();
+  const auto& cmdlines = cfg.process_cmdline();
   if (std::find(cmdlines.cbegin(), cmdlines.cend(), proc.cmdline) !=
       cmdlines.cend()) {
     return true;
@@ -619,17 +602,17 @@ HeapprofdProducer::DataSource* HeapprofdProducer::GetDataSourceForProcess(
     const Process& proc) {
   for (auto& ds_id_and_datasource : data_sources_) {
     DataSource& ds = ds_id_and_datasource.second;
-    if (DataSourceTargetsProcess(ds, proc))
+    if (ConfigTargetsProcess(ds.config, proc))
       return &ds;
   }
   return nullptr;
 }
 
-void HeapprofdProducer::RejectOtherDataSources(DataSource* active_ds,
-                                               const Process& proc) {
+void HeapprofdProducer::RecordOtherSourcesAsRejected(DataSource* active_ds,
+                                                     const Process& proc) {
   for (auto& ds_id_and_datasource : data_sources_) {
     DataSource& ds = ds_id_and_datasource.second;
-    if (&ds != active_ds && DataSourceTargetsProcess(ds, proc))
+    if (&ds != active_ds && ConfigTargetsProcess(ds.config, proc))
       ds.rejected_pids.emplace(proc.pid);
   }
 }
@@ -642,7 +625,7 @@ void HeapprofdProducer::HandleClientConnection(
     PERFETTO_LOG("No data source found.");
     return;
   }
-  RejectOtherDataSources(data_source, process);
+  RecordOtherSourcesAsRejected(data_source, process);
 
   auto shmem = SharedRingBuffer::Create(kShmemSize);
   if (!shmem || !shmem->is_valid()) {
