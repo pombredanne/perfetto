@@ -28,6 +28,8 @@ namespace perfetto {
 
 class DataSourceConfig;
 
+// This is a producer that only sends the provided |triggers| to the service. It
+// will never register any data sources.
 class ActivateTriggersProducer : public Producer {
  public:
   ActivateTriggersProducer(bool* success,
@@ -55,6 +57,9 @@ class ActivateTriggersProducer : public Producer {
   std::unique_ptr<TracingService::ProducerEndpoint> producer_endpoint_;
 };
 
+// Creates a ActivateTriggersProducer, which once the async connections call is
+// complete will set |success| to true. This function does not block. You must
+// wait on |task_runner->Run()| to safely access |success|.
 std::unique_ptr<ActivateTriggersProducer> ActivateTriggers(
     const std::vector<std::string>& triggers,
     PlatformTaskRunner* task_runner,

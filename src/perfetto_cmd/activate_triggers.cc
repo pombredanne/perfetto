@@ -58,37 +58,31 @@ void ActivateTriggersProducer::OnDisconnect() {
 }
 
 void ActivateTriggersProducer::OnTracingSetup() {
-  PERFETTO_FATAL("Attempted to OnTracingSetup() on commandline producer");
+  PERFETTO_DFATAL("Attempted to OnTracingSetup() on commandline producer");
 }
 void ActivateTriggersProducer::SetupDataSource(DataSourceInstanceID,
                                                const DataSourceConfig&) {
-  PERFETTO_FATAL("Attempted to SetupDataSource() on commandline producer");
+  PERFETTO_DFATAL("Attempted to SetupDataSource() on commandline producer");
 }
 void ActivateTriggersProducer::StartDataSource(DataSourceInstanceID,
                                                const DataSourceConfig&) {
-  PERFETTO_FATAL("Attempted to StartDataSource() on commandline producer");
+  PERFETTO_DFATAL("Attempted to StartDataSource() on commandline producer");
 }
 void ActivateTriggersProducer::StopDataSource(DataSourceInstanceID) {
-  PERFETTO_FATAL("Attempted to StopDataSource() on commandline producer");
+  PERFETTO_DFATAL("Attempted to StopDataSource() on commandline producer");
 }
 void ActivateTriggersProducer::Flush(FlushRequestID,
                                      const DataSourceInstanceID*,
                                      size_t) {
-  PERFETTO_FATAL("Attempted to Flush() on commandline producer");
+  PERFETTO_DFATAL("Attempted to Flush() on commandline producer");
 }
 
 std::unique_ptr<ActivateTriggersProducer> ActivateTriggers(
     const std::vector<std::string>& triggers,
     PlatformTaskRunner* task_runner,
     bool* success) {
-  if (triggers.empty()) {
-    PERFETTO_ELOG("No triggers were provided for ActivateTriggers().");
-    return nullptr;
-  }
-  if (!task_runner) {
-    PERFETTO_ELOG("No provided task runner.");
-    return nullptr;
-  }
+  PERFETTO_DCHECK(!triggers.empty());
+  PERFETTO_DCHECK(task_runner);
   return std::unique_ptr<ActivateTriggersProducer>(
       new ActivateTriggersProducer(success, task_runner, &triggers));
 }
