@@ -168,7 +168,6 @@ SharedRingBuffer::Buffer SharedRingBuffer::BeginWrite(
 
   base::Optional<PointerPositions> opt_pos = GetPointerPositions(spinlock);
   if (!opt_pos) {
-    meta_->stats.num_writes_corrupt++;
     errno = EBADF;
     return result;
   }
@@ -177,8 +176,8 @@ SharedRingBuffer::Buffer SharedRingBuffer::BeginWrite(
   const uint64_t size_with_header =
       base::AlignUp<kAlignment>(size + kHeaderSize);
   if (size_with_header > write_avail(pos)) {
-    meta_->stats.num_writes_overflow++;
     errno = EAGAIN;
+    meta_->num_writes_failed.fetch_add(1, std::memory_order_relaxed);
     return result;
   }
 
@@ -187,8 +186,8 @@ SharedRingBuffer::Buffer SharedRingBuffer::BeginWrite(
   result.size = size;
   result.data = wr_ptr + kHeaderSize;
   meta_->write_pos += size_with_header;
-  meta_->stats.bytes_written += size;
-  meta_->stats.num_writes_succeeded++;
+  meta_->bytes_written.fetch_add(size, std::memory_order_relaxed);
+  meta_->num_writes_succeeded.fetch_add(1, std::memory_order_relaxed);
   // By making this a release store, we can save grabbing the spinlock in
   // EndWrite.
   reinterpret_cast<std::atomic<uint32_t>*>(wr_ptr)->store(
@@ -209,30 +208,21 @@ SharedRingBuffer::Buffer SharedRingBuffer::BeginRead() {
   ScopedSpinlock spinlock(&meta_->spinlock, ScopedSpinlock::Mode::Blocking);
 
   base::Optional<PointerPositions> opt_pos = GetPointerPositions(spinlock);
-  if (!opt_pos) {
-    meta_->stats.num_reads_corrupt++;
-    errno = EBADF;
+  if (!opt_pos)
     return Buffer();
-  }
   auto pos = opt_pos.value();
 
   size_t avail_read = read_avail(pos);
 
-  if (avail_read < kHeaderSize) {
-    meta_->stats.num_reads_nodata++;
-    errno = EAGAIN;
+  if (avail_read < kHeaderSize)
     return Buffer();  // No data
-  }
 
   uint8_t* rd_ptr = at(pos.read_pos);
   PERFETTO_DCHECK(reinterpret_cast<uintptr_t>(rd_ptr) % kAlignment == 0);
   const size_t size = reinterpret_cast<std::atomic<uint32_t>*>(rd_ptr)->load(
       std::memory_order_acquire);
-  if (size == 0) {
-    meta_->stats.num_reads_nodata++;
-    errno = EAGAIN;
+  if (size == 0)
     return Buffer();
-  }
   const size_t size_with_header = base::AlignUp<kAlignment>(size + kHeaderSize);
 
   if (size_with_header > avail_read) {
@@ -240,8 +230,7 @@ SharedRingBuffer::Buffer SharedRingBuffer::BeginRead() {
         "Corrupted header detected, size=%zu"
         ", read_avail=%zu, rd=%" PRIu64 ", wr=%" PRIu64,
         size, avail_read, pos.read_pos, pos.write_pos);
-    meta_->stats.num_reads_corrupt++;
-    errno = EBADF;
+    meta_->num_reads_failed.fetch_add(1, std::memory_order_relaxed);
     return Buffer();
   }
 
@@ -256,7 +245,6 @@ void SharedRingBuffer::EndRead(Buffer buf) {
   ScopedSpinlock spinlock(&meta_->spinlock, ScopedSpinlock::Mode::Blocking);
   size_t size_with_header = base::AlignUp<kAlignment>(buf.size + kHeaderSize);
   meta_->read_pos += size_with_header;
-  meta_->stats.num_reads_succeeded++;
 }
 
 bool SharedRingBuffer::IsCorrupt(const PointerPositions& pos) {
