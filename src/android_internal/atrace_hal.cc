@@ -19,7 +19,6 @@
 #include <android/hardware/atrace/1.0/IAtraceDevice.h>
 #include <iostream>
 
-
 namespace perfetto {
 namespace android_internal {
 
@@ -47,25 +46,23 @@ bool GetCategories(TracingVendorCategory* categories, size_t* size_of_arr) {
   if (!GetService())
     return false;
 
-  auto category_cb = [categories, size_of_arr, &in_array_size](
-                      hidl_vec<TracingCategory> r) {
-      *size_of_arr = std::min(in_array_size, r.size());
-      for (int i = 0; i < *size_of_arr; ++i) {
-        const TracingCategory& cat = r[i];
-        TracingVendorCategory& result = categories[i];
-        strncpy(result.name, cat.name.c_str(),
-                sizeof(result.name));
-        strncpy(result.description, cat.description.c_str(),
-                sizeof(result.description));
-        result.name[sizeof(result.name) - 1] = '\0';
-        result.description[sizeof(result.description) - 1] = '\0';
-      }
+  auto category_cb = [categories, size_of_arr,
+                      &in_array_size](hidl_vec<TracingCategory> r) {
+    *size_of_arr = std::min(in_array_size, r.size());
+    for (int i = 0; i < *size_of_arr; ++i) {
+      const TracingCategory& cat = r[i];
+      TracingVendorCategory& result = categories[i];
+      strncpy(result.name, cat.name.c_str(), sizeof(result.name));
+      strncpy(result.description, cat.description.c_str(),
+              sizeof(result.description));
+      result.name[sizeof(result.name) - 1] = '\0';
+      result.description[sizeof(result.description) - 1] = '\0';
+    }
   };
 
   g_atraceHal->listCategories(category_cb);
   return true;
 }
-
 
 }  // namespace android_internal
 }  // namespace perfetto

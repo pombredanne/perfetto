@@ -19,15 +19,13 @@
 
 #include "src/android_internal/atrace_hal.h"
 
-
 namespace perfetto {
 
 namespace {
-  constexpr size_t kMaxNumCategories = 64;
+constexpr size_t kMaxNumCategories = 64;
 }
 
 struct AtraceHalWrapper::DynamicLibLoader {
-
   using ScopedDlHandle = base::ScopedResource<void*, dlclose, nullptr>;
 
   DynamicLibLoader() {
@@ -57,13 +55,10 @@ struct AtraceHalWrapper::DynamicLibLoader {
     return categories;
   }
 
-  private:
-    decltype(&android_internal::GetCategories) get_categories_ = nullptr;
-
-    ScopedDlHandle handle_;
-
+ private:
+  decltype(&android_internal::GetCategories) get_categories_ = nullptr;
+  ScopedDlHandle handle_;
 };
-
 
 AtraceHalWrapper::AtraceHalWrapper() {
   lib_.reset(new DynamicLibLoader());
@@ -72,17 +67,16 @@ AtraceHalWrapper::AtraceHalWrapper() {
 AtraceHalWrapper::~AtraceHalWrapper() = default;
 
 std::vector<AtraceHalWrapper::TracingVendorCategory>
-  AtraceHalWrapper::GetAvailableCategories() {
-    auto details =  lib_->GetCategories();
-    std::vector<AtraceHalWrapper::TracingVendorCategory> result;
-    for (size_t i = 0; i < details.size(); i++) {
-      AtraceHalWrapper::TracingVendorCategory cat;
-      cat.name = details[i].name;
-      cat.description = details[i].description;
-      result.emplace_back(cat);
-    }
-    return result;
+AtraceHalWrapper::GetAvailableCategories() {
+  auto details = lib_->GetCategories();
+  std::vector<AtraceHalWrapper::TracingVendorCategory> result;
+  for (size_t i = 0; i < details.size(); i++) {
+    AtraceHalWrapper::TracingVendorCategory cat;
+    cat.name = details[i].name;
+    cat.description = details[i].description;
+    result.emplace_back(cat);
+  }
+  return result;
 }
 
-}
-
+}  // namespace perfetto

@@ -35,7 +35,6 @@ struct TracingVendorCategory {
 
   // A longer description of the category.
   char description[256];
-
 };
 
 extern "C" {
