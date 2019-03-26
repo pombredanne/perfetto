@@ -353,7 +353,8 @@ bool HeapprofdProducer::Dump(DataSourceInstanceID id,
   }
   DataSource& data_source = it->second;
 
-  DumpState dump_state(data_source.trace_writer.get(), &next_index_);
+  DumpState dump_state(data_source.trace_writer.get(),
+                       &data_source.next_index_);
 
   for (pid_t rejected_pid : data_source.rejected_pids) {
     ProfilePacket::ProcessHeapSamples* proto =
@@ -628,10 +629,7 @@ void HeapprofdProducer::RejectOtherDataSources(DataSource* active_ds,
                                                const Process& proc) {
   for (auto& ds_id_and_datasource : data_sources_) {
     DataSource& ds = ds_id_and_datasource.second;
-    if (&ds == active_ds)
-      continue;
-
-    if (DataSourceTargetsProcess(ds, proc))
+    if (&ds != active_ds && DataSourceTargetsProcess(ds, proc))
       ds.rejected_pids.emplace(proc.pid);
   }
 }

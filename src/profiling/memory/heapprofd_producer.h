@@ -158,6 +158,7 @@ class HeapprofdProducer : public Producer, public UnwindingWorker::Delegate {
     std::set<pid_t> signaled_pids;
     std::set<pid_t> rejected_pids;
     std::map<pid_t, ProcessState> process_states;
+    uint64_t next_index_ = 0;
   };
 
   struct PendingProcess {
@@ -182,10 +183,6 @@ class HeapprofdProducer : public Producer, public UnwindingWorker::Delegate {
   std::unique_ptr<TracingService::ProducerEndpoint> endpoint_;
 
   GlobalCallstackTrie callsites_;
-  // Sequence number for ProfilePackets, so the consumer can assert that none
-  // of them were dropped.
-  uint64_t next_index_ = 0;
-
   std::vector<UnwindingWorker> unwinding_workers_;
 
   // state specific to mode_ == kCentral
