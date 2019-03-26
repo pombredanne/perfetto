@@ -73,7 +73,7 @@ message ProfilePacket {
     optional uint64 pid = 1;
 
     // This process was profiled from startup.
-    // If false, this process was singaled at runtime.
+    // If false, this process was already running when profiling started.
     optional bool from_startup = 3;
 
     // This process was not profiled because a concurrent session was active.

@@ -198,7 +198,9 @@ class HeapprofdEndToEnd : public ::testing::Test {
     return helper;
   }
 
-  void ValidateMultiple(TestHelper* helper, uint64_t pid, uint64_t alloc_size) {
+  void ValidateSampleSizes(TestHelper* helper,
+                           uint64_t pid,
+                           uint64_t alloc_size) {
     const auto& packets = helper->trace();
     for (const protos::TracePacket& packet : packets) {
       for (const auto& dump : packet.profile_packet().process_dumps()) {
@@ -310,7 +312,7 @@ class HeapprofdEndToEnd : public ::testing::Test {
     auto helper = Trace(trace_config);
     ValidateHasSamples(helper.get(), static_cast<uint64_t>(pid));
     ValidateOnlyPID(helper.get(), static_cast<uint64_t>(pid));
-    ValidateMultiple(helper.get(), static_cast<uint64_t>(pid), kAllocSize);
+    ValidateSampleSizes(helper.get(), static_cast<uint64_t>(pid), kAllocSize);
 
     PERFETTO_CHECK(kill(pid, SIGKILL) == 0);
     PERFETTO_CHECK(waitpid(pid, nullptr, 0) == pid);
@@ -338,7 +340,7 @@ class HeapprofdEndToEnd : public ::testing::Test {
     auto helper = Trace(trace_config);
     ValidateHasSamples(helper.get(), static_cast<uint64_t>(pid));
     ValidateOnlyPID(helper.get(), static_cast<uint64_t>(pid));
-    ValidateMultiple(helper.get(), static_cast<uint64_t>(pid), kAllocSize);
+    ValidateSampleSizes(helper.get(), static_cast<uint64_t>(pid), kAllocSize);
 
     PERFETTO_CHECK(kill(pid, SIGKILL) == 0);
     PERFETTO_CHECK(waitpid(pid, nullptr, 0) == pid);
@@ -479,8 +481,8 @@ class HeapprofdEndToEnd : public ::testing::Test {
     auto helper = Trace(trace_config);
     ValidateHasSamples(helper.get(), static_cast<uint64_t>(pid));
     ValidateOnlyPID(helper.get(), static_cast<uint64_t>(pid));
-    ValidateMultiple(helper.get(), static_cast<uint64_t>(pid),
-                     kFirstIterationBytes);
+    ValidateSampleSizes(helper.get(), static_cast<uint64_t>(pid),
+                        kFirstIterationBytes);
 
     signal_pipe.wr.reset();
     char buf[1];
@@ -496,8 +498,8 @@ class HeapprofdEndToEnd : public ::testing::Test {
     helper = Trace(trace_config);
     ValidateHasSamples(helper.get(), static_cast<uint64_t>(pid));
     ValidateOnlyPID(helper.get(), static_cast<uint64_t>(pid));
-    ValidateMultiple(helper.get(), static_cast<uint64_t>(pid),
-                     kSecondIterationBytes);
+    ValidateSampleSizes(helper.get(), static_cast<uint64_t>(pid),
+                        kSecondIterationBytes);
 
     PERFETTO_CHECK(kill(pid, SIGKILL) == 0);
     PERFETTO_CHECK(waitpid(pid, nullptr, 0) == pid);
@@ -536,7 +538,7 @@ class HeapprofdEndToEnd : public ::testing::Test {
     helper->WaitForReadData();
     ValidateHasSamples(helper.get(), static_cast<uint64_t>(pid));
     ValidateOnlyPID(helper.get(), static_cast<uint64_t>(pid));
-    ValidateMultiple(helper.get(), static_cast<uint64_t>(pid), kAllocSize);
+    ValidateSampleSizes(helper.get(), static_cast<uint64_t>(pid), kAllocSize);
     ValidateRejectedConcurrent(helper_concurrent.get(),
                                static_cast<uint64_t>(pid), false);
 

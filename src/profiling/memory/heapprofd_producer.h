@@ -145,7 +145,6 @@ class HeapprofdProducer : public Producer, public UnwindingWorker::Delegate {
 
   struct ProcessState {
     ProcessState(GlobalCallstackTrie* callsites) : heap_tracker(callsites) {}
-    uint64_t start_timestamp = 0;
     uint64_t unwinding_errors = 0;
     HeapTracker heap_tracker;
   };
@@ -171,6 +170,9 @@ class HeapprofdProducer : public Producer, public UnwindingWorker::Delegate {
 
   bool IsPidProfiled(pid_t);
   DataSource* GetDataSourceForProcess(const Process& proc);
+  bool DataSourceTargetsProcess(HeapprofdProducer::DataSource& ds,
+                                const Process& proc);
+  void RejectOtherDataSources(DataSource* active_ds, const Process& proc);
 
   std::map<DataSourceInstanceID, DataSource> data_sources_;
   std::map<FlushRequestID, size_t> flushes_in_progress_;

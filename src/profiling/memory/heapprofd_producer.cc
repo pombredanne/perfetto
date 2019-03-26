@@ -177,6 +177,13 @@ void HeapprofdProducer::SetupDataSource(DataSourceInstanceID id,
     return;
   }
 
+  auto it = data_sources_.find(id);
+  if (it != data_sources_.end()) {
+    PERFETTO_DFATAL("Received duplicated data source instance id: %" PRIu64,
+                    id);
+    return;
+  }
+
   // Child mode is only interested in the first data source matching the
   // already-connected process.
   if (mode_ == HeapprofdMode::kChild) {
@@ -200,13 +207,6 @@ void HeapprofdProducer::SetupDataSource(DataSourceInstanceID id,
       trace_writer->Flush();
       return;
     }
-  }
-
-  auto it = data_sources_.find(id);
-  if (it != data_sources_.end()) {
-    PERFETTO_DFATAL("Received duplicated data source instance id: %" PRIu64,
-                    id);
-    return;
   }
 
   DataSource data_source;
@@ -251,18 +251,14 @@ void HeapprofdProducer::StartDataSource(DataSourceInstanceID id,
   PERFETTO_DLOG("Start DataSource");
   const HeapprofdConfig& heapprofd_config = cfg.heapprofd_config();
 
-  // Child mode is only interested in data sources matching the
-  // already-connected process.
-  if (mode_ == HeapprofdMode::kChild &&
-      !SourceMatchesTarget(heapprofd_config)) {
-    PERFETTO_DLOG("Child mode skipping start of unrelated data source.");
-    return;
-  }
-
   auto it = data_sources_.find(id);
   if (it == data_sources_.end()) {
-    PERFETTO_DFATAL("Received invalid data source instance to start: %" PRIu64,
-                    id);
+    // This is expected in child heapprofd, where we reject uninteresting data
+    // sources in SetupDataSource.
+    if (mode_ == HeapprofdMode::kCentral) {
+      PERFETTO_DFATAL(
+          "Received invalid data source instance to start: %" PRIu64, id);
+    }
     return;
   }
   DataSource& data_source = it->second;
@@ -288,7 +284,8 @@ void HeapprofdProducer::StartDataSource(DataSourceInstanceID id,
 
     for (pid_t pid : pids) {
       if (IsPidProfiled(pid)) {
-        PERFETTO_LOG("Rejecting concurrent session for %d", pid);
+        PERFETTO_LOG("Rejecting concurrent session for %" PRIdMAX,
+                     static_cast<intmax_t>(pid));
         data_source.rejected_pids.emplace(pid);
         continue;
       }
@@ -596,36 +593,47 @@ void HeapprofdProducer::SocketDelegate::OnDataAvailable(
   }
 }
 
+bool HeapprofdProducer::DataSourceTargetsProcess(
+    HeapprofdProducer::DataSource& ds,
+    const Process& proc) {
+  if (ds.config.all())
+    return true;
+
+  const auto& pids = ds.config.pid();
+  if (std::find(pids.cbegin(), pids.cend(), static_cast<uint64_t>(proc.pid)) !=
+      pids.cend()) {
+    return true;
+  }
+
+  const auto& cmdlines = ds.config.process_cmdline();
+  if (std::find(cmdlines.cbegin(), cmdlines.cend(), proc.cmdline) !=
+      cmdlines.cend()) {
+    return true;
+  }
+
+  return false;
+}
+
 HeapprofdProducer::DataSource* HeapprofdProducer::GetDataSourceForProcess(
     const Process& proc) {
-  DataSource* match = nullptr;
   for (auto& ds_id_and_datasource : data_sources_) {
     DataSource& ds = ds_id_and_datasource.second;
-    if (ds.config.all()) {
-      if (!match)
-        match = &ds;
-      else
-        ds.rejected_pids.emplace(proc.pid);
-    }
-
-    for (uint64_t pid : ds.config.pid()) {
-      if (static_cast<pid_t>(pid) == proc.pid) {
-        if (!match)
-          match = &ds;
-        else
-          ds.rejected_pids.emplace(proc.pid);
-      }
-    }
-    for (const std::string& cmdline : ds.config.process_cmdline()) {
-      if (cmdline == proc.cmdline) {
-        if (!match)
-          match = &ds;
-        else
-          ds.rejected_pids.emplace(proc.pid);
-      }
-    }
+    if (DataSourceTargetsProcess(ds, proc))
+      return &ds;
   }
-  return match;
+  return nullptr;
+}
+
+void HeapprofdProducer::RejectOtherDataSources(DataSource* active_ds,
+                                               const Process& proc) {
+  for (auto& ds_id_and_datasource : data_sources_) {
+    DataSource& ds = ds_id_and_datasource.second;
+    if (&ds == active_ds)
+      continue;
+
+    if (DataSourceTargetsProcess(ds, proc))
+      ds.rejected_pids.emplace(proc.pid);
+  }
 }
 
 void HeapprofdProducer::HandleClientConnection(
@@ -636,6 +644,7 @@ void HeapprofdProducer::HandleClientConnection(
     PERFETTO_LOG("No data source found.");
     return;
   }
+  RejectOtherDataSources(data_source, process);
 
   auto shmem = SharedRingBuffer::Create(kShmemSize);
   if (!shmem || !shmem->is_valid()) {
