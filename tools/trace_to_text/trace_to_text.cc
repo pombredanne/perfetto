@@ -40,8 +40,8 @@ using google::protobuf::io::OstreamOutputStream;
 using google::protobuf::io::ZeroCopyOutputStream;
 
 inline void WriteToZeroCopyOutput(ZeroCopyOutputStream* output,
-                                  const char* str) {
-  size_t length = strlen(str);
+                                  const char* str,
+                                  size_t length) {
   if (length == 0)
     return;
 
@@ -57,6 +57,9 @@ inline void WriteToZeroCopyOutput(ZeroCopyOutputStream* output,
   }
   output->BackUp(size - static_cast<int>(bytes_to_copy));
 }
+
+constexpr char kPacketPrefix[] = "packet {\n";
+constexpr char kPacketSuffix[] = "}\n";
 
 }  // namespace
 
@@ -82,9 +85,11 @@ int TraceToText(std::istream* input, std::ostream* output) {
           PERFETTO_ELOG("Skipping invalid packet");
           return;
         }
-        WriteToZeroCopyOutput(zero_copy_output_ptr, "packet {\n");
+        WriteToZeroCopyOutput(zero_copy_output_ptr, kPacketPrefix,
+                              sizeof(kPacketPrefix) - 1);
         TextFormat::Print(*msg, zero_copy_output_ptr);
-        WriteToZeroCopyOutput(zero_copy_output_ptr, "}\n");
+        WriteToZeroCopyOutput(zero_copy_output_ptr, kPacketSuffix,
+                              sizeof(kPacketSuffix) - 1);
       });
   return 0;
 }
