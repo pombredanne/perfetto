@@ -22,6 +22,7 @@
 #include <memory>
 #include <mutex>
 #include <set>
+#include <vector>
 
 #include "perfetto/base/gtest_prod_util.h"
 #include "perfetto/base/logging.h"
@@ -31,6 +32,7 @@
 #include "perfetto/tracing/core/basic_types.h"
 #include "perfetto/tracing/core/commit_data_request.h"
 #include "perfetto/tracing/core/data_source_descriptor.h"
+#include "perfetto/tracing/core/observable_events.h"
 #include "perfetto/tracing/core/shared_memory_abi.h"
 #include "perfetto/tracing/core/trace_config.h"
 #include "perfetto/tracing/core/trace_stats.h"
@@ -90,6 +92,7 @@ class TracingServiceImpl : public TracingService {
     void NotifyDataSourceStopped(DataSourceInstanceID) override;
     SharedMemory* shared_memory() const override;
     size_t shared_buffer_page_size_kb() const override;
+    void ActivateTriggers(const std::vector<std::string>&) override;
 
     void OnTracingSetup();
     void SetupDataSource(DataSourceInstanceID, const DataSourceConfig&);
@@ -174,21 +177,35 @@ class TracingServiceImpl : public TracingService {
     void Detach(const std::string& key) override;
     void Attach(const std::string& key) override;
     void GetTraceStats() override;
+    void ObserveEvents(uint32_t enabled_event_types) override;
 
-    // TODO(eseckler): Notify consumer about the state change if necessary.
+    // If |observe_data_source_instances == true|, will queue a task to notify
+    // the consumer about the state change.
     void OnDataSourceInstanceStateChange(const ProducerEndpointImpl&,
-                                         const DataSourceInstance&) {}
+                                         const DataSourceInstance&);
 
    private:
     friend class TracingServiceImpl;
     ConsumerEndpointImpl(const ConsumerEndpointImpl&) = delete;
     ConsumerEndpointImpl& operator=(const ConsumerEndpointImpl&) = delete;
 
+    // Returns a pointer to an ObservableEvents object that the caller can fill
+    // and schedules a task to send the ObservableEvents to the consumer.
+    ObservableEvents* AddObservableEvents();
+
     base::TaskRunner* const task_runner_;
     TracingServiceImpl* const service_;
     Consumer* const consumer_;
     uid_t const uid_;
     TracingSessionID tracing_session_id_ = 0;
+
+    // Whether the consumer is interested in DataSourceInstance state change
+    // events.
+    uint32_t enabled_observable_event_types_ = ObservableEventType::kNone;
+    // ObservableEvents that will be sent to the consumer. If set, a task to
+    // flush the events to the consumer has been queued.
+    std::unique_ptr<ObservableEvents> observable_events_;
+
     PERFETTO_THREAD_CHECKER(thread_checker_)
     base::WeakPtrFactory<ConsumerEndpointImpl> weak_ptr_factory_;  // Keep last.
   };
@@ -216,6 +233,7 @@ class TracingServiceImpl : public TracingService {
   void NotifyFlushDoneForProducer(ProducerID, FlushRequestID);
   void NotifyDataSourceStarted(ProducerID, const DataSourceInstanceID);
   void NotifyDataSourceStopped(ProducerID, const DataSourceInstanceID);
+  void ActivateTriggers(ProducerID, const std::vector<std::string>& triggers);
 
   // Called by ConsumerEndpointImpl.
   bool DetachConsumer(ConsumerEndpointImpl*, const std::string& key);
@@ -375,6 +393,13 @@ class TracingServiceImpl : public TracingService {
     // prevent that a consumer re-attaches to a session from a different uid.
     uid_t const consumer_uid;
 
+    // The list of triggers this session received while alive and the time they
+    // were received at. This is used to insert 'fake' packets back to the
+    // consumer so they can tell when some event happened. The order matches the
+    // order they were received.
+    std::vector<std::pair<uint64_t, TraceConfig::TriggerConfig::Trigger>>
+        received_triggers;
+
     // The trace config provided by the Consumer when calling
     // EnableTracing(), plus any updates performed by ChangeTraceConfig.
     TraceConfig config;
@@ -464,6 +489,7 @@ class TracingServiceImpl : public TracingService {
   void ScrapeSharedMemoryBuffers(TracingSession* tracing_session,
                                  ProducerEndpointImpl* producer);
   TraceBuffer* GetBufferByID(BufferID);
+  void OnStartTriggersTimeout(TracingSessionID tsid);
 
   base::TaskRunner* const task_runner_;
   std::unique_ptr<SharedMemory::Factory> shm_factory_;

@@ -68,7 +68,7 @@ export class TrackGroupPanel extends Panel<Attrs> {
             m.trust('&#x200E;')),
           m('.fold-button',
             {
-              onclick: (e:MouseEvent) => {
+              onclick: (e: MouseEvent) => {
                 globals.dispatch(Actions.toggleTrackGroupCollapsed({
                   trackGroupId: attrs.trackGroupId,
                 })),
@@ -77,7 +77,7 @@ export class TrackGroupPanel extends Panel<Attrs> {
             },
             m('i.material-icons',
               this.trackGroupState.collapsed ? 'expand_more' : 'expand_less'))),
-        m(TrackContent, {track: this.summaryTrack}), );
+        this.summaryTrack ? m(TrackContent, {track: this.summaryTrack}) : null);
   }
 
   oncreate(vnode: m.CVnodeDOM<Attrs>) {
@@ -108,19 +108,28 @@ export class TrackGroupPanel extends Panel<Attrs> {
         size.height);
 
     ctx.translate(this.shellWidth, 0);
-    this.summaryTrack.renderCanvas(ctx);
+    if (this.summaryTrack) {
+      this.summaryTrack.renderCanvas(ctx);
+    }
     ctx.restore();
 
     const localState = globals.frontendLocalState;
-    drawVerticalLineAtTime(
-        ctx,
-        localState.timeScale,
-        localState.hoveredTimestamp,
-        size.height,
-        `#333`,
-        1 /* width */
-        );
-
+    // Draw vertical line when hovering on the the notes panel.
+    if (localState.showNotePreview) {
+      drawVerticalLineAtTime(ctx,
+                            localState.timeScale,
+                            localState.hoveredTimestamp,
+                            size.height,
+                            `#aaa`);
+    }
+    // Draw vertical line when shift is pressed.
+    if (localState.showTimeSelectPreview) {
+      drawVerticalLineAtTime(ctx,
+                            localState.timeScale,
+                            localState.hoveredTimestamp,
+                            size.height,
+                            `rgb(52,69,150)`);
+    }
     if (globals.state.currentSelection !== null) {
       if (globals.state.currentSelection.kind === 'NOTE') {
         const note = globals.state.notes[globals.state.currentSelection.id];

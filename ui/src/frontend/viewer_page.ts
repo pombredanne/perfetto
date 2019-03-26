@@ -30,6 +30,7 @@ import {PanAndZoomHandler} from './pan_and_zoom_handler';
 import {Panel} from './panel';
 import {AnyAttrsVnode, PanelContainer} from './panel_container';
 import {SliceDetailsPanel} from './slice_panel';
+import {ThreadStatePanel} from './thread_state_panel';
 import {TimeAxisPanel} from './time_axis_panel';
 import {computeZoom} from './time_scale';
 import {TimeSelectionPanel} from './time_selection_panel';
@@ -292,6 +293,15 @@ class TraceViewer implements m.ClassComponent {
           detailsPanels.push(m(SliceDetailsPanel, {
             key: 'slice',
             utid: curSelection.utid,
+          }));
+          break;
+        case 'THREAD_STATE':
+          detailsPanels.push(m(ThreadStatePanel, {
+            key: 'thread_state',
+            ts: curSelection.ts,
+            dur: curSelection.dur,
+            utid: curSelection.utid,
+            state: curSelection.state
           }));
           break;
         default:

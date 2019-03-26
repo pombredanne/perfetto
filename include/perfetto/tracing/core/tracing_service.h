@@ -128,6 +128,10 @@ class PERFETTO_EXPORT TracingService {
     // if the data source registered setting the flag
     // DataSourceDescriptor.will_notify_on_stop.
     virtual void NotifyDataSourceStopped(DataSourceInstanceID) = 0;
+
+    // This informs the service to activate any of these triggers if any tracing
+    // session was waiting for them.
+    virtual void ActivateTriggers(const std::vector<std::string>&) = 0;
   };  // class ProducerEndpoint.
 
   // The API for the Consumer port of the Service.
@@ -188,6 +192,20 @@ class PERFETTO_EXPORT TracingService {
 
     // Will call OnTraceStats().
     virtual void GetTraceStats() = 0;
+
+    enum ObservableEventType : uint32_t {
+      kNone = 0,
+      kDataSourceInstances = 1 << 0
+    };
+
+    // Start or stop observing events of selected types. |enabled_event_types|
+    // specifies the types of events to observe in a bitmask (see
+    // ObservableEventType enum). To disable observing, pass
+    // ObservableEventType::kNone. Will call OnObservableEvents() repeatedly
+    // whenever an event of an enabled ObservableEventType occurs.
+    //
+    // TODO(eseckler): Extend this to support producers & data sources.
+    virtual void ObserveEvents(uint32_t enabled_event_types) = 0;
   };  // class ConsumerEndpoint.
 
   // Implemented in src/core/tracing_service_impl.cc .

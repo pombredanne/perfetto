@@ -22,7 +22,7 @@ import {
   LogEntries,
   LogEntriesKey
 } from '../common/logs';
-import {timeToTimecode} from '../common/time';
+import {formatTimestamp} from '../common/time';
 import {TimeSpan} from '../common/time';
 
 import {globals} from './globals';
@@ -63,6 +63,8 @@ export class LogPanel extends Panel<{}> {
         assertExists(dom.querySelector('.scrolling-container') as HTMLElement);
     this.scrollContainer.addEventListener(
         'scroll', this.onScroll.bind(this), {passive: true});
+    this.bounds = globals.trackDataStore.get(LogBoundsKey) as LogBounds;
+    this.entries = globals.trackDataStore.get(LogEntriesKey) as LogEntries;
     this.recomputeVisibleRowsAndUpdate();
   }
 
@@ -79,7 +81,6 @@ export class LogPanel extends Panel<{}> {
   }
 
   onRowOver(ts: number) {
-    console.log('onRowOver');
     globals.frontendLocalState.setHoveredTimestamp(ts);
   }
 
@@ -128,7 +129,7 @@ export class LogPanel extends Panel<{}> {
                 onmouseout: this.onRowOut.bind(this),
               },
               m('.cell',
-                timeToTimecode(ts / 1e9 - globals.state.traceTime.startSec)),
+                formatTimestamp(ts / 1e9 - globals.state.traceTime.startSec)),
               m('.cell', priorityLetter || '?'),
               m('.cell', tags[i]),
               m('.cell', messages[i])));
