@@ -47,8 +47,7 @@ bool ProcessStatsConfig::operator==(const ProcessStatsConfig& other) const {
          (scan_all_processes_on_start_ == other.scan_all_processes_on_start_) &&
          (record_thread_names_ == other.record_thread_names_) &&
          (proc_stats_poll_ms_ == other.proc_stats_poll_ms_) &&
-         (proc_stats_duplicate_cache_clear_ms_ ==
-          other.proc_stats_duplicate_cache_clear_ms_);
+         (proc_stats_cache_ttl_ms_ == other.proc_stats_cache_ttl_ms_);
 }
 #pragma GCC diagnostic pop
 
@@ -81,12 +80,11 @@ void ProcessStatsConfig::FromProto(
   proc_stats_poll_ms_ =
       static_cast<decltype(proc_stats_poll_ms_)>(proto.proc_stats_poll_ms());
 
-  static_assert(sizeof(proc_stats_duplicate_cache_clear_ms_) ==
-                    sizeof(proto.proc_stats_duplicate_cache_clear_ms()),
+  static_assert(sizeof(proc_stats_cache_ttl_ms_) ==
+                    sizeof(proto.proc_stats_cache_ttl_ms()),
                 "size mismatch");
-  proc_stats_duplicate_cache_clear_ms_ =
-      static_cast<decltype(proc_stats_duplicate_cache_clear_ms_)>(
-          proto.proc_stats_duplicate_cache_clear_ms());
+  proc_stats_cache_ttl_ms_ = static_cast<decltype(proc_stats_cache_ttl_ms_)>(
+      proto.proc_stats_cache_ttl_ms());
   unknown_fields_ = proto.unknown_fields();
 }
 
@@ -119,12 +117,12 @@ void ProcessStatsConfig::ToProto(
   proto->set_proc_stats_poll_ms(
       static_cast<decltype(proto->proc_stats_poll_ms())>(proc_stats_poll_ms_));
 
-  static_assert(sizeof(proc_stats_duplicate_cache_clear_ms_) ==
-                    sizeof(proto->proc_stats_duplicate_cache_clear_ms()),
+  static_assert(sizeof(proc_stats_cache_ttl_ms_) ==
+                    sizeof(proto->proc_stats_cache_ttl_ms()),
                 "size mismatch");
-  proto->set_proc_stats_duplicate_cache_clear_ms(
-      static_cast<decltype(proto->proc_stats_duplicate_cache_clear_ms())>(
-          proc_stats_duplicate_cache_clear_ms_));
+  proto->set_proc_stats_cache_ttl_ms(
+      static_cast<decltype(proto->proc_stats_cache_ttl_ms())>(
+          proc_stats_cache_ttl_ms_));
   *(proto->mutable_unknown_fields()) = unknown_fields_;
 }
 
