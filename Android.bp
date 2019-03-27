@@ -356,6 +356,7 @@ cc_library_shared {
     "src/android_internal/power_stats_hal.cc",
   ],
   shared_libs: [
+    "android.hardware.atrace@1.0",
     "android.hardware.health@2.0",
     "android.hardware.power.stats@1.0",
     "libbase",
@@ -3165,6 +3166,7 @@ cc_binary_host {
     "src/trace_processor/storage_columns.cc",
     "src/trace_processor/storage_schema.cc",
     "src/trace_processor/storage_table.cc",
+    "src/trace_processor/string_pool.cc",
     "src/trace_processor/string_table.cc",
     "src/trace_processor/table.cc",
     "src/trace_processor/thread_table.cc",
