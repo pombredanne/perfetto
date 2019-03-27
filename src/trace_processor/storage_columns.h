@@ -227,8 +227,7 @@ class StringColumn final : public StorageColumn {
     if (str.empty()) {
       sqlite3_result_null(ctx);
     } else {
-      sqlite3_result_blob(ctx, str.c_str(), static_cast<int>(str.size()),
-                          sqlite_utils::kSqliteStatic);
+      sqlite3_result_text(ctx, str.c_str(), -1, sqlite_utils::kSqliteStatic);
     }
   }
 

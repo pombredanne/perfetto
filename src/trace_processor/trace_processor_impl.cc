@@ -276,7 +276,6 @@ void TraceProcessorImpl::ExecuteQuery(
           case SQLITE_INTEGER:
             desc->set_type(ColumnDesc::LONG);
             break;
-          case SQLITE_BLOB:
           case SQLITE_TEXT:
             desc->set_type(ColumnDesc::STRING);
             break;
@@ -306,9 +305,8 @@ void TraceProcessorImpl::ExecuteQuery(
           break;
         case ColumnDesc::STRING: {
           const char* str =
-              reinterpret_cast<const char*>(sqlite3_column_blob(*stmt, col));
-          column->add_string_values(
-              str, static_cast<size_t>(sqlite3_column_bytes(*stmt, col)));
+              reinterpret_cast<const char*>(sqlite3_column_text(*stmt, col));
+          column->add_string_values(str);
           column->add_is_nulls(false);
           break;
         }

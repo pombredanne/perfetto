@@ -83,9 +83,8 @@ void ArgsTable::ValueColumn::ReportResult(sqlite3_context* ctx,
       sqlite_utils::ReportSqliteResult(ctx, value.real_value);
       break;
     case VariadicType::kString: {
-      const auto& str = storage_->GetString(value.string_value);
-      sqlite3_result_blob(ctx, str.c_str(), static_cast<int>(str.size()),
-                          sqlite_utils::kSqliteStatic);
+      const char* str = storage_->GetString(value.string_value).c_str();
+      sqlite3_result_text(ctx, str, -1, sqlite_utils::kSqliteStatic);
       break;
     }
   }
