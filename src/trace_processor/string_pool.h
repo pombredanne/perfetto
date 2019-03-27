@@ -108,8 +108,7 @@ class StringPool {
     uint8_t* TryInsert(base::StringView str);
 
     uint32_t OffsetOf(uint8_t* ptr) const {
-      PERFETTO_DCHECK(Get(0) < ptr &&
-                      ptr < Get(static_cast<size_t>(kBlockSize)));
+      PERFETTO_DCHECK(Get(0) < ptr && ptr < Get(kBlockSize - 1));
       return static_cast<uint32_t>(ptr - Get(0));
     }
 
