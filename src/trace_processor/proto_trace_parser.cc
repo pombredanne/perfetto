@@ -856,8 +856,10 @@ void ProtoTraceParser::ParsePowerRails(ConstBytes blob) {
       auto idx = desc.index();
       if (power_rails_strs_id_.size() <= idx)
         power_rails_strs_id_.resize(idx + 1);
-      power_rails_strs_id_[idx] =
-          context_->storage->InternString(desc.rail_name());
+      char counter_name[255];
+      snprintf(counter_name, sizeof(counter_name), "power.%.*s_uws",
+               int(desc.rail_name().size), desc.rail_name().data);
+      power_rails_strs_id_[idx] = context_->storage->InternString(counter_name);
     }
   }
 
