@@ -118,7 +118,9 @@ ProcessStatsDataSource::ProcessStatsDataSource(
           " not a multiple of proc_stats_poll_ms. Rounding down to %ums.",
           proc_stats_ttl_ms, floor_ttl);
       proc_stats_ttl_ms = floor_ttl;
-    } else if (proc_stats_ttl_ms == 0) {
+    }
+
+    if (proc_stats_ttl_ms == 0) {
       PERFETTO_ILOG(
           "proc_stats_cache_ttl_ms is 0. Setting to proc_stats_poll_ms.");
       proc_stats_ttl_ms = poll_period_ms_;
