@@ -138,10 +138,11 @@ inline double ExtractSqliteValue(sqlite3_value* value) {
 template <>
 inline std::string ExtractSqliteValue(sqlite3_value* value) {
   auto type = sqlite3_value_type(value);
-  PERFETTO_DCHECK(type == SQLITE_TEXT);
+  PERFETTO_DCHECK(type == SQLITE_TEXT || type == SQLITE_BLOB);
   const auto* extracted =
-      reinterpret_cast<const char*>(sqlite3_value_text(value));
-  return std::string(extracted);
+      reinterpret_cast<const char*>(sqlite3_value_blob(value));
+  auto size = static_cast<size_t>(sqlite3_value_bytes(value));
+  return std::string(extracted, size);
 }
 
 template <typename T>
@@ -369,6 +370,7 @@ inline std::string SqliteValueAsString(sqlite3_value* value) {
       return std::to_string(sqlite3_value_int64(value));
     case SQLITE_FLOAT:
       return std::to_string(sqlite3_value_double(value));
+    case SQLITE_BLOB:
     case SQLITE_TEXT: {
       const char* str =
           reinterpret_cast<const char*>(sqlite3_value_text(value));

@@ -78,10 +78,12 @@ int StringTable::Cursor::Column(sqlite3_context* context, int col) {
     case Column::kStringId:
       sqlite3_result_int64(context, static_cast<sqlite3_int64>(row_));
       break;
-    case Column::kString:
-      sqlite3_result_text(context, storage_->GetString(string_id).c_str(), -1,
+    case Column::kString: {
+      const auto& str = storage_->GetString(string_id);
+      sqlite3_result_blob(context, str.c_str(), static_cast<int>(str.size()),
                           sqlite_utils::kSqliteStatic);
       break;
+    }
   }
   return SQLITE_OK;
 }

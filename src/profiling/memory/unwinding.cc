@@ -49,6 +49,7 @@
 #include "perfetto/base/scoped_file.h"
 #include "perfetto/base/string_utils.h"
 #include "perfetto/base/task_runner.h"
+#include "perfetto/base/thread_task_runner.h"
 #include "src/profiling/memory/wire_protocol.h"
 
 namespace perfetto {
@@ -133,7 +134,7 @@ FDMemory::FDMemory(base::ScopedFile mem_fd) : mem_fd_(std::move(mem_fd)) {}
 size_t FDMemory::Read(uint64_t addr, void* dst, size_t size) {
   ssize_t rd = ReadAtOffsetClobberSeekPos(*mem_fd_, dst, size, addr);
   if (rd == -1) {
-    PERFETTO_DPLOG("read at offset");
+    PERFETTO_DPLOG("read of %zu at offset %" PRIu64, size, addr);
     return 0;
   }
   return static_cast<size_t>(rd);
@@ -159,8 +160,10 @@ bool FileDescriptorMaps::Parse() {
             strncmp(name + 5, "ashmem/", 7) != 0) {
           flags |= unwindstack::MAPS_FLAGS_DEVICE_MAP;
         }
+        unwindstack::MapInfo* prev_map =
+            maps_.empty() ? nullptr : maps_.back().get();
         maps_.emplace_back(
-            new unwindstack::MapInfo(nullptr, start, end, pgoff, flags, name));
+            new unwindstack::MapInfo(prev_map, start, end, pgoff, flags, name));
       });
 }
 
@@ -173,12 +176,12 @@ bool DoUnwind(WireMessage* msg, UnwindingMetadata* metadata, AllocRecord* out) {
   std::unique_ptr<unwindstack::Regs> regs(
       CreateFromRawData(alloc_metadata->arch, alloc_metadata->register_data));
   if (regs == nullptr) {
+    PERFETTO_DLOG("Unable to construct unwindstack::Regs");
     unwindstack::FrameData frame_data{};
     frame_data.function_name = "ERROR READING REGISTERS";
     frame_data.map_name = "ERROR";
 
     out->frames.emplace_back(frame_data, "");
-    PERFETTO_DLOG("regs");
     return false;
   }
   uint8_t* stack = reinterpret_cast<uint8_t*>(msg->payload);
@@ -197,6 +200,7 @@ bool DoUnwind(WireMessage* msg, UnwindingMetadata* metadata, AllocRecord* out) {
   uint8_t error_code = 0;
   for (int attempt = 0; attempt < 2; ++attempt) {
     if (attempt > 0) {
+      PERFETTO_DLOG("Reparsing maps");
       metadata->ReparseMaps();
 #if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
       unwinder.SetJitDebug(metadata->jit_debug.get(), regs->Arch());
@@ -221,12 +225,12 @@ bool DoUnwind(WireMessage* msg, UnwindingMetadata* metadata, AllocRecord* out) {
   }
 
   if (error_code != 0) {
+    PERFETTO_DLOG("Unwinding error %" PRIu8, error_code);
     unwindstack::FrameData frame_data{};
     frame_data.function_name = "ERROR " + std::to_string(error_code);
     frame_data.map_name = "ERROR";
 
     out->frames.emplace_back(frame_data, "");
-    PERFETTO_DLOG("unwinding failed %" PRIu8, error_code);
   }
 
   return true;
@@ -239,10 +243,13 @@ void UnwindingWorker::OnDisconnect(base::UnixSocket* self) {
     PERFETTO_DFATAL("Disconnected unexpecter socket.");
     return;
   }
-  ClientData& socket_data = it->second;
-  DataSourceInstanceID ds_id = socket_data.data_source_instance_id;
+  ClientData& client_data = it->second;
+  DataSourceInstanceID ds_id = client_data.data_source_instance_id;
+  pid_t peer_pid = self->peer_pid();
   client_data_.erase(it);
-  delegate_->PostSocketDisconnected(ds_id, self->peer_pid());
+  // The erase invalidates the self pointer.
+  self = nullptr;
+  delegate_->PostSocketDisconnected(ds_id, peer_pid);
 }
 
 void UnwindingWorker::OnDataAvailable(base::UnixSocket* self) {
@@ -256,8 +263,8 @@ void UnwindingWorker::OnDataAvailable(base::UnixSocket* self) {
     return;
   }
 
-  ClientData& socket_data = it->second;
-  SharedRingBuffer& shmem = socket_data.shmem;
+  ClientData& client_data = it->second;
+  SharedRingBuffer& shmem = client_data.shmem;
   SharedRingBuffer::Buffer buf;
 
   for (;;) {
@@ -266,23 +273,24 @@ void UnwindingWorker::OnDataAvailable(base::UnixSocket* self) {
     buf = shmem.BeginRead();
     if (!buf)
       break;
-    HandleBuffer(&buf, &socket_data.metadata,
-                 socket_data.data_source_instance_id,
-                 socket_data.sock->peer_pid());
+    HandleBuffer(buf, &client_data.metadata,
+                 client_data.data_source_instance_id,
+                 client_data.sock->peer_pid(), delegate_);
     shmem.EndRead(std::move(buf));
   }
 }
 
-void UnwindingWorker::HandleBuffer(SharedRingBuffer::Buffer* buf,
+// static
+void UnwindingWorker::HandleBuffer(const SharedRingBuffer::Buffer& buf,
                                    UnwindingMetadata* unwinding_metadata,
                                    DataSourceInstanceID data_source_instance_id,
-                                   pid_t peer_pid) {
+                                   pid_t peer_pid,
+                                   Delegate* delegate) {
   WireMessage msg;
   // TODO(fmayer): standardise on char* or uint8_t*.
   // char* has stronger guarantees regarding aliasing.
   // see https://timsong-cpp.github.io/cppwp/n3337/basic.lval#10.8
-  if (!ReceiveWireMessage(reinterpret_cast<char*>(buf->data), buf->size,
-                          &msg)) {
+  if (!ReceiveWireMessage(reinterpret_cast<char*>(buf.data), buf.size, &msg)) {
     PERFETTO_DFATAL("Failed to receive wire message.");
     return;
   }
@@ -293,14 +301,14 @@ void UnwindingWorker::HandleBuffer(SharedRingBuffer::Buffer* buf,
     rec.pid = peer_pid;
     rec.data_source_instance_id = data_source_instance_id;
     DoUnwind(&msg, unwinding_metadata, &rec);
-    delegate_->PostAllocRecord(std::move(rec));
+    delegate->PostAllocRecord(std::move(rec));
   } else if (msg.record_type == RecordType::Free) {
     FreeRecord rec;
     rec.pid = peer_pid;
     rec.data_source_instance_id = data_source_instance_id;
     // We need to copy this, so we can return the memory to the shmem buffer.
-    memcpy(&rec.metadata, msg.free_header, sizeof(*msg.free_header));
-    delegate_->PostFreeRecord(std::move(rec));
+    memcpy(&rec.free_batch, msg.free_header, sizeof(*msg.free_header));
+    delegate->PostFreeRecord(std::move(rec));
   } else {
     PERFETTO_DFATAL("Invalid record type.");
   }
@@ -310,9 +318,9 @@ void UnwindingWorker::PostHandoffSocket(HandoffData handoff_data) {
   // Even with C++14, this cannot be moved, as std::function has to be
   // copyable, which HandoffData is not.
   HandoffData* raw_data = new HandoffData(std::move(handoff_data));
-  // We do not need to use a WeakPtr here because the TaskRunner gets Quit-ed
-  // before this object get destructed.
-  task_runner_->PostTask([this, raw_data] {
+  // We do not need to use a WeakPtr here because the task runner will not
+  // outlive its UnwindingWorker.
+  thread_task_runner_.get()->PostTask([this, raw_data] {
     HandoffData data = std::move(*raw_data);
     delete raw_data;
     HandleHandoffSocket(std::move(data));
@@ -320,9 +328,9 @@ void UnwindingWorker::PostHandoffSocket(HandoffData handoff_data) {
 }
 
 void UnwindingWorker::HandleHandoffSocket(HandoffData handoff_data) {
-  auto sock = base::UnixSocket::AdoptConnected(handoff_data.sock.ReleaseFd(),
-                                               this, this->task_runner_,
-                                               base::SockType::kStream);
+  auto sock = base::UnixSocket::AdoptConnected(
+      handoff_data.sock.ReleaseFd(), this, this->thread_task_runner_.get(),
+      base::SockType::kStream);
   pid_t peer_pid = sock->peer_pid();
 
   UnwindingMetadata metadata(peer_pid,
@@ -336,9 +344,10 @@ void UnwindingWorker::HandleHandoffSocket(HandoffData handoff_data) {
 }
 
 void UnwindingWorker::PostDisconnectSocket(pid_t pid) {
-  // We do not need to use a WeakPtr here because the TaskRunner gets Quit-ed
-  // before this object get destructed.
-  task_runner_->PostTask([this, pid] { HandleDisconnectSocket(pid); });
+  // We do not need to use a WeakPtr here because the task runner will not
+  // outlive its UnwindingWorker.
+  thread_task_runner_.get()->PostTask(
+      [this, pid] { HandleDisconnectSocket(pid); });
 }
 
 void UnwindingWorker::HandleDisconnectSocket(pid_t pid) {

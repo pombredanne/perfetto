@@ -75,10 +75,12 @@ int SqlStatsTable::Cursor::Eof() {
 int SqlStatsTable::Cursor::Column(sqlite3_context* context, int col) {
   const TraceStorage::SqlStats& stats = storage_->sql_stats();
   switch (col) {
-    case Column::kQuery:
-      sqlite3_result_text(context, stats.queries()[row_].c_str(), -1,
+    case Column::kQuery: {
+      const auto& str = stats.queries()[row_];
+      sqlite3_result_blob(context, str.data(), static_cast<int>(str.size()),
                           sqlite_utils::kSqliteStatic);
       break;
+    }
     case Column::kTimeQueued:
       sqlite3_result_int64(context,
                            static_cast<int64_t>(stats.times_queued()[row_]));

@@ -272,9 +272,10 @@ int SpanJoinOperatorTable::Cursor::Initialize(const QueryConstraints& qc,
   if (table_->partitioning_ == PartitioningType::kMixedPartitioning) {
     PERFETTO_DCHECK(step_now->IsPartitioned());
 
-    // If we emit shadow slices, we need to clear out from the full partition
-    // shadow slice.
+    // If we emit shadow slices, we need to step because the first slice will
+    // be a full partition shadow slice that we need to skip.
     if (step_now->definition()->emit_shadow_slices()) {
+      PERFETTO_DCHECK(step_now->IsFullPartitionShadowSlice());
       res = step_now->StepToNextPartition();
       if (PERFETTO_UNLIKELY(res.is_err()))
         return res.err_code;
@@ -548,12 +549,13 @@ SpanJoinOperatorTable::Query::StepToNextPartition() {
 }
 
 SpanJoinOperatorTable::Query::StepRet
-SpanJoinOperatorTable::Query::StepToPartition(int64_t partition) {
-  PERFETTO_DCHECK(partition_ <= partition);
+SpanJoinOperatorTable::Query::StepToPartition(int64_t target_partition) {
+  PERFETTO_DCHECK(partition_ <= target_partition);
   if (defn_->IsPartitioned()) {
-    while (partition_ < partition) {
-      if (IsFullPartitionShadowSlice() && partition < CursorPartition()) {
-        partition_ = partition;
+    while (partition_ < target_partition) {
+      if (IsFullPartitionShadowSlice() &&
+          target_partition < CursorPartition()) {
+        partition_ = target_partition;
         return StepRet(StepRet::Code::kRow);
       }
 
@@ -561,11 +563,11 @@ SpanJoinOperatorTable::Query::StepToPartition(int64_t partition) {
       if (!res.is_row())
         return res;
     }
-  } else if (/* !defn_->IsPartitioned() && */ partition_ < partition) {
+  } else if (/* !defn_->IsPartitioned() && */ partition_ < target_partition) {
     int res = PrepareRawStmt();
     if (res != SQLITE_OK)
       return StepRet(StepRet::Code::kError, res);
-    partition_ = partition;
+    partition_ = target_partition;
   }
   return StepRet(StepRet::Code::kRow);
 }
@@ -635,14 +637,16 @@ void SpanJoinOperatorTable::Query::ReportSqliteResult(sqlite3_context* context,
     case SQLITE_FLOAT:
       sqlite3_result_double(context, sqlite3_column_double(stmt, idx));
       break;
+    case SQLITE_BLOB:
     case SQLITE_TEXT: {
       // TODO(lalitm): note for future optimizations: if we knew the addresses
       // of the string intern pool, we could check if the string returned here
       // comes from the pool, and pass it as non-transient.
       const auto kSqliteTransient =
           reinterpret_cast<sqlite3_destructor_type>(-1);
-      auto ptr = reinterpret_cast<const char*>(sqlite3_column_text(stmt, idx));
-      sqlite3_result_text(context, ptr, -1, kSqliteTransient);
+      auto* ptr = reinterpret_cast<const char*>(sqlite3_column_blob(stmt, idx));
+      auto size = reinterpret_cast<int>(sqlite3_column_bytes(stmt, idx));
+      sqlite3_result_blob(context, ptr, size, kSqliteTransient);
       break;
     }
   }

@@ -62,7 +62,7 @@ void sqlite_str_split(sqlite3_context* context,
     if (fld == 0) {
       int size = next != nullptr ? static_cast<int>(next - in)
                                  : static_cast<int>(strlen(in));
-      sqlite3_result_text(context, in, size, sqlite_utils::kSqliteTransient);
+      sqlite3_result_blob(context, in, size, sqlite_utils::kSqliteTransient);
       return;
     } else if (next == nullptr) {
       break;

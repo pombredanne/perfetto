@@ -55,9 +55,11 @@ StatsTable::Cursor::Cursor(const TraceStorage* storage) : storage_(storage) {}
 int StatsTable::Cursor::Column(sqlite3_context* ctx, int N) {
   const auto kSqliteStatic = sqlite_utils::kSqliteStatic;
   switch (N) {
-    case Column::kName:
-      sqlite3_result_text(ctx, stats::kNames[key_], -1, kSqliteStatic);
+    case Column::kName: {
+      const auto* name = stats::kNames[key_];
+      sqlite3_result_blob(ctx, name, sizeof(name) - 1, kSqliteStatic);
       break;
+    }
     case Column::kIndex:
       if (stats::kTypes[key_] == stats::kIndexed) {
         sqlite3_result_int(ctx, index_->first);
@@ -68,20 +70,21 @@ int StatsTable::Cursor::Column(sqlite3_context* ctx, int N) {
     case Column::kSeverity:
       switch (stats::kSeverities[key_]) {
         case stats::kInfo:
-          sqlite3_result_text(ctx, "info", -1, kSqliteStatic);
+          sqlite3_result_blob(ctx, "info", sizeof("info") - 1, kSqliteStatic);
           break;
         case stats::kError:
-          sqlite3_result_text(ctx, "error", -1, kSqliteStatic);
+          sqlite3_result_blob(ctx, "error", sizeof("error") - 1, kSqliteStatic);
           break;
       }
       break;
     case Column::kSource:
       switch (stats::kSources[key_]) {
         case stats::kTrace:
-          sqlite3_result_text(ctx, "trace", -1, kSqliteStatic);
+          sqlite3_result_blob(ctx, "trace", sizeof("trace") - 1, kSqliteStatic);
           break;
         case stats::kAnalysis:
-          sqlite3_result_text(ctx, "analysis", -1, kSqliteStatic);
+          sqlite3_result_blob(ctx, "analysis", sizeof("analysis") - 1,
+                              kSqliteStatic);
           break;
       }
       break;

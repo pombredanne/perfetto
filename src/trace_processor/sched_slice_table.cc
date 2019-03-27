@@ -105,7 +105,8 @@ void SchedSliceTable::EndStateColumn::ReportResult(sqlite3_context* ctx,
   const auto& state = (*deque_)[row];
   if (state.is_valid()) {
     PERFETTO_CHECK(state.raw_state() < state_strings_.size());
-    sqlite3_result_text(ctx, state_strings_[state.raw_state()].data(), -1,
+    const auto& str = state_strings_[state.raw_state()];
+    sqlite3_result_blob(ctx, str.data(), static_cast<int>(str.size()),
                         sqlite_utils::kSqliteStatic);
   } else {
     sqlite3_result_null(ctx);
@@ -140,7 +141,8 @@ void SchedSliceTable::EndStateColumn::FilterOnState(
     int op,
     sqlite3_value* value,
     FilteredRowIndex* index) const {
-  if (sqlite3_value_type(value) != SQLITE_TEXT) {
+  auto type = sqlite3_value_type(value);
+  if (type != SQLITE_TEXT && type != SQLITE_BLOB) {
     index->set_error("end_state can only be filtered using strings");
     return;
   }

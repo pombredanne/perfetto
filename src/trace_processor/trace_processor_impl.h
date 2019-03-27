@@ -120,7 +120,10 @@ class TraceProcessor::IteratorImpl {
         value.type = SqlValue::kLong;
         value.long_value = sqlite3_column_int64(*stmt_, column);
         break;
+      case SQLITE_BLOB:
       case SQLITE_TEXT:
+        // TODO(lalitm): switch this usage to utilise sqlite3_column_blob
+        // and sqlite3_column_bytes.
         value.type = SqlValue::kString;
         value.string_value =
             reinterpret_cast<const char*>(sqlite3_column_text(*stmt_, column));

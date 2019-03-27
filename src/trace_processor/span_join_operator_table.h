@@ -163,7 +163,7 @@ class SpanJoinOperatorTable : public Table {
 
     StepRet Step();
     StepRet StepToNextPartition();
-    StepRet StepToPartition(int64_t partition);
+    StepRet StepToPartition(int64_t target_partition);
     StepRet StepUntil(int64_t timestamp);
 
     void ReportSqliteResult(sqlite3_context* context, size_t index);
@@ -177,6 +177,11 @@ class SpanJoinOperatorTable : public Table {
     bool Eof() const { return cursor_eof_ && mode_ == Mode::kRealSlice; }
     bool IsPartitioned() const { return defn_->IsPartitioned(); }
     bool IsRealSlice() const { return mode_ == Mode::kRealSlice; }
+
+    bool IsFullPartitionShadowSlice() const {
+      return mode_ == Mode::kShadowSlice && ts_start_ == 0 &&
+             ts_end_ == std::numeric_limits<int64_t>::max();
+    }
 
     int64_t CursorPartition() const {
       PERFETTO_DCHECK(defn_->IsPartitioned());
@@ -201,11 +206,6 @@ class SpanJoinOperatorTable : public Table {
     int64_t CursorDur() const {
       auto dur_idx = static_cast<int>(defn_->dur_idx());
       return sqlite3_column_int64(stmt_.get(), dur_idx);
-    }
-
-    bool IsFullPartitionShadowSlice() const {
-      return mode_ == Mode::kShadowSlice && ts_start_ == 0 &&
-             ts_end_ == std::numeric_limits<int64_t>::max();
     }
 
     std::string sql_query_;
