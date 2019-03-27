@@ -24,8 +24,8 @@
 #include <unordered_map>
 
 #include "src/trace_processor/trace_parser.h"
+#include "src/trace_processor/trace_sorter.h"
 #include "src/trace_processor/trace_storage.h"
-#include "src/trace_processor/trace_token.h"
 
 namespace Json {
 class Value;
@@ -47,8 +47,11 @@ class JsonTraceParser : public TraceParser {
   ~JsonTraceParser() override;
 
   // TraceParser implementation.
-  void ParseTracePacket(int64_t timestamp, TraceToken) override;
-  void ParseFtracePacket(uint32_t, int64_t, TraceToken) override;
+  void ParseTracePacket(int64_t timestamp,
+                        TraceSorter::TimestampedTracePiece) override;
+  void ParseFtracePacket(uint32_t,
+                         int64_t,
+                         TraceSorter::TimestampedTracePiece) override;
 
  private:
   TraceProcessorContext* const context_;

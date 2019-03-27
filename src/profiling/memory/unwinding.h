@@ -28,8 +28,10 @@
 #endif
 
 #include "perfetto/base/scoped_file.h"
+#include "perfetto/base/thread_task_runner.h"
+#include "perfetto/tracing/core/basic_types.h"
 #include "src/profiling/memory/bookkeeping.h"
-#include "src/profiling/memory/queue_messages.h"
+#include "src/profiling/memory/unwound_messages.h"
 #include "src/profiling/memory/wire_protocol.h"
 
 namespace perfetto {
@@ -145,8 +147,9 @@ class UnwindingWorker : public base::UnixSocket::EventListener {
     SharedRingBuffer shmem;
   };
 
-  UnwindingWorker(Delegate* delegate, base::TaskRunner* task_runner)
-      : delegate_(delegate), task_runner_(task_runner) {}
+  UnwindingWorker(Delegate* delegate, base::ThreadTaskRunner thread_task_runner)
+      : delegate_(delegate),
+        thread_task_runner_(std::move(thread_task_runner)) {}
 
   // Public API safe to call from other threads.
   void PostDisconnectSocket(pid_t pid);
@@ -161,7 +164,18 @@ class UnwindingWorker : public base::UnixSocket::EventListener {
   }
   void OnDataAvailable(base::UnixSocket* self) override;
 
+ public:
+  // static and public for testing/fuzzing
+  static void HandleBuffer(const SharedRingBuffer::Buffer& buf,
+                           UnwindingMetadata* unwinding_metadata,
+                           DataSourceInstanceID data_source_instance_id,
+                           pid_t peer_pid,
+                           Delegate* delegate);
+
  private:
+  void HandleHandoffSocket(HandoffData data);
+  void HandleDisconnectSocket(pid_t pid);
+
   struct ClientData {
     DataSourceInstanceID data_source_instance_id;
     std::unique_ptr<base::UnixSocket> sock;
@@ -169,13 +183,10 @@ class UnwindingWorker : public base::UnixSocket::EventListener {
     SharedRingBuffer shmem;
   };
 
-  void HandleBuffer(SharedRingBuffer::Buffer* buf, ClientData* socket_data);
-  void HandleHandoffSocket(HandoffData data);
-  void HandleDisconnectSocket(pid_t pid);
-
   std::map<pid_t, ClientData> client_data_;
   Delegate* delegate_;
-  base::TaskRunner* task_runner_;
+  // Task runner with a dedicated thread.
+  base::ThreadTaskRunner thread_task_runner_;
 };
 
 }  // namespace profiling

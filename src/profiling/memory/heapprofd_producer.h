@@ -28,6 +28,7 @@
 #include "perfetto/tracing/core/basic_types.h"
 #include "perfetto/tracing/core/data_source_config.h"
 #include "perfetto/tracing/core/producer.h"
+#include "perfetto/tracing/core/trace_writer.h"
 #include "perfetto/tracing/core/tracing_service.h"
 
 #include "src/profiling/memory/bookkeeping.h"
@@ -124,9 +125,6 @@ class HeapprofdProducer : public Producer, public UnwindingWorker::Delegate {
 
   const HeapprofdMode mode_;
 
-  std::vector<std::thread> MakeUnwindingThreads(size_t n);
-  std::vector<UnwindingWorker> MakeUnwindingWorkers(size_t n);
-
   void FinishDataSourceFlush(FlushRequestID flush_id);
   bool Dump(DataSourceInstanceID id,
             FlushRequestID flush_id,
@@ -139,11 +137,18 @@ class HeapprofdProducer : public Producer, public UnwindingWorker::Delegate {
 
   // functionality specific to mode_ == kChild
   void TerminateProcess(int exit_status);
-  bool SourceMatchesTarget(const HeapprofdConfig& cfg);
 
   // Valid only if mode_ == kChild. Adopts the (connected) sockets inherited
   // from the target process, invoking the on-connection callback.
   void AdoptTargetProcessSocket();
+
+  struct ProcessState {
+    ProcessState(GlobalCallstackTrie* callsites) : heap_tracker(callsites) {}
+    uint64_t heap_samples = 0;
+    uint64_t map_reparses = 0;
+    uint64_t unwinding_errors = 0;
+    HeapTracker heap_tracker;
+  };
 
   struct DataSource {
     DataSourceInstanceID id;
@@ -151,7 +156,10 @@ class HeapprofdProducer : public Producer, public UnwindingWorker::Delegate {
     HeapprofdConfig config;
     ClientConfiguration client_configuration;
     std::vector<SystemProperties::Handle> properties;
-    std::map<pid_t, HeapTracker> heap_trackers;
+    std::set<pid_t> signaled_pids;
+    std::set<pid_t> rejected_pids;
+    std::map<pid_t, ProcessState> process_states;
+    uint64_t next_index_ = 0;
   };
 
   struct PendingProcess {
@@ -162,7 +170,10 @@ class HeapprofdProducer : public Producer, public UnwindingWorker::Delegate {
 
   std::map<pid_t, PendingProcess> pending_processes_;
 
+  bool IsPidProfiled(pid_t);
   DataSource* GetDataSourceForProcess(const Process& proc);
+  bool ConfigTargetsProcess(const HeapprofdConfig& cfg, const Process& proc);
+  void RecordOtherSourcesAsRejected(DataSource* active_ds, const Process& proc);
 
   std::map<DataSourceInstanceID, DataSource> data_sources_;
   std::map<FlushRequestID, size_t> flushes_in_progress_;
@@ -172,15 +183,6 @@ class HeapprofdProducer : public Producer, public UnwindingWorker::Delegate {
   std::unique_ptr<TracingService::ProducerEndpoint> endpoint_;
 
   GlobalCallstackTrie callsites_;
-  // Sequence number for ProfilePackets, so the consumer can assert that none
-  // of them were dropped.
-  uint64_t next_index_ = 0;
-
-  // These are not fields in UnwinderThread as the task runner is not movable
-  // and that makes UnwinderThread very unwieldy objects (e.g. we cannot
-  // emplace_back into a vector as that requires movability.)
-  std::vector<base::UnixTaskRunner> unwinding_task_runners_;
-  std::vector<std::thread> unwinding_threads_;  // Only for ownership.
   std::vector<UnwindingWorker> unwinding_workers_;
 
   // state specific to mode_ == kCentral
@@ -188,9 +190,8 @@ class HeapprofdProducer : public Producer, public UnwindingWorker::Delegate {
   SystemProperties properties_;
 
   // state specific to mode_ == kChild
-  pid_t target_pid_ = base::kInvalidPid;
-  std::string target_cmdline_;
-  // This is a valid FD between SetTargetProcess and UseTargetProcessSocket
+  Process target_process_{base::kInvalidPid, ""};
+  // This is a valid FD between SetTargetProcess and AdoptTargetProcessSocket
   // only.
   base::ScopedFile inherited_fd_;
 

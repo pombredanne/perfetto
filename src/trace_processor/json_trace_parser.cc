@@ -43,13 +43,16 @@ JsonTraceParser::JsonTraceParser(TraceProcessorContext* context)
 
 JsonTraceParser::~JsonTraceParser() = default;
 
-void JsonTraceParser::ParseFtracePacket(uint32_t, int64_t, TraceToken) {
+void JsonTraceParser::ParseFtracePacket(uint32_t,
+                                        int64_t,
+                                        TraceSorter::TimestampedTracePiece) {
   PERFETTO_FATAL("Json Trace Parser cannot handle ftrace packets.");
 }
 
-void JsonTraceParser::ParseTracePacket(int64_t timestamp, TraceToken token) {
-  PERFETTO_DCHECK(token.type == TraceToken::TokenType::json_value);
-  Json::Value& value = token.json_value;
+void JsonTraceParser::ParseTracePacket(int64_t timestamp,
+                                       TraceSorter::TimestampedTracePiece ttp) {
+  PERFETTO_DCHECK(ttp.ContainsJsonValue());
+  Json::Value& value = *(ttp.json_value);
 
   ProcessTracker* procs = context_->process_tracker.get();
   TraceStorage* storage = context_->storage.get();

@@ -22,7 +22,6 @@
 #include "src/trace_processor/json_trace_utils.h"
 #include "src/trace_processor/trace_blob_view.h"
 #include "src/trace_processor/trace_sorter.h"
-#include "src/trace_processor/trace_token.h"
 
 namespace perfetto {
 namespace trace_processor {
@@ -94,9 +93,9 @@ JsonTraceTokenizer::~JsonTraceTokenizer() = default;
 
 bool JsonTraceTokenizer::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
   buffer_.insert(buffer_.end(), data.get(), data.get() + size);
-  char* buf = &buffer_[0];
+  const char* buf = buffer_.data();
   const char* next = buf;
-  const char* end = &buffer_[buffer_.size()];
+  const char* end = buf + buffer_.size();
 
   if (offset_ == 0) {
     // Trace could begin in any of these ways:
@@ -117,18 +116,18 @@ bool JsonTraceTokenizer::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
   auto* trace_sorter = context_->sorter.get();
 
   while (next < end) {
-    Json::Value value;
-    const auto res = ReadOneJsonDict(next, end, &value, &next);
+    std::unique_ptr<Json::Value> value(new Json::Value());
+    const auto res = ReadOneJsonDict(next, end, value.get(), &next);
     if (res == kFatalError)
       return false;
     if (res == kEndOfTrace || res == kNeedsMoreData)
       break;
 
-    base::Optional<int64_t> opt_ts = CoerceToNs(value["ts"]);
+    base::Optional<int64_t> opt_ts = CoerceToNs((*value)["ts"]);
     PERFETTO_CHECK(opt_ts.has_value());
     int64_t ts = opt_ts.value();
 
-    trace_sorter->PushTracePacket(ts, TraceToken(std::move(value)));
+    trace_sorter->PushJsonValue(ts, std::move(value));
   }
 
   offset_ += static_cast<uint64_t>(next - buf);

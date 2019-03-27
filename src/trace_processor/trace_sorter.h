@@ -22,9 +22,12 @@
 #include "perfetto/base/circular_queue.h"
 #include "perfetto/trace_processor/basic_types.h"
 #include "src/trace_processor/trace_blob_view.h"
-#include "src/trace_processor/trace_parser.h"
 #include "src/trace_processor/trace_processor_context.h"
 #include "src/trace_processor/trace_storage.h"
+
+#if PERFETTO_BUILDFLAG(PERFETTO_STANDALONE_BUILD)
+#include <json/value.h>
+#endif
 
 namespace perfetto {
 namespace trace_processor {
@@ -59,8 +62,8 @@ namespace trace_processor {
 class TraceSorter {
  public:
   struct TimestampedTracePiece {
-    TimestampedTracePiece(int64_t ts, uint64_t idx, TraceToken tk)
-        : timestamp(ts), packet_idx_(idx), token(std::move(tk)) {}
+    TimestampedTracePiece(int64_t ts, uint64_t idx, TraceBlobView tbv)
+        : timestamp(ts), packet_idx_(idx), blob_view(std::move(tbv)) {}
 
     TimestampedTracePiece(TimestampedTracePiece&&) noexcept = default;
     TimestampedTracePiece& operator=(TimestampedTracePiece&&) = default;
@@ -76,28 +79,52 @@ class TraceSorter {
              (timestamp == o.timestamp && packet_idx_ < o.packet_idx_);
     }
 
+#if PERFETTO_BUILDFLAG(PERFETTO_STANDALONE_BUILD)
+    TimestampedTracePiece(int64_t ts,
+                          uint64_t idx,
+                          std::unique_ptr<Json::Value> value)
+        : json_value(std::move(value)),
+          timestamp(ts),
+          packet_idx_(idx),
+          // TODO: Stop requiring TraceBlobView in TimestampedTracePiece.
+          blob_view(TraceBlobView(nullptr, 0, 0)) {}
+
+    inline bool ContainsJsonValue() { return json_value != nullptr; }
+
+    std::unique_ptr<Json::Value> json_value;
+#endif
+
     int64_t timestamp;
     uint64_t packet_idx_;
-    TraceToken token;
+    TraceBlobView blob_view;
   };
 
   TraceSorter(TraceProcessorContext*, int64_t window_size_ns);
-  ~TraceSorter() {}
 
-  inline void PushTracePacket(int64_t timestamp, TraceToken&& token) {
+  inline void PushTracePacket(int64_t timestamp, TraceBlobView packet) {
     DCHECK_ftrace_batch_cpu(kNoBatch);
     auto* queue = GetQueue(0);
     queue->Append(
-        TimestampedTracePiece(timestamp, packet_idx_++, std::move(token)));
+        TimestampedTracePiece(timestamp, packet_idx_++, std::move(packet)));
     MaybeExtractEvents(queue);
   }
 
+#if PERFETTO_BUILDFLAG(PERFETTO_STANDALONE_BUILD)
+  inline void PushJsonValue(int64_t timestamp,
+                            std::unique_ptr<Json::Value> json_value) {
+    auto* queue = GetQueue(0);
+    queue->Append(
+        TimestampedTracePiece(timestamp, packet_idx_++, std::move(json_value)));
+    MaybeExtractEvents(queue);
+  }
+#endif
+
   inline void PushFtraceEvent(uint32_t cpu,
                               int64_t timestamp,
-                              TraceToken token) {
+                              TraceBlobView event) {
     set_ftrace_batch_cpu_for_DCHECK(cpu);
     GetQueue(cpu + 1)->Append(
-        TimestampedTracePiece(timestamp, packet_idx_++, std::move(token)));
+        TimestampedTracePiece(timestamp, packet_idx_++, std::move(event)));
 
     // The caller must call FinalizeFtraceEventBatch() after having pushed a
     // batch of ftrace events. This is to amortize the overhead of handling
@@ -157,7 +184,37 @@ class TraceSorter {
     int64_t min_ts_ = std::numeric_limits<int64_t>::max();
     int64_t max_ts_ = 0;
     size_t sort_start_idx_ = 0;
-    int64_t sort_min_ts_ = 0;
+    int64_t sort_min_ts_ = std::numeric_limits<int64_t>::max();
+
+    // void PrintAllTimestamps() {
+    //   PERFETTO_ILOG("Printing Queue timestamps");
+    //   int max_print = 30;
+    //   int count = 0;
+    //   for (auto& ev : events_) {
+    //     if (count >= max_print) break;
+    //     PERFETTO_ILOG("%d Ts: %ld", count, ev.timestamp);
+    //     count++;
+    //   }
+    //   PERFETTO_ILOG("-------------------------");
+    // }
+
+    // void PrintSortBreakage() {
+    //   PERFETTO_ILOG("Printing Sort Break Info");
+    //   int64_t prev_ts = -1;
+    //   int idx = 0;
+    //   for (auto& ev : events_) {
+    //     if (ev.timestamp < prev_ts) {
+    //       PERFETTO_ILOG("Prev ts: %ld", prev_ts);
+    //       PERFETTO_ILOG("Curr ts: %ld", ev.timestamp);
+    //       PERFETTO_ILOG("Break index: %d", idx);
+    //       break;
+    //     }
+    //     prev_ts = ev.timestamp;
+    //     idx++;
+    //   }
+    //   PERFETTO_ILOG("Checked %d events.", idx);
+    //   PERFETTO_ILOG("-------------------------");
+    // }
   };
 
   // This method passes any events older than window_size_ns to the
@@ -206,7 +263,6 @@ class TraceSorter {
 
 #if PERFETTO_DCHECK_IS_ON()
   // Used only for DCHECK-ing that FinalizeFtraceEventBatch() is called.
- public:
   uint32_t ftrace_batch_cpu_ = kNoBatch;
 
   inline void DCHECK_ftrace_batch_cpu(uint32_t cpu) {
