@@ -25,6 +25,8 @@ namespace trace_processor {
 
 class TraceProcessorContext;
 
+// The Fuchsia trace format is documented at
+// https://fuchsia.googlesource.com/zircon/+/master/docs/tracing/trace_format.md
 class FuchsiaTraceParser : public ChunkedTraceReader {
   struct ThreadInfo {
     uint64_t pid;
