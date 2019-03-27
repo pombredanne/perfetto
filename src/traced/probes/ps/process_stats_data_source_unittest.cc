@@ -202,8 +202,7 @@ TEST_F(ProcessStatsDataSourceTest, ProcessStats) {
 TEST_F(ProcessStatsDataSourceTest, CacheProcessStats) {
   DataSourceConfig cfg;
   cfg.mutable_process_stats_config()->set_proc_stats_poll_ms(105);
-  cfg.mutable_process_stats_config()->set_proc_stats_duplicate_cache_clear_ms(
-      220);
+  cfg.mutable_process_stats_config()->set_proc_stats_cache_ttl_ms(220);
   *(cfg.mutable_process_stats_config()->add_quirks()) =
       perfetto::ProcessStatsConfig::DISABLE_ON_DEMAND;
   auto data_source = GetProcessStatsDataSource(cfg);
