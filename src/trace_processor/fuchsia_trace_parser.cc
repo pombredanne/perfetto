@@ -263,7 +263,7 @@ bool FuchsiaTraceParser::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
             break;
           }
           case kDurationComplete: {
-            // Since there is currently no args table, we exploit the fact that
+            // Since we're currently not handling args, we exploit the fact that
             // the timestamp is guaranteed to be the last word in the record and
             // skip directly over all the arguments.
             int64_t end_ts = TicksToNs(record_[record_size - 1],
@@ -351,8 +351,8 @@ bool FuchsiaTraceParser::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
 
         // A thread with priority 0 represents an idle CPU
         if (cpu_threads_.count(cpu) != 0 && outgoing_priority != 0) {
-          // Note: Some early events will fail to associate with their pid
-          // because the kernel object info event hasn't been processed yet.
+          // TODO(bhamrick): Some early events will fail to associate with their
+          // pid because the kernel object info event hasn't been processed yet.
           if (pid_table_.count(outgoing_thread.tid) > 0) {
             outgoing_thread.pid = pid_table_[outgoing_thread.tid];
           }
