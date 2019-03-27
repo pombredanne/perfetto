@@ -109,15 +109,25 @@ ProcessStatsDataSource::ProcessStatsDataSource(
     poll_period_ms_ = 100;
   }
 
-  process_stats_cache_clear_ms_ =
-      ps_config.proc_stats_duplicate_cache_clear_ms();
-  if (process_stats_cache_clear_ms_ > 0 &&
-      process_stats_cache_clear_ms_ < poll_period_ms_) {
-    PERFETTO_ILOG("process_stats_cache_clear_ms_ %" PRIu32
-                  " is less than minimum of %ums. Increasing to %ums.",
-                  process_stats_cache_clear_ms_, poll_period_ms_,
-                  poll_period_ms_);
-    process_stats_cache_clear_ms_ = poll_period_ms_;
+  if (poll_period_ms_ > 0) {
+    auto proc_stats_ttl_ms = ps_config.proc_stats_cache_ttl_ms();
+    if (proc_stats_ttl_ms % poll_period_ms_ != 0) {
+      auto floor_ttl = (proc_stats_ttl_ms / poll_period_ms_) * poll_period_ms_;
+      PERFETTO_ILOG(
+          "proc_stats_cache_ttl_ms %" PRIu32
+          " not a multiple of proc_stats_poll_ms. Rounding down to %ums.",
+          proc_stats_ttl_ms, floor_ttl);
+      proc_stats_ttl_ms = floor_ttl;
+    } else if (proc_stats_ttl_ms == 0) {
+      PERFETTO_ILOG(
+          "proc_stats_cache_ttl_ms is 0. Setting to proc_stats_poll_ms.");
+      proc_stats_ttl_ms = poll_period_ms_;
+    }
+
+    // We -1 here because this value represents the number of ticks between
+    // cache clears. Since for proc_stats_ttl_ms == poll_period_ms_, we will
+    // clear every tick, we want that to represent 0.
+    process_stats_cache_ttl_ticks_ = (proc_stats_ttl_ms / poll_period_ms_) - 1;
   }
 }
 
@@ -130,12 +140,6 @@ void ProcessStatsDataSource::Start() {
   auto weak_this = GetWeakPtr();
   if (poll_period_ms_) {
     task_runner_->PostTask(std::bind(&ProcessStatsDataSource::Tick, weak_this));
-  }
-
-  if (process_stats_cache_clear_ms_) {
-    task_runner_->PostDelayedTask(
-        std::bind(&ProcessStatsDataSource::ClearCache, weak_this),
-        process_stats_cache_clear_ms_);
   }
 }
 
@@ -329,6 +333,10 @@ void ProcessStatsDataSource::Tick(
   thiz.task_runner_->PostDelayedTask(
       std::bind(&ProcessStatsDataSource::Tick, weak_this), delay_ms);
   thiz.WriteAllProcessStats();
+
+  // We clear the cache every process_stats_cache_ttl_ticks_ ticks.
+  if (++thiz.ticks_ % thiz.process_stats_cache_ttl_ticks_ == 0)
+    thiz.process_stats_cache_.clear();
 }
 
 void ProcessStatsDataSource::WriteAllProcessStats() {
@@ -490,19 +498,6 @@ bool ProcessStatsDataSource::WriteMemCounters(int32_t pid,
     }
   }
   return proc_status_has_mem_counters;
-}
-
-// static
-void ProcessStatsDataSource::ClearCache(
-    base::WeakPtr<ProcessStatsDataSource> weak_this) {
-  if (!weak_this)
-    return;
-  ProcessStatsDataSource& thiz = *weak_this;
-  uint32_t period_ms = thiz.process_stats_cache_clear_ms_;
-  uint32_t delay_ms = period_ms - (base::GetWallTimeMs().count() % period_ms);
-  thiz.task_runner_->PostDelayedTask(
-      std::bind(&ProcessStatsDataSource::Tick, weak_this), delay_ms);
-  thiz.process_stats_cache_.clear();
 }
 
 }  // namespace perfetto

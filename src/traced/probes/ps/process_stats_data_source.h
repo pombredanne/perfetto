@@ -102,9 +102,6 @@ class ProcessStatsDataSource : public ProbesDataSource {
   void WriteAllProcessStats();
   bool WriteMemCounters(int32_t pid, const std::string& proc_status);
 
-  // Function to periodically clear the process stats cache.
-  static void ClearCache(base::WeakPtr<ProcessStatsDataSource>);
-
   // Common fields used for both process/tree relationships and stats/counters.
   base::TaskRunner* const task_runner_;
   std::unique_ptr<TraceWriter> writer_;
@@ -123,13 +120,14 @@ class ProcessStatsDataSource : public ProbesDataSource {
 
   // Fields for keeping track of the periodic stats/counters.
   uint32_t poll_period_ms_ = 0;
+  uint64_t ticks_ = 0;
   protos::pbzero::ProcessStats* cur_ps_stats_ = nullptr;
   protos::pbzero::ProcessStats_Process* cur_ps_stats_process_ = nullptr;
   std::vector<bool> skip_stats_for_pids_;
 
-  // Cached process stats per process. Cleared every
-  // |process_stats_cache_clear_ms_|.
-  uint32_t process_stats_cache_clear_ms_ = 0;
+  // Cached process stats per process. Cleared every |cache_ttl_ticks_| *
+  // |poll_period_ms_| ms.
+  uint32_t process_stats_cache_ttl_ticks_ = 0;
   std::unordered_map<int32_t, CachedProcessStats> process_stats_cache_;
 
   base::WeakPtrFactory<ProcessStatsDataSource> weak_factory_;  // Keep last.
