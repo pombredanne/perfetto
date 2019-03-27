@@ -356,6 +356,7 @@ cc_library_shared {
     "src/android_internal/power_stats_hal.cc",
   ],
   shared_libs: [
+    "android.hardware.atrace@1.0",
     "android.hardware.health@2.0",
     "android.hardware.power.stats@1.0",
     "libbase",
