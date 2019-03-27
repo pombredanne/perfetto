@@ -50,31 +50,10 @@ class LogHistogram {
   static constexpr uint64_t kMaxBucket = 0;
 
   void Add(uint64_t value) { values_[GetBucket(value)]++; }
-
-  std::vector<std::pair<uint64_t, uint64_t>> GetData() {
-    std::vector<std::pair<uint64_t, uint64_t>> data;
-    data.reserve(kBuckets);
-    for (size_t i = 0; i < kBuckets; ++i) {
-      if (i == kBuckets - 1)
-        data.emplace_back(0, values_[i]);
-      else
-        data.emplace_back(1 << i, values_[i]);
-    }
-    return data;
-  }
+  std::vector<std::pair<uint64_t, uint64_t>> GetData();
 
  private:
-  size_t GetBucket(uint64_t value) {
-    if (value == 0)
-      return 0;
-
-    unsigned long long v = value;
-    auto hibit = 8 * sizeof(unsigned long long) -
-                 static_cast<size_t>(__builtin_clzll(v));
-    if (hibit >= kBuckets)
-      return kBuckets - 1;
-    return hibit;
-  }
+  size_t GetBucket(uint64_t value);
 
   std::array<uint64_t, kBuckets> values_ = {};
 };

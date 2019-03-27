@@ -60,7 +60,38 @@ std::vector<UnwindingWorker> MakeUnwindingWorkers(HeapprofdProducer* delegate,
   return ret;
 }
 
+size_t CeilingLog2(uint64_t value) {
+  size_t i = 0;
+  while (value) {
+    i++;
+    value >>= 1;
+  }
+  return i;
+}
+
 }  // namespace
+
+std::vector<std::pair<uint64_t, uint64_t>> LogHistogram::GetData() {
+  std::vector<std::pair<uint64_t, uint64_t>> data;
+  data.reserve(kBuckets);
+  for (size_t i = 0; i < kBuckets; ++i) {
+    if (i == kBuckets - 1)
+      data.emplace_back(0, values_[i]);
+    else
+      data.emplace_back(1 << i, values_[i]);
+  }
+  return data;
+}
+
+size_t LogHistogram::GetBucket(uint64_t value) {
+  if (value == 0)
+    return 0;
+
+  size_t hibit = CeilingLog2(value);
+  if (hibit >= kBuckets)
+    return kBuckets - 1;
+  return hibit;
+}
 
 // We create kUnwinderThreads unwinding threads. Bookkeeping is done on the main
 // thread.
@@ -364,9 +395,12 @@ bool HeapprofdProducer::Dump(DataSourceInstanceID id,
       stats->set_map_reparses(process_state.map_reparses);
       auto* unwinding_hist = stats->set_unwinding_time_us();
       for (const auto& p : process_state.unwinding_time_us.GetData()) {
-        auto* sample = unwinding_hist->add_samples();
-        sample->set_bucket(p.first);
-        sample->set_count(p.second);
+        auto* bucket = unwinding_hist->add_buckets();
+        if (p.first != LogHistogram::kMaxBucket)
+          bucket->set_max_bucket(true);
+        else
+          bucket->set_upper_limit(p.first);
+        bucket->set_count(p.second);
       }
     };
     heap_tracker.Dump(std::move(new_heapsamples), &dump_state);
