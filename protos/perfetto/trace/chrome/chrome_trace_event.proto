@@ -119,5 +119,5 @@ message ChromeEventBundle {
 
   // Contents of a string table that's valid for
   // the whole ChromeEventBundle entry.
-  repeated ChromeStringTableEntry string_table = 3;
+  repeated ChromeStringTableEntry string_table = 3 [deprecated = true];
 }
