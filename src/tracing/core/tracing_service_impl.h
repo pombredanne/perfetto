@@ -146,10 +146,8 @@ class TracingServiceImpl : public TracingService {
     // before use.
     std::map<WriterID, BufferID> writers_;
 
-    // This is used only in in-process configurations. The mutex protects
-    // concurrent construction of |inproc_shmem_arbiter_|.
+    // This is used only in in-process configurations.
     // SharedMemoryArbiterImpl methods themselves are thread-safe.
-    std::mutex inproc_shmem_arbiter_mutex_;
     std::unique_ptr<SharedMemoryArbiterImpl> inproc_shmem_arbiter_;
 
     PERFETTO_THREAD_CHECKER(thread_checker_)

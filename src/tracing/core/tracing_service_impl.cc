@@ -2509,7 +2509,6 @@ void TracingServiceImpl::ProducerEndpointImpl::StopDataSource(
 
 SharedMemoryArbiterImpl*
 TracingServiceImpl::ProducerEndpointImpl::GetShmemArbiter() {
-  std::lock_guard<std::mutex> lock(inproc_shmem_arbiter_mutex_);
   PERFETTO_CHECK(inproc_shmem_arbiter_);
   return inproc_shmem_arbiter_.get();
 }
