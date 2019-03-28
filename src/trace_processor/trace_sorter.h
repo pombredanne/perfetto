@@ -185,36 +185,6 @@ class TraceSorter {
     int64_t max_ts_ = 0;
     size_t sort_start_idx_ = 0;
     int64_t sort_min_ts_ = std::numeric_limits<int64_t>::max();
-
-    // void PrintAllTimestamps() {
-    //   PERFETTO_ILOG("Printing Queue timestamps");
-    //   int max_print = 30;
-    //   int count = 0;
-    //   for (auto& ev : events_) {
-    //     if (count >= max_print) break;
-    //     PERFETTO_ILOG("%d Ts: %ld", count, ev.timestamp);
-    //     count++;
-    //   }
-    //   PERFETTO_ILOG("-------------------------");
-    // }
-
-    // void PrintSortBreakage() {
-    //   PERFETTO_ILOG("Printing Sort Break Info");
-    //   int64_t prev_ts = -1;
-    //   int idx = 0;
-    //   for (auto& ev : events_) {
-    //     if (ev.timestamp < prev_ts) {
-    //       PERFETTO_ILOG("Prev ts: %ld", prev_ts);
-    //       PERFETTO_ILOG("Curr ts: %ld", ev.timestamp);
-    //       PERFETTO_ILOG("Break index: %d", idx);
-    //       break;
-    //     }
-    //     prev_ts = ev.timestamp;
-    //     idx++;
-    //   }
-    //   PERFETTO_ILOG("Checked %d events.", idx);
-    //   PERFETTO_ILOG("-------------------------");
-    // }
   };
 
   // This method passes any events older than window_size_ns to the
