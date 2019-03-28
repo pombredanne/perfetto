@@ -184,7 +184,7 @@ std::string FormatHistogram(const protos::ProfilePacket_Histogram& hist) {
       upper_limit = std::to_string(bucket.upper_limit());
 
     out += "[" + prev_upper_limit + ", " + upper_limit +
-           "]: " + std::to_string(bucket.count());
+           "]: " + std::to_string(bucket.count()) + "\n ";
     prev_upper_limit = std::move(upper_limit);
   }
   return out;
