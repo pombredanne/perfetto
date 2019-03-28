@@ -22,8 +22,6 @@ package perfetto.protos;
 // of when it received it and a copy of the trigger. We emit this pair so that
 // filtering can be done on triggers received in the trace.
 message Trigger {
-  // The time that |trigger| was received by the service.
-  optional uint64 boot_time_ns = 1;
   // Name of the trigger which was received.
   optional string trigger_name = 2;
   // The actual producer that activated |trigger|.
