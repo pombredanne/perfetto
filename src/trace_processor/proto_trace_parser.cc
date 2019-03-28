@@ -1264,7 +1264,7 @@ void ProtoTraceParser::ParseSystemInfo(ConstBytes blob) {
     protos::pbzero::Utsname::Decoder utsname(utsname_blob.data,
                                              utsname_blob.size);
     base::StringView machine = utsname.machine();
-    if (machine == "aarch64") {
+    if (machine == "aarch64" || machine == "armv8l") {
       context_->syscall_tracker->SetArchitecture(kAarch64);
     } else if (machine == "x86_64") {
       context_->syscall_tracker->SetArchitecture(kX86_64);
