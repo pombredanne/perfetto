@@ -165,9 +165,9 @@ class UnwindingWorker : public base::UnixSocket::EventListener {
   void OnDataAvailable(base::UnixSocket* self) override;
 
  public:
-  // static and public for testing/fuzzing
   void ReadAndHandle(pid_t pid);
 
+  // static and public for testing/fuzzing
   static void HandleBuffer(const SharedRingBuffer::Buffer& buf,
                            UnwindingMetadata* unwinding_metadata,
                            DataSourceInstanceID data_source_instance_id,
