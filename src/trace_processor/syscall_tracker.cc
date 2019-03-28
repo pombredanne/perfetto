@@ -649,7 +649,8 @@ void SyscallTracker::SetArchitecture(Architecture arch) {
 
   for (size_t i = 0; i < kSyscallCount; i++) {
     const char* name = (*arch_to_generic_syscall_number)[i];
-    StringId id = context_->storage->InternString(name ? name : "");
+    StringId id =
+        context_->storage->InternString(name ? name : "UNKNOWN_SYSCALL");
     arch_syscall_to_string_id_[i] = id;
     if (name && !strcmp(name, "sys_write"))
       sys_write_string_id_ = id;
