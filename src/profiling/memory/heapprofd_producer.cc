@@ -396,7 +396,7 @@ bool HeapprofdProducer::Dump(DataSourceInstanceID id,
       auto* unwinding_hist = stats->set_unwinding_time_us();
       for (const auto& p : process_state.unwinding_time_us.GetData()) {
         auto* bucket = unwinding_hist->add_buckets();
-        if (p.first != LogHistogram::kMaxBucket)
+        if (p.first == LogHistogram::kMaxBucket)
           bucket->set_max_bucket(true);
         else
           bucket->set_upper_limit(p.first);
