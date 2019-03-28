@@ -60,7 +60,8 @@ std::vector<UnwindingWorker> MakeUnwindingWorkers(HeapprofdProducer* delegate,
   return ret;
 }
 
-size_t CeilingLog2(uint64_t value) {
+// Return largest n such that pow(2, n) < value.
+size_t Log2LessThan(uint64_t value) {
   size_t i = 0;
   while (value) {
     i++;
@@ -87,7 +88,7 @@ size_t LogHistogram::GetBucket(uint64_t value) {
   if (value == 0)
     return 0;
 
-  size_t hibit = CeilingLog2(value);
+  size_t hibit = Log2LessThan(value);
   if (hibit >= kBuckets)
     return kBuckets - 1;
   return hibit;
