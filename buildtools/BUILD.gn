@@ -398,7 +398,7 @@ if (current_toolchain == host_toolchain) {
 
 if (use_custom_libcxx) {
   # Support a custom libcxx with empty buildtools deps doesn't make sense.
-  assert(!perfetto_empty_buildtools_deps)
+  assert(!perfetto_no_source_buildtools)
 
   # Config applied to both libc++ and libc++abi targets below.
   config("libc++config") {
