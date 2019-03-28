@@ -368,6 +368,8 @@ int SpanJoinOperatorTable::Cursor::Next() {
     if (!t1_.IsRealSlice() && !t2_.IsRealSlice()) {
       PERFETTO_DCHECK(t1_.partition() == t2_.partition());
 
+      // If the table is not partitioned, partition() will return the partition
+      // the table was set to have by StepToPartition().
       auto t1_partition =
           t1_.IsPartitioned() ? t1_.CursorPartition() : t1_.partition();
       auto t2_partition =
