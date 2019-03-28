@@ -379,11 +379,7 @@ inline std::string SqliteValueAsString(sqlite3_value* value) {
       return std::to_string(sqlite3_value_int64(value));
     case SQLITE_FLOAT:
       return std::to_string(sqlite3_value_double(value));
-    case SQLITE_TEXT: {
-      const char* str =
-          reinterpret_cast<const char*>(sqlite3_value_text(value));
-      return "'" + std::string(str) + "'";
-    }
+    case SQLITE_TEXT:
     case SQLITE_BLOB: {
       const char* str =
           reinterpret_cast<const char*>(sqlite3_value_blob(value));
