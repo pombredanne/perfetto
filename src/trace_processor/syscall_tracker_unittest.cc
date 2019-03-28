@@ -63,6 +63,15 @@ TEST_F(SyscallTrackerTest, IgnoreSyscallsIfWeDontKnowArch) {
   context.syscall_tracker->Exit(110 /*ts*/, 42 /*utid*/, 7 /*syscall*/);
 }
 
+TEST_F(SyscallTrackerTest, IgnoreWriteSyscalls) {
+  context.syscall_tracker->SetArchitecture(kAarch64);
+  EXPECT_CALL(*slice_tracker, Begin(_, _, _, _)).Times(0);
+  EXPECT_CALL(*slice_tracker, End(_, _, _, _)).Times(0);
+
+  context.syscall_tracker->Enter(100 /*ts*/, 42 /*utid*/, 4 /*sys_write*/);
+  context.syscall_tracker->Exit(110 /*ts*/, 42 /*utid*/, 4 /*sys_write*/);
+}
+
 TEST_F(SyscallTrackerTest, Aarch64) {
   StringId begin_name = 0;
   StringId end_name = 0;
@@ -74,6 +83,21 @@ TEST_F(SyscallTrackerTest, Aarch64) {
   context.syscall_tracker->SetArchitecture(kAarch64);
   context.syscall_tracker->Enter(100 /*ts*/, 42 /*utid*/, 3 /*sys_read*/);
   context.syscall_tracker->Exit(110 /*ts*/, 42 /*utid*/, 3 /*sys_read*/);
+  EXPECT_EQ(context.storage->GetString(begin_name), "sys_read");
+  EXPECT_EQ(context.storage->GetString(end_name), "sys_read");
+}
+
+TEST_F(SyscallTrackerTest, x8664) {
+  StringId begin_name = 0;
+  StringId end_name = 0;
+  EXPECT_CALL(*slice_tracker, Begin(100, 42, 0, _))
+      .WillOnce(SaveArg<3>(&begin_name));
+  EXPECT_CALL(*slice_tracker, End(110, 42, 0, _))
+      .WillOnce(SaveArg<3>(&end_name));
+
+  context.syscall_tracker->SetArchitecture(kX86_64);
+  context.syscall_tracker->Enter(100 /*ts*/, 42 /*utid*/, 0 /*sys_read*/);
+  context.syscall_tracker->Exit(110 /*ts*/, 42 /*utid*/, 0 /*sys_read*/);
   EXPECT_EQ(context.storage->GetString(begin_name), "sys_read");
   EXPECT_EQ(context.storage->GetString(end_name), "sys_read");
 }

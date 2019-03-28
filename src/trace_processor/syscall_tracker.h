@@ -26,34 +26,13 @@
 namespace perfetto {
 namespace trace_processor {
 
-// Maximum of maximum value of Syscall enum and the maximum syscall numbers
-// in each of the architecture specific tables.
-static constexpr size_t kSyscallCount = 13;
+// Maximum syscall number known.
+static constexpr size_t kSyscallCount = 400;
 
 enum Architecture {
   kUnknown = 0,
   kAarch64,
-  kX8664,
-};
-
-// All known syscalls + kUnknownSyscall.
-// In no particular order with the exception of kUnknownSyscall which should be
-// 0 so default initialized array entries map to an unknown syscall.
-enum Syscall {
-  kUnknownSyscall = 0,
-  kRestartSyscall,
-  kSysExit,
-  kSysFork,
-  kSysRead,
-  kSysWrite,
-  kSysOpen,
-  kSysClose,
-  kSysCreat,
-  kSysLink,
-  kSysUnlink,
-  kSysExecve,
-  kSysChdir,
-  kSysTime,
+  kX86_64,
 };
 
 class SyscallTracker {
@@ -70,20 +49,12 @@ class SyscallTracker {
  private:
   TraceProcessorContext* const context_;
 
-  void InternSyscallString(Syscall, base::StringView);
   StringId SyscallNumberToStringId(uint32_t syscall_num);
-
-  // This is table from our arch independent syscall enum to the relevent
-  // string id:
-  std::array<StringId, kSyscallCount> generic_syscall_to_string_id_;
-
-  // This table from the platform specific syscall number to our arch
-  // independent enum.
-  std::array<Syscall, kSyscallCount> arch_to_generic_syscall_number_;
 
   // This is table from platform specific syscall number directly to
   // the relevent StringId (this avoids having to always do two conversions).
   std::array<StringId, kSyscallCount> arch_syscall_to_string_id_;
+  StringId sys_write_string_id_;
 };
 
 }  // namespace trace_processor
