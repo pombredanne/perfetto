@@ -632,7 +632,7 @@ void HeapprofdProducer::HandleClientConnection(
   if (!shmem_size)
     shmem_size = kDefaultShmemSize;
 
-  auto shmem = SharedRingBuffer::Create();
+  auto shmem = SharedRingBuffer::Create(shmem_size);
   if (!shmem || !shmem->is_valid()) {
     PERFETTO_LOG("Failed to create shared memory.");
     return;
