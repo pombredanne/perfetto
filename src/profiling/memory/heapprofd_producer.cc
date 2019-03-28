@@ -805,6 +805,10 @@ void HeapprofdProducer::HandleSocketDisconnected(DataSourceInstanceID id,
     return;
   ProcessState& process_state = process_state_it->second;
   process_state.disconnected = true;
+
+  // TODO(fmayer): Dump on process disconnect rather than data source
+  // destruction. This prevents us needing to hold onto the bookkeeping data
+  // after the process disconnected.
 }
 
 }  // namespace profiling
