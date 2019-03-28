@@ -26,6 +26,7 @@
 
 #include "perfetto/base/logging.h"
 #include "perfetto/base/optional.h"
+#include "src/trace_processor/null_term_string_view.h"
 #include "src/trace_processor/scoped_db.h"
 #include "src/trace_processor/table.h"
 
@@ -333,7 +334,7 @@ T FindEqBound(sqlite3_value* sqlite_val) {
   }
 }
 
-template <typename T>
+template <typename T, typename = sqlite_utils::is_numeric<T>>
 void ReportSqliteResult(sqlite3_context*, T value);
 
 // Do not add a uint64_t version of ReportSqliteResult. You should not be using
@@ -364,17 +365,30 @@ inline void ReportSqliteResult(sqlite3_context* ctx, double value) {
   sqlite3_result_double(ctx, value);
 }
 
+inline void ReportSqliteResult(
+    sqlite3_context* ctx,
+    const base::StringView& view,
+    sqlite3_destructor_type destructor = kSqliteStatic) {
+  sqlite3_result_blob(ctx, view.data(), static_cast<int>(view.size()),
+                      destructor);
+}
+
 inline std::string SqliteValueAsString(sqlite3_value* value) {
   switch (sqlite3_value_type(value)) {
     case SQLITE_INTEGER:
       return std::to_string(sqlite3_value_int64(value));
     case SQLITE_FLOAT:
       return std::to_string(sqlite3_value_double(value));
-    case SQLITE_BLOB:
     case SQLITE_TEXT: {
       const char* str =
           reinterpret_cast<const char*>(sqlite3_value_text(value));
       return "'" + std::string(str) + "'";
+    }
+    case SQLITE_BLOB: {
+      const char* str =
+          reinterpret_cast<const char*>(sqlite3_value_blob(value));
+      size_t size = static_cast<size_t>(sqlite3_value_bytes(value));
+      return "'" + std::string(str, size) + "'";
     }
     default:
       PERFETTO_FATAL("Unknown value type %d", sqlite3_value_type(value));

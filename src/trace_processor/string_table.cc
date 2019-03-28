@@ -80,8 +80,7 @@ int StringTable::Cursor::Column(sqlite3_context* context, int col) {
       break;
     case Column::kString: {
       const auto& str = storage_->GetString(string_id);
-      sqlite3_result_blob(context, str.c_str(), static_cast<int>(str.size()),
-                          sqlite_utils::kSqliteStatic);
+      sqlite_utils::ReportSqliteResult(context, NullTermStringView(str));
       break;
     }
   }

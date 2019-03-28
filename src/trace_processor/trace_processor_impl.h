@@ -121,13 +121,14 @@ class TraceProcessor::IteratorImpl {
         value.long_value = sqlite3_column_int64(*stmt_, column);
         break;
       case SQLITE_BLOB:
-      case SQLITE_TEXT:
-        // TODO(lalitm): switch this usage to utilise sqlite3_column_blob
-        // and sqlite3_column_bytes.
+      case SQLITE_TEXT: {
+        auto str =
+            reinterpret_cast<const char*>(sqlite3_column_blob(*stmt_, column));
+        auto size = static_cast<size_t>(sqlite3_column_bytes(*stmt_, column));
         value.type = SqlValue::kString;
-        value.string_value =
-            reinterpret_cast<const char*>(sqlite3_column_text(*stmt_, column));
+        value.string_value = base::StringView(str, size);
         break;
+      }
       case SQLITE_FLOAT:
         value.type = SqlValue::kDouble;
         value.double_value = sqlite3_column_double(*stmt_, column);

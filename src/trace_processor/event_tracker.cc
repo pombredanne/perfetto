@@ -26,14 +26,15 @@
 #include "src/trace_processor/stats.h"
 #include "src/trace_processor/trace_processor_context.h"
 
-#include "perfetto/trace/ftrace/ftrace_event.pb.h"
+#include "perfetto/trace/ftrace/ftrace_event.pbzero.h"
+#include "perfetto/trace/ftrace/sched.pbzero.h"
 
 namespace perfetto {
 namespace trace_processor {
 
 EventTracker::EventTracker(TraceProcessorContext* context) : context_(context) {
-  auto* descriptor =
-      GetMessageDescriptorForId(protos::FtraceEvent::kSchedSwitchFieldNumber);
+  auto* descriptor = GetMessageDescriptorForId(
+      protos::pbzero::FtraceEvent::kSchedSwitchFieldNumber);
   PERFETTO_CHECK(descriptor->max_field_id == kSchedSwitchMaxFieldId);
 
   for (size_t i = 1; i <= kSchedSwitchMaxFieldId; i++) {
@@ -107,7 +108,7 @@ void EventTracker::PushSchedSwitch(uint32_t cpu,
   // order as the order of fields in the proto; this is used by the raw table to
   // index these events using the field ids.
   using Variadic = TraceStorage::Args::Variadic;
-  using SS = protos::SchedSwitchFtraceEvent;
+  using SS = protos::pbzero::SchedSwitchFtraceEvent;
   auto add_raw_arg = [this](RowId row_id, int field_num,
                             TraceStorage::Args::Variadic var) {
     StringId key = sched_switch_field_ids_[static_cast<size_t>(field_num)];
@@ -144,9 +145,12 @@ RowId EventTracker::PushCounter(int64_t timestamp,
   }
   prev_timestamp_ = timestamp;
 
-  auto* counters = context_->storage->mutable_counters();
-  size_t idx = counters->AddCounter(timestamp, name_id, value, ref, ref_type);
-  return TraceStorage::CreateRowId(TableId::kCounters,
+  auto* definitions = context_->storage->mutable_counter_definitions();
+  auto counter_row = definitions->AddCounterDefinition(name_id, ref, ref_type);
+
+  auto* counter_values = context_->storage->mutable_counter_values();
+  size_t idx = counter_values->AddCounterValue(counter_row, timestamp, value);
+  return TraceStorage::CreateRowId(TableId::kCounterValues,
                                    static_cast<uint32_t>(idx));
 }
 

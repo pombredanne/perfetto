@@ -19,9 +19,10 @@
 
 #include <stdint.h>
 
+#include "perfetto/base/string_view.h"
+
 namespace perfetto {
 namespace trace_processor {
-
 
 struct Config {
   uint64_t window_size_ns = 180 * 1000 * 1000 * 1000ULL;  // 3 minutes.
@@ -37,14 +38,15 @@ struct SqlValue {
     kDouble,
   };
 
-  // Up to 1 of these fields can be accessed depending on |type|.
-  union {
-    // This string will be owned by the iterator that returned it and is valid
-    // as long until the subsequent call to Next().
-    const char* string_value;
-    int64_t long_value;
-    double double_value;
-  };
+  // Up to 1 of |long_value|, |double_value| and |string_value| can be accessed
+  // depending on |type|.
+  int64_t long_value;
+  double double_value;
+
+  // This string will be owned by the iterator that returned it and is valid
+  // as long until the subsequent call to Next().
+  base::StringView string_value;
+
   Type type = kNull;
 };
 

@@ -60,9 +60,10 @@ void sqlite_str_split(sqlite3_context* context,
   do {
     next = strstr(in, delimiter);
     if (fld == 0) {
-      int size = next != nullptr ? static_cast<int>(next - in)
-                                 : static_cast<int>(strlen(in));
-      sqlite3_result_blob(context, in, size, sqlite_utils::kSqliteTransient);
+      size_t size =
+          next != nullptr ? static_cast<size_t>(next - in) : strlen(in);
+      sqlite_utils::ReportSqliteResult(context, NullTermStringView(in, size),
+                                       sqlite_utils::kSqliteTransient);
       return;
     } else if (next == nullptr) {
       break;

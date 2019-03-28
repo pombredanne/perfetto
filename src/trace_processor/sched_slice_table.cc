@@ -106,8 +106,7 @@ void SchedSliceTable::EndStateColumn::ReportResult(sqlite3_context* ctx,
   if (state.is_valid()) {
     PERFETTO_CHECK(state.raw_state() < state_strings_.size());
     const auto& str = state_strings_[state.raw_state()];
-    sqlite3_result_blob(ctx, str.data(), static_cast<int>(str.size()),
-                        sqlite_utils::kSqliteStatic);
+    sqlite_utils::ReportSqliteResult(ctx, NullTermStringView(str.data()));
   } else {
     sqlite3_result_null(ctx);
   }

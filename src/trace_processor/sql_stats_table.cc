@@ -77,8 +77,7 @@ int SqlStatsTable::Cursor::Column(sqlite3_context* context, int col) {
   switch (col) {
     case Column::kQuery: {
       const auto& str = stats.queries()[row_];
-      sqlite3_result_blob(context, str.data(), static_cast<int>(str.size()),
-                          sqlite_utils::kSqliteStatic);
+      sqlite_utils::ReportSqliteResult(context, NullTermStringView(str));
       break;
     }
     case Column::kTimeQueued:
