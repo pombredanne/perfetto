@@ -42,7 +42,7 @@ ChromeConfig& ChromeConfig::operator=(ChromeConfig&&) = default;
 #pragma GCC diagnostic ignored "-Wfloat-equal"
 bool ChromeConfig::operator==(const ChromeConfig& other) const {
   return (trace_config_ == other.trace_config_) &&
-         output_filtering_enabled_ == other.output_filtering_enabled_;
+         (output_filtering_enabled_ == other.output_filtering_enabled_);
 }
 #pragma GCC diagnostic pop
 
@@ -50,7 +50,12 @@ void ChromeConfig::FromProto(const perfetto::protos::ChromeConfig& proto) {
   static_assert(sizeof(trace_config_) == sizeof(proto.trace_config()),
                 "size mismatch");
   trace_config_ = static_cast<decltype(trace_config_)>(proto.trace_config());
-  output_filtering_enabled_ = proto.output_filtering_enabled();
+
+  static_assert(sizeof(output_filtering_enabled_) ==
+                    sizeof(proto.output_filtering_enabled()),
+                "size mismatch");
+  output_filtering_enabled_ = static_cast<decltype(output_filtering_enabled_)>(
+      proto.output_filtering_enabled());
   unknown_fields_ = proto.unknown_fields();
 }
 
@@ -61,7 +66,13 @@ void ChromeConfig::ToProto(perfetto::protos::ChromeConfig* proto) const {
                 "size mismatch");
   proto->set_trace_config(
       static_cast<decltype(proto->trace_config())>(trace_config_));
-  proto->set_output_filtering_enabled(output_filtering_enabled_);
+
+  static_assert(sizeof(output_filtering_enabled_) ==
+                    sizeof(proto->output_filtering_enabled()),
+                "size mismatch");
+  proto->set_output_filtering_enabled(
+      static_cast<decltype(proto->output_filtering_enabled())>(
+          output_filtering_enabled_));
   *(proto->mutable_unknown_fields()) = unknown_fields_;
 }
 

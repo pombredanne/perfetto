@@ -69,7 +69,7 @@ class PERFETTO_EXPORT ChromeConfig {
 
  private:
   std::string trace_config_ = {};
-  bool output_filtering_enabled_ = false;
+  bool output_filtering_enabled_ = {};
 
   // Allows to preserve unknown protobuf fields for compatibility
   // with future versions of .proto files.
