@@ -27,7 +27,7 @@ namespace perfetto {
 namespace trace_processor {
 
 // Maximum syscall number known.
-static constexpr size_t kSyscallCount = 400;
+static constexpr size_t kSyscallCount = 330;
 
 enum Architecture {
   kUnknown = 0,
