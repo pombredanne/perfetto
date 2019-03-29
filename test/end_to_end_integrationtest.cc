@@ -759,33 +759,27 @@ TEST_F(PerfettoCmdlineTest, NoSanitizers(StopTracingTrigger)) {
 }
 
 TEST_F(PerfettoCmdlineTest, NoSanitizers(NoDataNoFileWithoutTrigger)) {
-  std::string cfg = R"(
-    buffers: {
-      size_kb: 8960
-      fill_policy: DISCARD
-    }
-    buffers: {
-      size_kb: 1280
-      fill_policy: DISCARD
-    }
-    data_sources: {
-      config {
-        name: "android.perfetto.FakeProducer"
-        for_testing {
-          message_count: 11
-          message_size: 32
-        }
-      }
-    }
-    trigger_config {
-      trigger_mode: STOP_TRACING
-      trigger_timeout_ms: 1
-      triggers {
-        name: "trigger_name"
-        stop_delay_ms: 500
-      }
-    }
-  )";
+  // See |message_count| and |message_size| in the TraceConfig above.
+  constexpr size_t kMessageCount = 11;
+  constexpr size_t kMessageSize = 32;
+  protos::TraceConfig trace_config;
+  trace_config.add_buffers()->set_size_kb(1024);
+  auto* ds_config = trace_config.add_data_sources()->mutable_config();
+  ds_config->set_name("android.perfetto.FakeProducer");
+  ds_config->mutable_for_testing()->set_message_count(kMessageCount);
+  ds_config->mutable_for_testing()->set_message_size(kMessageSize);
+  auto* trigger_cfg = trace_config.mutable_trigger_config();
+  trigger_cfg->set_trigger_mode(
+      protos::TraceConfig::TriggerConfig::STOP_TRACING);
+  trigger_cfg->set_trigger_timeout_ms(15000);
+  auto* trigger = trigger_cfg->add_triggers();
+  trigger->set_name("trigger_name");
+  // |stop_delay_ms| must be long enough that we can write the packets in
+  // before the trace finishes. This has to be long enough for the slowest
+  // emulator. But as short as possible to prevent the test running a long
+  // time.
+  trigger->set_stop_delay_ms(500);
+  trigger = trigger_cfg->add_triggers();
 
   // Enable tracing and detach as soon as it gets started.
   base::TestTaskRunner task_runner;
@@ -794,12 +788,12 @@ TEST_F(PerfettoCmdlineTest, NoSanitizers(NoDataNoFileWithoutTrigger)) {
   auto* fake_producer = helper.ConnectFakeProducer();
   EXPECT_TRUE(fake_producer);
 
-  std::thread background_trace([cfg, this]() {
+  std::thread background_trace([trace_config, this]() {
     EXPECT_EQ(0, Exec(
                      {
-                         "-o", "/tmp/output.perfetto-trace", "-c", "-", "--txt",
+                         "-o", "/tmp/output.perfetto-trace", "-c", "-",
                      },
-                     cfg));
+                     trace_config.SerializeAsString()));
   });
 
   background_trace.join();
