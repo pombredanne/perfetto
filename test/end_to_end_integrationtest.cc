@@ -597,40 +597,26 @@ TEST_F(PerfettoCmdlineTest, NoSanitizers(DetachAndAttach)) {
 }
 
 TEST_F(PerfettoCmdlineTest, NoSanitizers(StartTracingTrigger)) {
-  std::string cfg = R"(
-    buffers: {
-      size_kb: 8960
-      fill_policy: DISCARD
-    }
-    buffers: {
-      size_kb: 1280
-      fill_policy: DISCARD
-    }
-    data_sources: {
-      config {
-        name: "android.perfetto.FakeProducer"
-        for_testing {
-          message_count: 11
-          message_size: 32
-        }
-      }
-    }
-    trigger_config {
-      trigger_mode: START_TRACING
-      trigger_timeout_ms: 15000
-      triggers {
-        name: "trigger_name"
-        # |stop_delay_ms| must be long enough that we can write the packets in
-        # before the trace finishes. This has to be long enough for the slowest
-        # emulator. But as short as possible to prevent the test running a long
-        # time.
-        stop_delay_ms: 500
-      }
-    }
-  )";
   // See |message_count| and |message_size| in the TraceConfig above.
   constexpr size_t kMessageCount = 11;
   constexpr size_t kMessageSize = 32;
+  protos::TraceConfig trace_config;
+  trace_config.add_buffers()->set_size_kb(1024);
+  auto* ds_config = trace_config.add_data_sources()->mutable_config();
+  ds_config->set_name("android.perfetto.FakeProducer");
+  ds_config->mutable_for_testing()->set_message_count(kMessageCount);
+  ds_config->mutable_for_testing()->set_message_size(kMessageSize);
+  auto* trigger_cfg = trace_config.mutable_trigger_config();
+  trigger_cfg->set_trigger_mode(
+      protos::TraceConfig::TriggerConfig::START_TRACING);
+  trigger_cfg->set_trigger_timeout_ms(15000);
+  auto* trigger = trigger_cfg->add_triggers();
+  trigger->set_name("trigger_name");
+  // |stop_delay_ms| must be long enough that we can write the packets in
+  // before the trace finishes. This has to be long enough for the slowest
+  // emulator. But as short as possible to prevent the test running a long
+  // time.
+  trigger->set_stop_delay_ms(500);
 
   // We have 5 normal preample packets (trace config, clock, system info, sync
   // marker, stats) and then since this is a trace with a trigger config we have
@@ -645,12 +631,12 @@ TEST_F(PerfettoCmdlineTest, NoSanitizers(StartTracingTrigger)) {
   auto* fake_producer = helper.ConnectFakeProducer();
   EXPECT_TRUE(fake_producer);
 
-  std::thread background_trace([cfg, this]() {
+  std::thread background_trace([trace_config, this]() {
     EXPECT_EQ(0, Exec(
                      {
-                         "-o", "/tmp/output.perfetto-trace", "-c", "-", "--txt",
+                         "-o", "/tmp/output.perfetto-trace", "-c", "-",
                      },
-                     cfg));
+                     trace_config.SerializeAsString()));
   });
 
   helper.WaitForProducerSetup();
@@ -670,94 +656,50 @@ TEST_F(PerfettoCmdlineTest, NoSanitizers(StartTracingTrigger)) {
   ASSERT_TRUE(trace.ParseFromString(trace_str));
   EXPECT_EQ(kPreamblePackets + kMessageCount, trace.packet_size());
   for (const auto& packet : trace.packet()) {
-    switch (packet.data_case()) {
-      case protos::TracePacket::kTraceConfig:
-        // Ensure the trace config properly includes the trigger mode we set.
-        EXPECT_EQ(protos::TraceConfig::TriggerConfig::START_TRACING,
-                  packet.trace_config().trigger_config().trigger_mode());
-        break;
-      case protos::TracePacket::kTriggers:
-        // validate that the triggers are properly added to the trace.
-        ASSERT_EQ(1, packet.triggers().triggers_size());
-        EXPECT_EQ("trigger_name", packet.triggers().triggers(0).trigger_name());
-        break;
-      case protos::TracePacket::kForTesting:
-        // Make sure that the data size is correctly set based on what we
-        // requested.
-        EXPECT_EQ(kMessageSize, packet.for_testing().str().size());
-        break;
-      case protos::TracePacket::kClockSnapshot:
-      case protos::TracePacket::kTraceStats:
-      case protos::TracePacket::kSystemInfo:
-      case protos::TracePacket::kSynchronizationMarker:
-        // Preamble packets, that we don't really need to verify contents.
-        break;
-      case protos::TracePacket::kFtraceEvents:
-      case protos::TracePacket::kProcessTree:
-      case protos::TracePacket::kProcessStats:
-      case protos::TracePacket::kInodeFileMap:
-      case protos::TracePacket::kChromeEvents:
-      case protos::TracePacket::kSysStats:
-      case protos::TracePacket::kTrackEvent:
-      case protos::TracePacket::kFtraceStats:
-      case protos::TracePacket::kProfilePacket:
-      case protos::TracePacket::kBattery:
-      case protos::TracePacket::kPowerRails:
-      case protos::TracePacket::kAndroidLog:
-      case protos::TracePacket::kProcessDescriptor:
-      case protos::TracePacket::kThreadDescriptor:
-      case protos::TracePacket::DATA_NOT_SET:
-        ADD_FAILURE() << "Unexpected packet: " << packet.data_case();
-        break;
+    if (packet.data_case() == protos::TracePacket::kTraceConfig) {
+      // Ensure the trace config properly includes the trigger mode we set.
+      EXPECT_EQ(protos::TraceConfig::TriggerConfig::START_TRACING,
+                packet.trace_config().trigger_config().trigger_mode());
+    } else if (packet.data_case() == protos::TracePacket::kTrigger) {
+      // validate that the triggers are properly added to the trace.
+      EXPECT_EQ("trigger_name", packet.trigger().trigger_name());
+    } else if (packet.data_case() == protos::TracePacket::kForTesting) {
+      // Make sure that the data size is correctly set based on what we
+      // requested.
+      EXPECT_EQ(kMessageSize, packet.for_testing().str().size());
     }
   }
 }
 
 TEST_F(PerfettoCmdlineTest, NoSanitizers(StopTracingTrigger)) {
-  std::string cfg = R"(
-    buffers: {
-      size_kb: 8960
-      fill_policy: DISCARD
-    }
-    buffers: {
-      size_kb: 1280
-      fill_policy: DISCARD
-    }
-    data_sources: {
-      config {
-        name: "android.perfetto.FakeProducer"
-        for_testing {
-          message_count: 11
-          message_size: 32
-        }
-      }
-    }
-    trigger_config {
-      trigger_mode: STOP_TRACING
-      trigger_timeout_ms: 60000
-      triggers {
-        name: "trigger_name"
-        # |stop_delay_ms| must be long enough that we can write the packets in
-        # before the trace finishes. This has to be long enough for the slowest
-        # emulator. But as short as possible to prevent the test running a long
-        # time.
-        stop_delay_ms: 500
-      }
-      triggers {
-        name: "trigger_name_3"
-        # This stop delay should not be hit so choose a large value.
-        stop_delay_ms: 60000
-      }
-    }
-  )";
   // See |message_count| and |message_size| in the TraceConfig above.
   constexpr size_t kMessageCount = 11;
   constexpr size_t kMessageSize = 32;
+  protos::TraceConfig trace_config;
+  trace_config.add_buffers()->set_size_kb(1024);
+  auto* ds_config = trace_config.add_data_sources()->mutable_config();
+  ds_config->set_name("android.perfetto.FakeProducer");
+  ds_config->mutable_for_testing()->set_message_count(kMessageCount);
+  ds_config->mutable_for_testing()->set_message_size(kMessageSize);
+  auto* trigger_cfg = trace_config.mutable_trigger_config();
+  trigger_cfg->set_trigger_mode(
+      protos::TraceConfig::TriggerConfig::STOP_TRACING);
+  trigger_cfg->set_trigger_timeout_ms(15000);
+  auto* trigger = trigger_cfg->add_triggers();
+  trigger->set_name("trigger_name");
+  // |stop_delay_ms| must be long enough that we can write the packets in
+  // before the trace finishes. This has to be long enough for the slowest
+  // emulator. But as short as possible to prevent the test running a long
+  // time.
+  trigger->set_stop_delay_ms(500);
+  trigger = trigger_cfg->add_triggers();
+  trigger->set_name("trigger_name_3");
+  trigger->set_stop_delay_ms(60000);
 
   // We have 5 normal preample packets (trace config, clock, system info, sync
   // marker, stats) and then since this is a trace with a trigger config we have
   // an additional ReceivedTriggers packet.
-  constexpr size_t kPreamblePackets = 6;
+  constexpr size_t kPreamblePackets = 7;
 
   base::TestTaskRunner task_runner;
 
@@ -767,12 +709,12 @@ TEST_F(PerfettoCmdlineTest, NoSanitizers(StopTracingTrigger)) {
   auto* fake_producer = helper.ConnectFakeProducer();
   EXPECT_TRUE(fake_producer);
 
-  std::thread background_trace([cfg, this]() {
+  std::thread background_trace([trace_config, this]() {
     EXPECT_EQ(0, Exec(
                      {
-                         "-o", "/tmp/output.perfetto-trace", "-c", "-", "--txt",
+                         "-o", "/tmp/output.perfetto-trace", "-c", "-",
                      },
-                     cfg));
+                     trace_config.SerializeAsString()));
   });
 
   helper.WaitForProducerEnabled();
@@ -794,48 +736,24 @@ TEST_F(PerfettoCmdlineTest, NoSanitizers(StopTracingTrigger)) {
   protos::Trace trace;
   ASSERT_TRUE(trace.ParseFromString(trace_str));
   EXPECT_EQ(kPreamblePackets + kMessageCount, trace.packet_size());
+  bool seen_first_trigger = false;
   for (const auto& packet : trace.packet()) {
-    switch (packet.data_case()) {
-      case protos::TracePacket::kTraceConfig:
-        // Ensure the trace config properly includes the trigger mode we set.
-        EXPECT_EQ(protos::TraceConfig::TriggerConfig::STOP_TRACING,
-                  packet.trace_config().trigger_config().trigger_mode());
-        break;
-      case protos::TracePacket::kTriggers:
-        // validate that the triggers are properly added to the trace.
-        ASSERT_EQ(2, packet.triggers().triggers_size());
-        EXPECT_EQ("trigger_name", packet.triggers().triggers(0).trigger_name());
-        EXPECT_EQ("trigger_name_3",
-                  packet.triggers().triggers(1).trigger_name());
-        break;
-      case protos::TracePacket::kForTesting:
-        // Make sure that the data size is correctly set based on what we
-        // requested.
-        EXPECT_EQ(kMessageSize, packet.for_testing().str().size());
-        break;
-      case protos::TracePacket::kClockSnapshot:
-      case protos::TracePacket::kTraceStats:
-      case protos::TracePacket::kSystemInfo:
-      case protos::TracePacket::kSynchronizationMarker:
-        // Preamble packets, that we don't really need to verify contents.
-        break;
-      case protos::TracePacket::kFtraceEvents:
-      case protos::TracePacket::kProcessTree:
-      case protos::TracePacket::kProcessStats:
-      case protos::TracePacket::kInodeFileMap:
-      case protos::TracePacket::kChromeEvents:
-      case protos::TracePacket::kSysStats:
-      case protos::TracePacket::kTrackEvent:
-      case protos::TracePacket::kFtraceStats:
-      case protos::TracePacket::kProfilePacket:
-      case protos::TracePacket::kBattery:
-      case protos::TracePacket::kPowerRails:
-      case protos::TracePacket::kAndroidLog:
-      case protos::TracePacket::kProcessDescriptor:
-      case protos::TracePacket::kThreadDescriptor:
-      case protos::TracePacket::DATA_NOT_SET:
-        ADD_FAILURE() << "Unexpected packet: " << packet.data_case();
-        break;
+    if (packet.data_case() == protos::TracePacket::kTraceConfig) {
+      // Ensure the trace config properly includes the trigger mode we set.
+      EXPECT_EQ(protos::TraceConfig::TriggerConfig::STOP_TRACING,
+                packet.trace_config().trigger_config().trigger_mode());
+    } else if (packet.data_case() == protos::TracePacket::kTrigger) {
+      // validate that the triggers are properly added to the trace.
+      if (!seen_first_trigger) {
+        EXPECT_EQ("trigger_name", packet.trigger().trigger_name());
+        seen_first_trigger = true;
+      } else {
+        EXPECT_EQ("trigger_name_3", packet.trigger().trigger_name());
+      }
+    } else if (packet.data_case() == protos::TracePacket::kForTesting) {
+      // Make sure that the data size is correctly set based on what we
+      // requested.
+      EXPECT_EQ(kMessageSize, packet.for_testing().str().size());
     }
   }
 }
@@ -894,51 +812,33 @@ TEST_F(PerfettoCmdlineTest, NoSanitizers(NoDataNoFileWithoutTrigger)) {
 }
 
 TEST_F(PerfettoCmdlineTest, NoSanitizers(StopTracingTriggerFromConfig)) {
-  std::string cfg = R"(
-    buffers: {
-      size_kb: 8960
-      fill_policy: DISCARD
-    }
-    buffers: {
-      size_kb: 1280
-      fill_policy: DISCARD
-    }
-    data_sources: {
-      config {
-        name: "android.perfetto.FakeProducer"
-        for_testing {
-          message_count: 11
-          message_size: 32
-        }
-      }
-    }
-    trigger_config {
-      trigger_mode: STOP_TRACING
-      trigger_timeout_ms: 60000
-      triggers {
-        name: "trigger_name"
-        # |stop_delay_ms| must be long enough that we can write the packets in
-        # before the trace finishes. This has to be long enough for the slowest
-        # emulator. But as short as possible to prevent the test running a long
-        # time.
-        stop_delay_ms: 500
-      }
-      triggers {
-        name: "trigger_name_3"
-        # This stop delay should not be hit so choose a large value.
-        stop_delay_ms: 60000
-      }
-    }
-  )";
   // See |message_count| and |message_size| in the TraceConfig above.
   constexpr size_t kMessageCount = 11;
   constexpr size_t kMessageSize = 32;
+  protos::TraceConfig trace_config;
+  trace_config.add_buffers()->set_size_kb(1024);
+  auto* ds_config = trace_config.add_data_sources()->mutable_config();
+  ds_config->set_name("android.perfetto.FakeProducer");
+  ds_config->mutable_for_testing()->set_message_count(kMessageCount);
+  ds_config->mutable_for_testing()->set_message_size(kMessageSize);
+  auto* trigger_cfg = trace_config.mutable_trigger_config();
+  trigger_cfg->set_trigger_mode(
+      protos::TraceConfig::TriggerConfig::STOP_TRACING);
+  trigger_cfg->set_trigger_timeout_ms(15000);
+  auto* trigger = trigger_cfg->add_triggers();
+  trigger->set_name("trigger_name");
+  // |stop_delay_ms| must be long enough that we can write the packets in
+  // before the trace finishes. This has to be long enough for the slowest
+  // emulator. But as short as possible to prevent the test running a long
+  // time.
+  trigger->set_stop_delay_ms(500);
+  trigger = trigger_cfg->add_triggers();
+  trigger->set_name("trigger_name_3");
+  trigger->set_stop_delay_ms(60000);
 
   // We have 5 normal preample packets (trace config, clock, system info, sync
   // marker, stats) and then since this is a trace with a trigger config we have
   // an additional ReceivedTriggers packet.
-  constexpr size_t kPreamblePackets = 6;
-
   base::TestTaskRunner task_runner;
 
   // Enable tracing and detach as soon as it gets started.
@@ -947,12 +847,12 @@ TEST_F(PerfettoCmdlineTest, NoSanitizers(StopTracingTriggerFromConfig)) {
   auto* fake_producer = helper.ConnectFakeProducer();
   EXPECT_TRUE(fake_producer);
 
-  std::thread background_trace([cfg, this]() {
+  std::thread background_trace([trace_config, this]() {
     EXPECT_EQ(0, Exec(
                      {
-                         "-o", "/tmp/output.perfetto-trace", "-c", "-", "--txt",
+                         "-o", "/tmp/output.perfetto-trace", "-c", "-",
                      },
-                     cfg));
+                     trace_config.SerializeAsString()));
   });
 
   helper.WaitForProducerEnabled();
@@ -962,7 +862,7 @@ TEST_F(PerfettoCmdlineTest, NoSanitizers(StopTracingTriggerFromConfig)) {
   fake_producer->ProduceEventBatch(helper.WrapTask(on_data_written));
   task_runner.RunUntilCheckpoint("data_written_1");
 
-  std::string trigger_cfg = R"(
+  std::string triggers = R"(
     activate_triggers: "trigger_name_2"
     activate_triggers: "trigger_name"
     activate_triggers: "trigger_name_3"
@@ -972,7 +872,7 @@ TEST_F(PerfettoCmdlineTest, NoSanitizers(StopTracingTriggerFromConfig)) {
                    {
                        "-o", "/tmp/output.perfetto-trace", "-c", "-", "--txt",
                    },
-                   trigger_cfg))
+                   triggers))
       << "stderr: " << stderr_;
 
   background_trace.join();
@@ -981,49 +881,25 @@ TEST_F(PerfettoCmdlineTest, NoSanitizers(StopTracingTriggerFromConfig)) {
   base::ReadFile("/tmp/output.perfetto-trace", &trace_str);
   protos::Trace trace;
   ASSERT_TRUE(trace.ParseFromString(trace_str));
-  EXPECT_EQ(kPreamblePackets + kMessageCount, trace.packet_size());
+  EXPECT_LT(kMessageCount, trace.packet_size());
+  bool seen_first_trigger = false;
   for (const auto& packet : trace.packet()) {
-    switch (packet.data_case()) {
-      case protos::TracePacket::kTraceConfig:
-        // Ensure the trace config properly includes the trigger mode we set.
-        EXPECT_EQ(protos::TraceConfig::TriggerConfig::STOP_TRACING,
-                  packet.trace_config().trigger_config().trigger_mode());
-        break;
-      case protos::TracePacket::kTriggers:
-        // validate that the triggers are properly added to the trace.
-        ASSERT_EQ(2, packet.triggers().triggers_size());
-        EXPECT_EQ("trigger_name", packet.triggers().triggers(0).trigger_name());
-        EXPECT_EQ("trigger_name_3",
-                  packet.triggers().triggers(1).trigger_name());
-        break;
-      case protos::TracePacket::kForTesting:
-        // Make sure that the data size is correctly set based on what we
-        // requested.
-        EXPECT_EQ(kMessageSize, packet.for_testing().str().size());
-        break;
-      case protos::TracePacket::kClockSnapshot:
-      case protos::TracePacket::kTraceStats:
-      case protos::TracePacket::kSystemInfo:
-      case protos::TracePacket::kSynchronizationMarker:
-        // Preamble packets, that we don't really need to verify contents.
-        break;
-      case protos::TracePacket::kFtraceEvents:
-      case protos::TracePacket::kProcessTree:
-      case protos::TracePacket::kProcessStats:
-      case protos::TracePacket::kInodeFileMap:
-      case protos::TracePacket::kChromeEvents:
-      case protos::TracePacket::kSysStats:
-      case protos::TracePacket::kTrackEvent:
-      case protos::TracePacket::kFtraceStats:
-      case protos::TracePacket::kProfilePacket:
-      case protos::TracePacket::kBattery:
-      case protos::TracePacket::kPowerRails:
-      case protos::TracePacket::kAndroidLog:
-      case protos::TracePacket::kProcessDescriptor:
-      case protos::TracePacket::kThreadDescriptor:
-      case protos::TracePacket::DATA_NOT_SET:
-        ADD_FAILURE() << "Unexpected packet: " << packet.data_case();
-        break;
+    if (packet.data_case() == protos::TracePacket::kTraceConfig) {
+      // Ensure the trace config properly includes the trigger mode we set.
+      EXPECT_EQ(protos::TraceConfig::TriggerConfig::STOP_TRACING,
+                packet.trace_config().trigger_config().trigger_mode());
+    } else if (packet.data_case() == protos::TracePacket::kTrigger) {
+      // validate that the triggers are properly added to the trace.
+      if (!seen_first_trigger) {
+        EXPECT_EQ("trigger_name", packet.trigger().trigger_name());
+        seen_first_trigger = true;
+      } else {
+        EXPECT_EQ("trigger_name_3", packet.trigger().trigger_name());
+      }
+    } else if (packet.data_case() == protos::TracePacket::kForTesting) {
+      // Make sure that the data size is correctly set based on what we
+      // requested.
+      EXPECT_EQ(kMessageSize, packet.for_testing().str().size());
     }
   }
 }

@@ -437,7 +437,7 @@ class TracingServiceImpl : public TracingService {
     bool did_emit_system_info = false;
 
     // The number of received triggers we've emitted into the trace output.
-    size_t num_emitted_received_triggers = 0;
+    size_t num_triggers_emitted_into_trace = 0;
 
     State state = DISABLED;
 

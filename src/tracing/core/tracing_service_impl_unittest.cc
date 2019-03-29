@@ -658,16 +658,14 @@ TEST_F(TracingServiceImplTest, StartTracingTriggerMultipleTraces) {
 
 // Creates a tracing session with a START_TRACING trigger and checks that the
 // received_triggers are emitted as packets.
-TEST_F(TracingServiceImplTest, EmitTriggersStartTracingTrigger) {
+TEST_F(TracingServiceImplTest, EmitTriggersWithStartTracingTrigger) {
   std::unique_ptr<MockConsumer> consumer = CreateMockConsumer();
   consumer->Connect(svc.get());
 
   std::unique_ptr<MockProducer> producer = CreateMockProducer();
   producer->Connect(svc.get(), "mock_producer", /* uid = */ 123u);
 
-  // Create two data sources but enable only one of them.
   producer->RegisterDataSource("ds_1");
-  producer->RegisterDataSource("ds_2");
 
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(128);
@@ -716,13 +714,11 @@ TEST_F(TracingServiceImplTest, EmitTriggersStartTracingTrigger) {
   auto expect_received_trigger = [&](const std::string& name) {
     return Contains(AllOf(
         Property(
-            &protos::TracePacket::triggers,
-            Property(&protos::Triggers::triggers,
-                     Contains(AllOf(
-                         Property(&protos::Trigger::trigger_name, Eq(name)),
-                         Property(&protos::Trigger::producer_uid, Eq(123u)),
-                         Property(&protos::Trigger::producer_name,
-                                  Eq("mock_producer")))))),
+            &protos::TracePacket::trigger,
+            AllOf(Property(&protos::Trigger::trigger_name, Eq(name)),
+                  Property(&protos::Trigger::trusted_producer_uid, Eq(123u)),
+                  Property(&protos::Trigger::producer_name,
+                           Eq("mock_producer")))),
         Property(&protos::TracePacket::trusted_packet_sequence_id,
                  Eq(kServicePacketSequenceID))));
   };
@@ -735,16 +731,14 @@ TEST_F(TracingServiceImplTest, EmitTriggersStartTracingTrigger) {
 
 // Creates a tracing session with a START_TRACING trigger and checks that the
 // received_triggers are emitted as packets.
-TEST_F(TracingServiceImplTest, EmitTriggersStopTracingTrigger) {
+TEST_F(TracingServiceImplTest, EmitTriggersWithStopTracingTrigger) {
   std::unique_ptr<MockConsumer> consumer = CreateMockConsumer();
   consumer->Connect(svc.get());
 
   std::unique_ptr<MockProducer> producer = CreateMockProducer();
   producer->Connect(svc.get(), "mock_producer", /* uid = */ 321u);
 
-  // Create two data sources but enable only one of them.
   producer->RegisterDataSource("ds_1");
-  producer->RegisterDataSource("ds_2");
 
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(128);
@@ -765,7 +759,7 @@ TEST_F(TracingServiceImplTest, EmitTriggersStopTracingTrigger) {
   producer->WaitForDataSourceSetup("ds_1");
   producer->WaitForDataSourceStart("ds_1");
 
-  // The trace won't start until we send the trigger. since we have a
+  // The trace won't start until we send the trigger since we have a
   // START_TRACING trigger defined.
   std::vector<std::string> req;
   req.push_back("trigger_name");
@@ -798,13 +792,11 @@ TEST_F(TracingServiceImplTest, EmitTriggersStopTracingTrigger) {
   auto expect_received_trigger = [&](const std::string& name) {
     return Contains(AllOf(
         Property(
-            &protos::TracePacket::triggers,
-            Property(&protos::Triggers::triggers,
-                     Contains(AllOf(
-                         Property(&protos::Trigger::trigger_name, Eq(name)),
-                         Property(&protos::Trigger::producer_uid, Eq(321u)),
-                         Property(&protos::Trigger::producer_name,
-                                  Eq("mock_producer")))))),
+            &protos::TracePacket::trigger,
+            AllOf(Property(&protos::Trigger::trigger_name, Eq(name)),
+                  Property(&protos::Trigger::trusted_producer_uid, Eq(321u)),
+                  Property(&protos::Trigger::producer_name,
+                           Eq("mock_producer")))),
         Property(&protos::TracePacket::trusted_packet_sequence_id,
                  Eq(kServicePacketSequenceID))));
   };
@@ -843,16 +835,13 @@ TEST_F(TracingServiceImplTest, EmitTriggersRepeatedly) {
   trigger_config->set_trigger_timeout_ms(30000);
 
   auto expect_received_trigger = [&](const std::string& name) {
-    return Contains(AllOf(
-        Property(
-            &protos::TracePacket::triggers,
-            Property(&protos::Triggers::triggers,
-                     Contains(AllOf(
-                         Property(&protos::Trigger::trigger_name, Eq(name)),
-                         Property(&protos::Trigger::producer_name,
-                                  Eq("mock_producer")))))),
-        Property(&protos::TracePacket::trusted_packet_sequence_id,
-                 Eq(kServicePacketSequenceID))));
+    return Contains(
+        AllOf(Property(&protos::TracePacket::trigger,
+                       AllOf(Property(&protos::Trigger::trigger_name, Eq(name)),
+                             Property(&protos::Trigger::producer_name,
+                                      Eq("mock_producer")))),
+              Property(&protos::TracePacket::trusted_packet_sequence_id,
+                       Eq(kServicePacketSequenceID))));
   };
 
   consumer->EnableTracing(trace_config);
