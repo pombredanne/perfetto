@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "src/perfetto_cmd/activate_triggers.h"
+#include "src/perfetto_cmd/trigger_producer.h"
 
 #include <memory>
 
@@ -27,63 +27,73 @@ namespace perfetto {
 
 class DataSourceConfig;
 
-ActivateTriggersProducer::ActivateTriggersProducer(
-    bool* success,
-    PlatformTaskRunner* task_runner,
-    const std::vector<std::string>* const triggers)
-    : success_(success),
-      task_runner_(task_runner),
+TriggerProducer::TriggerProducer(std::function<void(bool)> callback,
+                                 base::TaskRunner* task_runner,
+                                 const std::vector<std::string>* const triggers)
+    : task_runner_(task_runner),
+      callback_(std::move(callback)),
       triggers_(triggers),
       producer_endpoint_(ProducerIPCClient::Connect(GetProducerSocket(),
                                                     this,
                                                     "perfetto_cmd_producer",
-                                                    task_runner)) {
+                                                    task_runner)),
+      weak_factory_(this) {
   // Give the socket up to 1 minute to attach and send the triggers before
   // reporting a failure.
-  task_runner_->PostDelayedTask([this]() { task_runner_->Quit(); }, 60000);
+  auto weak_this = weak_factory_.GetWeakPtr();
+  task_runner_->PostDelayedTask(
+      [weak_this]() {
+        if (!weak_this)
+          return;
+        weak_this->callback_(false);
+      },
+      60000);
 }
 
-ActivateTriggersProducer::~ActivateTriggersProducer() {}
+TriggerProducer::~TriggerProducer() {}
 
-void ActivateTriggersProducer::OnConnect() {
-  PERFETTO_DLOG("Connected as a producer and sending triggers.");
+void TriggerProducer::OnConnect() {
+  PERFETTO_DLOG("Producer connected, sending triggers.");
   // Send activation signal.
   producer_endpoint_->ActivateTriggers(*triggers_);
-  *success_ = true;
-  task_runner_->Quit();
+  auto weak_this = weak_factory_.GetWeakPtr();
+  task_runner_->PostTask([weak_this]() {
+    if (!weak_this)
+      return;
+    weak_this->callback_(true);
+  });
 }
 
-void ActivateTriggersProducer::OnDisconnect() {
+void TriggerProducer::OnDisconnect() {
   PERFETTO_DLOG("Disconnected as a producer.");
 }
 
-void ActivateTriggersProducer::OnTracingSetup() {
-  PERFETTO_DFATAL("Attempted to OnTracingSetup() on commandline producer");
-}
-void ActivateTriggersProducer::SetupDataSource(DataSourceInstanceID,
-                                               const DataSourceConfig&) {
+void TriggerProducer::OnTracingSetup() {}
+
+void TriggerProducer::SetupDataSource(DataSourceInstanceID,
+                                      const DataSourceConfig&) {
   PERFETTO_DFATAL("Attempted to SetupDataSource() on commandline producer");
 }
-void ActivateTriggersProducer::StartDataSource(DataSourceInstanceID,
-                                               const DataSourceConfig&) {
+void TriggerProducer::StartDataSource(DataSourceInstanceID,
+                                      const DataSourceConfig&) {
   PERFETTO_DFATAL("Attempted to StartDataSource() on commandline producer");
 }
-void ActivateTriggersProducer::StopDataSource(DataSourceInstanceID) {
+void TriggerProducer::StopDataSource(DataSourceInstanceID) {
   PERFETTO_DFATAL("Attempted to StopDataSource() on commandline producer");
 }
-void ActivateTriggersProducer::Flush(FlushRequestID,
-                                     const DataSourceInstanceID*,
-                                     size_t) {
+void TriggerProducer::Flush(FlushRequestID,
+                            const DataSourceInstanceID*,
+                            size_t) {
   PERFETTO_DFATAL("Attempted to Flush() on commandline producer");
 }
 
-std::unique_ptr<ActivateTriggersProducer> ActivateTriggers(
+std::unique_ptr<TriggerProducer> ActivateTriggers(
     const std::vector<std::string>& triggers,
-    PlatformTaskRunner* task_runner,
-    bool* success) {
+    std::function<void(bool)> callback,
+    base::TaskRunner* task_runner) {
   PERFETTO_DCHECK(!triggers.empty());
   PERFETTO_DCHECK(task_runner);
-  return std::unique_ptr<ActivateTriggersProducer>(
-      new ActivateTriggersProducer(success, task_runner, &triggers));
+  return std::unique_ptr<TriggerProducer>(
+      new TriggerProducer(std::move(callback), task_runner, &triggers));
 }
 }  // namespace perfetto

@@ -14,22 +14,38 @@
  * limitations under the License.
  */
 
-#ifndef SRC_PERFETTO_CMD_PLATFORM_TASK_RUNNER_H_
-#define SRC_PERFETTO_CMD_PLATFORM_TASK_RUNNER_H_
+#ifndef SRC_TRACED_PROBES_FTRACE_ATRACE_HAL_WRAPPER_H_
+#define SRC_TRACED_PROBES_FTRACE_ATRACE_HAL_WRAPPER_H_
 
-#include "perfetto/base/build_config.h"
-#include "perfetto/base/unix_task_runner.h"
+#include <memory>
+#include <string>
+#include <vector>
 
-#if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
-#include "perfetto/base/android_task_runner.h"
-#endif  // PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
+#include "perfetto/base/scoped_file.h"
 
 namespace perfetto {
-#if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
-using PlatformTaskRunner = base::AndroidTaskRunner;
-#else
-using PlatformTaskRunner = base::UnixTaskRunner;
-#endif
+
+class AtraceHalWrapper {
+ public:
+  AtraceHalWrapper();
+  ~AtraceHalWrapper();
+
+  struct TracingVendorCategory {
+    // The name identifying the category.
+    std::string name;
+
+    // A longer description of the category.
+    std::string description;
+  };
+
+  std::vector<TracingVendorCategory> GetAvailableCategories();
+
+ private:
+  struct DynamicLibLoader;
+
+  std::unique_ptr<DynamicLibLoader> lib_;
+};
+
 }  // namespace perfetto
 
-#endif  // SRC_PERFETTO_CMD_PLATFORM_TASK_RUNNER_H_
+#endif  // SRC_TRACED_PROBES_FTRACE_ATRACE_HAL_WRAPPER_H_

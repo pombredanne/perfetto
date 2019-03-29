@@ -14,15 +14,16 @@
  * limitations under the License.
  */
 
-#ifndef SRC_PERFETTO_CMD_ACTIVATE_TRIGGERS_H_
-#define SRC_PERFETTO_CMD_ACTIVATE_TRIGGERS_H_
+#ifndef SRC_PERFETTO_CMD_TRIGGER_PRODUCER_H_
+#define SRC_PERFETTO_CMD_TRIGGER_PRODUCER_H_
 
 #include <string>
 #include <vector>
 
+#include "perfetto/base/task_runner.h"
+#include "perfetto/base/weak_ptr.h"
 #include "perfetto/tracing/core/producer.h"
 #include "perfetto/tracing/core/tracing_service.h"
-#include "src/perfetto_cmd/platform_task_runner.h"
 
 namespace perfetto {
 
@@ -30,15 +31,15 @@ class DataSourceConfig;
 
 // This is a producer that only sends the provided |triggers| to the service. It
 // will never register any data sources.
-class ActivateTriggersProducer : public Producer {
+class TriggerProducer : public Producer {
  public:
-  ActivateTriggersProducer(bool* success,
-                           PlatformTaskRunner* task_runner,
-                           const std::vector<std::string>* const triggers);
-  ~ActivateTriggersProducer() override;
+  TriggerProducer(std::function<void(bool)> callback,
+                  base::TaskRunner* task_runner,
+                  const std::vector<std::string>* const triggers);
+  ~TriggerProducer() override;
 
-  // We will call ActivateTriggers() on the |producer_endpoint_| and then
-  // immediately call Quit() on |task_runner|.
+  // We will call Trigger() on the |producer_endpoint_| and then
+  // immediately call |callback_|.
   void OnConnect() override;
   // We have no clean up to do OnDisconnect.
   void OnDisconnect() override;
@@ -51,19 +52,21 @@ class ActivateTriggersProducer : public Producer {
   void Flush(FlushRequestID, const DataSourceInstanceID*, size_t) override;
 
  private:
-  bool* success_;
-  PlatformTaskRunner* task_runner_;
+  base::TaskRunner* const task_runner_;
+  const std::function<void(bool)> callback_;
   const std::vector<std::string>* const triggers_;
   std::unique_ptr<TracingService::ProducerEndpoint> producer_endpoint_;
+  base::WeakPtrFactory<TriggerProducer> weak_factory_;
 };
 
-// Creates a ActivateTriggersProducer, which once the async connections call is
-// complete will set |success| to true. This function does not block. You must
-// wait on |task_runner->Run()| to safely access |success|.
-std::unique_ptr<ActivateTriggersProducer> ActivateTriggers(
+// Creates a TriggerProducer, which once the async connections call is
+// complete it will issue |callback| with true if successfully and false
+// otherwise. This function does not block. the |task_runner| must survive
+// longer then this the returned TriggerProducer.
+std::unique_ptr<TriggerProducer> ActivateTriggers(
     const std::vector<std::string>& triggers,
-    PlatformTaskRunner* task_runner,
-    bool* success);
+    std::function<void(bool)> callback,
+    base::TaskRunner* task_runner);
 }  // namespace perfetto
 
-#endif  // SRC_PERFETTO_CMD_ACTIVATE_TRIGGERS_H_
+#endif  // SRC_PERFETTO_CMD_TRIGGER_PRODUCER_H_

@@ -23,8 +23,10 @@
 
 #include <time.h>
 
+#include "perfetto/base/build_config.h"
 #include "perfetto/base/event.h"
 #include "perfetto/base/scoped_file.h"
+#include "perfetto/base/unix_task_runner.h"
 #include "perfetto/tracing/core/consumer.h"
 #include "perfetto/tracing/ipc/consumer_ipc_client.h"
 #include "src/perfetto_cmd/platform_task_runner.h"
@@ -32,12 +34,21 @@
 
 #include "src/perfetto_cmd/perfetto_cmd_state.pb.h"
 
+#if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
+#include "perfetto/base/android_task_runner.h"
+#endif  // PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
+
 namespace perfetto {
 
 // Temporary directory for DropBox traces. Note that this is automatically
 // created by the system by setting setprop persist.traced.enable=1.
 extern const char* kTempDropBoxTraceDir;
 
+#if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
+using PlatformTaskRunner = base::AndroidTaskRunner;
+#else
+using PlatformTaskRunner = base::UnixTaskRunner;
+#endif
 
 class PerfettoCmd : public Consumer {
  public:

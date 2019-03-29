@@ -2135,29 +2135,27 @@ void TracingServiceImpl::MaybeEmitSystemInfo(
 void TracingServiceImpl::MaybeEmitReceivedTriggers(
     TracingSession* tracing_session,
     std::vector<TracePacket>* packets) {
-  if (tracing_session->num_emitted_received_triggers ==
-      tracing_session->received_triggers.size()) {
-    return;
-  }
-  protos::TrustedPacket packet;
-  protos::Triggers* triggers = packet.mutable_triggers();
-  for (size_t i = tracing_session->num_emitted_received_triggers;
+  PERFETTO_DCHECK(tracing_session->num_triggers_emitted_into_trace <=
+                  tracing_session->received_triggers.size());
+  for (size_t i = tracing_session->num_triggers_emitted_into_trace;
        i < tracing_session->received_triggers.size(); ++i) {
     const auto& info = tracing_session->received_triggers[i];
-    auto* trigger = triggers->add_triggers();
-    trigger->set_boot_time_ns(info.boot_time_ns);
+    protos::TrustedPacket packet;
+
+    protos::Trigger* trigger = packet.mutable_trigger();
     trigger->set_trigger_name(info.trigger_name);
     trigger->set_producer_name(info.producer_name);
     trigger->set_producer_uid(static_cast<int32_t>(info.producer_uid));
+
+    packet.set_timestamp(info.boot_time_ns);
+    packet.set_trusted_uid(static_cast<int32_t>(uid_));
+    packet.set_trusted_packet_sequence_id(kServicePacketSequenceID);
+    Slice slice = Slice::Allocate(static_cast<size_t>(packet.ByteSize()));
+    PERFETTO_CHECK(packet.SerializeWithCachedSizesToArray(slice.own_data()));
+    packets->emplace_back();
+    packets->back().AddSlice(std::move(slice));
+    ++tracing_session->num_triggers_emitted_into_trace;
   }
-  tracing_session->num_emitted_received_triggers =
-      tracing_session->received_triggers.size();
-  packet.set_trusted_uid(static_cast<int32_t>(uid_));
-  packet.set_trusted_packet_sequence_id(kServicePacketSequenceID);
-  Slice slice = Slice::Allocate(static_cast<size_t>(packet.ByteSize()));
-  PERFETTO_CHECK(packet.SerializeWithCachedSizesToArray(slice.own_data()));
-  packets->emplace_back();
-  packets->back().AddSlice(std::move(slice));
 }
 
 ////////////////////////////////////////////////////////////////////////////////

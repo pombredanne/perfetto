@@ -41,9 +41,9 @@
 #include "perfetto/tracing/core/data_source_descriptor.h"
 #include "perfetto/tracing/core/trace_config.h"
 #include "perfetto/tracing/core/trace_packet.h"
-#include "src/perfetto_cmd/activate_triggers.h"
 #include "src/perfetto_cmd/config.h"
 #include "src/perfetto_cmd/pbtxt_to_pb.h"
+#include "src/perfetto_cmd/trigger_producer.h"
 
 #include "perfetto/config/trace_config.pb.h"
 
@@ -132,14 +132,16 @@ using protozero::proto_utils::MakeTagLengthDelimited;
 int PerfettoCmd::PrintUsage(const char* argv0) {
   PERFETTO_ELOG(R"(
 Usage: %s
-  --background     -d     : Exits immediately and continues tracing in background
-  --config         -c     : /path/to/trace/config/file or - for stdin
-  --out            -o     : /path/to/out/trace/file or - for stdout
-  --dropbox           TAG : Upload trace into DropBox using tag TAG
-  --no-guardrails         : Ignore guardrails triggered when using --dropbox (for testing).
-  --txt                   : Parse config as pbtxt. Not a stable API. Not for production use.
-  --reset-guardrails      : Resets the state of the guardails and exits (for testing).
-  --activate-trigger      : A trigger_name to activate on to the service. If specified multiple times will activate them all. Cannot be used with --config or configuration flags.
+  --background     -d      : Exits immediately and continues tracing in background
+  --config         -c      : /path/to/trace/config/file or - for stdin
+  --out            -o      : /path/to/out/trace/file or - for stdout
+  --dropbox           TAG  : Upload trace into DropBox using tag TAG
+  --no-guardrails          : Ignore guardrails triggered when using --dropbox (for testing).
+  --txt                    : Parse config as pbtxt. Not a stable API. Not for production use.
+  --reset-guardrails       : Resets the state of the guardails and exits (for testing).
+  --trigger           NAME : Activate the NAME on to the service. If specified multiple times
+                             will activate them all. Cannot be used with --config or
+                             configuration flags.
   --help           -h
 
 
@@ -174,7 +176,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
     OPT_CONFIG_UID,
     OPT_SUBSCRIPTION_ID,
     OPT_RESET_GUARDRAILS,
-    OPT_ACTIVATE_TRIGGER,
+    OPT_TRIGGER,
     OPT_PBTXT_CONFIG,
     OPT_DROPBOX,
     OPT_ATRACE_APP,
@@ -200,7 +202,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
       {"config-uid", required_argument, nullptr, OPT_CONFIG_UID},
       {"subscription-id", required_argument, nullptr, OPT_SUBSCRIPTION_ID},
       {"reset-guardrails", no_argument, nullptr, OPT_RESET_GUARDRAILS},
-      {"activate-trigger", required_argument, nullptr, OPT_ACTIVATE_TRIGGER},
+      {"activate-trigger", required_argument, nullptr, OPT_TRIGGER},
       {"detach", required_argument, nullptr, OPT_DETACH},
       {"attach", required_argument, nullptr, OPT_ATTACH},
       {"is_detached", required_argument, nullptr, OPT_IS_DETACHED},
@@ -309,7 +311,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
       return 0;
     }
 
-    if (option == OPT_ACTIVATE_TRIGGER) {
+    if (option == OPT_TRIGGER) {
       triggers_to_activate.push_back(std::string(optarg));
       continue;
     }
@@ -392,7 +394,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
   // 2) A proto-text file/stdin (-c ... --txt).
   // 3) A set of option arguments (-t 10s -s 10m).
   // The only cases in which a trace config is not expected is --attach or
-  // --activate-trigger. For both of these we are just acting on already
+  // --trigger. For both of these we are just acting on already
   // existing sessions.
   perfetto::protos::TraceConfig trace_config_proto;
   bool parsed = false;
@@ -407,7 +409,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
     }
   } else if (!triggers_to_activate.empty()) {
     if (!trace_config_raw.empty() || has_config_options) {
-      PERFETTO_ELOG("Cannot specify a trace config with --activate-trigger");
+      PERFETTO_ELOG("Cannot specify a trace config with --trigger");
       return 1;
     }
   } else if (has_config_options) {
@@ -503,15 +505,16 @@ int PerfettoCmd::Main(int argc, char** argv) {
   // connect as a consumer or run the trace. So bail out after processing all
   // the options.
   if (!triggers_to_activate.empty()) {
-    bool success = false;
-    auto producer =
-        ActivateTriggers(triggers_to_activate, &task_runner_, &success);
+    bool finished_with_success = false;
+    std::unique_ptr<TriggerProducer> producer =
+        ActivateTriggers(triggers_to_activate,
+                         [this, &finished_with_success](bool success) {
+                           finished_with_success = success;
+                           task_runner_.Quit();
+                         },
+                         &task_runner_);
     task_runner_.Run();
-    if (!success) {
-      PERFETTO_ELOG("Failed to activate triggers");
-      return 1;
-    }
-    return 0;
+    return finished_with_success ? 0 : 1;
   }
 
   RateLimiter::Args args{};

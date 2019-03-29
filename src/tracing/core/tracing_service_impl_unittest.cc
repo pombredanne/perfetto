@@ -714,17 +714,14 @@ TEST_F(TracingServiceImplTest, EmitTriggersStartTracingTrigger) {
                   &protos::TraceConfig::TriggerConfig::trigger_mode,
                   Eq(protos::TraceConfig::TriggerConfig::START_TRACING))))));
   auto expect_received_trigger = [&](const std::string& name) {
-    return Contains(AllOf(
-        Property(
-            &protos::TracePacket::triggers,
-            Property(&protos::Triggers::triggers,
-                     Contains(AllOf(
-                         Property(&protos::Trigger::trigger_name, Eq(name)),
-                         Property(&protos::Trigger::producer_uid, Eq(123u)),
-                         Property(&protos::Trigger::producer_name,
-                                  Eq("mock_producer")))))),
-        Property(&protos::TracePacket::trusted_packet_sequence_id,
-                 Eq(kServicePacketSequenceID))));
+    return Contains(
+        AllOf(Property(&protos::TracePacket::trigger,
+                       AllOf(Property(&protos::Trigger::trigger_name, Eq(name)),
+                             Property(&protos::Trigger::producer_uid, Eq(123u)),
+                             Property(&protos::Trigger::producer_name,
+                                      Eq("mock_producer")))),
+              Property(&protos::TracePacket::trusted_packet_sequence_id,
+                       Eq(kServicePacketSequenceID))));
   };
   EXPECT_THAT(packets, expect_received_trigger("trigger_name"));
   EXPECT_THAT(packets,
@@ -796,17 +793,14 @@ TEST_F(TracingServiceImplTest, EmitTriggersStopTracingTrigger) {
                   Eq(protos::TraceConfig::TriggerConfig::STOP_TRACING))))));
 
   auto expect_received_trigger = [&](const std::string& name) {
-    return Contains(AllOf(
-        Property(
-            &protos::TracePacket::triggers,
-            Property(&protos::Triggers::triggers,
-                     Contains(AllOf(
-                         Property(&protos::Trigger::trigger_name, Eq(name)),
-                         Property(&protos::Trigger::producer_uid, Eq(321u)),
-                         Property(&protos::Trigger::producer_name,
-                                  Eq("mock_producer")))))),
-        Property(&protos::TracePacket::trusted_packet_sequence_id,
-                 Eq(kServicePacketSequenceID))));
+    return Contains(
+        AllOf(Property(&protos::TracePacket::trigger,
+                       AllOf(Property(&protos::Trigger::trigger_name, Eq(name)),
+                             Property(&protos::Trigger::producer_uid, Eq(321u)),
+                             Property(&protos::Trigger::producer_name,
+                                      Eq("mock_producer")))),
+              Property(&protos::TracePacket::trusted_packet_sequence_id,
+                       Eq(kServicePacketSequenceID))));
   };
   EXPECT_THAT(packets, expect_received_trigger("trigger_name"));
   EXPECT_THAT(packets,
@@ -843,16 +837,13 @@ TEST_F(TracingServiceImplTest, EmitTriggersRepeatedly) {
   trigger_config->set_trigger_timeout_ms(30000);
 
   auto expect_received_trigger = [&](const std::string& name) {
-    return Contains(AllOf(
-        Property(
-            &protos::TracePacket::triggers,
-            Property(&protos::Triggers::triggers,
-                     Contains(AllOf(
-                         Property(&protos::Trigger::trigger_name, Eq(name)),
-                         Property(&protos::Trigger::producer_name,
-                                  Eq("mock_producer")))))),
-        Property(&protos::TracePacket::trusted_packet_sequence_id,
-                 Eq(kServicePacketSequenceID))));
+    return Contains(
+        AllOf(Property(&protos::TracePacket::trigger,
+                       AllOf(Property(&protos::Trigger::trigger_name, Eq(name)),
+                             Property(&protos::Trigger::producer_name,
+                                      Eq("mock_producer")))),
+              Property(&protos::TracePacket::trusted_packet_sequence_id,
+                       Eq(kServicePacketSequenceID))));
   };
 
   consumer->EnableTracing(trace_config);
