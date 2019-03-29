@@ -72,7 +72,7 @@ message TracePacket {
     PowerRails power_rails = 40;
     AndroidLogPacket android_log = 39;
     SystemInfo system_info = 45;
-    Triggers triggers = 46;
+    Trigger trigger = 46;
 
     // Only used by TrackEvent.
     ProcessDescriptor process_descriptor = 43;
