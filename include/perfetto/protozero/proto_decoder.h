@@ -185,7 +185,7 @@ class TypedProtoDecoderBase : public ProtoDecoder {
     // implicit initializers on all the ~1000 entries. We need it to initialize
     // only on the first |max_field_id| fields, the remaining capacity doesn't
     // require initialization.
-    static_assert(PERFETTO_IS_TRIVIALLY_CONSTRUCTIBLE() &&
+    static_assert(PERFETTO_IS_TRIVIALLY_CONSTRUCTIBLE(Field) &&
                       std::is_trivially_destructible<Field>::value &&
                       std::is_trivial<Field>::value,
                   "Field must be a trivial aggregate type");
