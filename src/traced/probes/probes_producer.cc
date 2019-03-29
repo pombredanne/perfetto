@@ -36,6 +36,7 @@
 #include "src/traced/probes/android_log/android_log_data_source.h"
 #include "src/traced/probes/filesystem/inode_file_data_source.h"
 #include "src/traced/probes/ftrace/ftrace_data_source.h"
+#include "src/traced/probes/packages_list/packages_list_data_source.h"
 #include "src/traced/probes/power/android_power_data_source.h"
 #include "src/traced/probes/probes_data_source.h"
 #include "src/traced/probes/ps/process_stats_data_source.h"
@@ -289,7 +290,7 @@ std::unique_ptr<ProbesDataSource> ProbesProducer::CreatePackagesListDataSource(
     TracingSessionID session_id,
     const DataSourceConfig& config) {
   auto buffer_id = static_cast<BufferID>(config.target_buffer());
-  return std::unique_ptr<ProbesDataSource>(new AndroidLogDataSource(
+  return std::unique_ptr<ProbesDataSource>(new PackagesListDataSource(
       session_id, endpoint_->CreateTraceWriter(buffer_id)));
 }
 

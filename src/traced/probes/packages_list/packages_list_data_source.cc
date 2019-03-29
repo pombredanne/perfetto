@@ -102,6 +102,8 @@ void PackagesListDataSource::Start() {
       package->set_debuggable(pkg_struct.debuggable);
       package->set_profileable_from_shell(pkg_struct.profileable_from_shell);
       package->set_version_code(pkg_struct.version_code);
+    } else {
+      packages_list_packet->set_error(true);
     }
   }
   writer_->Flush();
