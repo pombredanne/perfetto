@@ -71,6 +71,15 @@ using ssize_t = long;
   std::is_trivially_constructible<T>::value
 #endif
 
+// TODO(lalitm): is_trivially_copyable is currently not available
+// in some environments we build in. Reenable when that environment supports
+// this.
+#if defined(__GNUG__) && __GNUC__ < 5
+#define PERFETTO_IS_TRIVIALLY_COPYABLE(T) true
+#else
+#define PERFETTO_IS_TRIVIALLY_COPYABLE(T) std::is_trivially_copyable<T>::value
+#endif
+
 namespace perfetto {
 namespace base {
 
