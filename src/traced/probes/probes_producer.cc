@@ -122,6 +122,12 @@ void ProbesProducer::OnConnect() {
     desc.set_name(kAndroidLogSourceName);
     endpoint_->RegisterDataSource(desc);
   }
+
+  {
+    DataSourceDescriptor desc;
+    desc.set_name(kPackagesListSourceName);
+    endpoint_->RegisterDataSource(desc);
+  }
 }
 
 void ProbesProducer::OnDisconnect() {

@@ -34,7 +34,7 @@ bool ReadPackagesListLine(char* line, Package* package) {
       case 1: {
         char* end;
         long long uid = strtoll(ss.cur_token(), &end, 10);
-        if (*end != '\0' || *ss.cur_token() == '\0' || uid < 0) {
+        if ((*end != '\0' && *end != '\n') || *ss.cur_token() == '\0') {
           PERFETTO_ELOG("Failed to parse packages.list uid.");
           return false;
         }
@@ -44,7 +44,7 @@ bool ReadPackagesListLine(char* line, Package* package) {
       case 2: {
         char* end;
         long long debuggable = strtoll(ss.cur_token(), &end, 10);
-        if (*end != '\0' || *ss.cur_token() == '\0') {
+        if ((*end != '\0' && *end != '\n') || *ss.cur_token() == '\0') {
           PERFETTO_ELOG("Failed to parse packages.list debuggable.");
           return false;
         }
@@ -54,7 +54,7 @@ bool ReadPackagesListLine(char* line, Package* package) {
       case 6: {
         char* end;
         long long profilable_from_shell = strtoll(ss.cur_token(), &end, 10);
-        if (*end != '\0' || *ss.cur_token() == '\0') {
+        if ((*end != '\0' && *end != '\n') || *ss.cur_token() == '\0') {
           PERFETTO_ELOG("Failed to parse packages.list profilable_from_shell.");
           return false;
         }
@@ -64,8 +64,9 @@ bool ReadPackagesListLine(char* line, Package* package) {
       case 7: {
         char* end;
         long long version_code = strtoll(ss.cur_token(), &end, 10);
-        if (*end != '\0' || *ss.cur_token() == '\0') {
-          PERFETTO_ELOG("Failed to parse packages.list version_code.");
+        if ((*end != '\0' && *end != '\n') || *ss.cur_token() == '\0') {
+          PERFETTO_ELOG("Failed to parse packages.list version_code: %s.",
+                        ss.cur_token());
           return false;
         }
         package->version_code = version_code;
@@ -87,6 +88,7 @@ void PackagesListDataSource::Start() {
   auto trace_packet = writer_->NewTracePacket();
   auto* packages_list_packet = trace_packet->set_packages_list();
   if (!fs) {
+    PERFETTO_ELOG("Failed to open packages.list");
     packages_list_packet->set_error(true);
     trace_packet->Finalize();
     writer_->Flush();
@@ -106,6 +108,7 @@ void PackagesListDataSource::Start() {
       packages_list_packet->set_error(true);
     }
   }
+  trace_packet->Finalize();
   writer_->Flush();
 }
 
