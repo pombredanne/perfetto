@@ -148,7 +148,7 @@ void HeapprofdProducer::SetupDataSource(DataSourceInstanceID id,
                                         const DataSourceConfig& cfg) {
   PERFETTO_DLOG("Setting up data source.");
   if (mode_ == HeapprofdMode::kChild && cfg.enable_extra_guardrails()) {
-    PERFETTO_ELOG("Not supported on user.");
+    PERFETTO_ELOG("enable_extra_guardrails is not supported on user.");
     return;
   }
 
