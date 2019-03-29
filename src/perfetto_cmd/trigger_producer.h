@@ -33,8 +33,8 @@ class DataSourceConfig;
 // will never register any data sources.
 class TriggerProducer : public Producer {
  public:
-  TriggerProducer(std::function<void(bool)> callback,
-                  base::TaskRunner* task_runner,
+  TriggerProducer(base::TaskRunner* task_runner,
+                  std::function<void(bool)> callback,
                   const std::vector<std::string>* const triggers);
   ~TriggerProducer() override;
 
@@ -52,6 +52,7 @@ class TriggerProducer : public Producer {
   void Flush(FlushRequestID, const DataSourceInstanceID*, size_t) override;
 
  private:
+  bool issued_callback_ = false;
   base::TaskRunner* const task_runner_;
   const std::function<void(bool)> callback_;
   const std::vector<std::string>* const triggers_;
@@ -59,14 +60,6 @@ class TriggerProducer : public Producer {
   base::WeakPtrFactory<TriggerProducer> weak_factory_;
 };
 
-// Creates a TriggerProducer, which once the async connections call is
-// complete it will issue |callback| with true if successfully and false
-// otherwise. This function does not block. the |task_runner| must survive
-// longer then this the returned TriggerProducer.
-std::unique_ptr<TriggerProducer> ActivateTriggers(
-    const std::vector<std::string>& triggers,
-    std::function<void(bool)> callback,
-    base::TaskRunner* task_runner);
 }  // namespace perfetto
 
 #endif  // SRC_PERFETTO_CMD_TRIGGER_PRODUCER_H_
