@@ -51,6 +51,7 @@ namespace profiling {
 //
 // TODO:
 // - Write a benchmark.
+// - Make the stats ifdef-able.
 class SharedRingBuffer {
  public:
   class Buffer {

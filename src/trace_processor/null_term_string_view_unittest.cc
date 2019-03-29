@@ -29,6 +29,7 @@ TEST(NullTermStringViewTest, Comparisions) {
   EXPECT_FALSE(NullTermStringView() < NullTermStringView(""));
   EXPECT_TRUE(NullTermStringView() < NullTermStringView("foo"));
   EXPECT_TRUE(NullTermStringView("") < NullTermStringView("foo"));
+  EXPECT_FALSE(NullTermStringView() < NullTermStringView("foo", 0));
   EXPECT_FALSE(NullTermStringView("foo") < NullTermStringView("foo"));
   EXPECT_TRUE(NullTermStringView("foo") < NullTermStringView("fooo"));
   EXPECT_FALSE(NullTermStringView("fooo") < NullTermStringView("foo"));
@@ -39,6 +40,7 @@ TEST(NullTermStringViewTest, Comparisions) {
   EXPECT_TRUE(NullTermStringView() <= NullTermStringView(""));
   EXPECT_TRUE(NullTermStringView() <= NullTermStringView("foo"));
   EXPECT_TRUE(NullTermStringView("") <= NullTermStringView("foo"));
+  EXPECT_TRUE(NullTermStringView() <= NullTermStringView("foo", 0));
   EXPECT_TRUE(NullTermStringView("foo") <= NullTermStringView("foo"));
   EXPECT_TRUE(NullTermStringView("foo") <= NullTermStringView("fooo"));
   EXPECT_FALSE(NullTermStringView("fooo") <= NullTermStringView("foo"));
@@ -49,6 +51,7 @@ TEST(NullTermStringViewTest, Comparisions) {
   EXPECT_FALSE(NullTermStringView() > NullTermStringView(""));
   EXPECT_FALSE(NullTermStringView() > NullTermStringView("foo"));
   EXPECT_FALSE(NullTermStringView("") > NullTermStringView("foo"));
+  EXPECT_FALSE(NullTermStringView() > NullTermStringView("foo", 0));
   EXPECT_FALSE(NullTermStringView("foo") > NullTermStringView("foo"));
   EXPECT_FALSE(NullTermStringView("foo") > NullTermStringView("fooo"));
   EXPECT_TRUE(NullTermStringView("fooo") > NullTermStringView("foo"));
@@ -59,6 +62,7 @@ TEST(NullTermStringViewTest, Comparisions) {
   EXPECT_TRUE(NullTermStringView() >= NullTermStringView(""));
   EXPECT_FALSE(NullTermStringView() >= NullTermStringView("foo"));
   EXPECT_FALSE(NullTermStringView("") >= NullTermStringView("foo"));
+  EXPECT_TRUE(NullTermStringView() >= NullTermStringView("foo", 0));
   EXPECT_TRUE(NullTermStringView("foo") >= NullTermStringView("foo"));
   EXPECT_FALSE(NullTermStringView("foo") >= NullTermStringView("fooo"));
   EXPECT_TRUE(NullTermStringView("fooo") >= NullTermStringView("foo"));

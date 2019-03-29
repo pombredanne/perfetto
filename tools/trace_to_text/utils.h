@@ -17,13 +17,12 @@
 #ifndef TOOLS_TRACE_TO_TEXT_UTILS_H_
 #define TOOLS_TRACE_TO_TEXT_UTILS_H_
 
-#include <stdio.h>
-#include <sys/ioctl.h>
 #include <unistd.h>
 
+#include <stdio.h>
+#include <sys/ioctl.h>
 #include <functional>
 #include <iostream>
-#include <memory>
 
 #include "perfetto/base/build_config.h"
 

@@ -2517,11 +2517,11 @@ TracingServiceImpl::ProducerEndpointImpl::GetShmemArbiter() {
 std::unique_ptr<TraceWriter>
 TracingServiceImpl::ProducerEndpointImpl::CreateTraceWriter(BufferID buf_id) {
   if (!inproc_shmem_arbiter_) {
-    PERFETTO_DLOG(
+    PERFETTO_DCHECK(in_process_);
+    PERFETTO_FATAL(
         "ProducerEndpoint::CreateTraceWriter can only be used when "
         "CreateProducer has been called with in_process=true and after tracing "
         "has started.");
-    return nullptr;
   }
 
   return GetShmemArbiter()->CreateTraceWriter(buf_id);
