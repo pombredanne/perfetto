@@ -677,18 +677,5 @@ void SyscallTracker::Exit(int64_t ts, UniqueTid utid, uint32_t syscall_num) {
   context_->slice_tracker->End(ts, utid, 0 /* cat */, name);
 }
 
-StringId SyscallTracker::SyscallNumberToStringId(uint32_t syscall_num) {
-  if (syscall_num > kSyscallCount)
-    return 0;
-  // We see two write sys calls around each userspace slice that is going via
-  // trace_marker, this violates the assumption that userspace slices are
-  // perfectly nested. For the moment ignore all write sys calls.
-  // TODO(hjd): Remove this limitation.
-  StringId id = arch_syscall_to_string_id_[syscall_num];
-  if (id == sys_write_string_id_)
-    return 0;
-  return id;
-}
-
 }  // namespace trace_processor
 }  // namespace perfetto

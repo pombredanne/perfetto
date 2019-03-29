@@ -49,7 +49,18 @@ class SyscallTracker {
  private:
   TraceProcessorContext* const context_;
 
-  StringId SyscallNumberToStringId(uint32_t syscall_num);
+  inline StringId SyscallNumberToStringId(uint32_t syscall) {
+    if (syscall > kSyscallCount)
+      return 0;
+    // We see two write sys calls around each userspace slice that is going via
+    // trace_marker, this violates the assumption that userspace slices are
+    // perfectly nested. For the moment ignore all write sys calls.
+    // TODO(hjd): Remove this limitation.
+    StringId id = arch_syscall_to_string_id_[syscall];
+    if (id == sys_write_string_id_)
+      return 0;
+    return id;
+  }
 
   // This is table from platform specific syscall number directly to
   // the relevent StringId (this avoids having to always do two conversions).
