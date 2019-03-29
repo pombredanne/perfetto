@@ -693,12 +693,10 @@ message TraceConfig {
     optional uint32 trigger_timeout_ms = 3;
   }
   optional TriggerConfig trigger_config = 17;
-  // DO NOT USE without discussing with the perfetto team. This is deprecated
-  // and should not be used post Q.
-  //
+
   // When this is non-empty the perfetto command line tool will ignore the rest
   // of this TraceConfig and instead connect to the perfetto service as a
-  // producer and send these triggers. Potentially stoping or starting traces
+  // producer and send these triggers, potentially stopping or starting traces
   // that were previous configured to use a TriggerConfig.
   repeated string activate_triggers = 18;
 }
