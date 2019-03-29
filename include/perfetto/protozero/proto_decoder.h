@@ -24,6 +24,7 @@
 
 #include "perfetto/base/logging.h"
 #include "perfetto/base/string_view.h"
+#include "perfetto/base/utils.h"
 #include "perfetto/protozero/field.h"
 #include "perfetto/protozero/proto_utils.h"
 
@@ -184,11 +185,8 @@ class TypedProtoDecoderBase : public ProtoDecoder {
     // implicit initializers on all the ~1000 entries. We need it to initialize
     // only on the first |max_field_id| fields, the remaining capacity doesn't
     // require initialization.
-    // TODO(lalitm): is_trivially_constructible is currently not available
-    // in some environments we build in. Reenable when that environment supports
-    // this.
-    static_assert(/* std::is_trivially_constructible<Field>::value && */
-                  std::is_trivially_destructible<Field>::value &&
+    static_assert(PERFETTO_IS_TRIVIALLY_CONSTRUCTIBLE() &&
+                      std::is_trivially_destructible<Field>::value &&
                       std::is_trivial<Field>::value,
                   "Field must be a trivial aggregate type");
     memset(fields_, 0, sizeof(Field) * num_fields_);
