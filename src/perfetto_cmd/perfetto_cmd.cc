@@ -202,7 +202,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
       {"config-uid", required_argument, nullptr, OPT_CONFIG_UID},
       {"subscription-id", required_argument, nullptr, OPT_SUBSCRIPTION_ID},
       {"reset-guardrails", no_argument, nullptr, OPT_RESET_GUARDRAILS},
-      {"activate-trigger", required_argument, nullptr, OPT_TRIGGER},
+      {"trigger", required_argument, nullptr, OPT_TRIGGER},
       {"detach", required_argument, nullptr, OPT_DETACH},
       {"attach", required_argument, nullptr, OPT_ATTACH},
       {"is_detached", required_argument, nullptr, OPT_IS_DETACHED},
@@ -506,13 +506,12 @@ int PerfettoCmd::Main(int argc, char** argv) {
   // the options.
   if (!triggers_to_activate.empty()) {
     bool finished_with_success = false;
-    std::unique_ptr<TriggerProducer> producer =
-        ActivateTriggers(triggers_to_activate,
-                         [this, &finished_with_success](bool success) {
-                           finished_with_success = success;
-                           task_runner_.Quit();
-                         },
-                         &task_runner_);
+    TriggerProducer producer(&task_runner_,
+                             [this, &finished_with_success](bool success) {
+                               finished_with_success = success;
+                               task_runner_.Quit();
+                             },
+                             &triggers_to_activate);
     task_runner_.Run();
     return finished_with_success ? 0 : 1;
   }

@@ -27,8 +27,8 @@ namespace perfetto {
 
 class DataSourceConfig;
 
-TriggerProducer::TriggerProducer(std::function<void(bool)> callback,
-                                 base::TaskRunner* task_runner,
+TriggerProducer::TriggerProducer(base::TaskRunner* task_runner,
+                                 std::function<void(bool)> callback,
                                  const std::vector<std::string>* const triggers)
     : task_runner_(task_runner),
       callback_(std::move(callback)),
@@ -43,8 +43,9 @@ TriggerProducer::TriggerProducer(std::function<void(bool)> callback,
   auto weak_this = weak_factory_.GetWeakPtr();
   task_runner_->PostDelayedTask(
       [weak_this]() {
-        if (!weak_this)
+        if (!weak_this || weak_this->issued_callback_)
           return;
+        weak_this->issued_callback_ = true;
         weak_this->callback_(false);
       },
       60000);
@@ -58,8 +59,9 @@ void TriggerProducer::OnConnect() {
   producer_endpoint_->ActivateTriggers(*triggers_);
   auto weak_this = weak_factory_.GetWeakPtr();
   task_runner_->PostTask([weak_this]() {
-    if (!weak_this)
+    if (!weak_this || weak_this->issued_callback_)
       return;
+    weak_this->issued_callback_ = true;
     weak_this->callback_(true);
   });
 }
@@ -87,13 +89,4 @@ void TriggerProducer::Flush(FlushRequestID,
   PERFETTO_DFATAL("Attempted to Flush() on commandline producer");
 }
 
-std::unique_ptr<TriggerProducer> ActivateTriggers(
-    const std::vector<std::string>& triggers,
-    std::function<void(bool)> callback,
-    base::TaskRunner* task_runner) {
-  PERFETTO_DCHECK(!triggers.empty());
-  PERFETTO_DCHECK(task_runner);
-  return std::unique_ptr<TriggerProducer>(
-      new TriggerProducer(std::move(callback), task_runner, &triggers));
-}
 }  // namespace perfetto

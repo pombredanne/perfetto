@@ -29,6 +29,7 @@
 #include "perfetto/base/file_utils.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/pipe.h"
+#include "perfetto/base/temp_file.h"
 #include "perfetto/traced/traced.h"
 #include "perfetto/tracing/core/trace_config.h"
 #include "perfetto/tracing/core/trace_packet.h"
@@ -631,17 +632,17 @@ TEST_F(PerfettoCmdlineTest, NoSanitizers(StartTracingTrigger)) {
   auto* fake_producer = helper.ConnectFakeProducer();
   EXPECT_TRUE(fake_producer);
 
-  std::thread background_trace([trace_config, this]() {
+  base::TempFile trace_output = base::TempFile::Create();
+  std::thread background_trace([&trace_output, &trace_config, this]() {
     EXPECT_EQ(0, Exec(
                      {
-                         "-o", "/tmp/output.perfetto-trace", "-c", "-",
+                         "-o", trace_output.path(), "-c", "-",
                      },
                      trace_config.SerializeAsString()));
   });
 
   helper.WaitForProducerSetup();
-  EXPECT_EQ(0, Exec({"--activate-trigger=trigger_name"}))
-      << "stderr: " << stderr_;
+  EXPECT_EQ(0, Exec({"--trigger=trigger_name"})) << "stderr: " << stderr_;
 
   // Wait for the producer to start, and then write out 11 packets.
   helper.WaitForProducerEnabled();
@@ -651,7 +652,7 @@ TEST_F(PerfettoCmdlineTest, NoSanitizers(StartTracingTrigger)) {
   background_trace.join();
 
   std::string trace_str;
-  base::ReadFile("/tmp/output.perfetto-trace", &trace_str);
+  base::ReadFile(trace_output.path(), &trace_str);
   protos::Trace trace;
   ASSERT_TRUE(trace.ParseFromString(trace_str));
   EXPECT_EQ(kPreamblePackets + kMessageCount, trace.packet_size());
@@ -709,10 +710,11 @@ TEST_F(PerfettoCmdlineTest, NoSanitizers(StopTracingTrigger)) {
   auto* fake_producer = helper.ConnectFakeProducer();
   EXPECT_TRUE(fake_producer);
 
-  std::thread background_trace([trace_config, this]() {
+  base::TempFile trace_output = base::TempFile::Create();
+  std::thread background_trace([&trace_output, &trace_config, this]() {
     EXPECT_EQ(0, Exec(
                      {
-                         "-o", "/tmp/output.perfetto-trace", "-c", "-",
+                         "-o", trace_output.path(), "-c", "-",
                      },
                      trace_config.SerializeAsString()));
   });
@@ -724,15 +726,14 @@ TEST_F(PerfettoCmdlineTest, NoSanitizers(StopTracingTrigger)) {
   fake_producer->ProduceEventBatch(helper.WrapTask(on_data_written));
   task_runner.RunUntilCheckpoint("data_written_1");
 
-  EXPECT_EQ(0, Exec({"--activate-trigger=trigger_name_2",
-                     "--activate-trigger=trigger_name",
-                     "--activate-trigger=trigger_name_3"}))
+  EXPECT_EQ(0, Exec({"--trigger=trigger_name_2", "--trigger=trigger_name",
+                     "--trigger=trigger_name_3"}))
       << "stderr: " << stderr_;
 
   background_trace.join();
 
   std::string trace_str;
-  base::ReadFile("/tmp/output.perfetto-trace", &trace_str);
+  base::ReadFile(trace_output.path(), &trace_str);
   protos::Trace trace;
   ASSERT_TRUE(trace.ParseFromString(trace_str));
   EXPECT_EQ(kPreamblePackets + kMessageCount, trace.packet_size());
@@ -771,7 +772,7 @@ TEST_F(PerfettoCmdlineTest, NoSanitizers(NoDataNoFileWithoutTrigger)) {
   auto* trigger_cfg = trace_config.mutable_trigger_config();
   trigger_cfg->set_trigger_mode(
       protos::TraceConfig::TriggerConfig::STOP_TRACING);
-  trigger_cfg->set_trigger_timeout_ms(15000);
+  trigger_cfg->set_trigger_timeout_ms(1000);
   auto* trigger = trigger_cfg->add_triggers();
   trigger->set_name("trigger_name");
   // |stop_delay_ms| must be long enough that we can write the packets in
@@ -788,20 +789,22 @@ TEST_F(PerfettoCmdlineTest, NoSanitizers(NoDataNoFileWithoutTrigger)) {
   auto* fake_producer = helper.ConnectFakeProducer();
   EXPECT_TRUE(fake_producer);
 
-  std::thread background_trace([trace_config, this]() {
+  base::TempFile trace_output = base::TempFile::Create();
+  std::string path = trace_output.path();
+  std::thread background_trace([&path, &trace_config, this]() {
     EXPECT_EQ(0, Exec(
                      {
-                         "-o", "/tmp/output.perfetto-trace", "-c", "-",
+                         "-o", path, "-c", "-",
                      },
                      trace_config.SerializeAsString()));
   });
-
+  trace_output.Unlink();
   background_trace.join();
 
   EXPECT_THAT(stderr_,
               ::testing::HasSubstr("No bytes written. Deleting file."));
   std::string trace_str;
-  EXPECT_FALSE(base::ReadFile("/tmp/output.perfetto-trace", &trace_str));
+  EXPECT_FALSE(base::ReadFile(path, &trace_str));
   EXPECT_EQ("", trace_str);
 }
 
