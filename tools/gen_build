@@ -390,6 +390,7 @@ class BuildGenerator(object):
       if target['type'] == 'action':
         self.action_generated_files.update(target['outputs'])
 
+
   def create_build_for_targets(self, targets, aliases):
     """Generate a BUILD for a list of GN targets and aliases."""
     self.build = Build(public=True)
@@ -426,6 +427,7 @@ class BuildGenerator(object):
     for dep in target.get('deps', []):
       resolved_deps.add(dep)
     return resolved_deps
+
 
   def apply_module_sources_to_target(self, target, module_desc):
     """
