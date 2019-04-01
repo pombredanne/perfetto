@@ -17,7 +17,7 @@
 #ifndef SRC_TRACE_PROCESSOR_SYSCALL_TRACKER_H_
 #define SRC_TRACE_PROCESSOR_SYSCALL_TRACKER_H_
 
-#include <numeric_limits>
+#include <limits>
 #include <tuple>
 
 #include "perfetto/base/string_view.h"
