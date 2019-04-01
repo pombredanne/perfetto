@@ -634,7 +634,8 @@ SyscallTracker::SyscallTracker(TraceProcessorContext* context)
 SyscallTracker::~SyscallTracker() = default;
 
 void SyscallTracker::SetArchitecture(Architecture arch) {
-  const std::array<const char*, kSyscallCount>* arch_to_generic_syscall_number;
+  const std::array<const char*, kSyscallCount>* arch_to_generic_syscall_number =
+      nullptr;
   switch (arch) {
     case kAarch64:
       arch_to_generic_syscall_number = &aarch64_to_syscall;
@@ -645,8 +646,6 @@ void SyscallTracker::SetArchitecture(Architecture arch) {
     case kUnknown:
       arch_to_generic_syscall_number = &unknown_to_syscall;
       break;
-    default:
-      PERFETTO_FATAL("For GCC");
   }
 
   for (size_t i = 0; i < kSyscallCount; i++) {
