@@ -19,8 +19,9 @@ option optimize_for = LITE_RUNTIME;
 package perfetto.protos;
 
 // When a TracingSession receives a trigger it records the boot time nanoseconds
-// of when it received it and a copy of the trigger. We emit this data so
-// filtering can be done on triggers received in the trace.
+// in the TracePacket's timestamp field as well as the name of the producer that
+// triggered it. We emit this data so filtering can be done on triggers received
+// in the trace.
 message Trigger {
   // Name of the trigger which was received.
   optional string trigger_name = 1;
