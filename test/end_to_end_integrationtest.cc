@@ -804,7 +804,7 @@ TEST_F(PerfettoCmdlineTest, NoSanitizers(NoDataNoFileWithoutTrigger)) {
   EXPECT_THAT(stderr_,
               ::testing::HasSubstr("No bytes written. Deleting file."));
   std::string trace_str;
-  EXPECT_FALSE(base::ReadFile(trace_output.path(), &trace_str));
+  EXPECT_FALSE(base::ReadFile(path, &trace_str));
   EXPECT_EQ("", trace_str);
 }
 
