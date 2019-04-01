@@ -61,8 +61,8 @@ class StorageColumn {
   // Generally this is only possible if the column is sorted.
   virtual Bounds BoundFilter(int, sqlite3_value*) const { return Bounds{}; }
 
-  // Returns whether this column is sorted in the storage.
-  virtual bool IsNaturallyOrdered() const { return false; }
+  // Returns whether this column is ordered.
+  virtual bool HasOrdering() const { return false; }
 
   const std::string& name() const { return col_name_; }
   bool hidden() const { return hidden_; }
@@ -119,7 +119,7 @@ class StringColumn final : public StorageColumn {
     return Table::ColumnType::kString;
   }
 
-  bool IsNaturallyOrdered() const override { return false; }
+  bool HasOrdering() const override { return false; }
 
  private:
   const std::deque<Id>* deque_ = nullptr;
@@ -211,7 +211,7 @@ class NumericColumn : public StorageColumn {
     };
   }
 
-  bool IsNaturallyOrdered() const override { return accessor_.HasOrdering(); }
+  bool HasOrdering() const override { return accessor_.HasOrdering(); }
 
   Table::ColumnType GetType() const override {
     if (std::is_same<NumericType, int32_t>::value) {
