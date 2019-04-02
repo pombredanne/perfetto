@@ -30,7 +30,7 @@
 #else
 // Json traces are only supported in standalone build.
 namespace Json {
-struct Value {}
+struct Value {};
 }  // namespace Json
 #endif
 
