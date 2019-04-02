@@ -624,19 +624,6 @@ void PerfettoCmd::OnTracingDisabled() {
 
 void PerfettoCmd::FinalizeTraceAndExit() {
   fflush(*trace_out_stream_);
-  if (bytes_written_ == 0) {
-    if (trace_out_path_ != "-") {
-      if (remove(trace_out_path_.c_str())) {
-        PERFETTO_ELOG("Failed to clean up empty file '%s'",
-                      trace_out_path_.c_str());
-      } else {
-        PERFETTO_ILOG("No bytes written. Deleting file.");
-      }
-    }
-    did_process_full_trace_ = true;
-    task_runner_.Quit();
-    return;
-  }
   if (dropbox_tag_.empty()) {
     trace_out_stream_.reset();
     did_process_full_trace_ = true;
@@ -650,6 +637,12 @@ void PerfettoCmd::FinalizeTraceAndExit() {
     }
   } else {
 #if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
+    if (bytes_written_ == 0) {
+      PERFETTO_ILOG("Skipping upload to dropbox. Empty trace.");
+      did_process_full_trace_ = true;
+      task_runner_.Quit();
+      return;
+    }
     android::sp<android::os::DropBoxManager> dropbox =
         new android::os::DropBoxManager();
     fseek(*trace_out_stream_, 0, SEEK_SET);
