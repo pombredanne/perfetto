@@ -76,7 +76,14 @@ class PerfettoTest : public ::testing::Test {
 
 class PerfettoCmdlineTest : public ::testing::Test {
  public:
-  void SetUp() override { test_helper_.StartServiceIfRequired(); }
+  void SetUp() override {
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+    // On android the test doesn't have permission when invoking the commandline
+    // client to write to /data/local/tmp. So instead we use the perfetto-traces
+    // directory as our TMPDIR so we won't run into permission issues.
+    setenv("TMPDIR", "/data/misc/perfetto-traces", 1);
+#endif
+    test_helper_.StartServiceIfRequired(); }
 
   void TearDown() override {}
 
@@ -631,12 +638,13 @@ TEST_F(PerfettoCmdlineTest, NoSanitizers(StartTracingTrigger)) {
   helper.StartServiceIfRequired();
   auto* fake_producer = helper.ConnectFakeProducer();
   EXPECT_TRUE(fake_producer);
-
   base::TempFile trace_output = base::TempFile::Create();
-  std::thread background_trace([&trace_output, &trace_config, this]() {
+  const std::string path = trace_output.path();
+  trace_output.Unlink();
+  std::thread background_trace([&path, &trace_config, this]() {
     EXPECT_EQ(0, Exec(
                      {
-                         "-o", trace_output.path(), "-c", "-",
+                         "-o", path, "-c", "-",
                      },
                      trace_config.SerializeAsString()));
   });
@@ -652,7 +660,7 @@ TEST_F(PerfettoCmdlineTest, NoSanitizers(StartTracingTrigger)) {
   background_trace.join();
 
   std::string trace_str;
-  base::ReadFile(trace_output.path(), &trace_str);
+  base::ReadFile(path, &trace_str);
   protos::Trace trace;
   ASSERT_TRUE(trace.ParseFromString(trace_str));
   EXPECT_EQ(kPreamblePackets + kMessageCount, trace.packet_size());
@@ -711,10 +719,12 @@ TEST_F(PerfettoCmdlineTest, NoSanitizers(StopTracingTrigger)) {
   EXPECT_TRUE(fake_producer);
 
   base::TempFile trace_output = base::TempFile::Create();
-  std::thread background_trace([&trace_output, &trace_config, this]() {
+  const std::string path = trace_output.path();
+  trace_output.Unlink();
+  std::thread background_trace([&path, &trace_config, this]() {
     EXPECT_EQ(0, Exec(
                      {
-                         "-o", trace_output.path(), "-c", "-",
+                         "-o", path, "-c", "-",
                      },
                      trace_config.SerializeAsString()));
   });
@@ -733,7 +743,7 @@ TEST_F(PerfettoCmdlineTest, NoSanitizers(StopTracingTrigger)) {
   background_trace.join();
 
   std::string trace_str;
-  base::ReadFile(trace_output.path(), &trace_str);
+  base::ReadFile(path, &trace_str);
   protos::Trace trace;
   ASSERT_TRUE(trace.ParseFromString(trace_str));
   EXPECT_EQ(kPreamblePackets + kMessageCount, trace.packet_size());
