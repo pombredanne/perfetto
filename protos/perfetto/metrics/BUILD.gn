@@ -18,8 +18,6 @@ import("../../../gn/protozero_library.gni")
 
 common_sources = [ "metrics.proto" ]
 
-# Proto messages that are required by the IPC service definitions but have also
-# a C++ counterpart in tracing/core (i.e. are used also for the non-IPC cases).
 proto_library("lite") {
   generate_python = false
   proto_in_dir = "$perfetto_root_path/protos"
