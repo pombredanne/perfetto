@@ -52,7 +52,7 @@ ReadDictRes ReadOneJsonDict(const char* start,
       // not a backslash the next character is escaped:
       is_escaping = *s == '\\' && !is_escaping;
       // If we're currently parsing a string we should ignore otherwise special
-      // characters and unconditionally continue:
+      // characters:
       continue;
     }
     if (*s == '{') {
