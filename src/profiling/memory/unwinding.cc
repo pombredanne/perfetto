@@ -221,6 +221,7 @@ bool DoUnwind(WireMessage* msg, UnwindingMetadata* metadata, AllocRecord* out) {
     if (attempt > 0) {
       PERFETTO_DLOG("Reparsing maps");
       metadata->ReparseMaps();
+      unwinder.SetRegs(regs.get());
       out->reparsed_map = true;
     }
     unwinder.Unwind(&kSkipMaps, nullptr);
