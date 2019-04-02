@@ -759,7 +759,13 @@ TEST_F(PerfettoCmdlineTest, NoSanitizers(StopTracingTrigger)) {
   }
 }
 
+// Dropbox on the commandline client only works on android builds. So disable
+// this test on all other builds.
+#if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
 TEST_F(PerfettoCmdlineTest, NoSanitizers(NoDataNoFileWithoutTrigger)) {
+#else
+TEST_F(PerfettoCmdlineTest, DISABLED_NoDataNoFileWithoutTrigger) {
+#endif
   // See |message_count| and |message_size| in the TraceConfig above.
   constexpr size_t kMessageCount = 11;
   constexpr size_t kMessageSize = 32;
@@ -789,23 +795,17 @@ TEST_F(PerfettoCmdlineTest, NoSanitizers(NoDataNoFileWithoutTrigger)) {
   auto* fake_producer = helper.ConnectFakeProducer();
   EXPECT_TRUE(fake_producer);
 
-  base::TempFile trace_output = base::TempFile::Create();
-  std::string path = trace_output.path();
-  std::thread background_trace([&path, &trace_config, this]() {
+  std::thread background_trace([&trace_config, this]() {
     EXPECT_EQ(0, Exec(
                      {
-                         "-o", path, "-c", "-",
+                         "--dropbox", "TAG", "-c", "-",
                      },
                      trace_config.SerializeAsString()));
   });
-  trace_output.Unlink();
   background_trace.join();
 
   EXPECT_THAT(stderr_,
-              ::testing::HasSubstr("No bytes written. Deleting file."));
-  std::string trace_str;
-  EXPECT_FALSE(base::ReadFile(path, &trace_str));
-  EXPECT_EQ("", trace_str);
+              ::testing::HasSubstr("Skipping upload to dropbox. Empty trace."));
 }
 
 }  // namespace perfetto
