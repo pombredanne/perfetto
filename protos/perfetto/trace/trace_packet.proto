@@ -73,11 +73,8 @@ message TracePacket {
     PowerRails power_rails = 40;
     AndroidLogPacket android_log = 39;
     SystemInfo system_info = 45;
-<<<<<<< HEAD
     Trigger trigger = 46;
-=======
-    PackagesList packages_list = 46;
->>>>>>> Add data source parsing packages.list.
+    PackagesList packages_list = 47;
 
     // Only used by TrackEvent.
     ProcessDescriptor process_descriptor = 43;
