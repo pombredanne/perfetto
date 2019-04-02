@@ -24,10 +24,11 @@ namespace trace_processor {
 
 class ArgsTracker;
 class ChunkedTraceReader;
+class ClockTracker;
 class EventTracker;
 class ProcessTracker;
 class SliceTracker;
-class ClockTracker;
+class SyscallTracker;
 class TraceParser;
 class TraceStorage;
 class TraceSorter;
@@ -40,6 +41,7 @@ class TraceProcessorContext {
   std::unique_ptr<ArgsTracker> args_tracker;
   std::unique_ptr<SliceTracker> slice_tracker;
   std::unique_ptr<ProcessTracker> process_tracker;
+  std::unique_ptr<SyscallTracker> syscall_tracker;
   std::unique_ptr<EventTracker> event_tracker;
   std::unique_ptr<ClockTracker> clock_tracker;
   std::unique_ptr<TraceStorage> storage;

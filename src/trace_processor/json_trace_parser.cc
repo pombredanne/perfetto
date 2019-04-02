@@ -25,6 +25,7 @@
 
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
+#include "perfetto/base/string_view.h"
 #include "perfetto/base/utils.h"
 #include "src/trace_processor/json_trace_utils.h"
 #include "src/trace_processor/process_tracker.h"
@@ -51,8 +52,8 @@ void JsonTraceParser::ParseFtracePacket(uint32_t,
 
 void JsonTraceParser::ParseTracePacket(int64_t timestamp,
                                        TraceSorter::TimestampedTracePiece ttp) {
-  PERFETTO_DCHECK(ttp.ContainsJsonValue());
-  Json::Value& value = *(ttp.json_value);
+  PERFETTO_DCHECK(ttp.json_value != nullptr);
+  const Json::Value& value = *(ttp.json_value);
 
   ProcessTracker* procs = context_->process_tracker.get();
   TraceStorage* storage = context_->storage.get();
@@ -67,15 +68,20 @@ void JsonTraceParser::ParseTracePacket(int64_t timestamp,
   base::Optional<uint32_t> opt_tid;
 
   if (value.isMember("pid"))
-    opt_pid = CoerceToUint32(value["pid"]);
+    opt_pid = json_trace_utils::CoerceToUint32(value["pid"]);
   if (value.isMember("tid"))
-    opt_tid = CoerceToUint32(value["tid"]);
+    opt_tid = json_trace_utils::CoerceToUint32(value["tid"]);
 
   uint32_t pid = opt_pid.value_or(0);
   uint32_t tid = opt_tid.value_or(pid);
 
-  const char* cat = value.isMember("cat") ? value["cat"].asCString() : "";
-  const char* name = value.isMember("name") ? value["name"].asCString() : "";
+  base::StringView cat = value.isMember("cat")
+                             ? base::StringView(value["cat"].asCString())
+                             : base::StringView();
+  base::StringView name = value.isMember("name")
+                              ? base::StringView(value["name"].asCString())
+                              : base::StringView();
+
   StringId cat_id = storage->InternString(cat);
   StringId name_id = storage->InternString(name);
   UniqueTid utid = procs->UpdateThread(tid, pid);
@@ -90,7 +96,8 @@ void JsonTraceParser::ParseTracePacket(int64_t timestamp,
       break;
     }
     case 'X': {  // TRACE_EVENT (scoped event).
-      base::Optional<int64_t> opt_dur = CoerceToNs(value["dur"]);
+      base::Optional<int64_t> opt_dur =
+          json_trace_utils::CoerceToNs(value["dur"]);
       if (!opt_dur.has_value())
         return;
       slice_tracker->Scoped(timestamp, utid, cat_id, name_id, opt_dur.value());

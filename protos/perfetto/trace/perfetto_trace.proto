@@ -3045,6 +3045,10 @@ message AndroidLogConfig {
 
 message ChromeConfig {
   optional string trace_config = 1;
+
+  // When enabled, the data source should only fill in fields in the output that
+  // are not potentially privacy sensitive.
+  optional bool privacy_filtering_enabled = 2;
 }
 
 // End of protos/perfetto/config/chrome/chrome_config.proto
@@ -3072,6 +3076,11 @@ message DataSourceConfig {
   // Set by the service to indicate the duration of the trace.
   // DO NOT SET in consumer as this will be overridden by the service.
   optional uint32 trace_duration_ms = 3;
+
+  // Set by the service to indicate whether this tracing session has extra
+  // guardrails.
+  // DO NOT SET in consumer as this will be overridden by the service.
+  optional bool enable_extra_guardrails = 6;
 
   // Set by the service to indicate which tracing session the data source
   // belongs to. The intended use case for this is checking if two data sources,

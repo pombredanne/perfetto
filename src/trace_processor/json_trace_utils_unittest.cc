@@ -23,6 +23,7 @@
 
 namespace perfetto {
 namespace trace_processor {
+namespace json_trace_utils {
 namespace {
 
 TEST(JsonTraceUtilsTest, CoerceToUint32) {
@@ -48,5 +49,6 @@ TEST(JsonTraceUtilsTest, CoerceToNs) {
 }
 
 }  // namespace
+}  // namespace json_trace_utils
 }  // namespace trace_processor
 }  // namespace perfetto

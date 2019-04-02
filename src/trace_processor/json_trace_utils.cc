@@ -24,6 +24,7 @@
 
 namespace perfetto {
 namespace trace_processor {
+namespace json_trace_utils {
 
 // Json trace event timestamps are in us.
 // https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/edit#heading=h.nso4gcezn7n1
@@ -76,5 +77,6 @@ base::Optional<uint32_t> CoerceToUint32(const Json::Value& value) {
   return static_cast<uint32_t>(n);
 }
 
+}  // namespace json_trace_utils
 }  // namespace trace_processor
 }  // namespace perfetto

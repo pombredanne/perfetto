@@ -123,7 +123,8 @@ bool JsonTraceTokenizer::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
     if (res == kEndOfTrace || res == kNeedsMoreData)
       break;
 
-    base::Optional<int64_t> opt_ts = CoerceToNs((*value)["ts"]);
+    base::Optional<int64_t> opt_ts =
+        json_trace_utils::CoerceToNs((*value)["ts"]);
     PERFETTO_CHECK(opt_ts.has_value());
     int64_t ts = opt_ts.value();
 

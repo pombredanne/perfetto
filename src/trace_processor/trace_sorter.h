@@ -27,6 +27,11 @@
 
 #if PERFETTO_BUILDFLAG(PERFETTO_STANDALONE_BUILD)
 #include <json/value.h>
+#else
+// Json traces are only supported in standalone build.
+namespace Json {
+struct Value {}
+}  // namespace Json
 #endif
 
 namespace perfetto {
@@ -79,20 +84,16 @@ class TraceSorter {
              (timestamp == o.timestamp && packet_idx_ < o.packet_idx_);
     }
 
-#if PERFETTO_BUILDFLAG(PERFETTO_STANDALONE_BUILD)
     TimestampedTracePiece(int64_t ts,
                           uint64_t idx,
                           std::unique_ptr<Json::Value> value)
         : json_value(std::move(value)),
           timestamp(ts),
           packet_idx_(idx),
-          // TODO: Stop requiring TraceBlobView in TimestampedTracePiece.
+          // TODO(dproy): Stop requiring TraceBlobView in TimestampedTracePiece.
           blob_view(TraceBlobView(nullptr, 0, 0)) {}
 
-    inline bool ContainsJsonValue() { return json_value != nullptr; }
-
     std::unique_ptr<Json::Value> json_value;
-#endif
 
     int64_t timestamp;
     uint64_t packet_idx_;
@@ -109,7 +110,6 @@ class TraceSorter {
     MaybeExtractEvents(queue);
   }
 
-#if PERFETTO_BUILDFLAG(PERFETTO_STANDALONE_BUILD)
   inline void PushJsonValue(int64_t timestamp,
                             std::unique_ptr<Json::Value> json_value) {
     auto* queue = GetQueue(0);
@@ -117,7 +117,6 @@ class TraceSorter {
         TimestampedTracePiece(timestamp, packet_idx_++, std::move(json_value)));
     MaybeExtractEvents(queue);
   }
-#endif
 
   inline void PushFtraceEvent(uint32_t cpu,
                               int64_t timestamp,

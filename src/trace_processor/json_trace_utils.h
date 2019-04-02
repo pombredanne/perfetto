@@ -30,10 +30,13 @@ namespace trace_processor {
 
 class TraceProcessorContext;
 
+namespace json_trace_utils {
+
 base::Optional<int64_t> CoerceToNs(const Json::Value& value);
 base::Optional<int64_t> CoerceToInt64(const Json::Value& value);
 base::Optional<uint32_t> CoerceToUint32(const Json::Value& value);
 
+}  // namespace json_trace_utils
 }  // namespace trace_processor
 }  // namespace perfetto
 

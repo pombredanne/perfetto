@@ -43,6 +43,7 @@
 #include "src/trace_processor/sqlite3_str_split.h"
 #include "src/trace_processor/stats_table.h"
 #include "src/trace_processor/string_table.h"
+#include "src/trace_processor/syscall_tracker.h"
 #include "src/trace_processor/table.h"
 #include "src/trace_processor/thread_table.h"
 #include "src/trace_processor/trace_blob_view.h"
@@ -168,6 +169,7 @@ TraceProcessorImpl::TraceProcessorImpl(const Config& cfg) : cfg_(cfg) {
   context_.slice_tracker.reset(new SliceTracker(&context_));
   context_.event_tracker.reset(new EventTracker(&context_));
   context_.process_tracker.reset(new ProcessTracker(&context_));
+  context_.syscall_tracker.reset(new SyscallTracker(&context_));
   context_.clock_tracker.reset(new ClockTracker(&context_));
 
   ArgsTable::RegisterTable(*db_, context_.storage.get());
