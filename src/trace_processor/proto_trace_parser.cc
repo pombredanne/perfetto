@@ -274,7 +274,12 @@ ProtoTraceParser::ProtoTraceParser(TraceProcessorContext* context)
 
 ProtoTraceParser::~ProtoTraceParser() = default;
 
-void ProtoTraceParser::ParseTracePacket(int64_t ts, TraceBlobView blob) {
+void ProtoTraceParser::ParseTracePacket(
+    int64_t ts,
+    TraceSorter::TimestampedTracePiece ttp) {
+  PERFETTO_DCHECK(ttp.json_value == nullptr);
+  const TraceBlobView& blob = ttp.blob_view;
+
   protos::pbzero::TracePacket::Decoder packet(blob.data(), blob.length());
 
   if (packet.has_process_tree())
@@ -475,9 +480,13 @@ void ProtoTraceParser::ParseProcessStats(int64_t ts, ConstBytes blob) {
   }
 }
 
-void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
-                                         int64_t ts,
-                                         TraceBlobView ftrace) {
+void ProtoTraceParser::ParseFtracePacket(
+    uint32_t cpu,
+    int64_t ts,
+    TraceSorter::TimestampedTracePiece ttp) {
+  PERFETTO_DCHECK(ttp.json_value == nullptr);
+  const TraceBlobView& ftrace = ttp.blob_view;
+
   ProtoDecoder decoder(ftrace.data(), ftrace.length());
   uint64_t raw_pid = 0;
   if (auto pid_field =
@@ -844,7 +853,12 @@ void ProtoTraceParser::ParsePowerRails(ConstBytes blob) {
     for (auto it = evt.rail_descriptor(); it; ++it) {
       protos::pbzero::PowerRails::RailDescriptor::Decoder desc(it->data(),
                                                                it->size());
-      auto idx = desc.index();
+      uint32_t idx = desc.index();
+      if (PERFETTO_UNLIKELY(idx > 256)) {
+        PERFETTO_DLOG("Skipping excessively large power_rail index %" PRIu32,
+                      idx);
+        continue;
+      }
       if (power_rails_strs_id_.size() <= idx)
         power_rails_strs_id_.resize(idx + 1);
       char counter_name[255];

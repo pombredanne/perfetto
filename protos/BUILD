@@ -28,6 +28,7 @@ proto_library(
     name = "android",
     srcs = [
         "perfetto/trace/android/android_log.proto",
+        "perfetto/trace/android/packages_list.proto",
     ],
     has_services = 1,
     cc_api_version = 2,
@@ -56,6 +57,7 @@ proto_library(
     name = "android_zero",
     srcs = [
         "perfetto/trace/android/android_log.proto",
+        "perfetto/trace/android/packages_list.proto",
     ],
     deps = [
         "//third_party/perfetto/protos:common_zero",
@@ -718,6 +720,7 @@ proto_library(
     srcs = [
         "perfetto/trace/clock_snapshot.proto",
         "perfetto/trace/system_info.proto",
+        "perfetto/trace/trigger.proto",
     ],
     has_services = 1,
     cc_api_version = 2,
@@ -778,6 +781,7 @@ proto_library(
         "perfetto/trace/test_event.proto",
         "perfetto/trace/trace.proto",
         "perfetto/trace/trace_packet.proto",
+        "perfetto/trace/trigger.proto",
     ],
     deps = [
         "//third_party/perfetto/protos:android_zero",
