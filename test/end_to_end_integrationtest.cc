@@ -78,10 +78,6 @@ class PerfettoCmdlineTest : public ::testing::Test {
  public:
   void SetUp() override {
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
-    // On android the test doesn't have permission when invoking the commandline
-    // client to write to /data/local/tmp. So instead we use the perfetto-traces
-    // directory as our TMPDIR so we won't run into permission issues.
-    setenv("TMPDIR", "/data/misc/perfetto-traces", 1);
 #endif
     test_helper_.StartServiceIfRequired(); }
 
@@ -132,6 +128,10 @@ class PerfettoCmdlineTest : public ::testing::Test {
              1);
       _exit(PerfettoCmdMain(static_cast<int>(argv.size() - 1), argv.data()));
 #else
+      // We have to choose a location that the perfetto binary will have
+      // permission to write to. This does not include /data/local/tmp so
+      // instead we override TMPDIR to the trace directory.
+      setenv("TMPDIR", "/data/misc/perfetto-traces", 1);
       execv("/system/bin/perfetto", &argv[0]);
       _exit(3);
 #endif
@@ -631,17 +631,21 @@ TEST_F(PerfettoCmdlineTest, NoSanitizers(StartTracingTrigger)) {
   // an additional ReceivedTriggers packet.
   constexpr size_t kPreamblePackets = 6;
 
+  PERFETTO_ELOG("about to start service");
   base::TestTaskRunner task_runner;
 
   // Enable tracing and detach as soon as it gets started.
   TestHelper helper(&task_runner);
   helper.StartServiceIfRequired();
+  PERFETTO_ELOG("connecting producer");
   auto* fake_producer = helper.ConnectFakeProducer();
   EXPECT_TRUE(fake_producer);
+  PERFETTO_ELOG("connected producer");
   base::TempFile trace_output = base::TempFile::Create();
   const std::string path = trace_output.path();
   trace_output.Unlink();
   std::thread background_trace([&path, &trace_config, this]() {
+  PERFETTO_ELOG("starting backgroud trace");
     EXPECT_EQ(0, Exec(
                      {
                          "-o", path, "-c", "-",
@@ -649,20 +653,27 @@ TEST_F(PerfettoCmdlineTest, NoSanitizers(StartTracingTrigger)) {
                      trace_config.SerializeAsString()));
   });
 
+  PERFETTO_ELOG("waiting for producer setup");
   helper.WaitForProducerSetup();
+  PERFETTO_ELOG("sending trigger");
   EXPECT_EQ(0, Exec({"--trigger=trigger_name"})) << "stderr: " << stderr_;
 
   // Wait for the producer to start, and then write out 11 packets.
+  PERFETTO_ELOG("waiting for producer start");
   helper.WaitForProducerEnabled();
   auto on_data_written = task_runner.CreateCheckpoint("data_written");
   fake_producer->ProduceEventBatch(helper.WrapTask(on_data_written));
+  PERFETTO_ELOG("waiting for producer data writter");
   task_runner.RunUntilCheckpoint("data_written");
+  PERFETTO_ELOG("waiting for thread to join");
   background_trace.join();
 
+  PERFETTO_ELOG("reading file");
   std::string trace_str;
   base::ReadFile(path, &trace_str);
   protos::Trace trace;
   ASSERT_TRUE(trace.ParseFromString(trace_str));
+  PERFETTO_ELOG("read trace");
   EXPECT_EQ(kPreamblePackets + kMessageCount, trace.packet_size());
   for (const auto& packet : trace.packet()) {
     if (packet.data_case() == protos::TracePacket::kTraceConfig) {
