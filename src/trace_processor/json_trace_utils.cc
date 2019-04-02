@@ -17,6 +17,7 @@
 #include "src/trace_processor/json_trace_utils.h"
 
 #include <json/value.h>
+#include <limits>
 
 #if !PERFETTO_BUILDFLAG(PERFETTO_STANDALONE_BUILD)
 #error The JSON trace parser is supported only in the standalone build for now.

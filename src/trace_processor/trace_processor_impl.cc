@@ -233,6 +233,9 @@ bool TraceProcessorImpl::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
 }
 
 void TraceProcessorImpl::NotifyEndOfFile() {
+  if (unrecoverable_parse_error_ || !context_.chunk_reader)
+    return;
+
   context_.sorter->ExtractEventsForced();
   BuildBoundsTable(*db_, context_.storage->GetTraceTimestampBoundsNs());
 }
