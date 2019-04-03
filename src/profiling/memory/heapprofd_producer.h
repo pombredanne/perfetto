@@ -46,7 +46,7 @@ struct Process {
 
 class LogHistogram {
  public:
-  static const size_t kMaxBucket;
+  static const uint64_t kMaxBucket;
   static constexpr size_t kBuckets = 20;
 
   void Add(uint64_t value) { values_[GetBucket(value)]++; }
