@@ -886,6 +886,7 @@ void TracingServiceImpl::ActivateTriggers(
             return trigger.name() == trigger_name;
           });
       if (iter == tracing_session.config.trigger_config().triggers().end()) {
+        PERFETTO_ELOG("Skipping trigger name");
         continue;
       }
 
@@ -895,6 +896,7 @@ void TracingServiceImpl::ActivateTriggers(
       if (!iter->producer_name_regex().empty() &&
           !std::regex_match(producer->name_,
                             std::regex(iter->producer_name_regex()))) {
+        PERFETTO_ELOG("Skipping trigger producer");
         continue;
       }
 
@@ -906,6 +908,7 @@ void TracingServiceImpl::ActivateTriggers(
       auto weak_this = weak_ptr_factory_.GetWeakPtr();
       switch (tracing_session.config.trigger_config().trigger_mode()) {
         case TraceConfig::TriggerConfig::START_TRACING:
+          PERFETTO_ELOG("START_TRACING");
           // If the session has already been triggered and moved past
           // CONFIGURED then we don't need to repeat StartTracing. This would
           // work fine (StartTracing would return false) but would add error
@@ -913,7 +916,7 @@ void TracingServiceImpl::ActivateTriggers(
           if (tracing_session.state != TracingSession::CONFIGURED)
             break;
 
-          PERFETTO_DLOG("Triggering '%s' on tracing session %" PRIu64
+          PERFETTO_ELOG("Triggering '%s' on tracing session %" PRIu64
                         " with duration of %" PRIu32 "ms.",
                         iter->name().c_str(), tsid, iter->stop_delay_ms());
           // We override the trace duration to be the trigger's requested
@@ -923,6 +926,7 @@ void TracingServiceImpl::ActivateTriggers(
           StartTracing(tsid);
           break;
         case TraceConfig::TriggerConfig::STOP_TRACING:
+          PERFETTO_ELOG("STOP_TRACING");
           // Only stop the trace once to avoid confusing log messages. I.E.
           // when we've already hit the first trigger we've already Posted the
           // task to FlushAndDisable. So all future triggers will just break
@@ -930,7 +934,7 @@ void TracingServiceImpl::ActivateTriggers(
           if (triggers_already_received)
             break;
 
-          PERFETTO_DLOG("Triggering '%s' on tracing session %" PRIu64
+          PERFETTO_ELOG("Triggering '%s' on tracing session %" PRIu64
                         " with duration of %" PRIu32 "ms.",
                         iter->name().c_str(), tsid, iter->stop_delay_ms());
           // Now that we've seen a trigger we need to stop, flush, and disable
@@ -948,6 +952,7 @@ void TracingServiceImpl::ActivateTriggers(
               iter->stop_delay_ms());
           break;
         case TraceConfig::TriggerConfig::UNSPECIFIED:
+          PERFETTO_ELOG("No trigger");
           // There are no triggers in this session move onto the next.
           break;
       }
