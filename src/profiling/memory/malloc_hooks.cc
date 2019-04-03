@@ -163,7 +163,7 @@ void ShutdownLazy() {
 
   // Clear primary shared pointer, such that later hook invocations become nops.
   //
-  // Note that once we unlock, we allow for heapprofd_initalize to create a new
+  // Note that once we unlock, we allow for heapprofd_initialize to create a new
   // client, with its lifetime possibly overlapping the current client's, which
   // is being kept alive by the already-acquired shared_ptr copies. This means
   // that we cannot rely on the hooks being unpatched at the time the destructor
