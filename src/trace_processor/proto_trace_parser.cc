@@ -1250,9 +1250,8 @@ void ProtoTraceParser::ParseFtraceStats(ConstBytes blob) {
       storage->SetIndexedStats(stats::ftrace_cpu_oldest_event_ts_begin + phase,
                                cpu, std::numeric_limits<int64_t>::max());
     } else {
-      storage->SetIndexedStats(
-          stats::ftrace_cpu_oldest_event_ts_begin + phase, cpu,
-          static_cast<int64_t>(cpu_stats.oldest_event_ts() * 1e9));
+      storage->SetIndexedStats(stats::ftrace_cpu_oldest_event_ts_begin + phase,
+                               cpu, static_cast<int64_t>(oldest_event_ts));
     }
 
     storage->SetIndexedStats(stats::ftrace_cpu_now_ts_begin + phase, cpu,
