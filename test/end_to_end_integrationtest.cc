@@ -643,6 +643,7 @@ TEST_F(PerfettoCmdlineTest, NoSanitizers(StartTracingTrigger)) {
   auto* fake_producer = helper.ConnectFakeProducer();
   EXPECT_TRUE(fake_producer);
   PERFETTO_ELOG("connected producer");
+  PERFETTO_ELOG("%s", getenv("TMPDIR") ? getenv("TMPDIR") : "was null");
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
   setenv("TMPDIR", "/data/misc/perfetto-traces", 1);
 #endif
