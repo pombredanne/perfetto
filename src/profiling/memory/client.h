@@ -27,6 +27,7 @@
 #include "perfetto/base/unix_socket.h"
 #include "src/profiling/memory/sampler.h"
 #include "src/profiling/memory/shared_ring_buffer.h"
+#include "src/profiling/memory/unhooked_allocator.h"
 #include "src/profiling/memory/wire_protocol.h"
 
 namespace perfetto {
@@ -49,9 +50,12 @@ class Client {
   // socket (which should already be connected to heapprofd).
   //
   // Returns a shared_ptr since that is how the client will ultimately be used,
-  // and to take advantage of std::make_shared putting the object & the control
-  // block in one block of memory.
-  static std::shared_ptr<Client> CreateAndHandshake(base::UnixSocketRaw sock);
+  // and to take advantage of std::allocate_shared putting the object & the
+  // control block in one block of memory.
+  static std::shared_ptr<Client> CreateAndHandshake(
+      base::UnixSocketRaw sock,
+      UnhookedAllocator<Client> unhooked_allocator);
+
   static base::Optional<base::UnixSocketRaw> ConnectToHeapprofd(
       const std::string& sock_name);
 
@@ -72,8 +76,8 @@ class Client {
     return sampler_.SampleSize(alloc_size);
   }
 
-  // Public for std::make_shared. Use CreateAndHandshake() to create instances
-  // instead.
+  // Public for std::allocate_shared. Use CreateAndHandshake() to create
+  // instances instead.
   Client(base::UnixSocketRaw sock,
          ClientConfiguration client_config,
          SharedRingBuffer shmem,

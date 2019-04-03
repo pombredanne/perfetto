@@ -572,9 +572,8 @@ class HeapprofdEndToEnd : public ::testing::Test {
     ASSERT_EQ(read(*ack_pipe.rd, buf, sizeof(buf)), 0);
     ack_pipe.rd.reset();
 
-    // TODO(rsavitski): this sleep is to compensate for the heapprofd delaying
-    // in closing the sockets (and therefore the client noticing that the
-    // session is over). Clarify where the delays are coming from.
+    // A brief sleep to allow the client to notice that the profiling session is
+    // to be torn down (as it rejects concurrent sessions).
     usleep(100 * kMsToUs);
 
     PERFETTO_LOG("HeapprofdEndToEnd::Reinit: Starting second");
