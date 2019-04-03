@@ -625,7 +625,7 @@ class HeapprofdEndToEnd : public ::testing::Test {
   // possible.
   void NativeProfilingActiveAtProcessExit() {
     constexpr uint64_t kTestAllocSize = 128;
-    base::Pipe start_pipe = base::Pipe::Create(base::Pipe::kBothNonBlock);
+    base::Pipe start_pipe = base::Pipe::Create(base::Pipe::kBothBlock);
 
     pid_t pid = fork();
     if (pid == 0) {  // child
