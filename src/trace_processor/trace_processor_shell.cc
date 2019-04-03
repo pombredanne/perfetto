@@ -145,39 +145,24 @@ bool PrintStats() {
   auto it = g_tp->ExecuteQuery(
       "SELECT name, idx, source, value from stats "
       "where severity = 'error' and value > 0");
-  if (!it.IsValid()) {
-    PERFETTO_ELOG("Error creating SQL iterator for printing stats");
-    return false;
-  }
 
-  std::vector<std::string> columns = {"name", "idx", "source", "value"};
   bool first = true;
-  for (uint32_t rows = 0;; rows++) {
-    using Iterator = trace_processor::TraceProcessor::Iterator;
-    auto result = it.Next();
-    if (PERFETTO_UNLIKELY(result == Iterator::NextResult::kError)) {
-      PERFETTO_ELOG("Error while iterating stats %s",
-                    it.GetLastError().value().c_str());
-      return false;
-    } else if (result == Iterator::NextResult::kEOF) {
-      break;
-    }
-
+  for (uint32_t rows = 0; it.Next(); rows++) {
     if (first) {
       fprintf(stderr, "Error stats for this trace:\n");
 
-      for (const auto& col : columns)
-        fprintf(stderr, "%40s ", col.c_str());
+      for (uint32_t i = 0; i < it.ColumnCount(); i++)
+        fprintf(stderr, "%40s ", it.GetColumName(i).c_str());
       fprintf(stderr, "\n");
 
-      for (size_t i = 0; i < columns.size(); i++)
+      for (uint32_t i = 0; i < it.ColumnCount(); i++)
         fprintf(stderr, "%40s ", "----------------------------------------");
       fprintf(stderr, "\n");
 
       first = false;
     }
 
-    for (uint32_t c = 0; c < columns.size(); c++) {
+    for (uint32_t c = 0; c < it.ColumnCount(); c++) {
       auto value = it.Get(c);
       switch (value.type) {
         case SqlValue::Type::kNull:
@@ -197,7 +182,12 @@ bool PrintStats() {
     }
     fprintf(stderr, "\n");
   }
-  return true;
+
+  auto opt_error = it.GetLastError();
+  if (PERFETTO_UNLIKELY(opt_error.has_value())) {
+    PERFETTO_ELOG("Error while iterating stats %s", opt_error->c_str());
+  }
+  return opt_error.has_value();
 }
 
 int ExportTraceToDatabase(const std::string& output_name) {
