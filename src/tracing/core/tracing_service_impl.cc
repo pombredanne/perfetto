@@ -875,6 +875,7 @@ void TracingServiceImpl::ActivateTriggers(
   auto* producer = GetProducer(producer_id);
   PERFETTO_DCHECK(producer);
   for (const auto& trigger_name : triggers) {
+    PERFETTO_ELOG("looking at trigger '%s'", trigger_name.c_str());
     for (auto& id_and_tracing_session : tracing_sessions_) {
       auto& tracing_session = id_and_tracing_session.second;
       TracingSessionID tsid = id_and_tracing_session.first;

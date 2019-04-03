@@ -45,6 +45,7 @@ TriggerProducer::TriggerProducer(base::TaskRunner* task_runner,
       [weak_this]() {
         if (!weak_this || weak_this->issued_callback_)
           return;
+        PERFETTO_ELOG("returning false");
         weak_this->issued_callback_ = true;
         weak_this->callback_(false);
       },
@@ -54,13 +55,14 @@ TriggerProducer::TriggerProducer(base::TaskRunner* task_runner,
 TriggerProducer::~TriggerProducer() {}
 
 void TriggerProducer::OnConnect() {
-  PERFETTO_DLOG("Producer connected, sending triggers.");
+  PERFETTO_ELOG("Producer connected, sending triggers.");
   // Send activation signal.
   producer_endpoint_->ActivateTriggers(*triggers_);
   auto weak_this = weak_factory_.GetWeakPtr();
   task_runner_->PostTask([weak_this]() {
     if (!weak_this || weak_this->issued_callback_)
       return;
+    PERFETTO_ELOG("returning true");
     weak_this->issued_callback_ = true;
     weak_this->callback_(true);
   });
