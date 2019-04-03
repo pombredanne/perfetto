@@ -22,13 +22,16 @@
 
 #include <functional>
 #include <iostream>
+#include <vector>
 
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/scoped_file.h"
+#include "perfetto/base/string_splitter.h"
 #include "perfetto/base/time.h"
 #include "perfetto/trace_processor/trace_processor.h"
 
+#include "perfetto/metrics/metrics.pb.h"
 #include "perfetto/trace_processor/raw_query.pb.h"
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) ||   \
@@ -138,6 +141,66 @@ char* GetLine(const char* prompt) {
 
 #endif
 
+bool PrintStats() {
+  auto it = g_tp->ExecuteQuery(
+      "SELECT name, idx, source, value from stats "
+      "where severity = 'error' and value > 0");
+  if (!it.IsValid()) {
+    PERFETTO_ELOG("Error creating SQL iterator for printing stats");
+    return false;
+  }
+
+  std::vector<std::string> columns = {"name", "idx", "source", "value"};
+
+  bool first = true;
+  for (uint32_t rows = 0;; rows++) {
+    using Iterator = trace_processor::TraceProcessor::Iterator;
+    auto result = it.Next();
+    if (PERFETTO_UNLIKELY(result == Iterator::NextResult::kError)) {
+      PERFETTO_ELOG("Error while iterating stats %s",
+                    it.GetLastError().value().c_str());
+      return false;
+    } else if (result == Iterator::NextResult::kEOF) {
+      break;
+    }
+
+    if (first) {
+      fprintf(stderr, "Error stats for this trace:\n");
+
+      for (const auto& col : columns)
+        fprintf(stderr, "%40s ", col.c_str());
+      fprintf(stderr, "\n");
+
+      for (size_t i = 0; i < columns.size(); i++)
+        fprintf(stderr, "%40s ", "----------------------------------------");
+      fprintf(stderr, "\n");
+
+      first = false;
+    }
+
+    for (uint32_t c = 0; c < columns.size(); c++) {
+      auto value = it.Get(c);
+      switch (value.type) {
+        case SqlValue::Type::kNull:
+          fprintf(stderr, "%-40.40s", "[NULL]");
+          break;
+        case SqlValue::Type::kDouble:
+          fprintf(stderr, "%40f", value.double_value);
+          break;
+        case SqlValue::Type::kLong:
+          fprintf(stderr, "%40" PRIi64, value.long_value);
+          break;
+        case SqlValue::Type::kString:
+          fprintf(stderr, "%-40.40s", value.string_value);
+          break;
+      }
+      fprintf(stderr, " ");
+    }
+    fprintf(stderr, "\n");
+  }
+  return true;
+}
+
 int ExportTraceToDatabase(const std::string& output_name) {
   PERFETTO_CHECK(output_name.find("'") == std::string::npos);
   {
@@ -197,6 +260,15 @@ int ExportTraceToDatabase(const std::string& output_name) {
     if (res.has_error())
       PERFETTO_ELOG("SQLite error: %s", res.error().c_str());
   });
+  return 0;
+}
+
+int RunMetrics(const std::vector<std::string>& metric_names) {
+  protos::TraceMetrics metrics_proto;
+  for (const auto& metric : metric_names) {
+    perfetto::base::ignore_result(metric);
+  }
+  perfetto::base::ignore_result(metrics_proto);
   return 0;
 }
 
@@ -417,11 +489,13 @@ void PrintUsage(char** argv) {
       "Interactive trace processor shell.\n"
       "Usage: %s [OPTIONS] trace_file.pb\n\n"
       "Options:\n"
-      " -d        Enable virtual table debugging.\n"
-      " -s FILE   Read and execute contents of file before launching an "
-      "interactive shell.\n"
-      " -q FILE   Read and execute an SQL query from a file.\n"
-      " -e FILE   Export the trace into a SQLite database.\n",
+      " -d                   Enable virtual table debugging.\n"
+      " -s FILE              Read and execute contents of file before "
+      "launching an interactive shell.\n"
+      " -q FILE              Read and execute an SQL query from a file.\n"
+      " -e FILE              Export the trace into a SQLite database.\n"
+      " --run-metrics x,y,z   Runs a comma separated list of metrics and "
+      "prints the result as a TraceMetrics proto to stdout.\n",
       argv[0]);
 }
 
@@ -433,6 +507,7 @@ int TraceProcessorMain(int argc, char** argv) {
   const char* trace_file_path = nullptr;
   const char* query_file_path = nullptr;
   const char* sqlite_file_path = nullptr;
+  const char* metric_names = nullptr;
   bool launch_shell = true;
   for (int i = 1; i < argc; i++) {
     if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--version") == 0) {
@@ -457,6 +532,13 @@ int TraceProcessorMain(int argc, char** argv) {
         return 1;
       }
       sqlite_file_path = argv[i];
+      continue;
+    } else if (strcmp(argv[i], "--run-metrics") == 0) {
+      if (++i == argc) {
+        PrintUsage(argv);
+        return 1;
+      }
+      metric_names = argv[i];
       continue;
     } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
       PrintUsage(argv);
@@ -531,6 +613,21 @@ int TraceProcessorMain(int argc, char** argv) {
 #if PERFETTO_HAS_SIGNAL_H()
   signal(SIGINT, [](int) { g_tp->InterruptQuery(); });
 #endif
+
+  // Print out the stats to stderr for the trace.
+  if (!PrintStats()) {
+    return 1;
+  }
+
+  // First, see if we have some metrics to run. If we do, just run them and
+  // return.
+  if (metric_names) {
+    std::vector<std::string> metrics;
+    for (base::StringSplitter ss(metric_names, ','); ss.Next();) {
+      metrics.emplace_back(ss.cur_token());
+    }
+    return RunMetrics(std::move(metrics));
+  }
 
   // If we were given a query file, load contents
   std::vector<std::string> queries;
