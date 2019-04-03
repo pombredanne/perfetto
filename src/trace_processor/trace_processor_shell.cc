@@ -186,8 +186,9 @@ bool PrintStats() {
   auto opt_error = it.GetLastError();
   if (PERFETTO_UNLIKELY(opt_error.has_value())) {
     PERFETTO_ELOG("Error while iterating stats %s", opt_error->c_str());
+    return false;
   }
-  return opt_error.has_value();
+  return true;
 }
 
 int ExportTraceToDatabase(const std::string& output_name) {
