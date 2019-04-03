@@ -78,8 +78,10 @@ class PerfettoCmdlineTest : public ::testing::Test {
  public:
   void SetUp() override {
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+    setenv("TMPDIR", "/data/misc/perfetto-traces", 1);
 #endif
-    test_helper_.StartServiceIfRequired(); }
+    test_helper_.StartServiceIfRequired();
+  }
 
   void TearDown() override {}
 
@@ -641,11 +643,17 @@ TEST_F(PerfettoCmdlineTest, NoSanitizers(StartTracingTrigger)) {
   auto* fake_producer = helper.ConnectFakeProducer();
   EXPECT_TRUE(fake_producer);
   PERFETTO_ELOG("connected producer");
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+  setenv("TMPDIR", "/data/misc/perfetto-traces", 1);
+#endif
+  PERFETTO_ELOG("%s", getenv("TMPDIR") ? getenv("TMPDIR") : "was null");
   base::TempFile trace_output = base::TempFile::Create();
   const std::string path = trace_output.path();
+  PERFETTO_ELOG("path: %s", path.c_str());
   trace_output.Unlink();
   std::thread background_trace([&path, &trace_config, this]() {
-  PERFETTO_ELOG("starting backgroud trace");
+    PERFETTO_ELOG("starting backgroud trace");
+    PERFETTO_ELOG("path: %s", path.c_str());
     EXPECT_EQ(0, Exec(
                      {
                          "-o", path, "-c", "-",
