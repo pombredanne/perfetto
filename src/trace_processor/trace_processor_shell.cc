@@ -151,7 +151,6 @@ bool PrintStats() {
   }
 
   std::vector<std::string> columns = {"name", "idx", "source", "value"};
-
   bool first = true;
   for (uint32_t rows = 0;; rows++) {
     using Iterator = trace_processor::TraceProcessor::Iterator;
