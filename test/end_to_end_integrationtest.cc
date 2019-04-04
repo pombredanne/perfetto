@@ -124,12 +124,14 @@ class PerfettoCmdlineTest : public ::testing::Test {
       PERFETTO_CHECK(dup2(devnull, STDOUT_FILENO) != -1);
       PERFETTO_CHECK(dup2(*err_pipe.wr, STDERR_FILENO) != -1);
 #if PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
+      PERFETTO_ELOG("starting daemons");
       setenv("PERFETTO_CONSUMER_SOCK_NAME", TestHelper::GetConsumerSocketName(),
              1);
       setenv("PERFETTO_PRODUCER_SOCK_NAME", TestHelper::GetProducerSocketName(),
              1);
       _exit(PerfettoCmdMain(static_cast<int>(argv.size() - 1), argv.data()));
 #else
+      PERFETTO_ELOG("using perfetto system");
       // We have to choose a location that the perfetto binary will have
       // permission to write to. This does not include /data/local/tmp so
       // instead we override TMPDIR to the trace directory.
@@ -825,6 +827,11 @@ TEST_F(PerfettoCmdlineTest, DISABLED_NoDataNoFileWithoutTrigger) {
   auto* fake_producer = helper.ConnectFakeProducer();
   EXPECT_TRUE(fake_producer);
 
+  if (remove("/data/misc/perfetto-traces/.guardraildata")) {
+    PERFETTO_ELOG("deleted state file");
+  } else {
+    PERFETTO_ELOG("failed to delete state file");
+  }
   std::thread background_trace([&trace_config, this]() {
     EXPECT_EQ(0, Exec(
                      {

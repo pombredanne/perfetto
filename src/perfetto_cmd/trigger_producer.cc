@@ -38,6 +38,10 @@ TriggerProducer::TriggerProducer(base::TaskRunner* task_runner,
                                                     "perfetto_cmd_producer",
                                                     task_runner)),
       weak_factory_(this) {
+  PERFETTO_ELOG("attempting to connect to %s", GetProducerSocket());
+  for (const auto& trigger : *triggers) {
+    PERFETTO_ELOG("trigger: %s", trigger.c_str());
+  }
   // Give the socket up to 1 minute to attach and send the triggers before
   // reporting a failure.
   auto weak_this = weak_factory_.GetWeakPtr();
